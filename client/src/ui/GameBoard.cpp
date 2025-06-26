@@ -569,6 +569,9 @@ namespace Blokus {
 
             // 현재 호버 위치에서 미리보기 즉시 업데이트
             showCurrentBlockPreview();
+
+            // 팔레트에도 회전 상태 반영
+            emit blockRotated(m_selectedBlock);
         }
         else if (event->key() == Qt::Key_F) {
             // F키: 블록 뒤집기만 (배치 안함)
@@ -578,6 +581,9 @@ namespace Blokus {
 
             // 현재 호버 위치에서 미리보기 즉시 업데이트
             showCurrentBlockPreview();
+
+            // 팔레트에도 뒤집기 상태 반영
+            emit blockFlipped(m_selectedBlock);
         }
         else if (event->key() == Qt::Key_Delete || event->key() == Qt::Key_Backspace) {
             // Delete/Backspace키: 현재 호버 위치의 블록 제거 (디버깅용)
@@ -681,18 +687,20 @@ namespace Blokus {
             canPlace = isValidBlockPlacement(previewBlock, m_hoveredCell);
         }
 
-        // 배치 불가능해도 미리보기는 표시 (빨간색으로)
-        QColor previewColor = getPlayerBrushColor(previewBlock.getPlayer());
-        QColor borderColor = previewColor.darker();
+        // 미리보기 색상 결정
+        QColor previewColor;
+        QColor borderColor;
 
-        if (!canPlace) {
+        if (canPlace) {
+            // 배치 가능하면 기존 색상에 투명도 적용
+            previewColor = getPlayerBrushColor(previewBlock.getPlayer());
+            previewColor.setAlpha(150); // 반투명
+            borderColor = previewColor.darker(150);
+        }
+        else {
             // 배치 불가능하면 빨간색으로 표시
             previewColor = QColor(255, 100, 100, 150); // 반투명 빨간색
             borderColor = QColor(200, 50, 50, 200);    // 진한 빨간색 테두리
-        }
-        else {
-            // 배치 가능하면 기존 색상에 투명도 적용
-            previewColor.setAlpha(150); // 반투명
         }
 
         // 미리보기 블록 생성

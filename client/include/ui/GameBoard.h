@@ -93,6 +93,8 @@ namespace Blokus {
         void cellHovered(int row, int col);
         void blockPlaced(const BlockPlacement& placement);
         void blockRemoved(const Position& position);
+        void blockRotated(const Block& block);    // 새로 추가
+        void blockFlipped(const Block& block);    // 새로 추가
 
         // 블록 관련 시그널 (새로 추가)
         void blockSelected(const Block& block);

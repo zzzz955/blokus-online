@@ -49,6 +49,12 @@ namespace Blokus {
                 // 다음 턴으로 이동
                 m_gameManager->nextTurn();
                 updateGameUI();
+
+                // 다음 플레이어에게 기본 블록 선택
+                PlayerColor nextPlayer = m_gameManager->getGameLogic().getCurrentPlayer();
+                Block defaultBlock(BlockType::Single, nextPlayer);
+                m_improvedPalette->setSelectedBlock(defaultBlock);
+                m_gameBoard->setSelectedBlock(defaultBlock);
             }
         }
     }
@@ -62,7 +68,15 @@ namespace Blokus {
     void MainWindow::onBlockSelected(const Block& block)
     {
         if (m_gameBoard) {
-            m_gameBoard->setSelectedBlock(block);
+            // 현재 플레이어 색상으로 블록 설정
+            Block playerBlock = block;
+            if (m_gameManager) {
+                playerBlock.setPlayer(m_gameManager->getGameLogic().getCurrentPlayer());
+            }
+
+            m_gameBoard->setSelectedBlock(playerBlock);
+            m_improvedPalette->setSelectedBlock(playerBlock);
+
             QString message = QString::fromUtf8("선택된 블록: %1")
                 .arg(BlockFactory::getBlockName(block.getType()));
             statusBar()->showMessage(message, 2000);
@@ -78,6 +92,11 @@ namespace Blokus {
         // 모든 블록을 사용 가능 상태로 리셋
         resetAllBlockStates();
 
+        // 기본 블록 선택 (파란 플레이어의 첫 블록)
+        Block defaultBlock(BlockType::Single, PlayerColor::Blue);
+        m_improvedPalette->setSelectedBlock(defaultBlock);
+        m_gameBoard->setSelectedBlock(defaultBlock);
+
         updateGameUI();
 
         statusBar()->showMessage(QString::fromUtf8("새 게임이 시작되었습니다! 파란 플레이어부터 시작합니다."), 3000);
@@ -88,6 +107,12 @@ namespace Blokus {
         if (m_gameManager->getGameState() == GameState::Playing) {
             m_gameManager->nextTurn();
             updateGameUI();
+
+            // 다음 플레이어에게 기본 블록 선택
+            PlayerColor currentPlayer = m_gameManager->getGameLogic().getCurrentPlayer();
+            Block defaultBlock(BlockType::Single, currentPlayer);
+            m_improvedPalette->setSelectedBlock(defaultBlock);
+            m_gameBoard->setSelectedBlock(defaultBlock);
         }
     }
 
@@ -193,7 +218,7 @@ namespace Blokus {
     void MainWindow::setupUI()
     {
         setWindowTitle(QString::fromUtf8("블로커스 온라인 - 개선된 4방향 UI"));
-        setMinimumSize(1400, 900); // 더 큰 창 크기
+        setMinimumSize(1600, 1000); // 더 큰 창 크기로 조정
 
         // 중앙 위젯 설정
         QWidget* centralWidget = new QWidget(this);
@@ -213,8 +238,10 @@ namespace Blokus {
         m_gameBoard = new GameBoard(this);
         m_gameBoard->setGameLogic(&m_gameManager->getGameLogic());
 
-        // 서쪽 팔레트 (1,0)
-        mainLayout->addWidget(m_improvedPalette->getWestPalette(), 1, 0);
+        // 서쪽 팔레트 (1,0) - 크기 조정
+        QWidget* westWidget = m_improvedPalette->getWestPalette();
+        westWidget->setMaximumWidth(100);
+        mainLayout->addWidget(westWidget, 1, 0);
 
         // 중앙 영역 (1,1)
         QWidget* centerWidget = new QWidget();
@@ -222,19 +249,27 @@ namespace Blokus {
         centerLayout->setContentsMargins(0, 0, 0, 0);
         centerLayout->setSpacing(3);
 
-        // 북쪽 팔레트
-        centerLayout->addWidget(m_improvedPalette->getNorthPalette());
+        // 북쪽 팔레트 - 높이 제한
+        QWidget* northWidget = m_improvedPalette->getNorthPalette();
+        northWidget->setMaximumHeight(100);
+        centerLayout->addWidget(northWidget);
 
-        // 게임보드
+        // 게임보드 - 정사각형 유지
+        m_gameBoard->setMinimumSize(600, 600);
         centerLayout->addWidget(m_gameBoard, 1);
 
-        // 남쪽 팔레트 (자신의 블록)
-        centerLayout->addWidget(m_improvedPalette->getSouthPalette());
+        // 남쪽 팔레트 (자신의 블록) - 높이 적절히 조정
+        QWidget* southWidget = m_improvedPalette->getSouthPalette();
+        southWidget->setMaximumHeight(150);
+        southWidget->setMinimumHeight(120);
+        centerLayout->addWidget(southWidget);
 
         mainLayout->addWidget(centerWidget, 1, 1);
 
-        // 동쪽 팔레트 (1,2)
-        mainLayout->addWidget(m_improvedPalette->getEastPalette(), 1, 2);
+        // 동쪽 팔레트 (1,2) - 크기 조정
+        QWidget* eastWidget = m_improvedPalette->getEastPalette();
+        eastWidget->setMaximumWidth(100);
+        mainLayout->addWidget(eastWidget, 1, 2);
 
         // 하단 컨트롤 패널 (2,0 - 2,2)
         QWidget* controlPanel = createCompactControlPanel();
@@ -245,9 +280,9 @@ namespace Blokus {
         mainLayout->setRowStretch(1, 1);  // 메인 게임 영역 (확장)
         mainLayout->setRowStretch(2, 0);  // 컨트롤 패널 (고정)
 
-        mainLayout->setColumnStretch(0, 0); // 서쪽 팔레트 (고정)
+        mainLayout->setColumnStretch(0, 0); // 서쪽 팔레트 (고정 100px)
         mainLayout->setColumnStretch(1, 1); // 중앙 게임보드 (확장)
-        mainLayout->setColumnStretch(2, 0); // 동쪽 팔레트 (고정)
+        mainLayout->setColumnStretch(2, 0); // 동쪽 팔레트 (고정 100px)
 
         // 메뉴 바 설정
         setupMenuBar();

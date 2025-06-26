@@ -1,39 +1,41 @@
-#include "ui/ImprovedBlockPalette.h"
+ï»¿#include "ui/ImprovedBlockPalette.h"
 #include <QPainter>
 #include <QMouseEvent>
+#include <QHBoxLayout>
+#include <QVBoxLayout>
+#include <QScrollArea>
 #include <QDebug>
+#include <QGraphicsProxyWidget>
+#include <cmath>
 
 namespace Blokus {
 
     // ========================================
-    // PolyominoWidget ±¸Çö
+    // BlockButton êµ¬í˜„
     // ========================================
 
-    PolyominoWidget::PolyominoWidget(const Block& block, bool isOwned, QWidget* parent)
+    BlockButton::BlockButton(const Block& block, qreal blockSize, QWidget* parent)
         : QWidget(parent)
         , m_block(block)
-        , m_isOwned(isOwned)
+        , m_blockSize(blockSize)
         , m_isSelected(false)
         , m_isUsed(false)
-        , m_cellSize(isOwned ? 12.0 : 8.0)  // ÀÚ½Å: 12px, »ó´ë¹æ: 8px
+        , m_isHovered(false)
+        , m_scene(nullptr)
+        , m_blockItem(nullptr)
     {
-        calculateSize();
-        setToolTip(QString::fromUtf8("%1 (%2Á¡)")
-            .arg(BlockFactory::getBlockName(m_block.getType()))
-            .arg(BlockFactory::getBlockScore(m_block.getType())));
+        setupGraphics();
+
+        // ë§ˆìš°ìŠ¤ ì¶”ì  í™œì„±í™”
+        setMouseTracking(true);
+
+        // íˆ´íŒ ì„¤ì •
+        setToolTip(QString::fromUtf8("%1 (%2ì¹¸)")
+            .arg(BlockFactory::getBlockName(block.getType()))
+            .arg(block.getSize()));
     }
 
-    void PolyominoWidget::calculateSize()
-    {
-        QRect blockRect = m_block.getBoundingRect();
-        int width = blockRect.width() * m_cellSize + 4;  // 2px ¿©¹é
-        int height = blockRect.height() * m_cellSize + 4; // 2px ¿©¹é
-
-        m_widgetSize = QSize(width, height);
-        setFixedSize(m_widgetSize);
-    }
-
-    void PolyominoWidget::setSelected(bool selected)
+    void BlockButton::setSelected(bool selected)
     {
         if (m_isSelected != selected) {
             m_isSelected = selected;
@@ -41,66 +43,93 @@ namespace Blokus {
         }
     }
 
-    void PolyominoWidget::setUsed(bool used)
+    void BlockButton::setUsed(bool used)
     {
         if (m_isUsed != used) {
             m_isUsed = used;
+            QWidget::setEnabled(!used); // QWidgetì˜ setEnabled í˜¸ì¶œ
             update();
         }
     }
 
-    QSize PolyominoWidget::sizeHint() const
+    void BlockButton::setEnabled(bool enabled)
     {
-        return m_widgetSize;
+        QWidget::setEnabled(enabled);
+        update();
     }
 
-    void PolyominoWidget::paintEvent(QPaintEvent* event)
+    void BlockButton::updateBlockState(const Block& newBlock)
+    {
+        m_block = newBlock;
+        setupGraphics();
+        update();
+    }
+
+    void BlockButton::setupGraphics()
+    {
+        // ë¸”ë¡ì˜ ë°”ìš´ë”© ë°•ìŠ¤ ê³„ì‚°
+        QRect boundingRect = m_block.getBoundingRect();
+        int width = boundingRect.width() * m_blockSize + 10; // ì—¬ë°± ì¶”ê°€
+        int height = boundingRect.height() * m_blockSize + 10;
+
+        setFixedSize(width, height);
+    }
+
+    QColor BlockButton::getPlayerColor() const
+    {
+        static const std::map<PlayerColor, QColor> colors = {
+            { PlayerColor::Blue, QColor(52, 152, 219) },
+            { PlayerColor::Yellow, QColor(241, 196, 15) },
+            { PlayerColor::Red, QColor(231, 76, 60) },
+            { PlayerColor::Green, QColor(46, 204, 113) },
+            { PlayerColor::None, QColor(200, 200, 200) }
+        };
+
+        auto it = colors.find(m_block.getPlayer());
+        return (it != colors.end()) ? it->second : colors.at(PlayerColor::None);
+    }
+
+    void BlockButton::paintEvent(QPaintEvent* event)
     {
         Q_UNUSED(event)
 
             QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing);
 
-        // ¹è°æ ±×¸®±â
-        if (m_isSelected && !m_isUsed) {
-            painter.fillRect(rect(), QColor(52, 152, 219, 50)); // ÆÄ¶õ ¼±ÅÃ ¹è°æ
-            painter.setPen(QPen(QColor(52, 152, 219), 2));
-            painter.drawRect(rect().adjusted(1, 1, -1, -1));
+        QColor baseColor = getPlayerColor();
+
+        // ì‚¬ìš©ëœ ë¸”ë¡ì€ íšŒìƒ‰ìœ¼ë¡œ í‘œì‹œ
+        if (m_isUsed) {
+            baseColor = QColor(150, 150, 150);
         }
 
-        // Æú¸®¿À¹Ì³ë ±×¸®±â
-        PositionList shape = m_block.getCurrentShape();
-
-        QColor blockColor;
-        if (m_isUsed) {
-            blockColor = QColor(150, 150, 150, 100); // È¸»ö (»ç¿ëµÊ)
+        // ì„ íƒëœ ë¸”ë¡ì€ í•˜ì´ë¼ì´íŠ¸
+        if (m_isSelected) {
+            painter.setPen(QPen(QColor(255, 215, 0), 3)); // ê¸ˆìƒ‰ í…Œë‘ë¦¬
+        }
+        else if (m_isHovered && !m_isUsed) {
+            painter.setPen(QPen(baseColor.lighter(130), 2));
         }
         else {
-            // ÇÃ·¹ÀÌ¾î »ö»ó
-            switch (m_block.getPlayer()) {
-            case PlayerColor::Blue: blockColor = QColor(52, 152, 219); break;
-            case PlayerColor::Yellow: blockColor = QColor(241, 196, 15); break;
-            case PlayerColor::Red: blockColor = QColor(231, 76, 60); break;
-            case PlayerColor::Green: blockColor = QColor(46, 204, 113); break;
-            default: blockColor = QColor(200, 200, 200); break;
-            }
+            painter.setPen(QPen(baseColor.darker(120), 1));
         }
 
-        painter.setBrush(QBrush(blockColor));
-        painter.setPen(QPen(blockColor.darker(150), 1));
+        // í˜¸ë²„ íš¨ê³¼
+        if (m_isHovered && !m_isUsed) {
+            baseColor = baseColor.lighter(110);
+        }
 
-        // °¢ ¼¿ ±×¸®±â
+        painter.setBrush(QBrush(baseColor));
+
+        // ë¸”ë¡ ëª¨ì–‘ ê·¸ë¦¬ê¸°
+        PositionList shape = m_block.getCurrentShape();
         for (const auto& pos : shape) {
-            QRect cellRect(
-                2 + pos.second * m_cellSize,
-                2 + pos.first * m_cellSize,
-                m_cellSize,
-                m_cellSize
-            );
-            painter.drawRect(cellRect);
+            int x = pos.second * m_blockSize + 5;
+            int y = pos.first * m_blockSize + 5;
+            painter.drawRect(x, y, m_blockSize, m_blockSize);
         }
 
-        // »ç¿ëµÈ ºí·Ï¿¡ X Ç¥½Ã
+        // ì‚¬ìš©ëœ ë¸”ë¡ì—ëŠ” X í‘œì‹œ
         if (m_isUsed) {
             painter.setPen(QPen(Qt::red, 2));
             painter.drawLine(2, 2, width() - 2, height() - 2);
@@ -108,7 +137,7 @@ namespace Blokus {
         }
     }
 
-    void PolyominoWidget::mousePressEvent(QMouseEvent* event)
+    void BlockButton::mousePressEvent(QMouseEvent* event)
     {
         if (event->button() == Qt::LeftButton && !m_isUsed) {
             emit blockClicked(m_block);
@@ -116,275 +145,387 @@ namespace Blokus {
         QWidget::mousePressEvent(event);
     }
 
+    void BlockButton::enterEvent(QEvent* event)
+    {
+        m_isHovered = true;
+        update();
+        QWidget::enterEvent(event);
+    }
+
+    void BlockButton::leaveEvent(QEvent* event)
+    {
+        m_isHovered = false;
+        update();
+        QWidget::leaveEvent(event);
+    }
+
     // ========================================
-    // CompactPlayerPalette ±¸Çö
+    // DirectionPalette êµ¬í˜„
     // ========================================
 
-    CompactPlayerPalette::CompactPlayerPalette(PlayerColor player, bool isOwned,
-        Qt::Orientation orientation, QWidget* parent)
+    DirectionPalette::DirectionPalette(Direction direction, QWidget* parent)
         : QWidget(parent)
-        , m_player(player)
-        , m_isOwned(isOwned)
-        , m_orientation(orientation)
+        , m_direction(direction)
+        , m_player(PlayerColor::None)
+        , m_scrollArea(nullptr)
+        , m_blockContainer(nullptr)
+        , m_blockLayout(nullptr)
         , m_selectedBlockType(BlockType::Single)
     {
-        setupUI();
-        createBlockWidgets();
+        setupLayout();
+
+        // ìŠ¤íƒ€ì¼ì‹œíŠ¸ ì„¤ì •
+        QString directionName = getDirectionName();
+        setObjectName(QString("DirectionPalette_%1").arg(directionName));
+
+        if (direction == Direction::South) {
+            setStyleSheet("QWidget#DirectionPalette_South { background-color: #f8f9fa; border: 2px solid #3498db; border-radius: 8px; }");
+        }
+        else {
+            setStyleSheet("QWidget#" + objectName() + " { background-color: #ecf0f1; border: 1px solid #bdc3c7; border-radius: 5px; }");
+        }
     }
 
-    void CompactPlayerPalette::setupUI()
+    void DirectionPalette::setPlayer(PlayerColor player)
+    {
+        if (m_player != player) {
+            m_player = player;
+
+            // í•´ë‹¹ í”Œë ˆì´ì–´ì˜ ë¸”ë¡ë“¤ë¡œ ì—…ë°ì´íŠ¸
+            m_blocks.clear();
+            auto allTypes = BlockFactory::getAllBlockTypes();
+            for (BlockType type : allTypes) {
+                m_blocks.emplace_back(type, player);
+            }
+
+            updateBlockButtons();
+        }
+    }
+
+    void DirectionPalette::setBlocks(const std::vector<Block>& blocks)
+    {
+        m_blocks = blocks;
+        updateBlockButtons();
+    }
+
+    void DirectionPalette::setBlockUsed(BlockType blockType, bool used)
+    {
+        if (used) {
+            m_usedBlocks.insert(blockType);
+        }
+        else {
+            m_usedBlocks.erase(blockType);
+        }
+
+        // í•´ë‹¹ ë¸”ë¡ ë²„íŠ¼ ì—…ë°ì´íŠ¸
+        auto it = m_blockButtons.find(blockType);
+        if (it != m_blockButtons.end()) {
+            it->second->setUsed(used);
+        }
+    }
+
+    void DirectionPalette::resetAllBlocks()
+    {
+        m_usedBlocks.clear();
+        for (auto& pair : m_blockButtons) {
+            pair.second->setUsed(false);
+        }
+    }
+
+    void DirectionPalette::highlightBlock(BlockType blockType, bool highlight)
+    {
+        auto it = m_blockButtons.find(blockType);
+        if (it != m_blockButtons.end()) {
+            it->second->setSelected(highlight);
+            m_selectedBlockType = highlight ? blockType : BlockType::Single;
+        }
+    }
+
+    void DirectionPalette::setupLayout()
     {
         QVBoxLayout* mainLayout = new QVBoxLayout(this);
-        mainLayout->setContentsMargins(2, 2, 2, 2);
+        mainLayout->setContentsMargins(3, 3, 3, 3);
         mainLayout->setSpacing(2);
 
-        // ÇÃ·¹ÀÌ¾î ¶óº§ (ÀÚ½ÅÀÇ ºí·Ï¸¸ Ç¥½Ã)
-        if (m_isOwned) {
-            m_playerLabel = new QLabel(QString::fromUtf8("³» ºí·Ï (%1)")
-                .arg(Utils::playerColorToString(m_player)));
-            m_playerLabel->setAlignment(Qt::AlignCenter);
-            m_playerLabel->setStyleSheet(QString("font-weight: bold; color: %1; padding: 3px;")
-                .arg(getPlayerColorName(m_player)));
-            mainLayout->addWidget(m_playerLabel);
-        }
-        else {
-            m_playerLabel = nullptr;
+        // ë°©í–¥ ë¼ë²¨ (ë‚¨ìª½ì€ ë” í° ê¸€ì)
+        QString labelText;
+        switch (m_direction) {
+        case Direction::North: labelText = QString::fromUtf8("ìƒëŒ€ë°©"); break;
+        case Direction::South: labelText = QString::fromUtf8("ë‚˜ì˜ ë¸”ë¡"); break;
+        case Direction::East: labelText = QString::fromUtf8("ìƒëŒ€ë°©"); break;
+        case Direction::West: labelText = QString::fromUtf8("ìƒëŒ€ë°©"); break;
         }
 
-        // ½ºÅ©·Ñ ¿µ¿ª
+        QLabel* directionLabel = new QLabel(labelText);
+        if (m_direction == Direction::South) {
+            directionLabel->setStyleSheet("font-weight: bold; font-size: 14px; color: #2c3e50; padding: 5px;");
+            directionLabel->setAlignment(Qt::AlignCenter);
+        }
+        else {
+            directionLabel->setStyleSheet("font-size: 10px; color: #7f8c8d; padding: 2px;");
+            directionLabel->setAlignment(Qt::AlignCenter);
+        }
+        mainLayout->addWidget(directionLabel);
+
+        // ìŠ¤í¬ë¡¤ ì˜ì—­
         m_scrollArea = new QScrollArea();
-        m_scrollArea->setHorizontalScrollBarPolicy(
-            m_orientation == Qt::Horizontal ? Qt::ScrollBarAsNeeded : Qt::ScrollBarAlwaysOff);
-        m_scrollArea->setVerticalScrollBarPolicy(
-            m_orientation == Qt::Vertical ? Qt::ScrollBarAsNeeded : Qt::ScrollBarAlwaysOff);
-        m_scrollArea->setFrameStyle(QFrame::NoFrame);
+        m_scrollArea->setWidgetResizable(true);
+        m_scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+        m_scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
 
-        // ÄÁÅ×ÀÌ³Ê
-        m_container = new QWidget();
+        // ë¸”ë¡ ì»¨í…Œì´ë„ˆ
+        m_blockContainer = new QWidget();
+        m_blockLayout = new QGridLayout(m_blockContainer);
+        m_blockLayout->setContentsMargins(2, 2, 2, 2);
+        m_blockLayout->setSpacing(2);
 
-        if (m_orientation == Qt::Horizontal) {
-            m_layout = new QHBoxLayout(m_container);
-            m_scrollArea->setFixedHeight(m_isOwned ? 80 : 50);
+        m_scrollArea->setWidget(m_blockContainer);
+        mainLayout->addWidget(m_scrollArea);
+
+        // í¬ê¸° ì œì•½ ì„¤ì •
+        if (m_direction == Direction::South) {
+            setMinimumHeight(120);
+            setMaximumHeight(180);
         }
         else {
-            m_layout = new QVBoxLayout(m_container);
-            m_scrollArea->setFixedWidth(m_isOwned ? 80 : 50);
-        }
-
-        m_layout->setContentsMargins(2, 2, 2, 2);
-        m_layout->setSpacing(2);
-
-        m_scrollArea->setWidget(m_container);
-        m_scrollArea->setWidgetResizable(true);
-        mainLayout->addWidget(m_scrollArea);
-    }
-
-    void CompactPlayerPalette::createBlockWidgets()
-    {
-        auto allBlockTypes = BlockFactory::getAllBlockTypes();
-
-        for (BlockType blockType : allBlockTypes) {
-            Block block(blockType, m_player);
-            PolyominoWidget* widget = new PolyominoWidget(block, m_isOwned, this);
-
-            connect(widget, &PolyominoWidget::blockClicked,
-                this, &CompactPlayerPalette::onBlockClicked);
-
-            m_layout->addWidget(widget);
-            m_blockWidgets[blockType] = widget;
-        }
-
-        // Ã¹ ¹øÂ° ºí·ÏÀ» ±âº» ¼±ÅÃ (ÀÚ½ÅÀÇ ºí·Ï¸¸)
-        if (m_isOwned && !m_blockWidgets.empty()) {
-            m_blockWidgets[BlockType::Single]->setSelected(true);
+            setMinimumWidth(80);
+            setMaximumWidth(120);
+            setMinimumHeight(300);
         }
     }
 
-    void CompactPlayerPalette::setSelectedBlock(BlockType blockType)
+    void DirectionPalette::updateBlockButtons()
     {
-        // ±âÁ¸ ¼±ÅÃ ÇØÁ¦
-        if (m_blockWidgets.find(m_selectedBlockType) != m_blockWidgets.end()) {
-            m_blockWidgets[m_selectedBlockType]->setSelected(false);
+        // ê¸°ì¡´ ë²„íŠ¼ë“¤ ì œê±°
+        for (auto& pair : m_blockButtons) {
+            delete pair.second;
+        }
+        m_blockButtons.clear();
+
+        // ë ˆì´ì•„ì›ƒ í´ë¦¬ì–´
+        QLayoutItem* item;
+        while ((item = m_blockLayout->takeAt(0)) != nullptr) {
+            delete item;
         }
 
-        // »õ·Î¿î ºí·Ï ¼±ÅÃ
-        m_selectedBlockType = blockType;
-        if (m_blockWidgets.find(blockType) != m_blockWidgets.end()) {
-            m_blockWidgets[blockType]->setSelected(true);
-        }
-    }
+        qreal blockSize = getBlockSize();
+        int maxPerRow = getMaxBlocksPerRow();
+        int row = 0, col = 0;
 
-    void CompactPlayerPalette::setBlockUsed(BlockType blockType, bool used)
-    {
-        if (m_blockWidgets.find(blockType) != m_blockWidgets.end()) {
-            m_blockWidgets[blockType]->setUsed(used);
+        for (const Block& block : m_blocks) {
+            BlockButton* button = new BlockButton(block, blockSize);
 
-            // »ç¿ëµÈ ºí·ÏÀÌ ÇöÀç ¼±ÅÃµÈ ºí·ÏÀÌ¸é ´Ù¸¥ ºí·ÏÀ¸·Î º¯°æ
-            if (used && blockType == m_selectedBlockType && m_isOwned) {
-                auto availableBlocks = BlockFactory::getAllBlockTypes();
-                for (BlockType availableType : availableBlocks) {
-                    if (!m_blockWidgets[availableType]->isUsed()) {
-                        setSelectedBlock(availableType);
-                        break;
-                    }
-                }
+            // ì‚¬ìš© ìƒíƒœ ì„¤ì •
+            bool isUsed = m_usedBlocks.find(block.getType()) != m_usedBlocks.end();
+            button->setUsed(isUsed);
+
+            // ì‹œê·¸ë„ ì—°ê²°
+            connect(button, &BlockButton::blockClicked, this, &DirectionPalette::onBlockButtonClicked);
+
+            m_blockLayout->addWidget(button, row, col);
+            m_blockButtons[block.getType()] = button;
+
+            col++;
+            if (col >= maxPerRow) {
+                col = 0;
+                row++;
             }
         }
     }
 
-    void CompactPlayerPalette::resetAllBlocks()
+    qreal DirectionPalette::getBlockSize() const
     {
-        for (auto& pair : m_blockWidgets) {
-            pair.second->setUsed(false);
-        }
-
-        // Ã¹ ¹øÂ° ºí·ÏÀ» ´Ù½Ã ¼±ÅÃ (ÀÚ½ÅÀÇ ºí·Ï¸¸)
-        if (m_isOwned) {
-            setSelectedBlock(BlockType::Single);
+        switch (m_direction) {
+        case Direction::South: return 25.0; // ìì‹ ì˜ ë¸”ë¡ì€ í¬ê²Œ
+        default: return 15.0;               // ìƒëŒ€ë°© ë¸”ë¡ì€ ì‘ê²Œ
         }
     }
 
-    Block CompactPlayerPalette::getSelectedBlock() const
+    int DirectionPalette::getMaxBlocksPerRow() const
     {
-        return Block(m_selectedBlockType, m_player);
+        switch (m_direction) {
+        case Direction::South: return 7;    // ë‚¨ìª½ì€ ê°€ë¡œë¡œ ë„“ê²Œ
+        case Direction::North: return 6;    // ë¶ìª½ë„ ê°€ë¡œë¡œ
+        case Direction::East:
+        case Direction::West: return 2;     // ë™ì„œìª½ì€ ì„¸ë¡œë¡œ ì¢ê²Œ
+        }
+        return 4;
     }
 
-    void CompactPlayerPalette::onBlockClicked(const Block& block)
+    QString DirectionPalette::getDirectionName() const
     {
-        if (m_isOwned && !m_blockWidgets[block.getType()]->isUsed()) {
-            setSelectedBlock(block.getType());
-            emit blockSelected(block);
+        switch (m_direction) {
+        case Direction::North: return "North";
+        case Direction::South: return "South";
+        case Direction::East: return "East";
+        case Direction::West: return "West";
         }
+        return "Unknown";
     }
 
-    QString CompactPlayerPalette::getPlayerColorName(PlayerColor player) const
+    void DirectionPalette::onBlockButtonClicked(const Block& block)
     {
-        switch (player) {
-        case PlayerColor::Blue: return "#3498db";
-        case PlayerColor::Yellow: return "#f1c40f";
-        case PlayerColor::Red: return "#e74c3c";
-        case PlayerColor::Green: return "#2ecc71";
-        default: return "#7f8c8d";
+        // ì‚¬ìš©ëœ ë¸”ë¡ì€ ì„ íƒ ë¶ˆê°€
+        if (m_usedBlocks.find(block.getType()) != m_usedBlocks.end()) {
+            return;
         }
+
+        // ì´ì „ ì„ íƒ í•´ì œ
+        if (m_selectedBlockType != BlockType::Single) {
+            auto prevIt = m_blockButtons.find(m_selectedBlockType);
+            if (prevIt != m_blockButtons.end()) {
+                prevIt->second->setSelected(false);
+            }
+        }
+
+        // ìƒˆ ì„ íƒ ì„¤ì •
+        m_selectedBlockType = block.getType();
+        auto it = m_blockButtons.find(m_selectedBlockType);
+        if (it != m_blockButtons.end()) {
+            it->second->setSelected(true);
+        }
+
+        emit blockSelected(block);
     }
 
     // ========================================
-    // ImprovedGamePalette ±¸Çö
+    // ImprovedGamePalette êµ¬í˜„
     // ========================================
 
     ImprovedGamePalette::ImprovedGamePalette(QWidget* parent)
         : QWidget(parent)
         , m_currentPlayer(PlayerColor::Blue)
+        , m_selectedBlock(BlockType::Single, PlayerColor::Blue)
     {
-        setupUI();
-        createPlayerPalettes();
-        updateCurrentPlayerHighlight();
-    }
-
-    void ImprovedGamePalette::setupUI()
-    {
-        // ÀüÃ¼ ·¹ÀÌ¾Æ¿ôÀº MainWindow¿¡¼­ °ü¸®
-        // ÀÌ À§Á¬Àº °¢ ¹æÇâº° ÆÈ·¹Æ®¸¸ Æ÷ÇÔ
-    }
-
-    void ImprovedGamePalette::createPlayerPalettes()
-    {
-        // ³²ÂÊ: ÀÚ½ÅÀÇ ºí·Ï (ÆÄ¶õ»ö, Å©°Ô)
-        m_southPalette = new CompactPlayerPalette(PlayerColor::Blue, true, Qt::Horizontal, this);
-
-        // µ¿ÂÊ: »ó´ë¹æ ºí·Ï (³ë¶õ»ö, ÀÛ°Ô)
-        m_eastPalette = new CompactPlayerPalette(PlayerColor::Yellow, false, Qt::Vertical, this);
-
-        // ºÏÂÊ: »ó´ë¹æ ºí·Ï (»¡°£»ö, ÀÛ°Ô)
-        m_northPalette = new CompactPlayerPalette(PlayerColor::Red, false, Qt::Horizontal, this);
-
-        // ¼­ÂÊ: »ó´ë¹æ ºí·Ï (ÃÊ·Ï»ö, ÀÛ°Ô)
-        m_westPalette = new CompactPlayerPalette(PlayerColor::Green, false, Qt::Vertical, this);
-
-        // ¸Ê¿¡ ÀúÀå
-        m_playerPalettes[PlayerColor::Blue] = m_southPalette;
-        m_playerPalettes[PlayerColor::Yellow] = m_eastPalette;
-        m_playerPalettes[PlayerColor::Red] = m_northPalette;
-        m_playerPalettes[PlayerColor::Green] = m_westPalette;
-
-        // ÀÚ½ÅÀÇ ºí·Ï ¼±ÅÃ ½Ã±×³Î ¿¬°á
-        connect(m_southPalette, &CompactPlayerPalette::blockSelected,
-            this, &ImprovedGamePalette::onPlayerBlockSelected);
+        setupPalettes();
+        updatePlayerAssignments();
     }
 
     void ImprovedGamePalette::setCurrentPlayer(PlayerColor player)
     {
-        m_currentPlayer = player;
-        updateCurrentPlayerHighlight();
-    }
-
-    void ImprovedGamePalette::updateCurrentPlayerHighlight()
-    {
-        for (auto& pair : m_playerPalettes) {
-            PlayerColor player = pair.first;
-            CompactPlayerPalette* palette = pair.second;
-
-            if (player == m_currentPlayer) {
-                palette->setStyleSheet("QWidget { border: 2px solid #e74c3c; }");
-            }
-            else {
-                palette->setStyleSheet("QWidget { border: 1px solid #bdc3c7; }");
-            }
+        if (m_currentPlayer != player) {
+            m_currentPlayer = player;
+            m_selectedBlock.setPlayer(player);
+            updatePlayerAssignments();
         }
-    }
-
-    Block ImprovedGamePalette::getSelectedBlock() const
-    {
-        auto it = m_playerPalettes.find(m_currentPlayer);
-        if (it != m_playerPalettes.end()) {
-            return it->second->getSelectedBlock();
-        }
-
-        return Block(BlockType::Single, m_currentPlayer);
     }
 
     void ImprovedGamePalette::setBlockUsed(PlayerColor player, BlockType blockType)
     {
-        auto it = m_playerPalettes.find(player);
-        if (it != m_playerPalettes.end()) {
-            it->second->setBlockUsed(blockType, true);
+        m_usedBlocks[player].insert(blockType);
+
+        // í•´ë‹¹ í”Œë ˆì´ì–´ì˜ íŒ”ë ˆíŠ¸ì—ì„œ ë¸”ë¡ ì‚¬ìš© í‘œì‹œ
+        DirectionPalette* palette = nullptr;
+        if (player == m_currentPlayer) {
+            palette = m_southPalette;
+        }
+        else {
+            // ë‹¤ë¥¸ í”Œë ˆì´ì–´ì˜ íŒ”ë ˆíŠ¸ ì°¾ê¸°
+            if (m_northPalette->getPlayer() == player) palette = m_northPalette;
+            else if (m_eastPalette->getPlayer() == player) palette = m_eastPalette;
+            else if (m_westPalette->getPlayer() == player) palette = m_westPalette;
+        }
+
+        if (palette) {
+            palette->setBlockUsed(blockType, true);
         }
     }
 
     void ImprovedGamePalette::resetAllPlayerBlocks()
     {
-        for (auto& pair : m_playerPalettes) {
-            pair.second->resetAllBlocks();
+        m_usedBlocks.clear();
+
+        m_northPalette->resetAllBlocks();
+        m_southPalette->resetAllBlocks();
+        m_eastPalette->resetAllBlocks();
+        m_westPalette->resetAllBlocks();
+    }
+
+    void ImprovedGamePalette::setSelectedBlock(const Block& block)
+    {
+        m_selectedBlock = block;
+
+        // ìì‹ ì˜ íŒ”ë ˆíŠ¸ì—ì„œë§Œ ì„ íƒ ìƒíƒœ ì—…ë°ì´íŠ¸
+        if (block.getPlayer() == m_currentPlayer) {
+            m_southPalette->highlightBlock(block.getType(), true);
         }
     }
 
-    void ImprovedGamePalette::onPlayerBlockSelected(const Block& block)
+    void ImprovedGamePalette::setupPalettes()
     {
-        // ÇöÀç ÇÃ·¹ÀÌ¾îÀÇ ºí·Ï¸¸ ¼±ÅÃ °¡´É
+        // 4ë°©í–¥ íŒ”ë ˆíŠ¸ ìƒì„±
+        m_northPalette = new DirectionPalette(DirectionPalette::Direction::North, this);
+        m_southPalette = new DirectionPalette(DirectionPalette::Direction::South, this);
+        m_eastPalette = new DirectionPalette(DirectionPalette::Direction::East, this);
+        m_westPalette = new DirectionPalette(DirectionPalette::Direction::West, this);
+
+        // ì‹œê·¸ë„ ì—°ê²°
+        connect(m_northPalette, &DirectionPalette::blockSelected, this, &ImprovedGamePalette::onDirectionBlockSelected);
+        connect(m_southPalette, &DirectionPalette::blockSelected, this, &ImprovedGamePalette::onDirectionBlockSelected);
+        connect(m_eastPalette, &DirectionPalette::blockSelected, this, &ImprovedGamePalette::onDirectionBlockSelected);
+        connect(m_westPalette, &DirectionPalette::blockSelected, this, &ImprovedGamePalette::onDirectionBlockSelected);
+    }
+
+    void ImprovedGamePalette::updatePlayerAssignments()
+    {
+        // í˜„ì¬ í”Œë ˆì´ì–´ëŠ” í•­ìƒ ë‚¨ìª½(í•˜ë‹¨)ì— ë°°ì¹˜
+        m_southPalette->setPlayer(m_currentPlayer);
+
+        // ë‚˜ë¨¸ì§€ í”Œë ˆì´ì–´ë“¤ì„ ë‹¤ë¥¸ ë°©í–¥ì— ë°°ì¹˜
+        std::vector<PlayerColor> otherPlayers;
+        std::vector<PlayerColor> allPlayers = {
+            PlayerColor::Blue, PlayerColor::Yellow,
+            PlayerColor::Red, PlayerColor::Green
+        };
+
+        for (PlayerColor player : allPlayers) {
+            if (player != m_currentPlayer) {
+                otherPlayers.push_back(player);
+            }
+        }
+
+        // 3ëª…ì˜ ìƒëŒ€ë°©ì„ ë¶, ë™, ì„œì— ë°°ì¹˜
+        if (otherPlayers.size() >= 1) m_northPalette->setPlayer(otherPlayers[0]);
+        if (otherPlayers.size() >= 2) m_eastPalette->setPlayer(otherPlayers[1]);
+        if (otherPlayers.size() >= 3) m_westPalette->setPlayer(otherPlayers[2]);
+
+        updateBlockAvailability();
+    }
+
+    void ImprovedGamePalette::updateBlockAvailability()
+    {
+        // ê° íŒ”ë ˆíŠ¸ì˜ ì‚¬ìš©ëœ ë¸”ë¡ ìƒíƒœ ì—…ë°ì´íŠ¸
+        for (const auto& playerBlocks : m_usedBlocks) {
+            PlayerColor player = playerBlocks.first;
+            const auto& usedBlocks = playerBlocks.second;
+
+            DirectionPalette* palette = nullptr;
+            if (player == m_currentPlayer) {
+                palette = m_southPalette;
+            }
+            else {
+                if (m_northPalette->getPlayer() == player) palette = m_northPalette;
+                else if (m_eastPalette->getPlayer() == player) palette = m_eastPalette;
+                else if (m_westPalette->getPlayer() == player) palette = m_westPalette;
+            }
+
+            if (palette) {
+                for (BlockType blockType : usedBlocks) {
+                    palette->setBlockUsed(blockType, true);
+                }
+            }
+        }
+    }
+
+    void ImprovedGamePalette::onDirectionBlockSelected(const Block& block)
+    {
+        // ìì‹ ì˜ ë¸”ë¡ë§Œ ì„ íƒ ê°€ëŠ¥ (ë‚¨ìª½ íŒ”ë ˆíŠ¸ì—ì„œë§Œ)
         if (block.getPlayer() == m_currentPlayer) {
+            m_selectedBlock = block;
             emit blockSelected(block);
         }
     }
 
-    // °¢ ¹æÇâ ÆÈ·¹Æ® Á¢±ÙÀÚµé ±¸Çö
-    CompactPlayerPalette* ImprovedGamePalette::getSouthPalette() const
-    {
-        return m_southPalette;
-    }
-
-    CompactPlayerPalette* ImprovedGamePalette::getEastPalette() const
-    {
-        return m_eastPalette;
-    }
-
-    CompactPlayerPalette* ImprovedGamePalette::getNorthPalette() const
-    {
-        return m_northPalette;
-    }
-
-    CompactPlayerPalette* ImprovedGamePalette::getWestPalette() const
-    {
-        return m_westPalette;
-    }
-
 } // namespace Blokus
+
+#include "ui/ImprovedBlockPalette.moc"

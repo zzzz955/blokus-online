@@ -1,35 +1,39 @@
 #pragma once
 
 #include <QWidget>
-#include <QHBoxLayout>
-#include <QVBoxLayout>
 #include <QScrollArea>
+#include <QGridLayout>
 #include <QLabel>
-#include <QFrame>
-#include <vector>
+#include <QPushButton>
+#include <QGraphicsView>
+#include <QGraphicsScene>
+#include <QGraphicsItem>
+#include <QPropertyAnimation>
+#include <QGraphicsOpacityEffect>
 #include <map>
+#include <set>
 
 #include "common/Types.h"
 #include "game/Block.h"
 
 namespace Blokus {
 
-    /**
-     * @brief 개별 폴리오미노를 표시하는 간단한 위젯
-     */
-    class PolyominoWidget : public QWidget
+    // 블록 버튼 클래스 - 클릭 가능한 블록 표시
+    class BlockButton : public QWidget
     {
         Q_OBJECT
 
     public:
-        explicit PolyominoWidget(const Block& block, bool isOwned = true, QWidget* parent = nullptr);
-
-        const Block& getBlock() const { return m_block; }
-        bool isSelected() const { return m_isSelected; }
-        bool isUsed() const { return m_isUsed; }
+        explicit BlockButton(const Block& block, qreal blockSize = 20.0, QWidget* parent = nullptr);
 
         void setSelected(bool selected);
         void setUsed(bool used);
+        void setEnabled(bool enabled);
+
+        Block getBlock() const { return m_block; }
+        BlockType getBlockType() const { return m_block.getType(); }
+
+        void updateBlockState(const Block& newBlock);
 
     signals:
         void blockClicked(const Block& block);
@@ -37,65 +41,71 @@ namespace Blokus {
     protected:
         void paintEvent(QPaintEvent* event) override;
         void mousePressEvent(QMouseEvent* event) override;
-        QSize sizeHint() const override;
+        void enterEvent(QEvent* event) override;
+        void leaveEvent(QEvent* event) override;
 
     private:
-        void calculateSize();
+        void setupGraphics();
+        QColor getPlayerColor() const;
 
         Block m_block;
-        bool m_isOwned;
+        qreal m_blockSize;
         bool m_isSelected;
         bool m_isUsed;
-
-        qreal m_cellSize;
-        QSize m_widgetSize;
+        bool m_isHovered;
+        QGraphicsScene* m_scene;
+        BlockGraphicsItem* m_blockItem;
     };
 
-    /**
-     * @brief 플레이어별 간소화된 블록 팔레트
-     */
-    class CompactPlayerPalette : public QWidget
+    // 방향별 팔레트 패널 클래스
+    class DirectionPalette : public QWidget
     {
         Q_OBJECT
 
     public:
-        explicit CompactPlayerPalette(PlayerColor player, bool isOwned = true,
-            Qt::Orientation orientation = Qt::Horizontal,
-            QWidget* parent = nullptr);
+        enum class Direction {
+            North,  // 상단 (작은 크기)
+            South,  // 하단 (큰 크기, 자신의 블록)
+            East,   // 우측 (작은 크기)
+            West    // 좌측 (작은 크기)
+        };
 
+        explicit DirectionPalette(Direction direction, QWidget* parent = nullptr);
+
+        void setPlayer(PlayerColor player);
+        void setBlocks(const std::vector<Block>& blocks);
+        void setBlockUsed(BlockType blockType, bool used);
+        void resetAllBlocks();
+        void highlightBlock(BlockType blockType, bool highlight);
+
+        Direction getDirection() const { return m_direction; }
         PlayerColor getPlayer() const { return m_player; }
-        void setSelectedBlock(BlockType blockType);
-        void setBlockUsed(BlockType blockType, bool used = true);
-        void resetAllBlocks(); // 모든 블록을 사용 가능 상태로 리셋
-        Block getSelectedBlock() const;
 
     signals:
         void blockSelected(const Block& block);
 
     private slots:
-        void onBlockClicked(const Block& block);
+        void onBlockButtonClicked(const Block& block);
 
     private:
-        void setupUI();
-        void createBlockWidgets();
-        QString getPlayerColorName(PlayerColor player) const; // 누락된 함수 추가
+        void setupLayout();
+        void updateBlockButtons();
+        qreal getBlockSize() const;
+        int getMaxBlocksPerRow() const;
+        QString getDirectionName() const;
 
+        Direction m_direction;
         PlayerColor m_player;
-        bool m_isOwned;
-        Qt::Orientation m_orientation;
-        BlockType m_selectedBlockType;
-
         QScrollArea* m_scrollArea;
-        QWidget* m_container;
-        QBoxLayout* m_layout;
-        QLabel* m_playerLabel;
-
-        std::map<BlockType, PolyominoWidget*> m_blockWidgets;
+        QWidget* m_blockContainer;
+        QGridLayout* m_blockLayout;
+        std::vector<Block> m_blocks;
+        std::map<BlockType, BlockButton*> m_blockButtons;
+        std::set<BlockType> m_usedBlocks;
+        BlockType m_selectedBlockType;
     };
 
-    /**
-     * @brief 개선된 게임 블록 팔레트 (4방향 레이아웃)
-     */
+    // 메인 개선된 게임 팔레트 클래스
     class ImprovedGamePalette : public QWidget
     {
         Q_OBJECT
@@ -103,38 +113,43 @@ namespace Blokus {
     public:
         explicit ImprovedGamePalette(QWidget* parent = nullptr);
 
-        void setCurrentPlayer(PlayerColor player);
-        PlayerColor getCurrentPlayer() const { return m_currentPlayer; }
-        Block getSelectedBlock() const;
-        void setBlockUsed(PlayerColor player, BlockType blockType);
-        void resetAllPlayerBlocks(); // 모든 플레이어의 블록 리셋
+        // 팔레트 접근자
+        DirectionPalette* getNorthPalette() const { return m_northPalette; }
+        DirectionPalette* getSouthPalette() const { return m_southPalette; }
+        DirectionPalette* getEastPalette() const { return m_eastPalette; }
+        DirectionPalette* getWestPalette() const { return m_westPalette; }
 
-        // 각 방향 팔레트 접근자들 (누락된 함수들 추가)
-        CompactPlayerPalette* getSouthPalette() const;
-        CompactPlayerPalette* getEastPalette() const;
-        CompactPlayerPalette* getNorthPalette() const;
-        CompactPlayerPalette* getWestPalette() const;
+        // 게임 상태 관리
+        void setCurrentPlayer(PlayerColor player);
+        void setBlockUsed(PlayerColor player, BlockType blockType);
+        void resetAllPlayerBlocks();
+
+        // 블록 선택 관리
+        Block getSelectedBlock() const { return m_selectedBlock; }
+        void setSelectedBlock(const Block& block);
 
     signals:
         void blockSelected(const Block& block);
 
     private slots:
-        void onPlayerBlockSelected(const Block& block);
+        void onDirectionBlockSelected(const Block& block);
 
     private:
-        void setupUI();
-        void createPlayerPalettes();
-        void updateCurrentPlayerHighlight();
+        void setupPalettes();
+        void updatePlayerAssignments();
+        void updateBlockAvailability();
 
         PlayerColor m_currentPlayer;
+        Block m_selectedBlock;
 
-        // 4방향 배치
-        CompactPlayerPalette* m_southPalette;  // 자신 (하단, 큰 크기)
-        CompactPlayerPalette* m_eastPalette;   // 상대방 (우측, 작은 크기)
-        CompactPlayerPalette* m_northPalette;  // 상대방 (상단, 작은 크기)
-        CompactPlayerPalette* m_westPalette;   // 상대방 (좌측, 작은 크기)
+        // 4방향 팔레트
+        DirectionPalette* m_northPalette;   // 상대방 (Yellow)
+        DirectionPalette* m_southPalette;   // 자신의 블록 (크게)
+        DirectionPalette* m_eastPalette;    // 상대방 (Red)
+        DirectionPalette* m_westPalette;    // 상대방 (Green)
 
-        std::map<PlayerColor, CompactPlayerPalette*> m_playerPalettes;
+        // 사용된 블록 추적
+        std::map<PlayerColor, std::set<BlockType>> m_usedBlocks;
     };
 
 } // namespace Blokus
