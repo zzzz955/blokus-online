@@ -3,6 +3,7 @@
 #include <vector>
 #include <map>
 #include <set>
+#include <QDebug>
 #include "common/Types.h"
 #include "game/Block.h"
 

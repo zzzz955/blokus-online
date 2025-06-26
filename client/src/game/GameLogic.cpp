@@ -123,20 +123,29 @@ namespace Blokus {
 
     bool GameLogic::isFirstBlockValid(const Block& block, const Position& position, PlayerColor player) const
     {
-        // 수정된 첫 번째 블록 규칙: 아무 모서리에서나 시작 가능
+        // 수정된 첫 번째 블록 규칙: 4개 모서리(코너) 중 하나에 무조건 닿아야 함
         PositionList absolutePositions = block.getAbsolutePositions(position);
 
-        // 블록의 셀 중 하나가 보드 모서리(경계)에 접촉하면 허용
+        // 4개 모서리 좌표 정의
+        std::vector<Position> corners = {
+            {0, 0},                    // 왼쪽 위 모서리
+            {0, BOARD_SIZE - 1},       // 오른쪽 위 모서리  
+            {BOARD_SIZE - 1, 0},       // 왼쪽 아래 모서리
+            {BOARD_SIZE - 1, BOARD_SIZE - 1}  // 오른쪽 아래 모서리
+        };
+
+        // 블록의 셀 중 하나가 4개 모서리 중 하나에 정확히 위치해야 함
         for (const auto& blockPos : absolutePositions) {
-            // 보드 경계에 접촉하는지 확인
-            if (blockPos.first == 0 ||                    // 상단 경계
-                blockPos.first == BOARD_SIZE - 1 ||       // 하단 경계
-                blockPos.second == 0 ||                   // 좌측 경계
-                blockPos.second == BOARD_SIZE - 1) {      // 우측 경계
-                return true;
+            for (const auto& corner : corners) {
+                if (blockPos == corner) {
+                    qDebug() << QString::fromUtf8("첫 블록 모서리 규칙 만족: (%1, %2)")
+                        .arg(blockPos.first).arg(blockPos.second);
+                    return true;
+                }
             }
         }
 
+        qDebug() << QString::fromUtf8("첫 블록 모서리 규칙 위반: 4개 코너 중 하나에 닿아야 함");
         return false;
     }
 

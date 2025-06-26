@@ -46,14 +46,29 @@ namespace Blokus {
                 // 블록 배치 성공 시 팔레트에서 블록 제거
                 PlayerColor currentPlayer = m_gameManager->getGameLogic().getCurrentPlayer();
                 Block selectedBlock = m_improvedPalette->getSelectedBlock();
+
+                qDebug() << QString::fromUtf8("블록 배치 성공: %1 플레이어의 %2 블록")
+                    .arg(Utils::playerColorToString(currentPlayer))
+                    .arg(BlockFactory::getBlockName(selectedBlock.getType()));
+
+                // 팔레트에서 해당 블록 제거
                 m_improvedPalette->removeBlock(currentPlayer, selectedBlock.getType());
 
-                // 자동으로 다음 턴으로 이동 (다음턴 버튼 제거)
+                qDebug() << QString::fromUtf8("팔레트에서 블록 제거 요청 완료");
+
+                // 자동으로 다음 턴으로 이동
                 m_gameManager->nextTurn();
                 updateGameUI();
 
                 // 선택된 블록 해제
                 clearSelectedBlock();
+
+                QString successMsg = QString::fromUtf8("블록 배치 완료! 다음 플레이어: %1")
+                    .arg(Utils::playerColorToString(m_gameManager->getGameLogic().getCurrentPlayer()));
+                statusBar()->showMessage(successMsg, 3000);
+            }
+            else {
+                statusBar()->showMessage(QString::fromUtf8("블록을 배치할 수 없습니다 - 규칙 위반"), 2000);
             }
         }
     }
@@ -215,9 +230,9 @@ namespace Blokus {
 
     void MainWindow::setupUI()
     {
-        setWindowTitle(QString::fromUtf8("블로커스 온라인 - 마작 스타일 레이아웃"));
-        setMinimumSize(1200, 900);
-        resize(1400, 1000);
+        setWindowTitle(QString::fromUtf8("블로커스 온라인 - 컴팩트 마작 레이아웃"));
+        setMinimumSize(1000, 800);  // 더 작은 최소 크기
+        resize(1200, 900);          // 기본 크기도 더 작게
 
         // 중앙 위젯 설정
         QWidget* centralWidget = new QWidget(this);
@@ -228,21 +243,23 @@ namespace Blokus {
         m_gameBoard = new GameBoard(this);
         m_gameBoard->setGameLogic(&m_gameManager->getGameLogic());
 
-        // 메인 레이아웃: 마작 스타일
+        // 메인 레이아웃: 더 컴팩트하게
         QVBoxLayout* mainLayout = new QVBoxLayout(centralWidget);
-        mainLayout->setContentsMargins(10, 10, 10, 10);
-        mainLayout->setSpacing(5);
+        mainLayout->setContentsMargins(8, 8, 8, 8);
+        mainLayout->setSpacing(4);
 
-        // 상단 게임 정보 패널
+        // 상단 게임 정보 패널 (더 작게)
         QWidget* gameInfoPanel = createGameInfoPanel();
+        gameInfoPanel->setFixedHeight(40);
         mainLayout->addWidget(gameInfoPanel);
 
         // 중앙 게임 영역 (마작 스타일)
         QWidget* gameArea = createMahjongStyleGameArea();
         mainLayout->addWidget(gameArea, 1);
 
-        // 하단 컨트롤 패널
+        // 하단 컨트롤 패널 (더 작게)
         QWidget* controlPanel = createCompactControlPanel();
+        controlPanel->setFixedHeight(35);
         mainLayout->addWidget(controlPanel);
 
         // 메뉴 바 설정
@@ -258,55 +275,89 @@ namespace Blokus {
     QWidget* MainWindow::createMahjongStyleGameArea()
     {
         QWidget* gameArea = new QWidget();
-        gameArea->setStyleSheet("QWidget { background-color: #2c3e50; }");
+        gameArea->setStyleSheet("QWidget { background-color: #34495e; border-radius: 8px; }");
 
         // 3x3 그리드로 마작 스타일 배치
         QGridLayout* gridLayout = new QGridLayout(gameArea);
-        gridLayout->setContentsMargins(5, 5, 5, 5);
-        gridLayout->setSpacing(2);
+        gridLayout->setContentsMargins(8, 8, 8, 8);
+        gridLayout->setSpacing(3);
 
-        // 팔레트 크기 설정
+        // 팔레트 크기 설정 (더 작게)
         QWidget* northPalette = m_improvedPalette->getNorthPalette();
         QWidget* southPalette = m_improvedPalette->getSouthPalette();
         QWidget* eastPalette = m_improvedPalette->getEastPalette();
         QWidget* westPalette = m_improvedPalette->getWestPalette();
 
-        // 크기 제한 설정
-        northPalette->setFixedHeight(80);
-        southPalette->setFixedHeight(80);
-        eastPalette->setFixedWidth(80);
-        westPalette->setFixedWidth(80);
+        // 크기 제한 설정 (더 컴팩트하게)
+        northPalette->setFixedHeight(60);   // 더 작게
+        southPalette->setFixedHeight(100);  // 자신의 블록은 적당히
+        eastPalette->setFixedWidth(70);     // 더 작게
+        westPalette->setFixedWidth(70);     // 더 작게
 
         // 게임보드 크기 설정
-        m_gameBoard->setMinimumSize(600, 600);
-        m_gameBoard->setMaximumSize(800, 800);
+        m_gameBoard->setMinimumSize(500, 500);
+        m_gameBoard->setMaximumSize(700, 700);
+
+        // 상대방 팔레트 스타일 설정 (더 작고 컴팩트하게)
+        QString smallPaletteStyle =
+            "QWidget { "
+            "background-color: #2c3e50; "
+            "border: 1px solid #34495e; "
+            "border-radius: 4px; "
+            "padding: 2px; "
+            "}";
+
+        northPalette->setStyleSheet(smallPaletteStyle);
+        eastPalette->setStyleSheet(smallPaletteStyle);
+        westPalette->setStyleSheet(smallPaletteStyle);
+
+        // 자신의 팔레트 스타일
+        southPalette->setStyleSheet(
+            "QWidget { "
+            "background-color: #3498db; "
+            "border: 2px solid #2980b9; "
+            "border-radius: 6px; "
+            "padding: 4px; "
+            "}"
+        );
 
         // 3x3 그리드 배치
         //     0   1   2
         // 0   .   N   .
-        // 1   W   B   E
+        // 1   W   B   E  
         // 2   .   S   .
 
-        gridLayout->addWidget(new QWidget(), 0, 0); // 빈 공간
+        // 빈 공간에는 투명한 위젯 배치
+        QWidget* corner1 = new QWidget();
+        QWidget* corner2 = new QWidget();
+        QWidget* corner3 = new QWidget();
+        QWidget* corner4 = new QWidget();
+
+        corner1->setStyleSheet("background: transparent;");
+        corner2->setStyleSheet("background: transparent;");
+        corner3->setStyleSheet("background: transparent;");
+        corner4->setStyleSheet("background: transparent;");
+
+        gridLayout->addWidget(corner1, 0, 0);
         gridLayout->addWidget(northPalette, 0, 1);
-        gridLayout->addWidget(new QWidget(), 0, 2); // 빈 공간
+        gridLayout->addWidget(corner2, 0, 2);
 
         gridLayout->addWidget(westPalette, 1, 0);
         gridLayout->addWidget(m_gameBoard, 1, 1);
         gridLayout->addWidget(eastPalette, 1, 2);
 
-        gridLayout->addWidget(new QWidget(), 2, 0); // 빈 공간
+        gridLayout->addWidget(corner3, 2, 0);
         gridLayout->addWidget(southPalette, 2, 1);
-        gridLayout->addWidget(new QWidget(), 2, 2); // 빈 공간
+        gridLayout->addWidget(corner4, 2, 2);
 
-        // 비율 설정 (중앙 게임보드가 확장)
-        gridLayout->setRowStretch(0, 0);
-        gridLayout->setRowStretch(1, 1);
-        gridLayout->setRowStretch(2, 0);
+        // 비율 설정 (중앙 게임보드가 확장, 팔레트는 고정 크기)
+        gridLayout->setRowStretch(0, 0);  // 북쪽 고정
+        gridLayout->setRowStretch(1, 1);  // 중앙 확장
+        gridLayout->setRowStretch(2, 0);  // 남쪽 고정
 
-        gridLayout->setColumnStretch(0, 0);
-        gridLayout->setColumnStretch(1, 1);
-        gridLayout->setColumnStretch(2, 0);
+        gridLayout->setColumnStretch(0, 0);  // 서쪽 고정
+        gridLayout->setColumnStretch(1, 1);  // 중앙 확장
+        gridLayout->setColumnStretch(2, 0);  // 동쪽 고정
 
         return gameArea;
     }

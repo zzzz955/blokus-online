@@ -69,8 +69,12 @@ namespace Blokus {
     {
         // 블록의 바운딩 박스 계산
         QRect boundingRect = m_block.getBoundingRect();
-        int width = boundingRect.width() * m_blockSize + 10; // 여백 추가
-        int height = boundingRect.height() * m_blockSize + 10;
+        int width = boundingRect.width() * m_blockSize + 4; // 여백 최소화
+        int height = boundingRect.height() * m_blockSize + 4;
+
+        // 최소 크기 보장
+        width = std::max(width, static_cast<int>(m_blockSize + 4));
+        height = std::max(height, static_cast<int>(m_blockSize + 4));
 
         setFixedSize(width, height);
     }
@@ -98,17 +102,12 @@ namespace Blokus {
 
         QColor baseColor = getPlayerColor();
 
-        // 사용된 블록은 회색으로 표시
-        if (m_isUsed) {
-            baseColor = QColor(150, 150, 150);
-        }
-
         // 선택된 블록은 하이라이트
         if (m_isSelected) {
-            painter.setPen(QPen(QColor(255, 215, 0), 3)); // 금색 테두리
+            painter.setPen(QPen(QColor(255, 215, 0), 2)); // 금색 테두리 (더 얇게)
         }
         else if (m_isHovered && !m_isUsed) {
-            painter.setPen(QPen(baseColor.lighter(130), 2));
+            painter.setPen(QPen(baseColor.lighter(130), 1));
         }
         else {
             painter.setPen(QPen(baseColor.darker(120), 1));
@@ -121,19 +120,18 @@ namespace Blokus {
 
         painter.setBrush(QBrush(baseColor));
 
-        // 블록 모양 그리기
+        // 블록 모양 그리기 (여백 최소화)
         PositionList shape = m_block.getCurrentShape();
         for (const auto& pos : shape) {
-            int x = pos.second * m_blockSize + 5;
-            int y = pos.first * m_blockSize + 5;
-            painter.drawRect(x, y, m_blockSize, m_blockSize);
-        }
+            int x = pos.second * m_blockSize + 2;
+            int y = pos.first * m_blockSize + 2;
 
-        // 사용된 블록에는 X 표시
-        if (m_isUsed) {
-            painter.setPen(QPen(Qt::red, 2));
-            painter.drawLine(2, 2, width() - 2, height() - 2);
-            painter.drawLine(width() - 2, 2, 2, height() - 2);
+            // 작은 블록의 경우 테두리 없이 그리기
+            if (m_blockSize <= 10) {
+                painter.setPen(Qt::NoPen);
+            }
+
+            painter.drawRect(x, y, m_blockSize, m_blockSize);
         }
     }
 
@@ -230,7 +228,8 @@ namespace Blokus {
         if (it != m_blockButtons.end()) {
             // 버튼을 레이아웃에서 제거하고 삭제
             m_blockLayout->removeWidget(it->second);
-            delete it->second;
+            it->second->setParent(nullptr);  // 부모 관계 해제
+            it->second->deleteLater();       // 안전한 삭제
             m_blockButtons.erase(it);
 
             // 블록 목록에서도 제거
@@ -242,8 +241,15 @@ namespace Blokus {
                 m_blocks.end()
             );
 
-            // 레이아웃 재정렬
+            // 사용된 블록 목록에 추가
+            m_usedBlocks.insert(blockType);
+
+            // 레이아웃 즉시 재정렬
             reorganizeLayout();
+
+            qDebug() << QString::fromUtf8("블록 제거됨: %1, 남은 블록 수: %2")
+                .arg(BlockFactory::getBlockName(blockType))
+                .arg(m_blockButtons.size());
         }
     }
 
@@ -282,53 +288,48 @@ namespace Blokus {
     void DirectionPalette::setupLayout()
     {
         QVBoxLayout* mainLayout = new QVBoxLayout(this);
-        mainLayout->setContentsMargins(3, 3, 3, 3);
-        mainLayout->setSpacing(2);
+        mainLayout->setContentsMargins(2, 2, 2, 2);
+        mainLayout->setSpacing(1);
 
         // 방향 라벨 (남쪽은 더 큰 글자)
         QString labelText;
         switch (m_direction) {
-        case Direction::North: labelText = QString::fromUtf8("상대방"); break;
+        case Direction::North: labelText = QString::fromUtf8("상대"); break;
         case Direction::South: labelText = QString::fromUtf8("나의 블록"); break;
-        case Direction::East: labelText = QString::fromUtf8("상대방"); break;
-        case Direction::West: labelText = QString::fromUtf8("상대방"); break;
+        case Direction::East: labelText = QString::fromUtf8("상대"); break;
+        case Direction::West: labelText = QString::fromUtf8("상대"); break;
         }
 
         QLabel* directionLabel = new QLabel(labelText);
         if (m_direction == Direction::South) {
-            directionLabel->setStyleSheet("font-weight: bold; font-size: 14px; color: #2c3e50; padding: 5px;");
+            directionLabel->setStyleSheet("font-weight: bold; font-size: 14px; color: #2c3e50; padding: 3px;");
             directionLabel->setAlignment(Qt::AlignCenter);
         }
         else {
-            directionLabel->setStyleSheet("font-size: 10px; color: #7f8c8d; padding: 2px;");
+            directionLabel->setStyleSheet("font-size: 9px; color: #7f8c8d; padding: 1px;");
             directionLabel->setAlignment(Qt::AlignCenter);
         }
         mainLayout->addWidget(directionLabel);
 
-        // 스크롤 영역
-        m_scrollArea = new QScrollArea();
-        m_scrollArea->setWidgetResizable(true);
-        m_scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-        m_scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-
-        // 블록 컨테이너
+        // 스크롤 영역 제거하고 직접 컨테이너 사용
         m_blockContainer = new QWidget();
         m_blockLayout = new QGridLayout(m_blockContainer);
-        m_blockLayout->setContentsMargins(2, 2, 2, 2);
-        m_blockLayout->setSpacing(2);
+        m_blockLayout->setContentsMargins(1, 1, 1, 1);
+        m_blockLayout->setSpacing(1);
 
-        m_scrollArea->setWidget(m_blockContainer);
-        mainLayout->addWidget(m_scrollArea);
+        // 스크롤 영역 없이 직접 추가
+        mainLayout->addWidget(m_blockContainer);
 
-        // 크기 제약 설정
+        // 크기 제약 설정 (더 작게 조정)
         if (m_direction == Direction::South) {
-            setMinimumHeight(120);
-            setMaximumHeight(180);
+            setMinimumHeight(100);
+            setMaximumHeight(130);
         }
         else {
-            setMinimumWidth(80);
-            setMaximumWidth(120);
-            setMinimumHeight(300);
+            // 북/동/서쪽은 더 작게
+            setMinimumWidth(60);
+            setMaximumWidth(90);
+            setMinimumHeight(200);
         }
     }
 
@@ -351,11 +352,12 @@ namespace Blokus {
         int row = 0, col = 0;
 
         for (const Block& block : m_blocks) {
-            BlockButton* button = new BlockButton(block, blockSize);
+            // 이미 제거된 블록은 버튼 생성 안함
+            if (m_usedBlocks.find(block.getType()) != m_usedBlocks.end()) {
+                continue;
+            }
 
-            // 사용 상태 설정
-            bool isUsed = m_usedBlocks.find(block.getType()) != m_usedBlocks.end();
-            button->setUsed(isUsed);
+            BlockButton* button = new BlockButton(block, blockSize);
 
             // 시그널 연결
             connect(button, &BlockButton::blockClicked, this, &DirectionPalette::onBlockButtonClicked);
@@ -369,47 +371,63 @@ namespace Blokus {
                 row++;
             }
         }
+
+        // 레이아웃 업데이트 강제
+        m_blockContainer->updateGeometry();
+        updateGeometry();
     }
 
     void DirectionPalette::reorganizeLayout()
     {
-        // 기존 레이아웃 클리어
+        // 현재 존재하는 버튼들만 다시 배치
+        QList<BlockButton*> buttons;
+        for (auto& pair : m_blockButtons) {
+            buttons.append(pair.second);
+        }
+
+        // 레이아웃 클리어 (위젯 삭제 안함)
         QLayoutItem* item;
         while ((item = m_blockLayout->takeAt(0)) != nullptr) {
-            // 위젯은 삭제하지 않고 레이아웃에서만 제거
+            delete item; // QLayoutItem만 삭제
         }
 
         // 버튼들을 다시 배치
-        qreal blockSize = getBlockSize();
         int maxPerRow = getMaxBlocksPerRow();
         int row = 0, col = 0;
 
-        for (auto& pair : m_blockButtons) {
-            m_blockLayout->addWidget(pair.second, row, col);
+        for (BlockButton* button : buttons) {
+            if (button) {
+                m_blockLayout->addWidget(button, row, col);
 
-            col++;
-            if (col >= maxPerRow) {
-                col = 0;
-                row++;
+                col++;
+                if (col >= maxPerRow) {
+                    col = 0;
+                    row++;
+                }
             }
         }
+
+        // 레이아웃 업데이트 강제
+        m_blockContainer->updateGeometry();
+        updateGeometry();
+        update();
     }
 
     qreal DirectionPalette::getBlockSize() const
     {
         switch (m_direction) {
-        case Direction::South: return 25.0; // 자신의 블록은 크게
-        default: return 15.0;               // 상대방 블록은 작게
+        case Direction::South: return 20.0; // 자신의 블록 (중간 크기)
+        default: return 8.0;                // 상대방 블록 (매우 작게)
         }
     }
 
     int DirectionPalette::getMaxBlocksPerRow() const
     {
         switch (m_direction) {
-        case Direction::South: return 7;    // 남쪽은 가로로 넓게
-        case Direction::North: return 6;    // 북쪽도 가로로
+        case Direction::South: return 8;    // 남쪽은 가로로 많이
+        case Direction::North: return 8;    // 북쪽도 가로로 많이
         case Direction::East:
-        case Direction::West: return 2;     // 동서쪽은 세로로 좁게
+        case Direction::West: return 3;     // 동서쪽은 3개씩
         }
         return 4;
     }

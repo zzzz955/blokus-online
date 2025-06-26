@@ -10,6 +10,7 @@
 #include <QGridLayout>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+#include <QDebug>
 
 #include "ui/GameBoard.h"
 #include "ui/ImprovedBlockPalette.h"
