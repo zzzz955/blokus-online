@@ -10,6 +10,9 @@
 #include <QGraphicsItem>
 #include <QPropertyAnimation>
 #include <QGraphicsOpacityEffect>
+#include <QTimer>              // 추가된 헤더
+#include <QDebug>              // 추가된 헤더
+#include <QApplication>        // 추가된 헤더
 #include <map>
 #include <set>
 

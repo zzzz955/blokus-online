@@ -348,25 +348,26 @@ namespace Blokus {
         Block blockToPlace = m_selectedBlock;
         blockToPlace.setPlayer(currentPlayer);
 
+        qDebug() << QString::fromUtf8("GameBoard::tryPlaceCurrentBlock 시작");
+        qDebug() << QString::fromUtf8("   블록: %1").arg(BlockFactory::getBlockName(blockToPlace.getType()));
+        qDebug() << QString::fromUtf8("   위치: (%1, %2)").arg(position.first).arg(position.second);
+        qDebug() << QString::fromUtf8("   플레이어: %1").arg(Utils::playerColorToString(currentPlayer));
+
         if (m_gameLogic->canPlaceBlock(blockToPlace, position, currentPlayer)) {
             // 게임 로직에서 블록 배치
             if (m_gameLogic->placeBlock(blockToPlace, position, currentPlayer)) {
                 // 시각적으로도 블록 추가
                 addBlockToBoard(blockToPlace, position);
 
-                // 블록 배치 시그널 발생
-                emit blockPlaced(BlockPlacement(
-                    blockToPlace.getType(),
-                    position,
-                    blockToPlace.getRotation(),
-                    blockToPlace.getFlipState(),
-                    currentPlayer
-                ));
+                // 🔥 중요: 성공 시그널 발생
+                qDebug() << QString::fromUtf8("✅ 블록 배치 성공! 시그널 발생");
+                emit blockPlacedSuccessfully(blockToPlace.getType(), currentPlayer);
 
                 return true;
             }
         }
 
+        qDebug() << QString::fromUtf8("❌ 블록 배치 실패");
         return false;
     }
 

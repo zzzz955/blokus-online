@@ -34,43 +34,58 @@ namespace Blokus {
         delete m_gameManager;
     }
 
+    void MainWindow::clearSelectedBlock()
+    {
+        qDebug() << QString::fromUtf8("선택된 블록 해제");
+
+        // 선택된 블록 해제
+        m_improvedPalette->clearSelection();
+        if (m_gameBoard) {
+            // 기본 블록으로 설정하되 선택 상태는 해제
+            Block emptyBlock(BlockType::Single, PlayerColor::None);
+            m_gameBoard->setSelectedBlock(emptyBlock);
+        }
+    }
+
     void MainWindow::onCellClicked(int row, int col)
     {
+        // 이제 실제 블록 배치는 GameBoard에서 처리하고 여기서는 단순히 UI 피드백만
         QString message = QString::fromUtf8("클릭된 셀: (%1, %2)").arg(row).arg(col);
         statusBar()->showMessage(message, 2000);
 
-        // 게임이 진행 중이면 블록 배치 시도
-        if (m_gameManager->getGameState() == GameState::Playing) {
-            Position clickedPos = { row, col };
-            if (m_gameBoard->tryPlaceCurrentBlock(clickedPos)) {
-                // 블록 배치 성공 시 팔레트에서 블록 제거
-                PlayerColor currentPlayer = m_gameManager->getGameLogic().getCurrentPlayer();
-                Block selectedBlock = m_improvedPalette->getSelectedBlock();
+        qDebug() << QString::fromUtf8("=== MainWindow::onCellClicked ===");
+        qDebug() << QString::fromUtf8("클릭 위치: (%1, %2)").arg(row).arg(col);
+        qDebug() << QString::fromUtf8("게임 상태: %1").arg((int)m_gameManager->getGameState());
+    }
 
-                qDebug() << QString::fromUtf8("블록 배치 성공: %1 플레이어의 %2 블록")
-                    .arg(Utils::playerColorToString(currentPlayer))
-                    .arg(BlockFactory::getBlockName(selectedBlock.getType()));
+    void MainWindow::onBlockPlacedSuccessfully(BlockType blockType, PlayerColor player)
+    {
+        qDebug() << QString::fromUtf8("🎉 MainWindow::onBlockPlacedSuccessfully 호출됨!");
+        qDebug() << QString::fromUtf8("   블록 타입: %1").arg(BlockFactory::getBlockName(blockType));
+        qDebug() << QString::fromUtf8("   플레이어: %1").arg(Utils::playerColorToString(player));
 
-                // 팔레트에서 해당 블록 제거
-                m_improvedPalette->removeBlock(currentPlayer, selectedBlock.getType());
+        // 팔레트에서 해당 블록 제거
+        qDebug() << QString::fromUtf8("🗑️ 팔레트에서 블록 제거 시작...");
+        m_improvedPalette->removeBlock(player, blockType);
 
-                qDebug() << QString::fromUtf8("팔레트에서 블록 제거 요청 완료");
+        // 강제 화면 업데이트
+        m_improvedPalette->update();
+        QApplication::processEvents();
 
-                // 자동으로 다음 턴으로 이동
-                m_gameManager->nextTurn();
-                updateGameUI();
+        qDebug() << QString::fromUtf8("✅ 팔레트 업데이트 완료");
 
-                // 선택된 블록 해제
-                clearSelectedBlock();
+        // 선택 해제
+        clearSelectedBlock();
 
-                QString successMsg = QString::fromUtf8("블록 배치 완료! 다음 플레이어: %1")
-                    .arg(Utils::playerColorToString(m_gameManager->getGameLogic().getCurrentPlayer()));
-                statusBar()->showMessage(successMsg, 3000);
-            }
-            else {
-                statusBar()->showMessage(QString::fromUtf8("블록을 배치할 수 없습니다 - 규칙 위반"), 2000);
-            }
-        }
+        // 다음 턴으로 이동
+        m_gameManager->nextTurn();
+        updateGameUI();
+
+        QString successMsg = QString::fromUtf8("블록 배치 완료! 다음: %1")
+            .arg(Utils::playerColorToString(m_gameManager->getGameLogic().getCurrentPlayer()));
+        statusBar()->showMessage(successMsg, 3000);
+
+        qDebug() << QString::fromUtf8("🎉 블록 배치 처리 완료!");
     }
 
     void MainWindow::onCellHovered(int row, int col)
@@ -102,6 +117,8 @@ namespace Blokus {
 
     void MainWindow::onNewGame()
     {
+        qDebug() << QString::fromUtf8("=== 새 게임 시작 ===");
+
         m_gameManager->startNewGame();
         m_gameBoard->setGameLogic(&m_gameManager->getGameLogic());
         m_gameBoard->clearAllBlocks();
@@ -115,6 +132,8 @@ namespace Blokus {
         updateGameUI();
 
         statusBar()->showMessage(QString::fromUtf8("새 게임이 시작되었습니다! 파란 플레이어부터 시작합니다."), 3000);
+
+        qDebug() << QString::fromUtf8("새 게임 초기화 완료");
     }
 
     void MainWindow::onResetBoard()
@@ -213,19 +232,16 @@ namespace Blokus {
 
     void MainWindow::resetAllBlockStates()
     {
+        qDebug() << QString::fromUtf8("=== 모든 블록 상태 리셋 ===");
+
         // 모든 플레이어의 모든 블록을 사용 가능 상태로 리셋
         m_improvedPalette->resetAllPlayerBlocks();
-    }
 
-    void MainWindow::clearSelectedBlock()
-    {
-        // 선택된 블록 해제
-        m_improvedPalette->clearSelection();
-        if (m_gameBoard) {
-            // 기본 블록으로 설정하되 선택 상태는 해제
-            Block emptyBlock(BlockType::Single, PlayerColor::None);
-            m_gameBoard->setSelectedBlock(emptyBlock);
-        }
+        // 강제 화면 업데이트
+        m_improvedPalette->update();
+        qApp->processEvents();
+
+        qDebug() << QString::fromUtf8("블록 상태 리셋 완료");
     }
 
     void MainWindow::setupUI()
@@ -464,11 +480,12 @@ namespace Blokus {
         // 게임보드 시그널
         connect(m_gameBoard, &GameBoard::cellClicked, this, &MainWindow::onCellClicked);
         connect(m_gameBoard, &GameBoard::cellHovered, this, &MainWindow::onCellHovered);
+        connect(m_gameBoard, &GameBoard::blockPlacedSuccessfully, this, &MainWindow::onBlockPlacedSuccessfully); // 새로 추가
 
         // 블록 팔레트 시그널
         connect(m_improvedPalette, &ImprovedGamePalette::blockSelected, this, &MainWindow::onBlockSelected);
 
-        // 버튼 시그널 (다음턴 버튼 제거)
+        // 버튼 시그널
         connect(m_resetButton, &QPushButton::clicked, this, &MainWindow::onResetBoard);
         connect(m_readOnlyButton, &QPushButton::clicked, this, &MainWindow::onToggleReadOnly);
         connect(m_newGameButton, &QPushButton::clicked, this, &MainWindow::onNewGame);

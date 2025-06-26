@@ -73,6 +73,7 @@ namespace Blokus {
         void blockRemoved(const Position& position);
         void blockRotated(const Block& block);
         void blockFlipped(const Block& block);
+        void blockPlacedSuccessfully(BlockType blockType, PlayerColor player); // 새로 추가
 
     protected:
         void mousePressEvent(QMouseEvent* event) override;

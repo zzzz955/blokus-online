@@ -30,6 +30,7 @@ namespace Blokus {
         void onCellClicked(int row, int col);
         void onCellHovered(int row, int col);
         void onBlockSelected(const Block& block);
+        void onBlockPlacedSuccessfully(BlockType blockType, PlayerColor player); // 새로 추가
         void onNewGame();
         void onResetBoard();
         void onToggleReadOnly();

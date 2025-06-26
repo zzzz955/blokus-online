@@ -222,34 +222,81 @@ namespace Blokus {
         }
     }
 
+    void DirectionPalette::setupLayout()
+    {
+        QVBoxLayout* mainLayout = new QVBoxLayout(this);
+        mainLayout->setContentsMargins(2, 2, 2, 2);
+        mainLayout->setSpacing(1);
+
+        // 방향 라벨 제거 - 블록만 표시
+
+        // 스크롤 영역 제거하고 직접 컨테이너 사용
+        m_blockContainer = new QWidget();
+        m_blockLayout = new QGridLayout(m_blockContainer);
+        m_blockLayout->setContentsMargins(2, 2, 2, 2);
+        m_blockLayout->setSpacing(3); // 블록 간격 증가
+
+        // 스크롤 영역 없이 직접 추가
+        mainLayout->addWidget(m_blockContainer);
+
+        // 크기 제약 설정
+        if (m_direction == Direction::South) {
+            setMinimumHeight(120);
+            setMaximumHeight(150);
+        }
+        else {
+            // 북/동/서쪽은 더 작게
+            setMinimumWidth(80);
+            setMaximumWidth(110);
+            setMinimumHeight(250);
+        }
+    }
+
     void DirectionPalette::removeBlock(BlockType blockType)
     {
+        qDebug() << QString::fromUtf8("DirectionPalette::removeBlock 호출됨: %1")
+            .arg(BlockFactory::getBlockName(blockType));
+
         auto it = m_blockButtons.find(blockType);
         if (it != m_blockButtons.end()) {
-            // 버튼을 레이아웃에서 제거하고 삭제
+            qDebug() << QString::fromUtf8("블록 버튼 찾음, 제거 시작");
+
+            // 버튼을 레이아웃에서 제거
             m_blockLayout->removeWidget(it->second);
-            it->second->setParent(nullptr);  // 부모 관계 해제
-            it->second->deleteLater();       // 안전한 삭제
+
+            // 버튼 완전히 삭제
+            it->second->setParent(nullptr);
+            it->second->deleteLater();
+
+            // 맵에서 제거
             m_blockButtons.erase(it);
 
             // 블록 목록에서도 제거
-            m_blocks.erase(
-                std::remove_if(m_blocks.begin(), m_blocks.end(),
-                    [blockType](const Block& block) {
-                        return block.getType() == blockType;
-                    }),
-                m_blocks.end()
-            );
+            auto blockIt = std::find_if(m_blocks.begin(), m_blocks.end(),
+                [blockType](const Block& block) {
+                    return block.getType() == blockType;
+                });
+
+            if (blockIt != m_blocks.end()) {
+                m_blocks.erase(blockIt);
+                qDebug() << QString::fromUtf8("블록 목록에서도 제거됨");
+            }
 
             // 사용된 블록 목록에 추가
             m_usedBlocks.insert(blockType);
 
-            // 레이아웃 즉시 재정렬
-            reorganizeLayout();
+            // 즉시 레이아웃 재정렬
+            QTimer::singleShot(0, this, [this]() {
+                reorganizeLayout();
+                update();
+                qDebug() << QString::fromUtf8("레이아웃 재정렬 완료, 남은 블록 수: %1")
+                    .arg(m_blockButtons.size());
+                });
 
-            qDebug() << QString::fromUtf8("블록 제거됨: %1, 남은 블록 수: %2")
-                .arg(BlockFactory::getBlockName(blockType))
-                .arg(m_blockButtons.size());
+        }
+        else {
+            qDebug() << QString::fromUtf8("제거할 블록 버튼을 찾을 수 없음: %1")
+                .arg(BlockFactory::getBlockName(blockType));
         }
     }
 
@@ -285,63 +332,21 @@ namespace Blokus {
         }
     }
 
-    void DirectionPalette::setupLayout()
-    {
-        QVBoxLayout* mainLayout = new QVBoxLayout(this);
-        mainLayout->setContentsMargins(2, 2, 2, 2);
-        mainLayout->setSpacing(1);
-
-        // 방향 라벨 (남쪽은 더 큰 글자)
-        QString labelText;
-        switch (m_direction) {
-        case Direction::North: labelText = QString::fromUtf8("상대"); break;
-        case Direction::South: labelText = QString::fromUtf8("나의 블록"); break;
-        case Direction::East: labelText = QString::fromUtf8("상대"); break;
-        case Direction::West: labelText = QString::fromUtf8("상대"); break;
-        }
-
-        QLabel* directionLabel = new QLabel(labelText);
-        if (m_direction == Direction::South) {
-            directionLabel->setStyleSheet("font-weight: bold; font-size: 14px; color: #2c3e50; padding: 3px;");
-            directionLabel->setAlignment(Qt::AlignCenter);
-        }
-        else {
-            directionLabel->setStyleSheet("font-size: 9px; color: #7f8c8d; padding: 1px;");
-            directionLabel->setAlignment(Qt::AlignCenter);
-        }
-        mainLayout->addWidget(directionLabel);
-
-        // 스크롤 영역 제거하고 직접 컨테이너 사용
-        m_blockContainer = new QWidget();
-        m_blockLayout = new QGridLayout(m_blockContainer);
-        m_blockLayout->setContentsMargins(1, 1, 1, 1);
-        m_blockLayout->setSpacing(1);
-
-        // 스크롤 영역 없이 직접 추가
-        mainLayout->addWidget(m_blockContainer);
-
-        // 크기 제약 설정 (더 작게 조정)
-        if (m_direction == Direction::South) {
-            setMinimumHeight(100);
-            setMaximumHeight(130);
-        }
-        else {
-            // 북/동/서쪽은 더 작게
-            setMinimumWidth(60);
-            setMaximumWidth(90);
-            setMinimumHeight(200);
-        }
-    }
-
     void DirectionPalette::updateBlockButtons()
     {
-        // 기존 버튼들 제거
+        qDebug() << QString::fromUtf8("DirectionPalette::updateBlockButtons 호출됨");
+
+        // 기존 버튼들 완전히 제거
         for (auto& pair : m_blockButtons) {
-            delete pair.second;
+            if (pair.second) {
+                m_blockLayout->removeWidget(pair.second);
+                pair.second->setParent(nullptr);
+                pair.second->deleteLater();
+            }
         }
         m_blockButtons.clear();
 
-        // 레이아웃 클리어
+        // 레이아웃 완전히 클리어
         QLayoutItem* item;
         while ((item = m_blockLayout->takeAt(0)) != nullptr) {
             delete item;
@@ -351,9 +356,12 @@ namespace Blokus {
         int maxPerRow = getMaxBlocksPerRow();
         int row = 0, col = 0;
 
+        // 사용되지 않은 블록들만 버튼 생성
         for (const Block& block : m_blocks) {
-            // 이미 제거된 블록은 버튼 생성 안함
+            // 이미 사용된 블록은 스킵
             if (m_usedBlocks.find(block.getType()) != m_usedBlocks.end()) {
+                qDebug() << QString::fromUtf8("사용된 블록 스킵: %1")
+                    .arg(BlockFactory::getBlockName(block.getType()));
                 continue;
             }
 
@@ -365,6 +373,9 @@ namespace Blokus {
             m_blockLayout->addWidget(button, row, col);
             m_blockButtons[block.getType()] = button;
 
+            qDebug() << QString::fromUtf8("블록 버튼 생성됨: %1 (위치: %2, %3)")
+                .arg(BlockFactory::getBlockName(block.getType())).arg(row).arg(col);
+
             col++;
             if (col >= maxPerRow) {
                 col = 0;
@@ -372,20 +383,27 @@ namespace Blokus {
             }
         }
 
-        // 레이아웃 업데이트 강제
+        qDebug() << QString::fromUtf8("총 %1개 블록 버튼 생성됨").arg(m_blockButtons.size());
+
+        // 강제 업데이트
         m_blockContainer->updateGeometry();
         updateGeometry();
+        update();
     }
 
     void DirectionPalette::reorganizeLayout()
     {
-        // 현재 존재하는 버튼들만 다시 배치
+        qDebug() << QString::fromUtf8("DirectionPalette::reorganizeLayout 호출됨");
+
+        // 현재 존재하는 버튼들 수집
         QList<BlockButton*> buttons;
         for (auto& pair : m_blockButtons) {
-            buttons.append(pair.second);
+            if (pair.second) {
+                buttons.append(pair.second);
+            }
         }
 
-        // 레이아웃 클리어 (위젯 삭제 안함)
+        // 레이아웃에서 모든 아이템 제거 (위젯은 유지)
         QLayoutItem* item;
         while ((item = m_blockLayout->takeAt(0)) != nullptr) {
             delete item; // QLayoutItem만 삭제
@@ -396,7 +414,7 @@ namespace Blokus {
         int row = 0, col = 0;
 
         for (BlockButton* button : buttons) {
-            if (button) {
+            if (button && button->parent() == m_blockContainer) {
                 m_blockLayout->addWidget(button, row, col);
 
                 col++;
@@ -407,7 +425,9 @@ namespace Blokus {
             }
         }
 
-        // 레이아웃 업데이트 강제
+        qDebug() << QString::fromUtf8("레이아웃 재정렬 완료: %1개 버튼").arg(buttons.size());
+
+        // 강제 업데이트
         m_blockContainer->updateGeometry();
         updateGeometry();
         update();
@@ -416,18 +436,18 @@ namespace Blokus {
     qreal DirectionPalette::getBlockSize() const
     {
         switch (m_direction) {
-        case Direction::South: return 20.0; // 자신의 블록 (중간 크기)
-        default: return 8.0;                // 상대방 블록 (매우 작게)
+        case Direction::South: return 22.0; // 자신의 블록 (중간 크기)
+        default: return 12.0;               // 상대방 블록 (작게)
         }
     }
 
     int DirectionPalette::getMaxBlocksPerRow() const
     {
         switch (m_direction) {
-        case Direction::South: return 8;    // 남쪽은 가로로 많이
-        case Direction::North: return 8;    // 북쪽도 가로로 많이
+        case Direction::South: return 7;    // 남쪽은 가로로 많이
+        case Direction::North: return 6;    // 북쪽도 가로로
         case Direction::East:
-        case Direction::West: return 3;     // 동서쪽은 3개씩
+        case Direction::West: return 2;     // 동서쪽은 2개씩
         }
         return 4;
     }
@@ -520,49 +540,87 @@ namespace Blokus {
         }
     }
 
+    void ImprovedGamePalette::resetAllPlayerBlocks()
+    {
+        qDebug() << QString::fromUtf8("ImprovedGamePalette::resetAllPlayerBlocks 호출됨");
+
+        // 제거된 블록 목록 초기화
+        m_removedBlocks.clear();
+        clearSelection();
+
+        // 모든 팔레트 재생성
+        if (m_northPalette) m_northPalette->resetAllBlocks();
+        if (m_southPalette) m_southPalette->resetAllBlocks();
+        if (m_eastPalette) m_eastPalette->resetAllBlocks();
+        if (m_westPalette) m_westPalette->resetAllBlocks();
+
+        // 플레이어 재할당
+        updatePlayerAssignments();
+
+        qDebug() << QString::fromUtf8("모든 팔레트 리셋 완료");
+    }
+
     void ImprovedGamePalette::removeBlock(PlayerColor player, BlockType blockType)
     {
+        qDebug() << QString::fromUtf8("ImprovedGamePalette::removeBlock 호출됨: %1 플레이어의 %2 블록")
+            .arg(Utils::playerColorToString(player))
+            .arg(BlockFactory::getBlockName(blockType));
+
+        // 제거된 블록 목록에 추가
         m_removedBlocks[player].insert(blockType);
 
-        // 해당 플레이어의 팔레트에서 블록 제거
+        // 해당 플레이어의 팔레트 찾기
         DirectionPalette* palette = nullptr;
+        QString paletteDirection;
+
         if (player == m_currentPlayer) {
             palette = m_southPalette;
+            paletteDirection = "South (나의 블록)";
         }
         else {
-            // 다른 플레이어의 팔레트 찾기
-            if (m_northPalette->getPlayer() == player) palette = m_northPalette;
-            else if (m_eastPalette->getPlayer() == player) palette = m_eastPalette;
-            else if (m_westPalette->getPlayer() == player) palette = m_westPalette;
+            if (m_northPalette && m_northPalette->getPlayer() == player) {
+                palette = m_northPalette;
+                paletteDirection = "North";
+            }
+            else if (m_eastPalette && m_eastPalette->getPlayer() == player) {
+                palette = m_eastPalette;
+                paletteDirection = "East";
+            }
+            else if (m_westPalette && m_westPalette->getPlayer() == player) {
+                palette = m_westPalette;
+                paletteDirection = "West";
+            }
         }
 
         if (palette) {
+            qDebug() << QString::fromUtf8("팔레트 찾음: %1, 블록 제거 요청")
+                .arg(paletteDirection);
+
+            // 해당 팔레트에서 블록 제거
             palette->removeBlock(blockType);
+
+            qDebug() << QString::fromUtf8("팔레트에서 블록 제거 완료");
+        }
+        else {
+            qDebug() << QString::fromUtf8("경고: 해당 플레이어의 팔레트를 찾을 수 없음: %1")
+                .arg(Utils::playerColorToString(player));
         }
 
         // 현재 선택된 블록이 제거된 블록이면 선택 해제
         if (m_hasSelection && m_selectedBlock.getType() == blockType &&
             m_selectedBlock.getPlayer() == player) {
+            qDebug() << QString::fromUtf8("현재 선택된 블록이 제거됨, 선택 해제");
             clearSelection();
         }
-    }
 
-    void ImprovedGamePalette::resetAllPlayerBlocks()
-    {
-        m_removedBlocks.clear();
-        clearSelection();
-
-        // 모든 팔레트 재생성
-        m_northPalette->resetAllBlocks();
-        m_southPalette->resetAllBlocks();
-        m_eastPalette->resetAllBlocks();
-        m_westPalette->resetAllBlocks();
-
-        updatePlayerAssignments();
+        qDebug() << QString::fromUtf8("블록 제거 완료: %1개 블록이 제거됨")
+            .arg(m_removedBlocks[player].size());
     }
 
     void ImprovedGamePalette::setupPalettes()
     {
+        qDebug() << QString::fromUtf8("ImprovedGamePalette::setupPalettes 호출됨");
+
         // 4방향 팔레트 생성
         m_northPalette = new DirectionPalette(DirectionPalette::Direction::North, this);
         m_southPalette = new DirectionPalette(DirectionPalette::Direction::South, this);
@@ -574,12 +632,20 @@ namespace Blokus {
         connect(m_southPalette, &DirectionPalette::blockSelected, this, &ImprovedGamePalette::onDirectionBlockSelected);
         connect(m_eastPalette, &DirectionPalette::blockSelected, this, &ImprovedGamePalette::onDirectionBlockSelected);
         connect(m_westPalette, &DirectionPalette::blockSelected, this, &ImprovedGamePalette::onDirectionBlockSelected);
+
+        qDebug() << QString::fromUtf8("4방향 팔레트 생성 및 시그널 연결 완료");
     }
 
     void ImprovedGamePalette::updatePlayerAssignments()
     {
+        qDebug() << QString::fromUtf8("ImprovedGamePalette::updatePlayerAssignments 호출됨");
+
         // 현재 플레이어는 항상 남쪽(하단)에 배치
-        m_southPalette->setPlayer(m_currentPlayer);
+        if (m_southPalette) {
+            m_southPalette->setPlayer(m_currentPlayer);
+            qDebug() << QString::fromUtf8("남쪽 팔레트에 %1 플레이어 할당")
+                .arg(Utils::playerColorToString(m_currentPlayer));
+        }
 
         // 나머지 플레이어들을 다른 방향에 배치
         std::vector<PlayerColor> otherPlayers;
@@ -595,15 +661,31 @@ namespace Blokus {
         }
 
         // 3명의 상대방을 북, 동, 서에 배치
-        if (otherPlayers.size() >= 1) m_northPalette->setPlayer(otherPlayers[0]);
-        if (otherPlayers.size() >= 2) m_eastPalette->setPlayer(otherPlayers[1]);
-        if (otherPlayers.size() >= 3) m_westPalette->setPlayer(otherPlayers[2]);
+        if (otherPlayers.size() >= 1 && m_northPalette) {
+            m_northPalette->setPlayer(otherPlayers[0]);
+            qDebug() << QString::fromUtf8("북쪽 팔레트에 %1 플레이어 할당")
+                .arg(Utils::playerColorToString(otherPlayers[0]));
+        }
+        if (otherPlayers.size() >= 2 && m_eastPalette) {
+            m_eastPalette->setPlayer(otherPlayers[1]);
+            qDebug() << QString::fromUtf8("동쪽 팔레트에 %1 플레이어 할당")
+                .arg(Utils::playerColorToString(otherPlayers[1]));
+        }
+        if (otherPlayers.size() >= 3 && m_westPalette) {
+            m_westPalette->setPlayer(otherPlayers[2]);
+            qDebug() << QString::fromUtf8("서쪽 팔레트에 %1 플레이어 할당")
+                .arg(Utils::playerColorToString(otherPlayers[2]));
+        }
 
         updateBlockAvailability();
+
+        qDebug() << QString::fromUtf8("플레이어 할당 완료");
     }
 
     void ImprovedGamePalette::updateBlockAvailability()
     {
+        qDebug() << QString::fromUtf8("ImprovedGamePalette::updateBlockAvailability 호출됨");
+
         // 각 팔레트의 제거된 블록 상태 업데이트
         for (const auto& playerBlocks : m_removedBlocks) {
             PlayerColor player = playerBlocks.first;
@@ -614,17 +696,22 @@ namespace Blokus {
                 palette = m_southPalette;
             }
             else {
-                if (m_northPalette->getPlayer() == player) palette = m_northPalette;
-                else if (m_eastPalette->getPlayer() == player) palette = m_eastPalette;
-                else if (m_westPalette->getPlayer() == player) palette = m_westPalette;
+                if (m_northPalette && m_northPalette->getPlayer() == player) palette = m_northPalette;
+                else if (m_eastPalette && m_eastPalette->getPlayer() == player) palette = m_eastPalette;
+                else if (m_westPalette && m_westPalette->getPlayer() == player) palette = m_westPalette;
             }
 
             if (palette) {
                 for (BlockType blockType : removedBlocks) {
                     palette->removeBlock(blockType);
                 }
+                qDebug() << QString::fromUtf8("%1 플레이어의 %2개 블록 제거됨")
+                    .arg(Utils::playerColorToString(player))
+                    .arg(removedBlocks.size());
             }
         }
+
+        qDebug() << QString::fromUtf8("블록 가용성 업데이트 완료");
     }
 
     void ImprovedGamePalette::onDirectionBlockSelected(const Block& block)
