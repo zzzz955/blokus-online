@@ -29,19 +29,19 @@ set(SOURCES
     src/main.cpp
     src/ui/GameBoard.cpp
     src/ui/MainWindow.cpp
-    src/ui/BlockPalette.cpp     # 블록 팔레트 UI
-    src/game/Block.cpp          # 블록 시스템
-    src/game/GameLogic.cpp      # 게임 로직 및 규칙
+    src/ui/ImprovedBlockPalette.cpp # 개선된 4방향 블록 팔레트
+    src/game/Block.cpp              # 블록 시스템
+    src/game/GameLogic.cpp          # 게임 로직 및 규칙
 )
 
 # 헤더 파일들
 set(HEADERS
     include/ui/GameBoard.h
     include/ui/MainWindow.h
-    include/ui/BlockPalette.h   # 블록 팔레트 헤더
+    include/ui/ImprovedBlockPalette.h # 개선된 블록 팔레트 헤더
     include/common/Types.h
-    include/game/Block.h        # 블록 헤더
-    include/game/GameLogic.h    # 게임 로직 헤더
+    include/game/Block.h            # 블록 헤더
+    include/game/GameLogic.h        # 게임 로직 헤더
 )
 
 # 실행 파일 생성

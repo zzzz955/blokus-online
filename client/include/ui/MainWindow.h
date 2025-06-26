@@ -14,7 +14,6 @@
 #include <QSplitter>
 
 #include "ui/GameBoard.h"
-#include "ui/BlockPalette.h"
 #include "game/GameLogic.h"
 
 namespace Blokus {
@@ -56,19 +55,20 @@ namespace Blokus {
     private:
         // UI 설정 함수들
         void setupUI();
-        QWidget* createControlPanel();
-        QWidget* createGameInfoPanel();      // 새로 추가
+        QWidget* createCompactControlPanel(); // 간소화된 컨트롤 패널
+        QWidget* createGameInfoPanel();      // 게임 정보 패널
         void setupMenuBar();
         void setupToolBar();
         void setupStatusBar();
         void connectSignals();
 
-        // 게임 UI 업데이트 (새로 추가)
+        // 게임 UI 업데이트
         void updateGameUI();
+        void resetAllBlockStates();         // 모든 블록 상태 리셋
 
         // 위젯 포인터들
         GameBoard* m_gameBoard;              // 메인 게임보드
-        GameBlockPalette* m_blockPalette;    // 블록 팔레트
+        class ImprovedGamePalette* m_improvedPalette; // 개선된 4방향 블록 팔레트
         QLabel* m_coordinateLabel;           // 좌표 표시 라벨
         QLabel* m_gameStatusLabel;           // 게임 상태 라벨
         QLabel* m_currentPlayerLabel;        // 현재 플레이어 라벨

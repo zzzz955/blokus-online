@@ -123,22 +123,17 @@ namespace Blokus {
 
     bool GameLogic::isFirstBlockValid(const Block& block, const Position& position, PlayerColor player) const
     {
-        // 첫 번째 블록은 해당 플레이어의 시작 모서리에 인접해야 함
-        Position startCorner = getPlayerStartCorner(player);
+        // 개선된 규칙: 첫 번째 블록은 보드의 아무 모서리에서나 시작 가능
         PositionList absolutePositions = block.getAbsolutePositions(position);
 
-        // 블록의 셀 중 하나가 시작 모서리에 인접해야 함
+        // 블록의 셀 중 하나가 보드 모서리(경계)에 접촉하면 허용
         for (const auto& blockPos : absolutePositions) {
-            if (blockPos == startCorner) {
-                return true; // 시작 모서리를 포함하는 경우
-            }
-
-            // 시작 모서리에 인접한 경우도 허용 (모서리 접촉)
-            std::vector<Position> diagonals = getDiagonalCells(startCorner);
-            for (const auto& diagonal : diagonals) {
-                if (blockPos == diagonal) {
-                    return true;
-                }
+            // 보드 경계에 접촉하는지 확인
+            if (blockPos.first == 0 ||                    // 상단 경계
+                blockPos.first == BOARD_SIZE - 1 ||       // 하단 경계
+                blockPos.second == 0 ||                   // 좌측 경계
+                blockPos.second == BOARD_SIZE - 1) {      // 우측 경계
+                return true;
             }
         }
 
