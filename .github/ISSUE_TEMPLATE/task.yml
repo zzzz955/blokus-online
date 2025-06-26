@@ -1,0 +1,150 @@
+name: 📋 Development Task
+description: 개발 작업이나 할 일을 등록합니다
+title: "[TASK] "
+labels: ["task", "development"]
+assignees: ["zzzz955"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        개발 작업을 체계적으로 관리하기 위한 템플릿입니다.
+
+  - type: dropdown
+    id: phase
+    attributes:
+      label: 🚀 개발 단계
+      description: 현재 어느 개발 단계의 작업인가요?
+      options:
+        - "1단계: Qt 클라이언트 기본 구조"
+        - "2단계: AI 싱글플레이어"
+        - "3단계: C++ 멀티플레이어 서버"
+        - "4단계: 고급 기능 및 최적화"
+        - "기타: 공통/인프라"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: 🏗️ 컴포넌트
+      description: 작업 대상 컴포넌트를 선택해주세요
+      options:
+        - UI/Frontend
+        - Game Logic
+        - Network
+        - AI System
+        - Database
+        - Build/Deploy
+        - Testing
+        - Documentation
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 📝 작업 설명
+      description: 수행할 작업을 구체적으로 설명해주세요
+      placeholder: |
+        예: GameBoard 클래스 구현
+        - QGraphicsView 기반 20x20 격자 보드
+        - 마우스 클릭/드래그 이벤트 처리
+        - 블록 배치 시각화
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: ✅ 완료 조건
+      description: 이 작업이 완료되었다고 판단할 수 있는 기준
+      placeholder: |
+        - [ ] 20x20 격자가 정확히 표시됨
+        - [ ] 마우스 클릭으로 셀 선택 가능
+        - [ ] 드래그로 블록 이동 가능
+        - [ ] 단위 테스트 작성 완료
+        - [ ] 코드 리뷰 완료
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: ⭐ 우선순위
+      description: 작업의 우선순위를 설정해주세요
+      options:
+        - P0 (Critical - 즉시 처리)
+        - P1 (High - 이번 스프린트)
+        - P2 (Medium - 다음 스프린트)
+        - P3 (Low - 여유시 처리)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: estimate
+    attributes:
+      label: ⏱️ 예상 소요 시간
+      description: 작업 완료까지 예상 시간을 선택해주세요
+      options:
+        - "1-2시간"
+        - "반나절 (3-4시간)"
+        - "하루 (6-8시간)"
+        - "2-3일"
+        - "1주일"
+        - "2주일 이상"
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: 🔗 의존성
+      description: 이 작업을 시작하기 전에 완료되어야 하는 작업들
+      placeholder: |
+        - #123 프로젝트 기본 구조 설정
+        - #124 CMake 빌드 시스템 구축
+
+  - type: textarea
+    id: blockers
+    attributes:
+      label: 🚧 차단 요소
+      description: 작업 진행을 방해할 수 있는 요소들
+      placeholder: |
+        - Qt 라이브러리 설치 필요
+        - 디자인 시안 확정 대기
+
+  - type: textarea
+    id: technical_notes
+    attributes:
+      label: 🔧 기술적 고려사항
+      description: 구현 시 고려해야 할 기술적 사항들
+      placeholder: |
+        - QGraphicsView 성능 최적화 필요
+        - 메모리 사용량 모니터링
+        - 크로스플랫폼 호환성 확인
+
+  - type: textarea
+    id: resources
+    attributes:
+      label: 📚 참고 자료
+      description: 작업에 도움이 될 참고 자료나 링크
+      placeholder: |
+        - Qt Documentation: QGraphicsView
+        - GitHub Issue: #xxx
+        - 디자인 문서: link
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: 📋 작업 체크리스트
+      description: 작업 진행 과정에서 확인할 항목들
+      options:
+        - label: 요구사항 분석 완료
+        - label: 설계 문서 작성
+        - label: 구현 계획 수립
+        - label: 코드 구현
+        - label: 단위 테스트 작성
+        - label: 통합 테스트 실행
+        - label: 코드 리뷰 요청
+        - label: 문서화 업데이트

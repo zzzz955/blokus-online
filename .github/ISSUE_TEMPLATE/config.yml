@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 💬 Discussions
+    url: https://github.com/zzzz955/blokus-online/discussions
+    about: 일반적인 질문이나 아이디어 토론은 여기서 해주세요
+  - name: 📖 Documentation
+    url: https://github.com/zzzz955/blokus-online/wiki
+    about: 프로젝트 문서와 가이드를 확인하세요
+  - name: 🚀 Project Board
+    url: https://github.com/zzzz955/blokus-online/projects
+    about: 현재 개발 진행 상황을 확인하세요

@@ -1,0 +1,146 @@
+name: 🚀 Feature Request
+description: 새로운 기능이나 개선사항을 제안해주세요
+title: "[FEATURE] "
+labels: ["enhancement", "needs-discussion"]
+assignees: ["zzzz955"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        새로운 기능 제안을 해주셔서 감사합니다! 
+        Blokus Online을 더 좋게 만드는데 도움이 됩니다.
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: 📂 카테고리
+      description: 제안하는 기능의 카테고리를 선택해주세요
+      options:
+        - Gameplay (게임플레이)
+        - UI/UX (사용자 인터페이스)
+        - Network (네트워크/멀티플레이어)
+        - Performance (성능 개선)
+        - AI (인공지능)
+        - Accessibility (접근성)
+        - Developer Experience (개발자 경험)
+        - Documentation (문서화)
+        - Other (기타)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: ⭐ 우선순위
+      description: 이 기능의 중요도를 평가해주세요
+      options:
+        - High (핵심 기능, 빠른 구현 필요)
+        - Medium (유용한 기능, 중기 계획)
+        - Low (좋은 아이디어, 장기 계획)
+        - Nice to have (있으면 좋은 기능)
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 🎯 해결하고자 하는 문제
+      description: 현재 어떤 문제나 불편함이 있나요?
+      placeholder: |
+        예: 현재 게임에서 AI 플레이어가 없어서 혼자 연습하기 어렵습니다.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: 💡 제안하는 해결책
+      description: 어떤 기능이나 개선사항을 제안하시나요?
+      placeholder: |
+        예: 3단계 난이도의 AI 플레이어를 추가하여 싱글플레이어 모드를 제공합니다.
+        - 쉬움: 랜덤 배치
+        - 보통: 기본 전략 알고리즘
+        - 어려움: 미니맥스 알고리즘
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 🔄 대안
+      description: 다른 해결 방법을 고려해보셨나요?
+      placeholder: |
+        - 온라인 매칭 시스템
+        - 튜토리얼 모드
+        - 연습 모드
+
+  - type: textarea
+    id: benefits
+    attributes:
+      label: 📈 기대 효과
+      description: 이 기능이 구현되면 어떤 이점이 있을까요?
+      placeholder: |
+        - 사용자가 언제든 혼자 연습할 수 있음
+        - 신규 사용자의 학습 곡선 완화
+        - 게임의 재플레이 가치 증가
+    validations:
+      required: true
+
+  - type: dropdown
+    id: complexity
+    attributes:
+      label: 🏗️ 예상 구현 복잡도
+      description: 이 기능의 구현 난이도를 어떻게 생각하시나요?
+      options:
+        - Simple (몇 시간 내 구현 가능)
+        - Medium (며칠 정도 소요)
+        - Complex (몇 주 정도 소요)
+        - Very Complex (한 달 이상 소요)
+        - Not Sure (잘 모르겠음)
+
+  - type: textarea
+    id: implementation
+    attributes:
+      label: 🛠️ 구현 아이디어
+      description: 구현 방법에 대한 아이디어가 있다면 공유해주세요
+      placeholder: |
+        - 사용할 라이브러리나 기술
+        - 설계 아이디어
+        - 참고할 수 있는 리소스
+
+  - type: textarea
+    id: mockup
+    attributes:
+      label: 🎨 모형/스케치
+      description: UI mockup이나 스케치가 있다면 첨부해주세요
+      placeholder: |
+        이미지 파일을 드래그하거나 링크를 첨부해주세요
+
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: 🎯 범위
+      description: 이 기능과 관련된 영역을 모두 선택해주세요
+      options:
+        - label: Client (Qt 클라이언트)
+        - label: Server (C++ 서버)
+        - label: Database (데이터베이스)
+        - label: Network Protocol (네트워크 프로토콜)
+        - label: Game Logic (게임 로직)
+        - label: UI Design (UI 디자인)
+        - label: Testing (테스트)
+        - label: Documentation (문서화)
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: ✅ 체크리스트
+      description: 제출 전 확인해주세요
+      options:
+        - label: 기존 이슈에서 중복되지 않는 제안입니다
+          required: true
+        - label: 프로젝트 목표와 일치하는 기능입니다
+          required: true
+        - label: 구체적이고 실현 가능한 제안입니다
+          required: true
