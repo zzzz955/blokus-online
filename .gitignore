@@ -1,0 +1,274 @@
+# Blokus Online - Root .gitignore
+
+# ========================================
+# Operating System Files
+# ========================================
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+
+# Linux
+*~
+.directory
+
+# ========================================
+# IDE and Editor Files
+# ========================================
+
+# Visual Studio
+.vs/
+*.vcxproj.user
+*.vcxproj.filters
+*.sln.docstates
+*.userprefs
+.vscode/
+
+# Qt Creator
+*.pro.user
+*.pro.user.*
+CMakeLists.txt.user*
+*.autosave
+
+# ========================================
+# C++ Build Files
+# ========================================
+
+# Compiled Object files
+*.o
+*.obj
+*.ko
+*.elf
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled Static libraries
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# ========================================
+# Qt Specific
+# ========================================
+
+# Qt build directories
+build/
+build-*/
+*-build/
+
+# Qt generated files
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+*.qm
+*.ts~
+
+# Qt Makefiles
+Makefile*
+!Makefile.am
+
+# Qt temporary files
+.qmake.stash
+*.pro.user*
+
+# ========================================
+# Server (C++) Specific
+# ========================================
+
+# Server build directory
+server/build/
+server/bin/
+server/obj/
+
+# Generated protobuf files
+server/src/*.pb.cc
+server/src/*.pb.h
+client/src/*.pb.cc
+client/src/*.pb.h
+
+# CMake (if used later)
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+
+# ========================================
+# vcpkg
+# ========================================
+
+# vcpkg installed packages
+vcpkg_installed/
+.vcpkg-root
+
+# vcpkg ports (if customized)
+ports/
+
+# ========================================
+# Node.js (Web Service)
+# ========================================
+
+# Dependencies
+web-service/node_modules/
+web-service/npm-debug.log*
+web-service/yarn-debug.log*
+web-service/yarn-error.log*
+
+# Runtime data
+web-service/pids/
+web-service/*.pid
+web-service/*.seed
+web-service/*.pid.lock
+
+# Coverage directory used by tools like istanbul
+web-service/coverage/
+
+# Environment variables
+web-service/.env
+web-service/.env.local
+web-service/.env.production
+
+# ========================================
+# Database
+# ========================================
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# PostgreSQL
+*.dump
+
+# ========================================
+# Logs
+# ========================================
+
+# Application logs
+*.log
+logs/
+server/logs/
+client/logs/
+
+# spdlog files
+*.spdlog
+
+# ========================================
+# Configuration Files
+# ========================================
+
+# Configuration files with sensitive data
+config.ini
+settings.ini
+*.config
+.env
+
+# SSL certificates
+*.pem
+*.key
+*.crt
+*.p12
+
+# ========================================
+# Generated/Temporary Files
+# ========================================
+
+# Backup files
+*.bak
+*.backup
+*.tmp
+*.temp
+
+# Archive files
+*.zip
+*.rar
+*.7z
+*.tar.gz
+
+# Generated documentation
+docs/html/
+docs/latex/
+doxygen_output/
+
+# ========================================
+# Package Managers
+# ========================================
+
+# Conan
+conandata.yml
+conanfile.txt
+conanbuildinfo.*
+
+# ========================================
+# Testing
+# ========================================
+
+# Test results
+test_results/
+*.test
+Testing/
+
+# Coverage reports
+*.gcov
+*.gcda
+*.gcno
+
+# ========================================
+# Release/Distribution
+# ========================================
+
+# Release builds
+release/
+dist/
+*.msi
+*.dmg
+*.deb
+*.rpm
+
+# Installer files
+installer/output/
+
+# ========================================
+# Project Specific
+# ========================================
+
+# Game replay files
+replays/
+*.replay
+
+# Screenshots
+screenshots/
+
+# User data (for development)
+userdata/
+saves/
