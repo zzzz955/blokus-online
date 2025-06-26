@@ -11,6 +11,14 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
+# MSVC UTF-8 인코딩 강제 설정 (디버그 문제 해결)
+if(MSVC)
+    add_compile_options(/utf-8)
+    add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
+    # 한글 콘솔 출력을 위한 설정
+    add_compile_definitions(UNICODE _UNICODE)
+endif()
+
 # vcpkg 패키지 찾기
 find_package(Qt5 REQUIRED COMPONENTS Core Widgets Gui Svg Network)
 find_package(spdlog CONFIG REQUIRED)

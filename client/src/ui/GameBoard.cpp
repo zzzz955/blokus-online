@@ -121,8 +121,8 @@ namespace Blokus {
                     x, y, m_cellSize, m_cellSize, m_gridPen, m_emptyBrush);
 
                 // ¼¿¿¡ ÁÂÇ¥ Á¤º¸ ÀúÀå
-                cell->setData(0, row);  // row
-                cell->setData(1, col);  // col
+                cell->setData(0, row);  // Çà
+                cell->setData(1, col);  // ¿­
 
                 m_gridCells.push_back(cell);
             }
