@@ -1,0 +1,16 @@
+{
+  "name": "blokus-online",
+  "version": "1.0.0",
+  "description": "Blokus Online Multiplayer Game",
+  "dependencies": [
+    "qt5-base",
+    "qt5-svg",
+    "protobuf",
+    "spdlog",
+    "boost-asio",
+    "boost-system", 
+    "boost-thread",
+    "nlohmann-json"
+  ],
+  "builtin-baseline": "3f8078010e5ec665602f564df755e41479aafd73"
+}
