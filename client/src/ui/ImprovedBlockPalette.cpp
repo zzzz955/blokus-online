@@ -497,17 +497,47 @@ namespace Blokus {
         , m_currentPlayer(PlayerColor::Blue)
         , m_selectedBlock(BlockType::Single, PlayerColor::Blue)
         , m_hasSelection(false)
+        , m_fixedPlayer(PlayerColor::Blue)  // 고정된 플레이어 (항상 파랑)
     {
         setupPalettes();
-        updatePlayerAssignments();
+        setupFixedPlayerAssignments();  // 고정 할당
+    }
+
+    void ImprovedGamePalette::setupFixedPlayerAssignments()
+    {
+        qDebug() << QString::fromUtf8("고정 플레이어 할당 설정");
+
+        // 고정 플레이어 할당 (변경되지 않음)
+        m_fixedPlayer = PlayerColor::Blue;  // 항상 파랑 플레이어
+
+        // 남쪽(하단)은 항상 파랑 플레이어 (나)
+        if (m_southPalette) {
+            m_southPalette->setPlayer(PlayerColor::Blue);
+            qDebug() << QString::fromUtf8("남쪽 팔레트: 파랑 (나의 블록)");
+        }
+
+        // 다른 방향은 다른 플레이어들
+        if (m_northPalette) {
+            m_northPalette->setPlayer(PlayerColor::Yellow);
+            qDebug() << QString::fromUtf8("북쪽 팔레트: 노랑");
+        }
+        if (m_eastPalette) {
+            m_eastPalette->setPlayer(PlayerColor::Red);
+            qDebug() << QString::fromUtf8("동쪽 팔레트: 빨강");
+        }
+        if (m_westPalette) {
+            m_westPalette->setPlayer(PlayerColor::Green);
+            qDebug() << QString::fromUtf8("서쪽 팔레트: 초록");
+        }
     }
 
     Block ImprovedGamePalette::getSelectedBlock() const
     {
-        if (m_hasSelection) {
+        // 내 턴이고 선택이 있을 때만 반환
+        if (m_hasSelection && m_currentPlayer == m_fixedPlayer) {
             return m_selectedBlock;
         }
-        // 선택이 없으면 빈 블록 반환
+        // 내 턴이 아니거나 선택이 없으면 빈 블록 반환
         return Block(BlockType::Single, PlayerColor::None);
     }
 
@@ -535,14 +565,23 @@ namespace Blokus {
     {
         if (m_currentPlayer != player) {
             m_currentPlayer = player;
-            m_selectedBlock.setPlayer(player);
-            updatePlayerAssignments();
+            qDebug() << QString::fromUtf8("현재 플레이어 변경: %1")
+                .arg(Utils::playerColorToString(player));
+
+            // 중요: 팔레트 재할당하지 않음! 고정 유지
+            // updatePlayerAssignments(); // 이 줄 제거
+
+            // 내 턴이 아니면 선택 해제
+            if (player != m_fixedPlayer) {
+                clearSelection();
+                qDebug() << QString::fromUtf8("내 턴이 아님 - 선택 해제");
+            }
         }
     }
 
     void ImprovedGamePalette::resetAllPlayerBlocks()
     {
-        qDebug() << QString::fromUtf8("ImprovedGamePalette::resetAllPlayerBlocks 호출됨");
+        qDebug() << QString::fromUtf8("=== 모든 플레이어 블록 리셋 ===");
 
         // 제거된 블록 목록 초기화
         m_removedBlocks.clear();
@@ -554,8 +593,8 @@ namespace Blokus {
         if (m_eastPalette) m_eastPalette->resetAllBlocks();
         if (m_westPalette) m_westPalette->resetAllBlocks();
 
-        // 플레이어 재할당
-        updatePlayerAssignments();
+        // 고정 플레이어 재할당 (변경되지 않는 할당)
+        setupFixedPlayerAssignments();
 
         qDebug() << QString::fromUtf8("모든 팔레트 리셋 완료");
     }
@@ -716,15 +755,38 @@ namespace Blokus {
 
     void ImprovedGamePalette::onDirectionBlockSelected(const Block& block)
     {
-        // 자신의 블록만 선택 가능 (남쪽 팔레트에서만)
-        if (block.getPlayer() == m_currentPlayer) {
-            // 이전 선택 해제
-            clearSelection();
+        qDebug() << QString::fromUtf8("블록 선택 시도: %1 (플레이어: %2)")
+            .arg(BlockFactory::getBlockName(block.getType()))
+            .arg(Utils::playerColorToString(block.getPlayer()));
 
-            m_selectedBlock = block;
-            m_hasSelection = true;
-            emit blockSelected(block);
+        // 오직 내 턴이고, 내 블록(파랑)일 때만 선택 가능
+        if (m_currentPlayer != m_fixedPlayer) {
+            qDebug() << QString::fromUtf8("❌ 내 턴이 아님 - 선택 불가");
+            return;
         }
+
+        if (block.getPlayer() != m_fixedPlayer) {
+            qDebug() << QString::fromUtf8("❌ 내 블록이 아님 - 선택 불가");
+            return;
+        }
+
+        // 남쪽 팔레트(내 블록)에서만 선택 가능
+        QObject* sender = QObject::sender();
+        if (sender != m_southPalette) {
+            qDebug() << QString::fromUtf8("❌ 내 팔레트가 아님 - 선택 불가");
+            return;
+        }
+
+        // 이전 선택 해제
+        clearSelection();
+
+        m_selectedBlock = block;
+        m_hasSelection = true;
+
+        qDebug() << QString::fromUtf8("✅ 블록 선택 성공: %1")
+            .arg(BlockFactory::getBlockName(block.getType()));
+
+        emit blockSelected(block);
     }
 
 } // namespace Blokus

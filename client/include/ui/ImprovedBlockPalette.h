@@ -142,18 +142,20 @@ namespace Blokus {
 
     private:
         void setupPalettes();
-        void updatePlayerAssignments();
+        void setupFixedPlayerAssignments();  // 새로 추가
+        void updatePlayerAssignments();      // 사용 안함 (호환성 유지)
         void updateBlockAvailability();
 
         PlayerColor m_currentPlayer;
+        PlayerColor m_fixedPlayer;           // 새로 추가 (항상 파랑)
         Block m_selectedBlock;
         bool m_hasSelection;
 
         // 4방향 팔레트
-        DirectionPalette* m_northPalette;
-        DirectionPalette* m_southPalette;
-        DirectionPalette* m_eastPalette;
-        DirectionPalette* m_westPalette;
+        DirectionPalette* m_northPalette;    // 항상 노랑
+        DirectionPalette* m_southPalette;    // 항상 파랑 (나)
+        DirectionPalette* m_eastPalette;     // 항상 빨강
+        DirectionPalette* m_westPalette;     // 항상 초록
 
         // 제거된 블록 추적
         std::map<PlayerColor, std::set<BlockType>> m_removedBlocks;

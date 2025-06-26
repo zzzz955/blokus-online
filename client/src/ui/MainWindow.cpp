@@ -62,10 +62,11 @@ namespace Blokus {
     {
         qDebug() << QString::fromUtf8("🎉 MainWindow::onBlockPlacedSuccessfully 호출됨!");
         qDebug() << QString::fromUtf8("   블록 타입: %1").arg(BlockFactory::getBlockName(blockType));
-        qDebug() << QString::fromUtf8("   플레이어: %1").arg(Utils::playerColorToString(player));
+        qDebug() << QString::fromUtf8("   배치한 플레이어: %1").arg(Utils::playerColorToString(player));
 
-        // 팔레트에서 해당 블록 제거
-        qDebug() << QString::fromUtf8("🗑️ 팔레트에서 블록 제거 시작...");
+        // 해당 플레이어의 팔레트에서만 블록 제거
+        qDebug() << QString::fromUtf8("🗑️ %1 플레이어 팔레트에서 블록 제거")
+            .arg(Utils::playerColorToString(player));
         m_improvedPalette->removeBlock(player, blockType);
 
         // 강제 화면 업데이트
@@ -74,14 +75,19 @@ namespace Blokus {
 
         qDebug() << QString::fromUtf8("✅ 팔레트 업데이트 완료");
 
-        // 선택 해제
-        clearSelectedBlock();
+        // 선택 해제 (내 블록이었다면)
+        PlayerColor currentPlayer = m_gameManager->getGameLogic().getCurrentPlayer();
+        if (player == PlayerColor::Blue) {  // 내가 배치했다면
+            clearSelectedBlock();
+            qDebug() << QString::fromUtf8("내 블록 배치 완료 - 선택 해제");
+        }
 
         // 다음 턴으로 이동
         m_gameManager->nextTurn();
         updateGameUI();
 
-        QString successMsg = QString::fromUtf8("블록 배치 완료! 다음: %1")
+        QString successMsg = QString::fromUtf8("%1 플레이어 블록 배치 완료! 다음: %2")
+            .arg(Utils::playerColorToString(player))
             .arg(Utils::playerColorToString(m_gameManager->getGameLogic().getCurrentPlayer()));
         statusBar()->showMessage(successMsg, 3000);
 
@@ -96,15 +102,14 @@ namespace Blokus {
 
     void MainWindow::onBlockSelected(const Block& block)
     {
-        if (m_gameBoard) {
-            // 현재 플레이어 색상으로 블록 설정
-            Block playerBlock = block;
-            if (m_gameManager) {
-                playerBlock.setPlayer(m_gameManager->getGameLogic().getCurrentPlayer());
-            }
+        qDebug() << QString::fromUtf8("MainWindow::onBlockSelected 호출됨");
+        qDebug() << QString::fromUtf8("   선택된 블록: %1").arg(BlockFactory::getBlockName(block.getType()));
+        qDebug() << QString::fromUtf8("   블록 플레이어: %1").arg(Utils::playerColorToString(block.getPlayer()));
 
-            m_gameBoard->setSelectedBlock(playerBlock);
-            m_improvedPalette->setSelectedBlock(playerBlock);
+        if (m_gameBoard) {
+            // 블록을 그대로 게임보드에 설정 (색깔 변경 안함)
+            m_gameBoard->setSelectedBlock(block);
+            m_improvedPalette->setSelectedBlock(block);
 
             QString message = QString::fromUtf8("선택된 블록: %1")
                 .arg(BlockFactory::getBlockName(block.getType()));
@@ -192,6 +197,17 @@ namespace Blokus {
             .arg(Utils::playerColorToString(currentPlayer));
         m_currentPlayerLabel->setText(playerText);
 
+        // 내 턴인지 표시
+        if (currentPlayer == PlayerColor::Blue) {
+            playerText += QString::fromUtf8(" (내 턴)");
+            m_currentPlayerLabel->setStyleSheet("color: #2980b9; font-weight: bold;");
+        }
+        else {
+            playerText += QString::fromUtf8(" (상대 턴)");
+            m_currentPlayerLabel->setStyleSheet("color: #7f8c8d;");
+        }
+        m_currentPlayerLabel->setText(playerText);
+
         // 게임 상태 업데이트
         GameState gameState = m_gameManager->getGameState();
         QString statusText;
@@ -201,8 +217,14 @@ namespace Blokus {
             statusText = QString::fromUtf8("대기 중 - '새 게임' 버튼을 눌러 시작하세요");
             break;
         case GameState::Playing:
-            statusText = QString::fromUtf8("게임 진행 중 - 턴 %1")
-                .arg(m_gameManager->getTurnNumber());
+            if (currentPlayer == PlayerColor::Blue) {
+                statusText = QString::fromUtf8("게임 진행 중 - 내 턴입니다! (턴 %1)")
+                    .arg(m_gameManager->getTurnNumber());
+            }
+            else {
+                statusText = QString::fromUtf8("게임 진행 중 - 상대방 턴입니다 (턴 %1)")
+                    .arg(m_gameManager->getTurnNumber());
+            }
             break;
         case GameState::Finished:
             statusText = QString::fromUtf8("게임 종료");
@@ -214,7 +236,7 @@ namespace Blokus {
 
         m_gameStatusLabel->setText(statusText);
 
-        // 버튼 상태 업데이트 (다음턴 버튼 제거)
+        // 버튼 상태 업데이트
         m_newGameButton->setEnabled(true);
 
         // 게임 종료 시 점수 표시
