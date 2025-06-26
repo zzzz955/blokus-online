@@ -19,10 +19,18 @@ find_package(nlohmann_json CONFIG REQUIRED)
 # 소스 파일들 (실제 존재하는 파일만)
 set(SOURCES
     src/main.cpp
+    src/ui/GameBoard.cpp
+    src/ui/MainWindow.cpp
+)
+
+set(HEADERS
+    include/ui/GameBoard.h
+    include/ui/MainWindow.h
+    include/common/Types.h
 )
 
 # 실행 파일 생성
-add_executable(BlokusClient ${SOURCES})
+add_executable(BlokusClient ${SOURCES} ${HEADERS})
 
 # 포함 디렉토리
 target_include_directories(BlokusClient PRIVATE
@@ -52,4 +60,27 @@ if(MSVC)
     target_compile_options(BlokusClient PRIVATE /W4 /utf-8)
 else()
     target_compile_options(BlokusClient PRIVATE -Wall -Wextra -pedantic)
+endif()
+
+# Qt5 DLL 자동 복사 (Windows용)
+if(WIN32)
+    # Qt5 DLL들 복사
+    add_custom_command(TARGET BlokusClient POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "$<TARGET_FILE:Qt5::Core>" "$<TARGET_FILE_DIR:BlokusClient>"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different  
+        "$<TARGET_FILE:Qt5::Gui>" "$<TARGET_FILE_DIR:BlokusClient>"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "$<TARGET_FILE:Qt5::Widgets>" "$<TARGET_FILE_DIR:BlokusClient>"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "$<TARGET_FILE:Qt5::Svg>" "$<TARGET_FILE_DIR:BlokusClient>"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "$<TARGET_FILE:Qt5::Network>" "$<TARGET_FILE_DIR:BlokusClient>"
+    )
+    
+    # vcpkg 의존성 DLL들도 복사
+    add_custom_command(TARGET BlokusClient POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_PREFIX_PATH}/bin" "$<TARGET_FILE_DIR:BlokusClient>"
+    )
 endif()
