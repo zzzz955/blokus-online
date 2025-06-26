@@ -22,6 +22,7 @@ namespace Blokus {
         , m_currentPreview(nullptr)
         , m_selectedBlock(BlockType::Single, PlayerColor::Blue)
         , m_testBlockIndex(0)
+        , m_gameLogic(nullptr)
     {
         setupScene();
         setupStyles();
@@ -92,7 +93,7 @@ namespace Blokus {
 
         // 시각적 요소 생성
         drawGrid();
-        drawStartingCorners();
+        // drawStartingCorners(); // 시작 모서리 하이라이트 제거
 
         // 뷰 맞춤
         fitBoardToView();
@@ -266,71 +267,6 @@ namespace Blokus {
         qDebug() << QString::fromUtf8("모든 블록 제거됨");
     }
 
-    void GameBoard::addTestBlocks()
-    {
-        qDebug() << QString::fromUtf8("테스트 블록들 추가 중...");
-
-        // 각 플레이어별로 몇 개의 블록을 랜덤 위치에 배치
-        std::vector<PlayerColor> players = {
-            PlayerColor::Blue, PlayerColor::Yellow,
-            PlayerColor::Red, PlayerColor::Green
-        };
-
-        std::vector<BlockType> testBlocks = {
-            BlockType::Single, BlockType::Domino, BlockType::TrioLine,
-            BlockType::Tetro_T, BlockType::Pento_F
-        };
-
-        std::random_device rd;
-        std::mt19937 gen(rd());
-        std::uniform_int_distribution<> posDist(2, BOARD_SIZE - 8);
-
-        for (size_t i = 0; i < players.size() && i < testBlocks.size(); ++i) {
-            Block testBlock(testBlocks[i], players[i]);
-            Position randomPos = { posDist(gen), posDist(gen) };
-
-            addBlockToBoard(testBlock, randomPos);
-        }
-    }
-
-    void GameBoard::showAllBlockTypes()
-    {
-        clearAllBlocks();
-
-        qDebug() << QString::fromUtf8("모든 블록 타입 표시 중...");
-
-        auto allBlockTypes = BlockFactory::getAllBlockTypes();
-        PlayerColor currentPlayer = PlayerColor::Blue;
-
-        int row = 1, col = 1;
-        int maxColsPerRow = 8;
-        int currentCol = 0;
-
-        for (BlockType blockType : allBlockTypes) {
-            Block block(blockType, currentPlayer);
-            Position pos = { row, col };
-
-            if (isValidBlockPlacement(block, pos)) {
-                addBlockToBoard(block, pos);
-
-                // 다음 위치 계산
-                QRect blockRect = block.getBoundingRect();
-                col += blockRect.width() + 1;
-                currentCol++;
-
-                // 줄 바꿈
-                if (currentCol >= maxColsPerRow) {
-                    row += 6; // 충분한 간격
-                    col = 1;
-                    currentCol = 0;
-
-                    // 플레이어 색상 변경
-                    currentPlayer = Utils::getNextPlayer(currentPlayer);
-                }
-            }
-        }
-    }
-
     BlockGraphicsItem* GameBoard::createBlockGraphicsItem(const Block& block, const Position& position)
     {
         QColor fillColor = getPlayerBrushColor(block.getPlayer());
@@ -366,16 +302,12 @@ namespace Blokus {
 
     bool GameBoard::checkBlokusRules(const Block& block, const Position& position, PlayerColor player) const
     {
-        // TODO: 실제 블로커스 규칙 구현
-        // 1. 첫 번째 블록은 모서리에 배치
-        // 2. 이후 블록들은 같은 색 블록과 모서리로만 접촉
-        // 3. 같은 색 블록과 변으로 접촉 금지
+        // 게임 로직이 있으면 그쪽에서 처리, 없으면 기본 허용
+        if (m_gameLogic) {
+            return m_gameLogic->canPlaceBlock(block, position, player);
+        }
 
-        Q_UNUSED(block)
-            Q_UNUSED(position)
-            Q_UNUSED(player)
-
-            return true; // 현재는 항상 허용
+        return true; // 게임 로직이 없으면 기본적으로 허용
     }
 
     QColor GameBoard::getPlayerBrushColor(PlayerColor player) const
@@ -394,7 +326,62 @@ namespace Blokus {
     }
 
     // ========================================
-    // 기존 함수들
+    // 게임 로직 연동 함수들
+    // ========================================
+
+    void GameBoard::setGameLogic(GameLogic* gameLogic)
+    {
+        m_gameLogic = gameLogic;
+        qDebug() << QString::fromUtf8("GameBoard에 게임 로직 연결됨");
+    }
+
+    bool GameBoard::tryPlaceCurrentBlock(const Position& position)
+    {
+        if (!m_gameLogic) {
+            qWarning() << QString::fromUtf8("게임 로직이 설정되지 않음");
+            return false;
+        }
+
+        // 현재 선택된 블록으로 배치 시도
+        PlayerColor currentPlayer = m_gameLogic->getCurrentPlayer();
+        Block blockToPlace = m_selectedBlock;
+        blockToPlace.setPlayer(currentPlayer);
+
+        if (m_gameLogic->canPlaceBlock(blockToPlace, position, currentPlayer)) {
+            // 게임 로직에서 블록 배치
+            if (m_gameLogic->placeBlock(blockToPlace, position, currentPlayer)) {
+                // 시각적으로도 블록 추가
+                addBlockToBoard(blockToPlace, position);
+
+                // 블록 배치 시그널 발생
+                emit blockPlaced(BlockPlacement(
+                    blockToPlace.getType(),
+                    position,
+                    blockToPlace.getRotation(),
+                    blockToPlace.getFlipState(),
+                    currentPlayer
+                ));
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    void GameBoard::setSelectedBlock(const Block& block)
+    {
+        m_selectedBlock = block;
+
+        // 현재 호버 위치에서 미리보기 업데이트
+        showCurrentBlockPreview();
+
+        qDebug() << QString::fromUtf8("선택된 블록 변경: %1")
+            .arg(BlockFactory::getBlockName(block.getType()));
+    }
+
+    // ========================================
+    // 기본 보드 상태 함수들
     // ========================================
 
     bool GameBoard::isCellValid(int row, int col) const
@@ -469,81 +456,19 @@ namespace Blokus {
         return mapFromScene(sceneX, sceneY);
     }
 
-    // 개선된 keyPressEvent - 배치하지 않고 상태만 변경
-    void GameBoard::keyPressEvent(QKeyEvent* event)
+    QColor GameBoard::getPlayerColor(PlayerColor player) const
     {
-        if (m_readOnly) {
-            QGraphicsView::keyPressEvent(event);
-            return;
+        auto it = m_playerColors.find(player);
+        if (it != m_playerColors.end()) {
+            return it->second;
         }
-
-        if (event->key() == Qt::Key_R) {
-            // R키: 블록 회전만 (배치 안함)
-            m_selectedBlock.rotateClockwise();
-
-            QString rotationMsg = QString::fromUtf8("블록 회전: %1도")
-                .arg(static_cast<int>(m_selectedBlock.getRotation()) * 90);
-            qDebug() << rotationMsg;
-
-            // 현재 호버 위치에서 미리보기 즉시 업데이트
-            showCurrentBlockPreview();
-        }
-        else if (event->key() == Qt::Key_F) {
-            // F키: 블록 뒤집기만 (배치 안함)
-            m_selectedBlock.flipHorizontal();
-
-            qDebug() << QString::fromUtf8("블록 뒤집기 적용");
-
-            // 현재 호버 위치에서 미리보기 즉시 업데이트
-            showCurrentBlockPreview();
-        }
-        else if (event->key() == Qt::Key_N) {
-            // N키: 다음 블록 타입으로 즉시 변경
-            auto allTypes = BlockFactory::getAllBlockTypes();
-            m_testBlockIndex = (m_testBlockIndex + 1) % allTypes.size();
-
-            BlockType newType = allTypes[m_testBlockIndex];
-            PlayerColor currentPlayer = m_selectedBlock.getPlayer(); // 기존 색상 유지
-            m_selectedBlock = Block(newType, currentPlayer);
-
-            QString blockMsg = QString::fromUtf8("블록 변경: %1")
-                .arg(BlockFactory::getBlockName(newType));
-            qDebug() << blockMsg;
-
-            // 즉시 미리보기 업데이트 (마우스 이동 불필요)
-            showCurrentBlockPreview();
-        }
-        else if (event->key() == Qt::Key_C) {
-            // C키: 플레이어 색상 변경
-            PlayerColor currentPlayer = m_selectedBlock.getPlayer();
-            PlayerColor nextPlayer = Utils::getNextPlayer(currentPlayer);
-            m_selectedBlock.setPlayer(nextPlayer);
-
-            QString colorMsg = QString::fromUtf8("플레이어 색상 변경: %1")
-                .arg(Utils::playerColorToString(nextPlayer));
-            qDebug() << colorMsg;
-
-            // 즉시 미리보기 색상 업데이트
-            showCurrentBlockPreview();
-        }
-        else if (event->key() == Qt::Key_Delete || event->key() == Qt::Key_Backspace) {
-            // Delete/Backspace키: 현재 호버 위치의 블록 제거
-            Position currentPos = m_hoveredCell;
-            if (isCellValid(currentPos.first, currentPos.second) &&
-                m_blockMap.find(currentPos) != m_blockMap.end()) {
-                removeBlockFromBoard(currentPos);
-                qDebug() << QString::fromUtf8("블록 제거: (%1, %2)")
-                    .arg(currentPos.first).arg(currentPos.second);
-
-                // 미리보기 다시 표시
-                showCurrentBlockPreview();
-            }
-        }
-
-        QGraphicsView::keyPressEvent(event);
+        return m_playerColors.at(PlayerColor::None);
     }
 
-    // 개선된 mousePressEvent - 좌클릭 시 미리보기 블록 배치
+    // ========================================
+    // 이벤트 핸들러들
+    // ========================================
+
     void GameBoard::mousePressEvent(QMouseEvent* event)
     {
         if (m_readOnly) {
@@ -557,58 +482,25 @@ namespace Blokus {
         if (event->button() == Qt::LeftButton) {
             if (isCellValid(boardPos.first, boardPos.second)) {
                 // 좌클릭: 현재 선택된 블록을 해당 위치에 배치 시도
-                if (isValidBlockPlacement(m_selectedBlock, boardPos)) {
-                    addBlockToBoard(m_selectedBlock, boardPos);
+                if (tryPlaceCurrentBlock(boardPos)) {
                     QString placeMsg = QString::fromUtf8("블록 배치: %1 (위치: %2, %3)")
                         .arg(BlockFactory::getBlockName(m_selectedBlock.getType()))
                         .arg(boardPos.first)
                         .arg(boardPos.second);
                     qDebug() << placeMsg;
-
-                    // 배치 후 미리보기 업데이트
-                    showCurrentBlockPreview();
                 }
                 else {
-                    qDebug() << QString::fromUtf8("블록 배치 불가 - 충돌 또는 경계 밖 (위치: %1, %2)")
+                    qDebug() << QString::fromUtf8("블록 배치 불가 - 규칙 위반 (위치: %1, %2)")
                         .arg(boardPos.first).arg(boardPos.second);
                 }
 
                 emit cellClicked(boardPos.first, boardPos.second);
             }
         }
-        // 우클릭으로 테스트 블록 추가 (기존 기능 유지)
-        else if (event->button() == Qt::RightButton) {
-            if (isCellValid(boardPos.first, boardPos.second)) {
-                onAddRandomBlock();
-            }
-        }
 
         QGraphicsView::mousePressEvent(event);
     }
 
-    void GameBoard::wheelEvent(QWheelEvent* event)
-    {
-        // 확대/축소 기능
-        const qreal scaleFactor = 1.15;
-        const qreal currentScale = transform().m11();
-
-        if (event->angleDelta().y() > 0) {
-            // 확대
-            if (currentScale < 3.0) {
-                scale(scaleFactor, scaleFactor);
-            }
-        }
-        else {
-            // 축소
-            if (currentScale > 0.3) {
-                scale(1.0 / scaleFactor, 1.0 / scaleFactor);
-            }
-        }
-
-        event->accept();
-    }
-
-    // 개선된 mouseMoveEvent - 호버 시 즉시 미리보기 업데이트
     void GameBoard::mouseMoveEvent(QMouseEvent* event)
     {
         if (!m_readOnly) {
@@ -638,43 +530,70 @@ namespace Blokus {
         QGraphicsView::mouseMoveEvent(event);
     }
 
-    // 개선된 현재 블록 미리보기 - 배치 불가능해도 빨간색으로 표시
-    void GameBoard::showCurrentBlockPreview()
+    void GameBoard::wheelEvent(QWheelEvent* event)
     {
-        if (m_readOnly || !isCellValid(m_hoveredCell.first, m_hoveredCell.second)) {
-            hideBlockPreview();
+        // 확대/축소 기능
+        const qreal scaleFactor = 1.15;
+        const qreal currentScale = transform().m11();
+
+        if (event->angleDelta().y() > 0) {
+            // 확대
+            if (currentScale < 3.0) {
+                scale(scaleFactor, scaleFactor);
+            }
+        }
+        else {
+            // 축소
+            if (currentScale > 0.3) {
+                scale(1.0 / scaleFactor, 1.0 / scaleFactor);
+            }
+        }
+
+        event->accept();
+    }
+
+    void GameBoard::keyPressEvent(QKeyEvent* event)
+    {
+        if (m_readOnly) {
+            QGraphicsView::keyPressEvent(event);
             return;
         }
 
-        hideBlockPreview(); // 기존 미리보기 제거
+        if (event->key() == Qt::Key_R) {
+            // R키: 블록 회전만 (배치 안함)
+            m_selectedBlock.rotateClockwise();
 
-        // 배치 가능 여부 확인
-        bool canPlace = isValidBlockPlacement(m_selectedBlock, m_hoveredCell);
+            QString rotationMsg = QString::fromUtf8("블록 회전: %1도")
+                .arg(static_cast<int>(m_selectedBlock.getRotation()) * 90);
+            qDebug() << rotationMsg;
 
-        // 배치 불가능해도 미리보기는 표시 (빨간색으로)
-        QColor previewColor = getPlayerBrushColor(m_selectedBlock.getPlayer());
-        QColor borderColor = previewColor.darker();
-
-        if (!canPlace) {
-            // 배치 불가능하면 빨간색으로 표시
-            previewColor = QColor(255, 100, 100, 150); // 반투명 빨간색
-            borderColor = QColor(200, 50, 50, 200);    // 진한 빨간색 테두리
+            // 현재 호버 위치에서 미리보기 즉시 업데이트
+            showCurrentBlockPreview();
         }
-        else {
-            // 배치 가능하면 기존 색상에 투명도 적용
-            previewColor.setAlpha(150); // 반투명
+        else if (event->key() == Qt::Key_F) {
+            // F키: 블록 뒤집기만 (배치 안함)
+            m_selectedBlock.flipHorizontal();
+
+            qDebug() << QString::fromUtf8("블록 뒤집기 적용");
+
+            // 현재 호버 위치에서 미리보기 즉시 업데이트
+            showCurrentBlockPreview();
+        }
+        else if (event->key() == Qt::Key_Delete || event->key() == Qt::Key_Backspace) {
+            // Delete/Backspace키: 현재 호버 위치의 블록 제거 (디버깅용)
+            Position currentPos = m_hoveredCell;
+            if (isCellValid(currentPos.first, currentPos.second) &&
+                m_blockMap.find(currentPos) != m_blockMap.end()) {
+                removeBlockFromBoard(currentPos);
+                qDebug() << QString::fromUtf8("블록 제거: (%1, %2)")
+                    .arg(currentPos.first).arg(currentPos.second);
+
+                // 미리보기 다시 표시
+                showCurrentBlockPreview();
+            }
         }
 
-        // 미리보기 블록 생성
-        m_currentPreview = new BlockGraphicsItem(m_selectedBlock, m_cellSize);
-        if (m_currentPreview) {
-            m_currentPreview->setPreviewMode(true);
-            m_currentPreview->updateColors(previewColor, borderColor);
-            m_currentPreview->updatePosition(m_hoveredCell, m_cellSize);
-            m_currentPreview->setZValue(3); // 다른 블록들 위에 표시
-
-            m_scene->addItem(m_currentPreview);
-        }
+        QGraphicsView::keyPressEvent(event);
     }
 
     void GameBoard::resizeEvent(QResizeEvent* event)
@@ -683,7 +602,6 @@ namespace Blokus {
         fitBoardToView();
     }
 
-    // 보드를 벗어날 때 미리보기 숨김
     void GameBoard::leaveEvent(QEvent* event)
     {
         m_hoveredCell = { -1, -1 };
@@ -711,15 +629,6 @@ namespace Blokus {
         }
     }
 
-    QColor GameBoard::getPlayerColor(PlayerColor player) const
-    {
-        auto it = m_playerColors.find(player);
-        if (it != m_playerColors.end()) {
-            return it->second;
-        }
-        return m_playerColors.at(PlayerColor::None);
-    }
-
     void GameBoard::setBoardReadOnly(bool readOnly)
     {
         m_readOnly = readOnly;
@@ -744,12 +653,219 @@ namespace Blokus {
     }
 
     // ========================================
-    // 테스트용 슬롯들
+    // 미리보기 관련 함수들
     // ========================================
+
+    void GameBoard::showCurrentBlockPreview()
+    {
+        if (m_readOnly || !isCellValid(m_hoveredCell.first, m_hoveredCell.second)) {
+            hideBlockPreview();
+            return;
+        }
+
+        hideBlockPreview(); // 기존 미리보기 제거
+
+        // 현재 플레이어 색상으로 블록 설정
+        Block previewBlock = m_selectedBlock;
+        if (m_gameLogic) {
+            previewBlock.setPlayer(m_gameLogic->getCurrentPlayer());
+        }
+
+        // 배치 가능 여부 확인 (게임 로직 사용)
+        bool canPlace = false;
+        if (m_gameLogic) {
+            canPlace = m_gameLogic->canPlaceBlock(previewBlock, m_hoveredCell, previewBlock.getPlayer());
+        }
+        else {
+            // 게임 로직이 없으면 기본 충돌 검사만
+            canPlace = isValidBlockPlacement(previewBlock, m_hoveredCell);
+        }
+
+        // 배치 불가능해도 미리보기는 표시 (빨간색으로)
+        QColor previewColor = getPlayerBrushColor(previewBlock.getPlayer());
+        QColor borderColor = previewColor.darker();
+
+        if (!canPlace) {
+            // 배치 불가능하면 빨간색으로 표시
+            previewColor = QColor(255, 100, 100, 150); // 반투명 빨간색
+            borderColor = QColor(200, 50, 50, 200);    // 진한 빨간색 테두리
+        }
+        else {
+            // 배치 가능하면 기존 색상에 투명도 적용
+            previewColor.setAlpha(150); // 반투명
+        }
+
+        // 미리보기 블록 생성
+        m_currentPreview = new BlockGraphicsItem(previewBlock, m_cellSize);
+        if (m_currentPreview) {
+            m_currentPreview->setPreviewMode(true);
+            m_currentPreview->updateColors(previewColor, borderColor);
+            m_currentPreview->updatePosition(m_hoveredCell, m_cellSize);
+            m_currentPreview->setZValue(3); // 다른 블록들 위에 표시
+
+            m_scene->addItem(m_currentPreview);
+        }
+    }
+
+    void GameBoard::hideBlockPreview()
+    {
+        if (m_currentPreview) {
+            m_scene->removeItem(m_currentPreview);
+            delete m_currentPreview;
+            m_currentPreview = nullptr;
+        }
+
+        // 기존 미리보기 아이템들도 제거
+        for (auto* item : m_previewItems) {
+            if (m_scene && item) {
+                m_scene->removeItem(item);
+                delete item;
+            }
+        }
+        m_previewItems.clear();
+    }
+
+    // ========================================
+    // 블록 배치 관련 함수들 (인터페이스 호환성)
+    // ========================================
+
+    bool GameBoard::canPlaceBlock(const BlockPlacement& placement) const
+    {
+        Block block(placement.type, placement.player);
+        block.setRotation(placement.rotation);
+        block.setFlipState(placement.flip);
+
+        if (m_gameLogic) {
+            return m_gameLogic->canPlaceBlock(block, placement.position, placement.player);
+        }
+        else {
+            return isValidBlockPlacement(block, placement.position) &&
+                checkBlokusRules(block, placement.position, placement.player);
+        }
+    }
+
+    bool GameBoard::placeBlock(const BlockPlacement& placement)
+    {
+        if (!canPlaceBlock(placement)) {
+            return false;
+        }
+
+        Block block(placement.type, placement.player);
+        block.setRotation(placement.rotation);
+        block.setFlipState(placement.flip);
+
+        if (m_gameLogic) {
+            if (m_gameLogic->placeBlock(block, placement.position, placement.player)) {
+                addBlockToBoard(block, placement.position);
+                emit blockPlaced(placement);
+                return true;
+            }
+        }
+        else {
+            addBlockToBoard(block, placement.position);
+            emit blockPlaced(placement);
+            return true;
+        }
+
+        return false;
+    }
+
+    void GameBoard::removeBlock(const Position& position)
+    {
+        removeBlockFromBoard(position);
+        emit blockRemoved(position);
+    }
+
+    void GameBoard::showBlockPreview(const BlockPlacement& placement)
+    {
+        hideBlockPreview(); // 기존 미리보기 제거
+
+        if (!canPlaceBlock(placement)) {
+            return; // 배치할 수 없는 위치면 미리보기 안함
+        }
+
+        Block previewBlock(placement.type, placement.player);
+        previewBlock.setRotation(placement.rotation);
+        previewBlock.setFlipState(placement.flip);
+
+        QColor previewColor = getPlayerBrushColor(placement.player);
+        previewColor.setAlpha(120); // 반투명
+
+        m_currentPreview = createBlockGraphicsItem(previewBlock, placement.position);
+        if (m_currentPreview) {
+            m_currentPreview->setPreviewMode(true);
+            m_currentPreview->updateColors(previewColor, previewColor.darker());
+            m_currentPreview->setZValue(3); // 다른 블록들 위에 표시
+        }
+    }
+
+    // ========================================
+    // 테스트/디버깅 함수들 (private)
+    // ========================================
+
+    void GameBoard::addTestBlocks()
+    {
+        qDebug() << QString::fromUtf8("테스트 블록들 추가 중...");
+
+        // 각 플레이어별로 몇 개의 블록을 랜덤 위치에 배치
+        std::vector<PlayerColor> players = {
+            PlayerColor::Blue, PlayerColor::Yellow,
+            PlayerColor::Red, PlayerColor::Green
+        };
+
+        std::vector<BlockType> testBlocks = {
+            BlockType::Single, BlockType::Domino, BlockType::TrioLine,
+            BlockType::Tetro_T, BlockType::Pento_F
+        };
+
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<> posDist(2, BOARD_SIZE - 8);
+
+        for (size_t i = 0; i < players.size() && i < testBlocks.size(); ++i) {
+            Block testBlock(testBlocks[i], players[i]);
+            Position randomPos = { posDist(gen), posDist(gen) };
+
+            addBlockToBoard(testBlock, randomPos);
+        }
+    }
 
     void GameBoard::onShowAllBlocks()
     {
-        showAllBlockTypes();
+        clearAllBlocks();
+
+        qDebug() << QString::fromUtf8("모든 블록 타입 표시 중...");
+
+        auto allBlockTypes = BlockFactory::getAllBlockTypes();
+        PlayerColor currentPlayer = PlayerColor::Blue;
+
+        int row = 1, col = 1;
+        int maxColsPerRow = 8;
+        int currentCol = 0;
+
+        for (BlockType blockType : allBlockTypes) {
+            Block block(blockType, currentPlayer);
+            Position pos = { row, col };
+
+            if (isValidBlockPlacement(block, pos)) {
+                addBlockToBoard(block, pos);
+
+                // 다음 위치 계산
+                QRect blockRect = block.getBoundingRect();
+                col += blockRect.width() + 1;
+                currentCol++;
+
+                // 줄 바꿈
+                if (currentCol >= maxColsPerRow) {
+                    row += 6; // 충분한 간격
+                    col = 1;
+                    currentCol = 0;
+
+                    // 플레이어 색상 변경
+                    currentPlayer = Utils::getNextPlayer(currentPlayer);
+                }
+            }
+        }
     }
 
     void GameBoard::onClearAllBlocks()
@@ -791,83 +907,6 @@ namespace Blokus {
         else {
             qDebug() << QString::fromUtf8("랜덤 블록 배치 실패 - 위치 충돌");
         }
-    }
-
-    // ========================================
-    // 블록 배치 관련 함수들
-    // ========================================
-
-    bool GameBoard::canPlaceBlock(const BlockPlacement& placement) const
-    {
-        Block block(placement.type, placement.player);
-        block.setRotation(placement.rotation);
-        block.setFlipState(placement.flip);
-
-        return isValidBlockPlacement(block, placement.position) &&
-            checkBlokusRules(block, placement.position, placement.player);
-    }
-
-    bool GameBoard::placeBlock(const BlockPlacement& placement)
-    {
-        if (!canPlaceBlock(placement)) {
-            return false;
-        }
-
-        Block block(placement.type, placement.player);
-        block.setRotation(placement.rotation);
-        block.setFlipState(placement.flip);
-
-        addBlockToBoard(block, placement.position);
-        emit blockPlaced(placement);
-
-        return true;
-    }
-
-    void GameBoard::removeBlock(const Position& position)
-    {
-        removeBlockFromBoard(position);
-        emit blockRemoved(position);
-    }
-
-    void GameBoard::showBlockPreview(const BlockPlacement& placement)
-    {
-        hideBlockPreview(); // 기존 미리보기 제거
-
-        if (!canPlaceBlock(placement)) {
-            return; // 배치할 수 없는 위치면 미리보기 안함
-        }
-
-        Block previewBlock(placement.type, placement.player);
-        previewBlock.setRotation(placement.rotation);
-        previewBlock.setFlipState(placement.flip);
-
-        QColor previewColor = getPlayerBrushColor(placement.player);
-        previewColor.setAlpha(120); // 반투명
-
-        m_currentPreview = createBlockGraphicsItem(previewBlock, placement.position);
-        if (m_currentPreview) {
-            m_currentPreview->setPreviewMode(true);
-            m_currentPreview->updateColors(previewColor, previewColor.darker());
-            m_currentPreview->setZValue(3); // 다른 블록들 위에 표시
-        }
-    }
-
-    void GameBoard::hideBlockPreview()
-    {
-        if (m_currentPreview) {
-            m_scene->removeItem(m_currentPreview);
-            delete m_currentPreview;
-            m_currentPreview = nullptr;
-        }
-
-        // 기존 미리보기 아이템들도 제거
-        for (auto* item : m_previewItems) {
-            if (m_scene && item) {
-                m_scene->removeItem(item);
-                delete item;
-            }
-        }
-        m_previewItems.clear();
     }
 
 } // namespace Blokus

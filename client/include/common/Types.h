@@ -2,6 +2,7 @@
 
 #include <utility>
 #include <vector>
+#include <QString>
 #include <QPoint>
 
 namespace Blokus {
@@ -124,6 +125,7 @@ Pento_Z = 20        // ■■
         FlipState flip;         // 뒤집기 상태
         PlayerColor player;     // 소유 플레이어
 
+        // 기본 생성자
         BlockPlacement()
             : type(BlockType::Single)
             , position({ 0, 0 })
@@ -133,11 +135,22 @@ Pento_Z = 20        // ■■
         {
         }
 
+        // 매개변수 생성자 (기본 값들)
         BlockPlacement(BlockType t, Position pos, PlayerColor p)
             : type(t)
             , position(pos)
             , rotation(Rotation::Degree_0)
             , flip(FlipState::Normal)
+            , player(p)
+        {
+        }
+
+        // 완전한 매개변수 생성자
+        BlockPlacement(BlockType t, Position pos, Rotation rot, FlipState f, PlayerColor p)
+            : type(t)
+            , position(pos)
+            , rotation(rot)
+            , flip(f)
             , player(p)
         {
         }
@@ -154,7 +167,7 @@ Pento_Z = 20        // ■■
 
         PlayerInfo()
             : color(PlayerColor::None)
-            , name("플레이어")
+            , name(QString::fromUtf8("플레이어"))
             , score(0)
             , remainingBlocks(BLOCKS_PER_PLAYER)
             , isAI(false)
@@ -198,11 +211,11 @@ Pento_Z = 20        // ■■
         // PlayerColor를 문자열로 변환
         inline QString playerColorToString(PlayerColor color) {
             switch (color) {
-            case PlayerColor::Blue: return "파랑";
-            case PlayerColor::Yellow: return "노랑";
-            case PlayerColor::Red: return "빨강";
-            case PlayerColor::Green: return "초록";
-            default: return "없음";
+            case PlayerColor::Blue: return QString::fromUtf8("파랑");
+            case PlayerColor::Yellow: return QString::fromUtf8("노랑");
+            case PlayerColor::Red: return QString::fromUtf8("빨강");
+            case PlayerColor::Green: return QString::fromUtf8("초록");
+            default: return QString::fromUtf8("없음");
             }
         }
 

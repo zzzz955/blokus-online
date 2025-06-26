@@ -16,6 +16,7 @@
 
 #include "common/Types.h"
 #include "game/Block.h"
+#include "game/GameLogic.h"
 
 namespace Blokus {
 
@@ -61,6 +62,11 @@ namespace Blokus {
         void removeBlockFromBoard(const Position& position);
         void clearAllBlocks();
 
+        // 게임 로직 연동 (새로 추가)
+        void setGameLogic(GameLogic* gameLogic);
+        bool tryPlaceCurrentBlock(const Position& position);
+        void setSelectedBlock(const Block& block);
+
         // 테스트용 블록 생성 (개발/디버깅용)
         void addTestBlocks();
         void showAllBlockTypes();
@@ -80,11 +86,6 @@ namespace Blokus {
         // 보드 설정
         void setBoardReadOnly(bool readOnly);
         void resetBoard();
-
-        // 블록 테스트 슬롯들 (새로 추가)
-        void onShowAllBlocks();
-        void onClearAllBlocks();
-        void onAddRandomBlock();
 
     signals:
         // 사용자 입력 이벤트
@@ -134,6 +135,11 @@ namespace Blokus {
         QColor getPlayerBrushColor(PlayerColor player) const;
         QColor getPlayerBorderColor(PlayerColor player) const;
 
+        // 테스트/디버깅 함수들 (private로 이동)
+        void onShowAllBlocks();
+        void onClearAllBlocks();
+        void onAddRandomBlock();
+
         // 멤버 변수들
         QGraphicsScene* m_scene;                    // 그래픽 씬
         QGraphicsRectItem* m_boardRect;             // 보드 경계 사각형
@@ -157,8 +163,11 @@ namespace Blokus {
         std::vector<BlockGraphicsItem*> m_blockItems;   // 배치된 블록들
         std::map<Position, BlockGraphicsItem*> m_blockMap; // 위치별 블록 맵
         BlockGraphicsItem* m_currentPreview;            // 현재 미리보기 블록
-        Block m_selectedBlock;                          // 현재 선택된 블록 (테스트용)
+        Block m_selectedBlock;                          // 현재 선택된 블록
         int m_testBlockIndex;                           // 테스트 블록 인덱스
+
+        // 게임 로직 (새로 추가)
+        GameLogic* m_gameLogic;                         // 게임 로직 참조
 
         // 스타일 설정
         QPen m_gridPen;                             // 격자 펜

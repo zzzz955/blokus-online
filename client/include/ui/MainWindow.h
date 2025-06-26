@@ -11,8 +11,11 @@
 #include <QStatusBar>
 #include <QMessageBox>
 #include <QGroupBox>
+#include <QSplitter>
 
 #include "ui/GameBoard.h"
+#include "ui/BlockPalette.h"
+#include "game/GameLogic.h"
 
 namespace Blokus {
 
@@ -31,32 +34,51 @@ namespace Blokus {
 
     public:
         explicit MainWindow(QWidget* parent = nullptr);
-        ~MainWindow() = default;
+        ~MainWindow(); // = default 제거
 
     private slots:
         // 게임보드 이벤트 핸들러
         void onCellClicked(int row, int col);
         void onCellHovered(int row, int col);
 
+        // 블록 팔레트 이벤트 핸들러 (새로 추가)
+        void onBlockSelected(const Block& block);
+
         // UI 컨트롤 핸들러
         void onResetBoard();
         void onToggleReadOnly();
         void onAbout();
 
+        // 게임 컨트롤 핸들러 (새로 추가)
+        void onNewGame();
+        void onNextTurn();
+
     private:
         // UI 설정 함수들
         void setupUI();
         QWidget* createControlPanel();
+        QWidget* createGameInfoPanel();      // 새로 추가
         void setupMenuBar();
         void setupToolBar();
         void setupStatusBar();
         void connectSignals();
 
+        // 게임 UI 업데이트 (새로 추가)
+        void updateGameUI();
+
         // 위젯 포인터들
         GameBoard* m_gameBoard;              // 메인 게임보드
+        GameBlockPalette* m_blockPalette;    // 블록 팔레트
         QLabel* m_coordinateLabel;           // 좌표 표시 라벨
+        QLabel* m_gameStatusLabel;           // 게임 상태 라벨
+        QLabel* m_currentPlayerLabel;        // 현재 플레이어 라벨
         QPushButton* m_resetButton;          // 초기화 버튼
         QPushButton* m_readOnlyButton;       // 상호작용 토글 버튼
+        QPushButton* m_newGameButton;        // 새 게임 버튼
+        QPushButton* m_nextTurnButton;       // 다음 턴 버튼
+
+        // 게임 로직
+        GameStateManager* m_gameManager;     // 게임 상태 관리자
     };
 
 } // namespace Blokus
