@@ -28,7 +28,7 @@ namespace Blokus {
 
         void setSelected(bool selected);
         void setUsed(bool used);
-        void setEnabled(bool enabled);
+        void setEnabled(bool enabled); // override 제거됨
 
         Block getBlock() const { return m_block; }
         BlockType getBlockType() const { return m_block.getType(); }
@@ -75,6 +75,7 @@ namespace Blokus {
         void setPlayer(PlayerColor player);
         void setBlocks(const std::vector<Block>& blocks);
         void setBlockUsed(BlockType blockType, bool used);
+        void removeBlock(BlockType blockType);
         void resetAllBlocks();
         void highlightBlock(BlockType blockType, bool highlight);
 
@@ -90,6 +91,7 @@ namespace Blokus {
     private:
         void setupLayout();
         void updateBlockButtons();
+        void reorganizeLayout();
         qreal getBlockSize() const;
         int getMaxBlocksPerRow() const;
         QString getDirectionName() const;
@@ -121,12 +123,13 @@ namespace Blokus {
 
         // 게임 상태 관리
         void setCurrentPlayer(PlayerColor player);
-        void setBlockUsed(PlayerColor player, BlockType blockType);
+        void removeBlock(PlayerColor player, BlockType blockType);
         void resetAllPlayerBlocks();
 
         // 블록 선택 관리
-        Block getSelectedBlock() const { return m_selectedBlock; }
+        Block getSelectedBlock() const;
         void setSelectedBlock(const Block& block);
+        void clearSelection();
 
     signals:
         void blockSelected(const Block& block);
@@ -141,15 +144,16 @@ namespace Blokus {
 
         PlayerColor m_currentPlayer;
         Block m_selectedBlock;
+        bool m_hasSelection;
 
         // 4방향 팔레트
-        DirectionPalette* m_northPalette;   // 상대방 (Yellow)
-        DirectionPalette* m_southPalette;   // 자신의 블록 (크게)
-        DirectionPalette* m_eastPalette;    // 상대방 (Red)
-        DirectionPalette* m_westPalette;    // 상대방 (Green)
+        DirectionPalette* m_northPalette;
+        DirectionPalette* m_southPalette;
+        DirectionPalette* m_eastPalette;
+        DirectionPalette* m_westPalette;
 
-        // 사용된 블록 추적
-        std::map<PlayerColor, std::set<BlockType>> m_usedBlocks;
+        // 제거된 블록 추적
+        std::map<PlayerColor, std::set<BlockType>> m_removedBlocks;
     };
 
 } // namespace Blokus

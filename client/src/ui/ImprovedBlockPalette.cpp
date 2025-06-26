@@ -47,7 +47,7 @@ namespace Blokus {
     {
         if (m_isUsed != used) {
             m_isUsed = used;
-            QWidget::setEnabled(!used); // QWidget의 setEnabled 호출
+            QWidget::setEnabled(!used);
             update();
         }
     }
@@ -224,12 +224,50 @@ namespace Blokus {
         }
     }
 
+    void DirectionPalette::removeBlock(BlockType blockType)
+    {
+        auto it = m_blockButtons.find(blockType);
+        if (it != m_blockButtons.end()) {
+            // 버튼을 레이아웃에서 제거하고 삭제
+            m_blockLayout->removeWidget(it->second);
+            delete it->second;
+            m_blockButtons.erase(it);
+
+            // 블록 목록에서도 제거
+            m_blocks.erase(
+                std::remove_if(m_blocks.begin(), m_blocks.end(),
+                    [blockType](const Block& block) {
+                        return block.getType() == blockType;
+                    }),
+                m_blocks.end()
+            );
+
+            // 레이아웃 재정렬
+            reorganizeLayout();
+        }
+    }
+
     void DirectionPalette::resetAllBlocks()
     {
         m_usedBlocks.clear();
+
+        // 모든 버튼 삭제
         for (auto& pair : m_blockButtons) {
-            pair.second->setUsed(false);
+            delete pair.second;
         }
+        m_blockButtons.clear();
+
+        // 블록 목록 재생성
+        if (m_player != PlayerColor::None) {
+            m_blocks.clear();
+            auto allTypes = BlockFactory::getAllBlockTypes();
+            for (BlockType type : allTypes) {
+                m_blocks.emplace_back(type, m_player);
+            }
+        }
+
+        // 버튼 재생성
+        updateBlockButtons();
     }
 
     void DirectionPalette::highlightBlock(BlockType blockType, bool highlight)
@@ -333,6 +371,30 @@ namespace Blokus {
         }
     }
 
+    void DirectionPalette::reorganizeLayout()
+    {
+        // 기존 레이아웃 클리어
+        QLayoutItem* item;
+        while ((item = m_blockLayout->takeAt(0)) != nullptr) {
+            // 위젯은 삭제하지 않고 레이아웃에서만 제거
+        }
+
+        // 버튼들을 다시 배치
+        qreal blockSize = getBlockSize();
+        int maxPerRow = getMaxBlocksPerRow();
+        int row = 0, col = 0;
+
+        for (auto& pair : m_blockButtons) {
+            m_blockLayout->addWidget(pair.second, row, col);
+
+            col++;
+            if (col >= maxPerRow) {
+                col = 0;
+                row++;
+            }
+        }
+    }
+
     qreal DirectionPalette::getBlockSize() const
     {
         switch (m_direction) {
@@ -396,9 +458,39 @@ namespace Blokus {
         : QWidget(parent)
         , m_currentPlayer(PlayerColor::Blue)
         , m_selectedBlock(BlockType::Single, PlayerColor::Blue)
+        , m_hasSelection(false)
     {
         setupPalettes();
         updatePlayerAssignments();
+    }
+
+    Block ImprovedGamePalette::getSelectedBlock() const
+    {
+        if (m_hasSelection) {
+            return m_selectedBlock;
+        }
+        // 선택이 없으면 빈 블록 반환
+        return Block(BlockType::Single, PlayerColor::None);
+    }
+
+    void ImprovedGamePalette::setSelectedBlock(const Block& block)
+    {
+        m_selectedBlock = block;
+        m_hasSelection = true;
+
+        // 자신의 팔레트에서만 선택 상태 업데이트
+        if (block.getPlayer() == m_currentPlayer) {
+            m_southPalette->highlightBlock(block.getType(), true);
+        }
+    }
+
+    void ImprovedGamePalette::clearSelection()
+    {
+        if (m_hasSelection) {
+            // 이전 선택 해제
+            m_southPalette->highlightBlock(m_selectedBlock.getType(), false);
+            m_hasSelection = false;
+        }
     }
 
     void ImprovedGamePalette::setCurrentPlayer(PlayerColor player)
@@ -410,11 +502,11 @@ namespace Blokus {
         }
     }
 
-    void ImprovedGamePalette::setBlockUsed(PlayerColor player, BlockType blockType)
+    void ImprovedGamePalette::removeBlock(PlayerColor player, BlockType blockType)
     {
-        m_usedBlocks[player].insert(blockType);
+        m_removedBlocks[player].insert(blockType);
 
-        // 해당 플레이어의 팔레트에서 블록 사용 표시
+        // 해당 플레이어의 팔레트에서 블록 제거
         DirectionPalette* palette = nullptr;
         if (player == m_currentPlayer) {
             palette = m_southPalette;
@@ -427,28 +519,28 @@ namespace Blokus {
         }
 
         if (palette) {
-            palette->setBlockUsed(blockType, true);
+            palette->removeBlock(blockType);
+        }
+
+        // 현재 선택된 블록이 제거된 블록이면 선택 해제
+        if (m_hasSelection && m_selectedBlock.getType() == blockType &&
+            m_selectedBlock.getPlayer() == player) {
+            clearSelection();
         }
     }
 
     void ImprovedGamePalette::resetAllPlayerBlocks()
     {
-        m_usedBlocks.clear();
+        m_removedBlocks.clear();
+        clearSelection();
 
+        // 모든 팔레트 재생성
         m_northPalette->resetAllBlocks();
         m_southPalette->resetAllBlocks();
         m_eastPalette->resetAllBlocks();
         m_westPalette->resetAllBlocks();
-    }
 
-    void ImprovedGamePalette::setSelectedBlock(const Block& block)
-    {
-        m_selectedBlock = block;
-
-        // 자신의 팔레트에서만 선택 상태 업데이트
-        if (block.getPlayer() == m_currentPlayer) {
-            m_southPalette->highlightBlock(block.getType(), true);
-        }
+        updatePlayerAssignments();
     }
 
     void ImprovedGamePalette::setupPalettes()
@@ -494,10 +586,10 @@ namespace Blokus {
 
     void ImprovedGamePalette::updateBlockAvailability()
     {
-        // 각 팔레트의 사용된 블록 상태 업데이트
-        for (const auto& playerBlocks : m_usedBlocks) {
+        // 각 팔레트의 제거된 블록 상태 업데이트
+        for (const auto& playerBlocks : m_removedBlocks) {
             PlayerColor player = playerBlocks.first;
-            const auto& usedBlocks = playerBlocks.second;
+            const auto& removedBlocks = playerBlocks.second;
 
             DirectionPalette* palette = nullptr;
             if (player == m_currentPlayer) {
@@ -510,8 +602,8 @@ namespace Blokus {
             }
 
             if (palette) {
-                for (BlockType blockType : usedBlocks) {
-                    palette->setBlockUsed(blockType, true);
+                for (BlockType blockType : removedBlocks) {
+                    palette->removeBlock(blockType);
                 }
             }
         }
@@ -521,7 +613,11 @@ namespace Blokus {
     {
         // 자신의 블록만 선택 가능 (남쪽 팔레트에서만)
         if (block.getPlayer() == m_currentPlayer) {
+            // 이전 선택 해제
+            clearSelection();
+
             m_selectedBlock = block;
+            m_hasSelection = true;
             emit blockSelected(block);
         }
     }

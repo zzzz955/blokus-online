@@ -3,6 +3,8 @@
 #include "game/Block.h"
 #include <QApplication>
 #include <QGridLayout>
+#include <QHBoxLayout>
+#include <QVBoxLayout>
 
 namespace Blokus {
 
@@ -41,20 +43,17 @@ namespace Blokus {
         if (m_gameManager->getGameState() == GameState::Playing) {
             Position clickedPos = { row, col };
             if (m_gameBoard->tryPlaceCurrentBlock(clickedPos)) {
-                // 블록 배치 성공 시 팔레트에서 사용됨 표시
+                // 블록 배치 성공 시 팔레트에서 블록 제거
                 PlayerColor currentPlayer = m_gameManager->getGameLogic().getCurrentPlayer();
                 Block selectedBlock = m_improvedPalette->getSelectedBlock();
-                m_improvedPalette->setBlockUsed(currentPlayer, selectedBlock.getType());
+                m_improvedPalette->removeBlock(currentPlayer, selectedBlock.getType());
 
-                // 다음 턴으로 이동
+                // 자동으로 다음 턴으로 이동 (다음턴 버튼 제거)
                 m_gameManager->nextTurn();
                 updateGameUI();
 
-                // 다음 플레이어에게 기본 블록 선택
-                PlayerColor nextPlayer = m_gameManager->getGameLogic().getCurrentPlayer();
-                Block defaultBlock(BlockType::Single, nextPlayer);
-                m_improvedPalette->setSelectedBlock(defaultBlock);
-                m_gameBoard->setSelectedBlock(defaultBlock);
+                // 선택된 블록 해제
+                clearSelectedBlock();
             }
         }
     }
@@ -80,6 +79,9 @@ namespace Blokus {
             QString message = QString::fromUtf8("선택된 블록: %1")
                 .arg(BlockFactory::getBlockName(block.getType()));
             statusBar()->showMessage(message, 2000);
+
+            // 게임보드에 포커스 설정 (키보드 입력을 위해)
+            m_gameBoard->setFocus();
         }
     }
 
@@ -92,28 +94,12 @@ namespace Blokus {
         // 모든 블록을 사용 가능 상태로 리셋
         resetAllBlockStates();
 
-        // 기본 블록 선택 (파란 플레이어의 첫 블록)
-        Block defaultBlock(BlockType::Single, PlayerColor::Blue);
-        m_improvedPalette->setSelectedBlock(defaultBlock);
-        m_gameBoard->setSelectedBlock(defaultBlock);
+        // 선택된 블록 해제
+        clearSelectedBlock();
 
         updateGameUI();
 
         statusBar()->showMessage(QString::fromUtf8("새 게임이 시작되었습니다! 파란 플레이어부터 시작합니다."), 3000);
-    }
-
-    void MainWindow::onNextTurn()
-    {
-        if (m_gameManager->getGameState() == GameState::Playing) {
-            m_gameManager->nextTurn();
-            updateGameUI();
-
-            // 다음 플레이어에게 기본 블록 선택
-            PlayerColor currentPlayer = m_gameManager->getGameLogic().getCurrentPlayer();
-            Block defaultBlock(BlockType::Single, currentPlayer);
-            m_improvedPalette->setSelectedBlock(defaultBlock);
-            m_gameBoard->setSelectedBlock(defaultBlock);
-        }
     }
 
     void MainWindow::onResetBoard()
@@ -121,6 +107,7 @@ namespace Blokus {
         m_gameManager->resetGame();
         m_gameBoard->resetBoard();
         resetAllBlockStates();
+        clearSelectedBlock();
         updateGameUI();
         statusBar()->showMessage(QString::fromUtf8("게임이 초기화되었습니다"), 1000);
     }
@@ -138,23 +125,24 @@ namespace Blokus {
     void MainWindow::onAbout()
     {
         QMessageBox::about(this, QString::fromUtf8("블로커스 온라인"),
-            QString::fromUtf8("🎲 블로커스 온라인 - 개선된 UI 버전 v3.0\n\n"
-                "✅ 완전히 새로운 4방향 블록 팔레트!\n\n"
+            QString::fromUtf8("🎲 블로커스 온라인 - 고급 UI 버전 v4.0\n\n"
+                "✅ 완전히 새로운 마작 스타일 레이아웃!\n\n"
                 "🎮 UI 개선사항:\n"
-                "• 자신의 블록: 하단에 크게 표시\n"
-                "• 상대방 블록: 동/서/북쪽에 작게 표시\n"
-                "• 폴리오미노 모양 그대로 표시\n"
-                "• 깔끔한 그리드 레이아웃\n"
-                "• 직관적인 블록 선택\n\n"
+                "• 중앙 게임보드 중심 설계\n"
+                "• 4방향 팔레트가 보드에 인접 배치\n"
+                "• 사용된 블록 자동 제거\n"
+                "• 반응형 레이아웃\n"
+                "• 자동 턴 진행\n\n"
                 "🏆 게임 규칙:\n"
                 "• 첫 블록은 아무 모서리에서나 시작 가능\n"
                 "• 이후 블록은 같은 색과 모서리로만 접촉\n"
                 "• 같은 색끼리 변 접촉 금지\n\n"
                 "🎯 플레이 방법:\n"
                 "1. '새 게임'으로 시작\n"
-                "2. 하단에서 자신의 블록 선택\n"
-                "3. R/F키로 회전/뒤집기\n"
-                "4. 좌클릭으로 배치\n\n"
+                "2. 자신의 팔레트에서 블록 선택\n"
+                "3. R/F키로 회전/뒤집기 (호버 상태에서)\n"
+                "4. 좌클릭으로 배치\n"
+                "5. 자동으로 다음 턴 진행\n\n"
                 "개발: SSAFY 포트폴리오 프로젝트"));
     }
 
@@ -192,9 +180,8 @@ namespace Blokus {
 
         m_gameStatusLabel->setText(statusText);
 
-        // 버튼 상태 업데이트
+        // 버튼 상태 업데이트 (다음턴 버튼 제거)
         m_newGameButton->setEnabled(true);
-        m_nextTurnButton->setEnabled(gameState == GameState::Playing);
 
         // 게임 종료 시 점수 표시
         if (gameState == GameState::Finished) {
@@ -215,74 +202,48 @@ namespace Blokus {
         m_improvedPalette->resetAllPlayerBlocks();
     }
 
+    void MainWindow::clearSelectedBlock()
+    {
+        // 선택된 블록 해제
+        m_improvedPalette->clearSelection();
+        if (m_gameBoard) {
+            // 기본 블록으로 설정하되 선택 상태는 해제
+            Block emptyBlock(BlockType::Single, PlayerColor::None);
+            m_gameBoard->setSelectedBlock(emptyBlock);
+        }
+    }
+
     void MainWindow::setupUI()
     {
-        setWindowTitle(QString::fromUtf8("블로커스 온라인 - 개선된 4방향 UI"));
-        setMinimumSize(1600, 1000); // 더 큰 창 크기로 조정
+        setWindowTitle(QString::fromUtf8("블로커스 온라인 - 마작 스타일 레이아웃"));
+        setMinimumSize(1200, 900);
+        resize(1400, 1000);
 
         // 중앙 위젯 설정
         QWidget* centralWidget = new QWidget(this);
         setCentralWidget(centralWidget);
-
-        // 메인 그리드 레이아웃 (3x3)
-        QGridLayout* mainLayout = new QGridLayout(centralWidget);
-        mainLayout->setContentsMargins(5, 5, 5, 5);
-        mainLayout->setSpacing(3);
-
-        // 상단 게임 정보 패널 (0,0 - 0,2)
-        QWidget* gameInfoPanel = createGameInfoPanel();
-        mainLayout->addWidget(gameInfoPanel, 0, 0, 1, 3);
 
         // 팔레트 및 게임보드 생성
         m_improvedPalette = new ImprovedGamePalette(this);
         m_gameBoard = new GameBoard(this);
         m_gameBoard->setGameLogic(&m_gameManager->getGameLogic());
 
-        // 서쪽 팔레트 (1,0) - 크기 조정
-        QWidget* westWidget = m_improvedPalette->getWestPalette();
-        westWidget->setMaximumWidth(100);
-        mainLayout->addWidget(westWidget, 1, 0);
+        // 메인 레이아웃: 마작 스타일
+        QVBoxLayout* mainLayout = new QVBoxLayout(centralWidget);
+        mainLayout->setContentsMargins(10, 10, 10, 10);
+        mainLayout->setSpacing(5);
 
-        // 중앙 영역 (1,1)
-        QWidget* centerWidget = new QWidget();
-        QVBoxLayout* centerLayout = new QVBoxLayout(centerWidget);
-        centerLayout->setContentsMargins(0, 0, 0, 0);
-        centerLayout->setSpacing(3);
+        // 상단 게임 정보 패널
+        QWidget* gameInfoPanel = createGameInfoPanel();
+        mainLayout->addWidget(gameInfoPanel);
 
-        // 북쪽 팔레트 - 높이 제한
-        QWidget* northWidget = m_improvedPalette->getNorthPalette();
-        northWidget->setMaximumHeight(100);
-        centerLayout->addWidget(northWidget);
+        // 중앙 게임 영역 (마작 스타일)
+        QWidget* gameArea = createMahjongStyleGameArea();
+        mainLayout->addWidget(gameArea, 1);
 
-        // 게임보드 - 정사각형 유지
-        m_gameBoard->setMinimumSize(600, 600);
-        centerLayout->addWidget(m_gameBoard, 1);
-
-        // 남쪽 팔레트 (자신의 블록) - 높이 적절히 조정
-        QWidget* southWidget = m_improvedPalette->getSouthPalette();
-        southWidget->setMaximumHeight(150);
-        southWidget->setMinimumHeight(120);
-        centerLayout->addWidget(southWidget);
-
-        mainLayout->addWidget(centerWidget, 1, 1);
-
-        // 동쪽 팔레트 (1,2) - 크기 조정
-        QWidget* eastWidget = m_improvedPalette->getEastPalette();
-        eastWidget->setMaximumWidth(100);
-        mainLayout->addWidget(eastWidget, 1, 2);
-
-        // 하단 컨트롤 패널 (2,0 - 2,2)
+        // 하단 컨트롤 패널
         QWidget* controlPanel = createCompactControlPanel();
-        mainLayout->addWidget(controlPanel, 2, 0, 1, 3);
-
-        // 그리드 비율 설정
-        mainLayout->setRowStretch(0, 0);  // 게임 정보 패널 (고정)
-        mainLayout->setRowStretch(1, 1);  // 메인 게임 영역 (확장)
-        mainLayout->setRowStretch(2, 0);  // 컨트롤 패널 (고정)
-
-        mainLayout->setColumnStretch(0, 0); // 서쪽 팔레트 (고정 100px)
-        mainLayout->setColumnStretch(1, 1); // 중앙 게임보드 (확장)
-        mainLayout->setColumnStretch(2, 0); // 동쪽 팔레트 (고정 100px)
+        mainLayout->addWidget(controlPanel);
 
         // 메뉴 바 설정
         setupMenuBar();
@@ -294,38 +255,90 @@ namespace Blokus {
         setupStatusBar();
     }
 
+    QWidget* MainWindow::createMahjongStyleGameArea()
+    {
+        QWidget* gameArea = new QWidget();
+        gameArea->setStyleSheet("QWidget { background-color: #2c3e50; }");
+
+        // 3x3 그리드로 마작 스타일 배치
+        QGridLayout* gridLayout = new QGridLayout(gameArea);
+        gridLayout->setContentsMargins(5, 5, 5, 5);
+        gridLayout->setSpacing(2);
+
+        // 팔레트 크기 설정
+        QWidget* northPalette = m_improvedPalette->getNorthPalette();
+        QWidget* southPalette = m_improvedPalette->getSouthPalette();
+        QWidget* eastPalette = m_improvedPalette->getEastPalette();
+        QWidget* westPalette = m_improvedPalette->getWestPalette();
+
+        // 크기 제한 설정
+        northPalette->setFixedHeight(80);
+        southPalette->setFixedHeight(80);
+        eastPalette->setFixedWidth(80);
+        westPalette->setFixedWidth(80);
+
+        // 게임보드 크기 설정
+        m_gameBoard->setMinimumSize(600, 600);
+        m_gameBoard->setMaximumSize(800, 800);
+
+        // 3x3 그리드 배치
+        //     0   1   2
+        // 0   .   N   .
+        // 1   W   B   E
+        // 2   .   S   .
+
+        gridLayout->addWidget(new QWidget(), 0, 0); // 빈 공간
+        gridLayout->addWidget(northPalette, 0, 1);
+        gridLayout->addWidget(new QWidget(), 0, 2); // 빈 공간
+
+        gridLayout->addWidget(westPalette, 1, 0);
+        gridLayout->addWidget(m_gameBoard, 1, 1);
+        gridLayout->addWidget(eastPalette, 1, 2);
+
+        gridLayout->addWidget(new QWidget(), 2, 0); // 빈 공간
+        gridLayout->addWidget(southPalette, 2, 1);
+        gridLayout->addWidget(new QWidget(), 2, 2); // 빈 공간
+
+        // 비율 설정 (중앙 게임보드가 확장)
+        gridLayout->setRowStretch(0, 0);
+        gridLayout->setRowStretch(1, 1);
+        gridLayout->setRowStretch(2, 0);
+
+        gridLayout->setColumnStretch(0, 0);
+        gridLayout->setColumnStretch(1, 1);
+        gridLayout->setColumnStretch(2, 0);
+
+        return gameArea;
+    }
+
     QWidget* MainWindow::createGameInfoPanel()
     {
         QWidget* panel = new QWidget();
         panel->setFixedHeight(50);
-        panel->setStyleSheet("QWidget { background-color: #2c3e50; color: white; border-radius: 5px; }");
+        panel->setStyleSheet("QWidget { background-color: #34495e; color: white; border-radius: 5px; }");
 
         QHBoxLayout* layout = new QHBoxLayout(panel);
-        layout->setContentsMargins(10, 5, 10, 5);
+        layout->setContentsMargins(15, 8, 15, 8);
 
         // 게임 상태 라벨
         m_gameStatusLabel = new QLabel(QString::fromUtf8("대기 중"));
-        m_gameStatusLabel->setStyleSheet("font-size: 14px; font-weight: bold;");
+        m_gameStatusLabel->setStyleSheet("font-size: 16px; font-weight: bold;");
         layout->addWidget(m_gameStatusLabel);
 
         layout->addStretch();
 
         // 현재 플레이어 라벨
         m_currentPlayerLabel = new QLabel(QString::fromUtf8("현재 플레이어: 없음"));
-        m_currentPlayerLabel->setStyleSheet("font-size: 12px;");
+        m_currentPlayerLabel->setStyleSheet("font-size: 14px;");
         layout->addWidget(m_currentPlayerLabel);
 
         layout->addStretch();
 
-        // 게임 조작 버튼들
+        // 새 게임 버튼만 유지 (다음턴 버튼 제거)
         m_newGameButton = new QPushButton(QString::fromUtf8("🎮 새 게임"));
-        m_nextTurnButton = new QPushButton(QString::fromUtf8("⏭️ 다음 턴"));
-
-        m_newGameButton->setStyleSheet("QPushButton { font-size: 11px; padding: 5px 12px; background-color: #27ae60; border: none; border-radius: 3px; } QPushButton:hover { background-color: #2ecc71; }");
-        m_nextTurnButton->setStyleSheet("QPushButton { font-size: 11px; padding: 5px 12px; background-color: #3498db; border: none; border-radius: 3px; } QPushButton:hover { background-color: #5dade2; }");
+        m_newGameButton->setStyleSheet("QPushButton { font-size: 12px; padding: 8px 15px; background-color: #27ae60; border: none; border-radius: 4px; } QPushButton:hover { background-color: #2ecc71; }");
 
         layout->addWidget(m_newGameButton);
-        layout->addWidget(m_nextTurnButton);
 
         return panel;
     }
@@ -333,32 +346,34 @@ namespace Blokus {
     QWidget* MainWindow::createCompactControlPanel()
     {
         QWidget* panel = new QWidget();
-        panel->setFixedHeight(60);
+        panel->setFixedHeight(50);
         panel->setStyleSheet("QWidget { background-color: #ecf0f1; border-radius: 5px; }");
 
         QHBoxLayout* layout = new QHBoxLayout(panel);
-        layout->setContentsMargins(10, 5, 10, 5);
+        layout->setContentsMargins(15, 8, 15, 8);
 
         // 좌표 표시
         m_coordinateLabel = new QLabel(QString::fromUtf8("보드 위에서 마우스를 움직이세요"));
-        m_coordinateLabel->setStyleSheet("font-size: 11px; color: #666;");
+        m_coordinateLabel->setStyleSheet("font-size: 12px; color: #666;");
         layout->addWidget(m_coordinateLabel);
 
         layout->addStretch();
 
         // 조작법 안내
-        QLabel* helpLabel = new QLabel(QString::fromUtf8("R키: 회전 | F키: 뒤집기 | 좌클릭: 배치"));
-        helpLabel->setStyleSheet("font-size: 10px; color: #888;");
+        QLabel* helpLabel = new QLabel(QString::fromUtf8("R키: 회전 | F키: 뒤집기 | 좌클릭: 배치 | 자동 턴 진행"));
+        helpLabel->setStyleSheet("font-size: 11px; color: #888;");
         layout->addWidget(helpLabel);
 
         layout->addStretch();
 
         // 컨트롤 버튼들
-        m_resetButton = new QPushButton(QString::fromUtf8("🔄 리셋"));
-        m_readOnlyButton = new QPushButton(QString::fromUtf8("🔒 잠금"));
+        m_resetButton = new QPushButton(QString::fromUtf8("🔄"));
+        m_readOnlyButton = new QPushButton(QString::fromUtf8("🔒"));
 
-        m_resetButton->setFixedSize(60, 30);
-        m_readOnlyButton->setFixedSize(60, 30);
+        m_resetButton->setFixedSize(40, 30);
+        m_readOnlyButton->setFixedSize(40, 30);
+        m_resetButton->setToolTip(QString::fromUtf8("게임 리셋"));
+        m_readOnlyButton->setToolTip(QString::fromUtf8("잠금 모드"));
 
         layout->addWidget(m_resetButton);
         layout->addWidget(m_readOnlyButton);
@@ -384,7 +399,6 @@ namespace Blokus {
 
         toolBar->addAction(QString::fromUtf8("🎮"), this, &MainWindow::onNewGame)->setToolTip(QString::fromUtf8("새 게임 (Ctrl+N)"));
         toolBar->addAction(QString::fromUtf8("🔄"), this, &MainWindow::onResetBoard)->setToolTip(QString::fromUtf8("게임 리셋 (Ctrl+R)"));
-        toolBar->addAction(QString::fromUtf8("⏭️"), this, &MainWindow::onNextTurn)->setToolTip(QString::fromUtf8("다음 턴"));
         toolBar->addSeparator();
         toolBar->addAction(QString::fromUtf8("ℹ️"), this, &MainWindow::onAbout)->setToolTip(QString::fromUtf8("게임 규칙 (F1)"));
     }
@@ -403,11 +417,10 @@ namespace Blokus {
         // 블록 팔레트 시그널
         connect(m_improvedPalette, &ImprovedGamePalette::blockSelected, this, &MainWindow::onBlockSelected);
 
-        // 버튼 시그널
+        // 버튼 시그널 (다음턴 버튼 제거)
         connect(m_resetButton, &QPushButton::clicked, this, &MainWindow::onResetBoard);
         connect(m_readOnlyButton, &QPushButton::clicked, this, &MainWindow::onToggleReadOnly);
         connect(m_newGameButton, &QPushButton::clicked, this, &MainWindow::onNewGame);
-        connect(m_nextTurnButton, &QPushButton::clicked, this, &MainWindow::onNextTurn);
     }
 
 } // namespace Blokus

@@ -23,6 +23,7 @@ namespace Blokus {
         , m_selectedBlock(BlockType::Single, PlayerColor::Blue)
         , m_testBlockIndex(0)
         , m_gameLogic(nullptr)
+        , m_hasSelectedBlock(false)  // 선택 상태 추가
     {
         setupScene();
         setupStyles();
@@ -372,12 +373,19 @@ namespace Blokus {
     void GameBoard::setSelectedBlock(const Block& block)
     {
         m_selectedBlock = block;
+        m_hasSelectedBlock = (block.getPlayer() != PlayerColor::None);
 
         // 현재 호버 위치에서 미리보기 업데이트
-        showCurrentBlockPreview();
+        if (m_hasSelectedBlock) {
+            showCurrentBlockPreview();
+        }
+        else {
+            hideBlockPreview();
+        }
 
-        qDebug() << QString::fromUtf8("선택된 블록 변경: %1")
-            .arg(BlockFactory::getBlockName(block.getType()));
+        qDebug() << QString::fromUtf8("선택된 블록 변경: %1 (선택상태: %2)")
+            .arg(BlockFactory::getBlockName(block.getType()))
+            .arg(m_hasSelectedBlock ? "있음" : "없음");
     }
 
     // ========================================
@@ -517,8 +525,10 @@ namespace Blokus {
                     // 즉시 호버 이벤트 발생
                     emit cellHovered(m_hoveredCell.first, m_hoveredCell.second);
 
-                    // 즉시 블록 미리보기 업데이트
-                    showCurrentBlockPreview();
+                    // 블록이 선택된 상태에서만 미리보기 표시
+                    if (m_hasSelectedBlock) {
+                        showCurrentBlockPreview();
+                    }
                 }
                 else {
                     // 보드 밖으로 나가면 미리보기 숨김
@@ -554,48 +564,55 @@ namespace Blokus {
 
     void GameBoard::keyPressEvent(QKeyEvent* event)
     {
-        if (m_readOnly) {
-            QGraphicsView::keyPressEvent(event);
-            return;
-        }
+        // 읽기 전용 모드가 아니고 블록이 선택된 상태에서만 키보드 입력 처리
+        if (!m_readOnly && m_hasSelectedBlock) {
+            if (event->key() == Qt::Key_R) {
+                // R키: 블록 회전
+                m_selectedBlock.rotateClockwise();
 
-        if (event->key() == Qt::Key_R) {
-            // R키: 블록 회전만 (배치 안함)
-            m_selectedBlock.rotateClockwise();
+                QString rotationMsg = QString::fromUtf8("블록 회전: %1도")
+                    .arg(static_cast<int>(m_selectedBlock.getRotation()) * 90);
+                qDebug() << rotationMsg;
 
-            QString rotationMsg = QString::fromUtf8("블록 회전: %1도")
-                .arg(static_cast<int>(m_selectedBlock.getRotation()) * 90);
-            qDebug() << rotationMsg;
-
-            // 현재 호버 위치에서 미리보기 즉시 업데이트
-            showCurrentBlockPreview();
-
-            // 팔레트에도 회전 상태 반영
-            emit blockRotated(m_selectedBlock);
-        }
-        else if (event->key() == Qt::Key_F) {
-            // F키: 블록 뒤집기만 (배치 안함)
-            m_selectedBlock.flipHorizontal();
-
-            qDebug() << QString::fromUtf8("블록 뒤집기 적용");
-
-            // 현재 호버 위치에서 미리보기 즉시 업데이트
-            showCurrentBlockPreview();
-
-            // 팔레트에도 뒤집기 상태 반영
-            emit blockFlipped(m_selectedBlock);
-        }
-        else if (event->key() == Qt::Key_Delete || event->key() == Qt::Key_Backspace) {
-            // Delete/Backspace키: 현재 호버 위치의 블록 제거 (디버깅용)
-            Position currentPos = m_hoveredCell;
-            if (isCellValid(currentPos.first, currentPos.second) &&
-                m_blockMap.find(currentPos) != m_blockMap.end()) {
-                removeBlockFromBoard(currentPos);
-                qDebug() << QString::fromUtf8("블록 제거: (%1, %2)")
-                    .arg(currentPos.first).arg(currentPos.second);
-
-                // 미리보기 다시 표시
+                // 즉시 미리보기 업데이트
                 showCurrentBlockPreview();
+
+                // 팔레트에도 회전 상태 반영
+                emit blockRotated(m_selectedBlock);
+
+                event->accept();
+                return;
+            }
+            else if (event->key() == Qt::Key_F) {
+                // F키: 블록 뒤집기
+                m_selectedBlock.flipHorizontal();
+
+                qDebug() << QString::fromUtf8("블록 뒤집기 적용");
+
+                // 즉시 미리보기 업데이트
+                showCurrentBlockPreview();
+
+                // 팔레트에도 뒤집기 상태 반영
+                emit blockFlipped(m_selectedBlock);
+
+                event->accept();
+                return;
+            }
+            else if (event->key() == Qt::Key_Delete || event->key() == Qt::Key_Backspace) {
+                // Delete/Backspace키: 현재 호버 위치의 블록 제거 (디버깅용)
+                Position currentPos = m_hoveredCell;
+                if (isCellValid(currentPos.first, currentPos.second) &&
+                    m_blockMap.find(currentPos) != m_blockMap.end()) {
+                    removeBlockFromBoard(currentPos);
+                    qDebug() << QString::fromUtf8("블록 제거: (%1, %2)")
+                        .arg(currentPos.first).arg(currentPos.second);
+
+                    // 미리보기 다시 표시
+                    showCurrentBlockPreview();
+                }
+
+                event->accept();
+                return;
             }
         }
 
@@ -614,6 +631,20 @@ namespace Blokus {
         m_hoverTimer->stop();
         hideBlockPreview(); // 마우스가 보드를 벗어나면 미리보기 숨김
         QGraphicsView::leaveEvent(event);
+    }
+
+    // 포커스 이벤트 처리 추가
+    void GameBoard::focusInEvent(QFocusEvent* event)
+    {
+        // 포커스를 받으면 키보드 입력 준비
+        QGraphicsView::focusInEvent(event);
+        qDebug() << QString::fromUtf8("GameBoard 포커스 획득 - 키보드 입력 활성화");
+    }
+
+    void GameBoard::focusOutEvent(QFocusEvent* event)
+    {
+        QGraphicsView::focusOutEvent(event);
+        qDebug() << QString::fromUtf8("GameBoard 포커스 상실");
     }
 
     void GameBoard::fitBoardToView()
@@ -664,7 +695,8 @@ namespace Blokus {
 
     void GameBoard::showCurrentBlockPreview()
     {
-        if (m_readOnly || !isCellValid(m_hoveredCell.first, m_hoveredCell.second)) {
+        // 선택된 블록이 없거나 읽기 전용이면 미리보기 안함
+        if (!m_hasSelectedBlock || m_readOnly || !isCellValid(m_hoveredCell.first, m_hoveredCell.second)) {
             hideBlockPreview();
             return;
         }
