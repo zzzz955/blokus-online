@@ -1,0 +1,60 @@
+{
+  "configurations": [
+    {
+      "name": "x64-Debug",
+      "generator": "Visual Studio 17 2022 Win64",
+      "configurationType": "Debug",
+      "buildRoot": "${projectDir}\\build",
+      "installRoot": "${projectDir}\\install",
+      "cmakeCommandArgs": "",
+      "buildCommandArgs": "",
+      "ctestCommandArgs": "",
+      "inheritEnvironments": [ "msvc_x64_x64" ],
+      "variables": [
+        {
+          "name": "CMAKE_TOOLCHAIN_FILE",
+          "value": "${projectDir}\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake",
+          "type": "FILEPATH"
+        },
+        {
+          "name": "CMAKE_PREFIX_PATH",
+          "value": "${projectDir}\\vcpkg_installed\\x64-windows",
+          "type": "PATH"
+        },
+        {
+          "name": "VCPKG_TARGET_TRIPLET",
+          "value": "x64-windows",
+          "type": "STRING"
+        }
+      ]
+    },
+    {
+      "name": "x64-Release",
+      "generator": "Visual Studio 17 2022 Win64", 
+      "configurationType": "Release",
+      "buildRoot": "${projectDir}\\build-release",
+      "installRoot": "${projectDir}\\install",
+      "cmakeCommandArgs": "",
+      "buildCommandArgs": "",
+      "ctestCommandArgs": "",
+      "inheritEnvironments": [ "msvc_x64_x64" ],
+      "variables": [
+        {
+          "name": "CMAKE_TOOLCHAIN_FILE",
+          "value": "${projectDir}\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake",
+          "type": "FILEPATH"
+        },
+        {
+          "name": "CMAKE_PREFIX_PATH",
+          "value": "${projectDir}\\vcpkg_installed\\x64-windows",
+          "type": "PATH"
+        },
+        {
+          "name": "VCPKG_TARGET_TRIPLET",
+          "value": "x64-windows",
+          "type": "STRING"
+        }
+      ]
+    }
+  ]
+}
