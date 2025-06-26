@@ -66,19 +66,19 @@ namespace Blokus {
     void GameBoard::setupStyles()
     {
         // 격자 펜 설정
-        m_gridPen = QPen(QColor(200, 200, 200), 1, Qt::SolidLine);
-        m_borderPen = QPen(QColor(100, 100, 100), 2, Qt::SolidLine);
+        m_gridPen = QPen(QColor(200, 180, 140), 1, Qt::SolidLine);     // 베이지 계열 격자
+        m_borderPen = QPen(QColor(139, 119, 101), 2, Qt::SolidLine);   // 진한 베이지 테두리
 
-        // 브러시 설정
-        m_emptyBrush = QBrush(QColor(245, 245, 245));
-        m_highlightBrush = QBrush(QColor(255, 255, 0, 100));
+        // 브러시 설정 - 베이지색 계열
+        m_emptyBrush = QBrush(QColor(245, 245, 220));                  // 베이지색 (빈 칸)
+        m_highlightBrush = QBrush(QColor(255, 255, 0, 100));           // 하이라이트
 
-        // 플레이어 색상 설정
-        m_playerColors[PlayerColor::Blue] = QColor(52, 152, 219);     // 파랑
-        m_playerColors[PlayerColor::Yellow] = QColor(241, 196, 15);   // 노랑  
-        m_playerColors[PlayerColor::Red] = QColor(231, 76, 60);       // 빨강
-        m_playerColors[PlayerColor::Green] = QColor(46, 204, 113);    // 초록
-        m_playerColors[PlayerColor::None] = QColor(245, 245, 245);    // 빈 칸
+        // 플레이어 색상 설정 (기존 유지)
+        m_playerColors[PlayerColor::Blue] = QColor(52, 152, 219);      // 파랑
+        m_playerColors[PlayerColor::Yellow] = QColor(241, 196, 15);    // 노랑  
+        m_playerColors[PlayerColor::Red] = QColor(231, 76, 60);        // 빨강
+        m_playerColors[PlayerColor::Green] = QColor(46, 204, 113);     // 초록
+        m_playerColors[PlayerColor::None] = QColor(245, 245, 220);     // 베이지색 (빈 칸)
     }
 
     void GameBoard::initializeBoard()

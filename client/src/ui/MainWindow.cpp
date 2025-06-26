@@ -268,9 +268,16 @@ namespace Blokus {
 
     void MainWindow::setupUI()
     {
-        setWindowTitle(QString::fromUtf8("블로커스 온라인 - 컴팩트 마작 레이아웃"));
-        setMinimumSize(1000, 800);  // 더 작은 최소 크기
-        resize(1200, 900);          // 기본 크기도 더 작게
+        setWindowTitle(QString::fromUtf8("블로커스 온라인 - 베이지 테마"));
+        setMinimumSize(1200, 1000);  // 충분한 크기
+        resize(1400, 1100);          // 더 큰 기본 크기
+
+        // 전체 배경색 설정 - 베이지 테마
+        setStyleSheet(
+            "QMainWindow { "
+            "background-color: #faf0e6; "  // 연한 베이지 배경
+            "}"
+        );
 
         // 중앙 위젯 설정
         QWidget* centralWidget = new QWidget(this);
@@ -281,24 +288,27 @@ namespace Blokus {
         m_gameBoard = new GameBoard(this);
         m_gameBoard->setGameLogic(&m_gameManager->getGameLogic());
 
-        // 메인 레이아웃: 더 컴팩트하게
+        // 메인 레이아웃: 충분한 여백
         QVBoxLayout* mainLayout = new QVBoxLayout(centralWidget);
-        mainLayout->setContentsMargins(8, 8, 8, 8);
-        mainLayout->setSpacing(4);
+        mainLayout->setContentsMargins(15, 15, 15, 15);
+        mainLayout->setSpacing(10);
 
-        // 상단 게임 정보 패널 (더 작게)
+        // 상단 게임 정보 패널
         QWidget* gameInfoPanel = createGameInfoPanel();
-        gameInfoPanel->setFixedHeight(40);
+        gameInfoPanel->setFixedHeight(55);
         mainLayout->addWidget(gameInfoPanel);
 
-        // 중앙 게임 영역 (마작 스타일)
+        // 중앙 게임 영역 (마작 스타일) - 고정 크기
         QWidget* gameArea = createMahjongStyleGameArea();
-        mainLayout->addWidget(gameArea, 1);
+        mainLayout->addWidget(gameArea);
 
-        // 하단 컨트롤 패널 (더 작게)
+        // 하단 컨트롤 패널
         QWidget* controlPanel = createCompactControlPanel();
-        controlPanel->setFixedHeight(35);
+        controlPanel->setFixedHeight(45);
         mainLayout->addWidget(controlPanel);
+
+        // 레이아웃이 확장되지 않도록 설정
+        mainLayout->addStretch(0);
 
         // 메뉴 바 설정
         setupMenuBar();
@@ -313,49 +323,40 @@ namespace Blokus {
     QWidget* MainWindow::createMahjongStyleGameArea()
     {
         QWidget* gameArea = new QWidget();
-        gameArea->setStyleSheet("QWidget { background-color: #34495e; border-radius: 8px; }");
+        gameArea->setStyleSheet(
+            "QWidget { "
+            "background-color: #34495e; "  // 어두운 배경 (베이지와 대비)
+            "border-radius: 12px; "
+            "padding: 10px; "
+            "}"
+        );
 
         // 3x3 그리드로 마작 스타일 배치
         QGridLayout* gridLayout = new QGridLayout(gameArea);
-        gridLayout->setContentsMargins(8, 8, 8, 8);
-        gridLayout->setSpacing(3);
+        gridLayout->setContentsMargins(15, 15, 15, 15);
+        gridLayout->setSpacing(12);
 
-        // 팔레트 크기 설정 (더 작게)
+        // 팔레트 크기 설정
         QWidget* northPalette = m_improvedPalette->getNorthPalette();
         QWidget* southPalette = m_improvedPalette->getSouthPalette();
         QWidget* eastPalette = m_improvedPalette->getEastPalette();
         QWidget* westPalette = m_improvedPalette->getWestPalette();
 
-        // 크기 제한 설정 (더 컴팩트하게)
-        northPalette->setFixedHeight(60);   // 더 작게
-        southPalette->setFixedHeight(100);  // 자신의 블록은 적당히
-        eastPalette->setFixedWidth(70);     // 더 작게
-        westPalette->setFixedWidth(70);     // 더 작게
+        // 크기 제한 설정 (침범 방지)
+        northPalette->setFixedHeight(130);   // 북쪽
+        southPalette->setFixedHeight(200);   // 남쪽 - 더 크게 (보드 침범 안함)
+        eastPalette->setFixedWidth(160);     // 동쪽
+        westPalette->setFixedWidth(160);     // 서쪽
 
-        // 게임보드 크기 설정
-        m_gameBoard->setMinimumSize(500, 500);
-        m_gameBoard->setMaximumSize(700, 700);
+        // 게임보드 크기 설정 (고정 크기로 침범 방지)
+        m_gameBoard->setFixedSize(550, 550); // 정사각형 고정 크기
 
-        // 상대방 팔레트 스타일 설정 (더 작고 컴팩트하게)
-        QString smallPaletteStyle =
-            "QWidget { "
-            "background-color: #2c3e50; "
-            "border: 1px solid #34495e; "
-            "border-radius: 4px; "
-            "padding: 2px; "
-            "}";
-
-        northPalette->setStyleSheet(smallPaletteStyle);
-        eastPalette->setStyleSheet(smallPaletteStyle);
-        westPalette->setStyleSheet(smallPaletteStyle);
-
-        // 자신의 팔레트 스타일
-        southPalette->setStyleSheet(
-            "QWidget { "
-            "background-color: #3498db; "
-            "border: 2px solid #2980b9; "
-            "border-radius: 6px; "
-            "padding: 4px; "
+        // 게임보드 베이지색 스타일
+        m_gameBoard->setStyleSheet(
+            "QGraphicsView { "
+            "background-color: #f5f5dc; "     // 베이지색 배경
+            "border: 3px solid #8b7355; "     // 진한 베이지 테두리
+            "border-radius: 8px; "
             "}"
         );
 
@@ -371,10 +372,11 @@ namespace Blokus {
         QWidget* corner3 = new QWidget();
         QWidget* corner4 = new QWidget();
 
-        corner1->setStyleSheet("background: transparent;");
-        corner2->setStyleSheet("background: transparent;");
-        corner3->setStyleSheet("background: transparent;");
-        corner4->setStyleSheet("background: transparent;");
+        QString cornerStyle = "background: transparent; border: none;";
+        corner1->setStyleSheet(cornerStyle);
+        corner2->setStyleSheet(cornerStyle);
+        corner3->setStyleSheet(cornerStyle);
+        corner4->setStyleSheet(cornerStyle);
 
         gridLayout->addWidget(corner1, 0, 0);
         gridLayout->addWidget(northPalette, 0, 1);
@@ -388,13 +390,13 @@ namespace Blokus {
         gridLayout->addWidget(southPalette, 2, 1);
         gridLayout->addWidget(corner4, 2, 2);
 
-        // 비율 설정 (중앙 게임보드가 확장, 팔레트는 고정 크기)
+        // 비율 설정 (모든 크기 고정으로 침범 방지)
         gridLayout->setRowStretch(0, 0);  // 북쪽 고정
-        gridLayout->setRowStretch(1, 1);  // 중앙 확장
+        gridLayout->setRowStretch(1, 0);  // 중앙도 고정 (침범 방지)
         gridLayout->setRowStretch(2, 0);  // 남쪽 고정
 
         gridLayout->setColumnStretch(0, 0);  // 서쪽 고정
-        gridLayout->setColumnStretch(1, 1);  // 중앙 확장
+        gridLayout->setColumnStretch(1, 0);  // 중앙도 고정 (침범 방지)
         gridLayout->setColumnStretch(2, 0);  // 동쪽 고정
 
         return gameArea;

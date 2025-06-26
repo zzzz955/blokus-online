@@ -94,6 +94,7 @@ namespace Blokus {
     private:
         void setupLayout();
         void updateBlockButtons();
+        void forceLayoutUpdate();
         void reorganizeLayout();
         qreal getBlockSize() const;
         int getMaxBlocksPerRow() const;
