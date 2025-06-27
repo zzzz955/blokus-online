@@ -11,6 +11,7 @@ namespace Blokus {
     constexpr int BOARD_SIZE = 20;          // 20x20 게임 보드
     constexpr int MAX_PLAYERS = 4;          // 최대 플레이어 수
     constexpr int BLOCKS_PER_PLAYER = 21;   // 플레이어당 블록 수
+    constexpr int DEFAULT_TURN_TIME = 30;   // 🔥 기본 턴 제한시간 (30초)
 
     // 위치 타입 정의 (행, 열)
     using Position = std::pair<int, int>;
@@ -63,58 +64,35 @@ namespace Blokus {
     // 블록 타입 (폴리오미노 종류)
     enum class BlockType {
         // 1칸 블록
-        Single = 0,         // ■
+        Single = 0,
 
         // 2칸 블록  
-        Domino = 1,         // ■■
+        Domino = 1,
 
         // 3칸 블록
-        TrioLine = 2,       // ■■■
-        TrioAngle = 3,      // ■■
-        //  ■
+        TrioLine = 2,
+        TrioAngle = 3,
 
-// 4칸 블록
-Tetro_I = 4,        // ■■■■
-Tetro_O = 5,        // ■■
-// ■■
-Tetro_T = 6,        // ■■■
-//  ■
-Tetro_L = 7,        // ■■■
-// ■
-Tetro_S = 8,        // ■■
-//  ■■
+        // 4칸 블록
+        Tetro_I=4,
+        Tetro_O=5,
+        Tetro_T=6,
+        Tetro_L=7,
+        Tetro_S=8,
 
-// 5칸 블록 (총 12개)
-Pento_F = 9,        //  ■■
-// ■■
-//  ■
-Pento_I = 10,       // ■■■■■
-Pento_L = 11,       // ■■■■
-// ■
-Pento_N = 12,       // ■■■
-//   ■■
-Pento_P = 13,       // ■■
-// ■■
-// ■
-Pento_T = 14,       // ■■■
-//  ■
-//  ■
-Pento_U = 15,       // ■ ■
-// ■■■
-Pento_V = 16,       // ■
-// ■
-// ■■■
-Pento_W = 17,       // ■
-// ■■
-//  ■■
-Pento_X = 18,       //  ■
-// ■■■
-//  ■
-Pento_Y = 19,       // ■■■■
-//  ■
-Pento_Z = 20        // ■■
-//  ■
-//  ■■
+        // 5칸 블록 (총 12개)
+        Pento_F=9,
+        Pento_I=10,
+        Pento_L=11,
+        Pento_N=12,
+        Pento_P=13,
+        Pento_T=14,
+        Pento_U=15,
+        Pento_V=16,
+        Pento_W=17,
+        Pento_X=18,
+        Pento_Y=19,
+        Pento_Z=20
     };
 
     // 블록 배치 정보 구조체
@@ -179,17 +157,19 @@ Pento_Z = 20        // ■■
     // 게임 설정 구조체
     struct GameSettings {
         int playerCount;            // 플레이어 수 (2-4)
-        int timeLimit;              // 턴 제한시간 (초, 0=무제한)
+        int turnTimeLimit;          // 🔥 턴 제한시간 (초, 기본 30초)
         bool enableAI;              // AI 플레이어 허용
         int aiDifficulty;           // AI 난이도 (1-3)
         bool showHints;             // 힌트 표시 여부
+        QString gameMode;           // 게임 모드 ("classic", "duo", "practice")
 
         GameSettings()
             : playerCount(4)
-            , timeLimit(0)
+            , turnTimeLimit(DEFAULT_TURN_TIME)  // 🔥 30초 기본값
             , enableAI(true)
             , aiDifficulty(2)
             , showHints(true)
+            , gameMode("classic")
         {
         }
     };
@@ -229,6 +209,19 @@ Pento_Z = 20        // ■■
             default: return PlayerColor::Blue;
             }
         }
+
+        // 🔥 턴 시간 포맷팅 (30초 → "0:30")
+        inline QString formatTurnTime(int seconds) {
+            int minutes = seconds / 60;
+            int remainingSeconds = seconds % 60;
+            return QString("%1:%2").arg(minutes).arg(remainingSeconds, 2, 10, QChar('0'));
+        }
+
+        // 🔥 시간 초과 여부 확인
+        inline bool isTurnTimeExpired(int remainingSeconds) {
+            return remainingSeconds <= 0;
+        }
+
     } // namespace Utils
 
 } // namespace Blokus
