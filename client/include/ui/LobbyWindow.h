@@ -29,31 +29,6 @@
 #include "common/Types.h"  // 🔥 Types.h에서 UserInfo, RoomInfo 등을 가져옴
 
 namespace Blokus {
-
-    // RoomInfo는 LobbyWindow에서만 사용되므로 여기에 유지
-    struct RoomInfo {
-        int roomId;
-        QString roomName;
-        QString hostName;
-        int currentPlayers;
-        int maxPlayers;
-        bool isPrivate;
-        bool isPlaying;
-        QString gameMode;
-
-        RoomInfo()
-            : roomId(0)
-            , roomName(QString::fromUtf8("새 방"))
-            , hostName(QString::fromUtf8("호스트"))
-            , currentPlayers(1)
-            , maxPlayers(4)
-            , isPrivate(false)
-            , isPlaying(false)
-            , gameMode(QString::fromUtf8("클래식"))
-        {
-        }
-    };
-
     // ChatMessage는 로비 채팅용이므로 여기에 유지
     struct ChatMessage {
         QString username;
