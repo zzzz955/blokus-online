@@ -168,6 +168,29 @@ namespace Blokus {
         }
     };
 
+    struct RoomInfo {
+        int roomId;
+        QString roomName;
+        QString hostName;
+        int currentPlayers;
+        int maxPlayers;
+        bool isPrivate;
+        bool isPlaying;
+        QString gameMode;
+
+        RoomInfo()
+            : roomId(0)
+            , roomName(QString::fromUtf8("새 방"))
+            , hostName(QString::fromUtf8("호스트"))
+            , currentPlayers(1)
+            , maxPlayers(4)
+            , isPrivate(false)
+            , isPlaying(false)
+            , gameMode(QString::fromUtf8("클래식"))
+        {
+        }
+    };
+
     // 플레이어 정보 구조체 (게임 내)
     struct PlayerInfo {
         PlayerColor color;          // 플레이어 색상

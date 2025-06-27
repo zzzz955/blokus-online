@@ -11,7 +11,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-# MSVC UTF-8 인코딩 강제 설정 (디버그 문제 해결)
+# MSVC UTF-8 인코딩 강제 설정 (디버깅 문제 해결)
 if(MSVC)
     add_compile_options(/utf-8)
     add_compile_options(/wd4828)  # C4828 경고 무시
@@ -29,10 +29,10 @@ find_package(nlohmann_json CONFIG REQUIRED)
 set(SOURCES
     src/main.cpp
     src/ui/GameBoard.cpp
-    src/ui/MainWindow.cpp
+    src/ui/GameRoomWindow.cpp          # 🔥 MainWindow.cpp -> GameRoomWindow.cpp 변경
     src/ui/ImprovedBlockPalette.cpp    # 개선된 4방향 블록 팔레트
-    src/ui/LoginWindow.cpp             # 🆕 로그인 화면
-    src/ui/LobbyWindow.cpp             # 🆕 로비 화면
+    src/ui/LoginWindow.cpp             # 로그인 화면
+    src/ui/LobbyWindow.cpp             # 로비 화면
     src/game/Block.cpp                 # 블록 시스템
     src/game/GameLogic.cpp             # 게임 로직 및 규칙
 )
@@ -40,10 +40,10 @@ set(SOURCES
 # 헤더 파일들
 set(HEADERS
     include/ui/GameBoard.h
-    include/ui/MainWindow.h
+    include/ui/GameRoomWindow.h        # 🔥 MainWindow.h -> GameRoomWindow.h 변경
     include/ui/ImprovedBlockPalette.h  # 개선된 블록 팔레트 헤더
-    include/ui/LoginWindow.h           # 🆕 로그인 화면 헤더
-    include/ui/LobbyWindow.h           # 🆕 로비 화면 헤더
+    include/ui/LoginWindow.h           # 로그인 화면 헤더
+    include/ui/LobbyWindow.h           # 로비 화면 헤더
     include/common/Types.h
     include/game/Block.h               # 블록 헤더
     include/game/GameLogic.h           # 게임 로직 헤더
@@ -100,7 +100,7 @@ endif()
 # 디버그 정보 추가
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_definitions(BlokusClient PRIVATE DEBUG _DEBUG)
-    message(STATUS "디버그 모드: 로그인 시스템 + 블록 렌더링 시스템 포함")
+    message(STATUS "디버그 모드: 게임 룸 시스템 + 플레이어 슬롯 관리 포함")
 endif()
 
 # 빌드 정보 출력
@@ -108,6 +108,9 @@ message(STATUS "=== 블로커스 클라이언트 빌드 정보 ===")
 message(STATUS "버전: ${PROJECT_VERSION}")
 message(STATUS "로그인 시스템: 활성화")
 message(STATUS "로비 시스템: 활성화")
+message(STATUS "게임 룸 시스템: 활성화")  # 🔥 새로운 시스템
+message(STATUS "플레이어 슬롯 관리: 활성화")  # 🔥 새로운 기능
+message(STATUS "AI 플레이어 지원: 활성화")  # 🔥 새로운 기능
 message(STATUS "블록 시스템: 활성화")
 message(STATUS "총 소스 파일: ${SOURCES}")
 message(STATUS "========================================")

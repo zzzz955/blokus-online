@@ -5,7 +5,10 @@
 
 #include "ui/LoginWindow.h"
 #include "ui/LobbyWindow.h"
-#include "ui/MainWindow.h"
+#include "ui/GameRoomWindow.h"  // 🔥 MainWindow 대신 GameRoomWindow 사용
+#include "common/Types.h"
+
+using namespace Blokus;
 
 class AppController : public QObject
 {
@@ -15,8 +18,9 @@ public:
     AppController()
         : m_loginWindow(nullptr)
         , m_lobbyWindow(nullptr)
-        , m_gameWindow(nullptr)
+        , m_gameRoomWindow(nullptr)  // 🔥 GameRoomWindow로 변경
         , m_currentUsername("")
+        , m_currentRoomInfo()
     {
         initializeApplication();
     }
@@ -92,10 +96,10 @@ private slots:
             m_lobbyWindow = nullptr;
         }
 
-        if (m_gameWindow) {
-            m_gameWindow->hide();
-            m_gameWindow->deleteLater();
-            m_gameWindow = nullptr;
+        if (m_gameRoomWindow) {
+            m_gameRoomWindow->hide();
+            m_gameRoomWindow->deleteLater();
+            m_gameRoomWindow = nullptr;
         }
 
         if (m_loginWindow) {
@@ -105,16 +109,32 @@ private slots:
         }
 
         m_currentUsername.clear();
+        m_currentRoomInfo = GameRoomInfo();
     }
 
-    void handleCreateRoomRequest(const Blokus::RoomInfo& roomInfo)
+    void handleCreateRoomRequest(const RoomInfo& roomInfo)
     {
         qDebug() << QString::fromUtf8("방 생성 요청: %1").arg(roomInfo.roomName);
 
         // 더미 방 생성 로직
         QTimer::singleShot(500, this, [this, roomInfo]() {
-            qDebug() << QString::fromUtf8("방 생성 성공! 게임 시작");
-            createGameWindow(roomInfo.roomId, true); // 호스트로 입장
+            // RoomInfo를 GameRoomInfo로 변환
+            GameRoomInfo gameRoomInfo;
+            gameRoomInfo.roomId = roomInfo.roomId;
+            gameRoomInfo.roomName = roomInfo.roomName;
+            gameRoomInfo.hostUsername = m_currentUsername;
+            gameRoomInfo.hostColor = PlayerColor::Blue;  // 방장은 항상 파란색
+            gameRoomInfo.maxPlayers = roomInfo.maxPlayers;
+            gameRoomInfo.gameMode = roomInfo.gameMode;
+            gameRoomInfo.isPlaying = false;
+
+            // 첫 번째 슬롯(파란색)에 호스트 배치
+            gameRoomInfo.playerSlots[0].username = m_currentUsername;
+            gameRoomInfo.playerSlots[0].isHost = true;
+            gameRoomInfo.playerSlots[0].isReady = true;
+
+            qDebug() << QString::fromUtf8("방 생성 성공! 게임 룸으로 이동");
+            createGameRoomWindow(gameRoomInfo, true); // 호스트로 입장
             });
     }
 
@@ -124,15 +144,128 @@ private slots:
 
         // 더미 방 입장 로직
         QTimer::singleShot(500, this, [this, roomId]() {
-            qDebug() << QString::fromUtf8("방 입장 성공! 게임 시작");
-            createGameWindow(roomId, false); // 일반 참가자로 입장
+            // 더미 방 정보 생성
+            GameRoomInfo gameRoomInfo;
+            gameRoomInfo.roomId = roomId;
+            gameRoomInfo.roomName = QString::fromUtf8("테스트 방 #%1").arg(roomId);
+            gameRoomInfo.hostUsername = QString::fromUtf8("방장");
+            gameRoomInfo.hostColor = PlayerColor::Blue;
+            gameRoomInfo.maxPlayers = 4;
+            gameRoomInfo.gameMode = QString::fromUtf8("클래식");
+            gameRoomInfo.isPlaying = false;
+
+            // 기존 플레이어들 배치 (더미)
+            gameRoomInfo.playerSlots[0].username = QString::fromUtf8("방장");
+            gameRoomInfo.playerSlots[0].isHost = true;
+            gameRoomInfo.playerSlots[0].isReady = true;
+
+            // 내가 들어갈 다음 빈 슬롯 찾기
+            PlayerColor myColor = PlayerColor::Yellow; // 기본적으로 노란색
+            for (int i = 1; i < 4; ++i) {
+                if (gameRoomInfo.playerSlots[i].isEmpty()) {
+                    PlayerColor slotColor = static_cast<PlayerColor>(i + 1);
+                    gameRoomInfo.playerSlots[i].username = m_currentUsername;
+                    gameRoomInfo.playerSlots[i].isHost = false;
+                    gameRoomInfo.playerSlots[i].isReady = false;
+                    myColor = slotColor;
+                    break;
+                }
+            }
+
+            qDebug() << QString::fromUtf8("방 입장 성공! 게임 룸으로 이동 (색상: %1)")
+                .arg(Utils::playerColorToString(myColor));
+            createGameRoomWindow(gameRoomInfo, false); // 일반 참가자로 입장
             });
+    }
+
+    // 🔥 게임 룸 관련 이벤트 핸들러들
+    void handleLeaveRoomRequest()
+    {
+        qDebug() << QString::fromUtf8("방 나가기 요청");
+
+        // 게임 룸 창 닫고 로비로 돌아가기
+        if (m_gameRoomWindow) {
+            m_gameRoomWindow->hide();
+            m_gameRoomWindow->deleteLater();
+            m_gameRoomWindow = nullptr;
+        }
+
+        // 로비 창 다시 표시
+        if (m_lobbyWindow) {
+            m_lobbyWindow->show();
+            m_lobbyWindow->raise();
+            m_lobbyWindow->activateWindow();
+        }
+        else {
+            createLobbyWindow(); // 로비 창이 없으면 새로 생성
+        }
+
+        m_currentRoomInfo = GameRoomInfo();
     }
 
     void handleGameStartRequest()
     {
         qDebug() << QString::fromUtf8("게임 시작 요청");
-        // 게임 시작 로직 (향후 구현)
+
+        if (m_gameRoomWindow) {
+            m_gameRoomWindow->startGame();
+        }
+    }
+
+    void handleAddAIPlayerRequest(PlayerColor color, int difficulty)
+    {
+        qDebug() << QString::fromUtf8("AI 플레이어 추가 요청: %1 색상, 난이도 %2")
+            .arg(Utils::playerColorToString(color)).arg(difficulty);
+
+        // 더미 AI 추가 로직
+        QTimer::singleShot(200, this, [this, color, difficulty]() {
+            if (m_gameRoomWindow) {
+                // AI 슬롯 생성
+                PlayerSlot aiSlot;
+                aiSlot.color = color;
+                aiSlot.username = "";
+                aiSlot.isAI = true;
+                aiSlot.aiDifficulty = difficulty;
+                aiSlot.isHost = false;
+                aiSlot.isReady = true;
+
+                m_gameRoomWindow->updatePlayerSlot(color, aiSlot);
+                m_gameRoomWindow->addSystemMessage(
+                    QString::fromUtf8("AI 플레이어가 추가되었습니다. (난이도: %1)")
+                    .arg(difficulty == 1 ? "쉬움" : difficulty == 2 ? "보통" : "어려움"));
+            }
+            });
+    }
+
+    void handleRemovePlayerRequest(PlayerColor color)
+    {
+        qDebug() << QString::fromUtf8("플레이어 제거 요청: %1").arg(Utils::playerColorToString(color));
+
+        // 더미 플레이어 제거 로직
+        if (m_gameRoomWindow) {
+            PlayerSlot emptySlot;
+            emptySlot.color = color;
+            m_gameRoomWindow->updatePlayerSlot(color, emptySlot);
+            m_gameRoomWindow->addSystemMessage(QString::fromUtf8("플레이어가 방을 나갔습니다."));
+        }
+    }
+
+    void handleKickPlayerRequest(PlayerColor color)
+    {
+        qDebug() << QString::fromUtf8("플레이어 강퇴 요청: %1").arg(Utils::playerColorToString(color));
+
+        // 더미 강퇴 로직
+        handleRemovePlayerRequest(color); // 제거와 동일하게 처리
+    }
+
+    void handleGameRoomChatMessage(const QString& message)
+    {
+        qDebug() << QString::fromUtf8("게임 룸 채팅: %1").arg(message);
+
+        // 더미 채팅 처리 - 내 메시지를 방에 추가
+        if (m_gameRoomWindow) {
+            m_gameRoomWindow->addChatMessage(m_currentUsername, message, false);
+        }
     }
 
 private:
@@ -178,11 +311,6 @@ private:
                 this, &AppController::handleCreateRoomRequest);
             connect(m_lobbyWindow, &Blokus::LobbyWindow::joinRoomRequested,
                 this, &AppController::handleJoinRoomRequest);
-            connect(m_lobbyWindow, &Blokus::LobbyWindow::gameStartRequested,
-                this, &AppController::handleGameStartRequest);
-
-            // 🔥 주의: 로비 창이 닫힐 때 애플리케이션 종료하지 않도록 제거
-            // connect(m_lobbyWindow, &QMainWindow::destroyed, qApp, &QApplication::quit);
 
             m_lobbyWindow->show();
             m_lobbyWindow->raise();
@@ -199,31 +327,53 @@ private:
         }
     }
 
-    void createGameWindow(int roomId, bool isHost)
+    void createGameRoomWindow(const GameRoomInfo& roomInfo, bool isHost)
     {
-        qDebug() << QString::fromUtf8("게임 창 생성: 방 %1, 호스트: %2").arg(roomId).arg(isHost);
+        qDebug() << QString::fromUtf8("게임 룸 창 생성: 방 %1, 호스트: %2")
+            .arg(roomInfo.roomId).arg(isHost);
 
-        // 로비 창 숨기기
-        if (m_lobbyWindow) {
-            m_lobbyWindow->hide();
+        try {
+            // 로비 창 숨기기
+            if (m_lobbyWindow) {
+                m_lobbyWindow->hide();
+            }
+
+            // 기존 게임 룸 창이 있으면 제거
+            if (m_gameRoomWindow) {
+                m_gameRoomWindow->deleteLater();
+            }
+
+            // 새 게임 룸 창 생성
+            m_gameRoomWindow = new Blokus::GameRoomWindow(roomInfo, m_currentUsername);
+            m_currentRoomInfo = roomInfo;
+
+            // 게임 룸 시그널 연결
+            connect(m_gameRoomWindow, &Blokus::GameRoomWindow::leaveRoomRequested,
+                this, &AppController::handleLeaveRoomRequest);
+            connect(m_gameRoomWindow, &Blokus::GameRoomWindow::gameStartRequested,
+                this, &AppController::handleGameStartRequest);
+            connect(m_gameRoomWindow, &Blokus::GameRoomWindow::addAIPlayerRequested,
+                this, &AppController::handleAddAIPlayerRequest);
+            connect(m_gameRoomWindow, &Blokus::GameRoomWindow::removePlayerRequested,
+                this, &AppController::handleRemovePlayerRequest);
+            connect(m_gameRoomWindow, &Blokus::GameRoomWindow::kickPlayerRequested,
+                this, &AppController::handleKickPlayerRequest);
+            connect(m_gameRoomWindow, &Blokus::GameRoomWindow::chatMessageSent,
+                this, &AppController::handleGameRoomChatMessage);
+
+            m_gameRoomWindow->show();
+            m_gameRoomWindow->raise();
+            m_gameRoomWindow->activateWindow();
+
+            qDebug() << QString::fromUtf8("게임 룸 창 생성 완료");
+
         }
-
-        // 게임 창 생성
-        if (!m_gameWindow) {
-            m_gameWindow = new Blokus::MainWindow();
+        catch (const std::exception& e) {
+            qDebug() << QString::fromUtf8("게임 룸 창 생성 실패: %1").arg(e.what());
         }
-
-        // 창 제목 설정
-        QString title = QString::fromUtf8("블로커스 온라인 - %1님 (방 #%2)")
-            .arg(m_currentUsername).arg(roomId);
-        if (isHost) {
-            title += QString::fromUtf8(" [방장]");
+        catch (...) {
+            qDebug() << QString::fromUtf8("게임 룸 창 생성 중 알 수 없는 오류");
         }
-        m_gameWindow->setWindowTitle(title);
-
-        m_gameWindow->show();
-        m_gameWindow->raise();
-        m_gameWindow->activateWindow();
     }
 
     void cleanupWindows()
@@ -238,17 +388,18 @@ private:
             m_lobbyWindow = nullptr;
         }
 
-        if (m_gameWindow) {
-            delete m_gameWindow;
-            m_gameWindow = nullptr;
+        if (m_gameRoomWindow) {
+            delete m_gameRoomWindow;
+            m_gameRoomWindow = nullptr;
         }
     }
 
 private:
     Blokus::LoginWindow* m_loginWindow;
     Blokus::LobbyWindow* m_lobbyWindow;
-    Blokus::MainWindow* m_gameWindow;
+    Blokus::GameRoomWindow* m_gameRoomWindow;  // 🔥 GameRoomWindow로 변경
     QString m_currentUsername;
+    Blokus::GameRoomInfo m_currentRoomInfo;   // 🔥 현재 방 정보 저장
 };
 
 int main(int argc, char* argv[])
@@ -271,7 +422,7 @@ int main(int argc, char* argv[])
     AppController controller;
     controller.start();
 
-    qDebug() << QString::fromUtf8("블로커스 온라인 시작됨");
+    qDebug() << QString::fromUtf8("블로커스 온라인 시작됨 - 게임 룸 시스템 활성화");
 
     return app.exec();
 }
