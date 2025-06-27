@@ -134,13 +134,48 @@ namespace Blokus {
         }
     };
 
-    // 플레이어 정보 구조체
+    // 사용자 정보 구조체  
+    struct UserInfo {
+        QString username;           // 사용자명
+        int level;                  // 경험치 레벨 (게임 수에 따라 증가)
+        int totalGames;             // 총 게임 수
+        int wins;                   // 승리 수
+        int losses;                 // 패배 수
+        int averageScore;           // 평균 점수
+        bool isOnline;              // 온라인 상태
+        QString status;             // "로비", "게임중", "자리비움"
+
+        UserInfo()
+            : username(QString::fromUtf8("익명"))
+            , level(1)
+            , totalGames(0)
+            , wins(0)
+            , losses(0)
+            , averageScore(0)
+            , isOnline(true)
+            , status(QString::fromUtf8("로비"))
+        {
+        }
+
+        // 승률 계산
+        double getWinRate() const {
+            return totalGames > 0 ? (double)wins / totalGames * 100.0 : 0.0;
+        }
+
+        // 레벨 계산 (10게임당 1레벨)
+        int calculateLevel() const {
+            return (totalGames / 10) + 1;
+        }
+    };
+
+    // 플레이어 정보 구조체 (게임 내)
     struct PlayerInfo {
         PlayerColor color;          // 플레이어 색상
         QString name;               // 플레이어 이름
         int score;                  // 현재 점수
         int remainingBlocks;        // 남은 블록 수
         bool isAI;                  // AI 플레이어 여부
+        int aiDifficulty;           // AI 난이도 (1-3)
         bool isActive;              // 활성 상태
 
         PlayerInfo()
@@ -149,6 +184,7 @@ namespace Blokus {
             , score(0)
             , remainingBlocks(BLOCKS_PER_PLAYER)
             , isAI(false)
+            , aiDifficulty(2)
             , isActive(true)
         {
         }
@@ -161,7 +197,8 @@ namespace Blokus {
         bool enableAI;              // AI 플레이어 허용
         int aiDifficulty;           // AI 난이도 (1-3)
         bool showHints;             // 힌트 표시 여부
-        QString gameMode;           // 게임 모드 ("classic", "duo", "practice")
+        QString gameMode;           // 게임 모드 ("classic", "duo")
+        bool recordStats;           // 통계 기록 여부 (기본 true)
 
         GameSettings()
             : playerCount(4)
@@ -170,6 +207,7 @@ namespace Blokus {
             , aiDifficulty(2)
             , showHints(true)
             , gameMode("classic")
+            , recordStats(true)         // 🔥 통계는 기록, 레이팅은 안함
         {
         }
     };

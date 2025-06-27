@@ -26,9 +26,11 @@
 #include <QDateTime>
 #include <QDebug>
 
+#include "common/Types.h"  // 🔥 Types.h에서 UserInfo, RoomInfo 등을 가져옴
+
 namespace Blokus {
 
-    // 방 정보 구조체
+    // RoomInfo는 LobbyWindow에서만 사용되므로 여기에 유지
     struct RoomInfo {
         int roomId;
         QString roomName;
@@ -47,34 +49,12 @@ namespace Blokus {
             , maxPlayers(4)
             , isPrivate(false)
             , isPlaying(false)
-            , gameMode(QString::fromUtf8("일반"))
+            , gameMode(QString::fromUtf8("클래식"))
         {
         }
     };
 
-    // 사용자 정보 구조체
-    struct UserInfo {
-        QString username;
-        int level;
-        int wins;
-        int losses;
-        int rating;
-        bool isOnline;
-        QString status; // "로비", "게임중", "자리비움"
-
-        UserInfo()
-            : username(QString::fromUtf8("익명"))
-            , level(1)
-            , wins(0)
-            , losses(0)
-            , rating(1000)
-            , isOnline(true)
-            , status(QString::fromUtf8("로비"))
-        {
-        }
-    };
-
-    // 채팅 메시지 구조체
+    // ChatMessage는 로비 채팅용이므로 여기에 유지
     struct ChatMessage {
         QString username;
         QString message;

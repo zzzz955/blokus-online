@@ -1,4 +1,5 @@
 ﻿#include "ui/LobbyWindow.h"
+#include "common/Types.h"  // 🔥 UserInfo 등을 위해 추가
 #include <QApplication>
 #include <QDesktopWidget>
 #include <QHeaderView>
@@ -52,7 +53,7 @@ namespace Blokus {
         m_gameModeCombo = new QComboBox();
         m_gameModeCombo->addItem(QString::fromUtf8("클래식 (4인, 20x20)"), "classic");
         m_gameModeCombo->addItem(QString::fromUtf8("듀오 (2인, 14x14)"), "duo");
-        m_gameModeCombo->addItem(QString::fromUtf8("연습 모드 (AI 상대)"), "practice");
+        // 연습 모드 제거 - 대신 방에서 AI 추가 기능 사용
 
         // 최대 인원
         QLabel* playersLabel = new QLabel(QString::fromUtf8("최대 인원"));
@@ -124,12 +125,7 @@ namespace Blokus {
     {
         QString mode = m_gameModeCombo->currentData().toString();
 
-        if (mode == "practice") {
-            // 연습 모드는 1인용 (AI 상대)
-            m_maxPlayersSpinBox->setValue(1);
-            m_maxPlayersSpinBox->setEnabled(false);
-        }
-        else if (mode == "duo") {
+        if (mode == "duo") {
             // 듀오 모드는 2인용 고정
             m_maxPlayersSpinBox->setValue(2);
             m_maxPlayersSpinBox->setRange(2, 2);
@@ -229,10 +225,11 @@ namespace Blokus {
 
             // 내 정보 설정
             m_myUserInfo.username = username;
-            m_myUserInfo.level = 5;
-            m_myUserInfo.wins = 23;
-            m_myUserInfo.losses = 7;
-            m_myUserInfo.rating = 1350;
+            m_myUserInfo.totalGames = 45;
+            m_myUserInfo.wins = 28;
+            m_myUserInfo.losses = 17;
+            m_myUserInfo.level = m_myUserInfo.calculateLevel();
+            m_myUserInfo.averageScore = 52;
 
             // 타이머 설정 (30초마다 방 목록 갱신)
             if (m_refreshTimer) {
@@ -380,7 +377,7 @@ namespace Blokus {
         m_rankingTable = new QTableWidget();
         m_rankingTable->setColumnCount(3);
         m_rankingTable->setHorizontalHeaderLabels({
-            QString::fromUtf8("순위"), QString::fromUtf8("플레이어"), QString::fromUtf8("레이팅")
+            QString::fromUtf8("순위"), QString::fromUtf8("플레이어"), QString::fromUtf8("승률")
             });
         m_rankingTable->horizontalHeader()->setStretchLastSection(true);
         m_rankingTable->verticalHeader()->setVisible(false);
@@ -924,17 +921,19 @@ namespace Blokus {
             }
             m_rankingTable->setItem(i, 1, nameItem);
 
-            m_rankingTable->setItem(i, 2, new QTableWidgetItem(QString::number(user.rating)));
+            // 승률 표시 (소수점 1자리)
+            QString winRateText = QString::number(user.getWinRate(), 'f', 1) + "%";
+            m_rankingTable->setItem(i, 2, new QTableWidgetItem(winRateText));
         }
     }
 
     void LobbyWindow::updateUserStatsDisplay()
     {
-        QString statsText = QString::fromUtf8("레벨 %1 | %2승 %3패 | 레이팅 %4")
+        QString statsText = QString::fromUtf8("레벨 %1 | %2승 %3패 | 승률 %4%")
             .arg(m_myUserInfo.level)
             .arg(m_myUserInfo.wins)
             .arg(m_myUserInfo.losses)
-            .arg(m_myUserInfo.rating);
+            .arg(QString::number(m_myUserInfo.getWinRate(), 'f', 1));
 
         m_userStatsLabel->setText(statsText);
         m_userStatsLabel->setStyleSheet("color: white; font-size: 13px;");
@@ -1048,10 +1047,11 @@ namespace Blokus {
         for (int i = 0; i < usernames.size(); ++i) {
             UserInfo user;
             user.username = usernames[i];
-            user.level = (i % 10) + 1;
-            user.wins = (i + 1) * 5;
-            user.losses = i * 2;
-            user.rating = 1000 + (i * 50);
+            user.totalGames = (i + 1) * 15;  // 15, 30, 45, ... 게임
+            user.wins = user.totalGames * 0.6; // 60% 승률
+            user.losses = user.totalGames - user.wins;
+            user.level = user.calculateLevel();
+            user.averageScore = 40 + (i * 5); // 40~80점 평균
             user.isOnline = true;
             user.status = statuses[i % statuses.size()];
             users.append(user);
@@ -1060,10 +1060,11 @@ namespace Blokus {
         // 내 정보도 추가
         UserInfo me;
         me.username = m_myUsername;
-        me.level = 5;
-        me.wins = 23;
-        me.losses = 7;
-        me.rating = 1350;
+        me.totalGames = 45;
+        me.wins = 28;
+        me.losses = 17;
+        me.level = me.calculateLevel();
+        me.averageScore = 52;
         me.isOnline = true;
         me.status = QString::fromUtf8("로비");
         users.prepend(me); // 맨 앞에 추가
@@ -1077,17 +1078,17 @@ namespace Blokus {
 
         QStringList roomNames = {
             QString::fromUtf8("초보자 환영 🔰"), QString::fromUtf8("고수들의 전쟁 ⚔️"), QString::fromUtf8("친목방 😊"),
-            QString::fromUtf8("랭크 게임 🏆"), QString::fromUtf8("AI 연습방 🤖"), QString::fromUtf8("여유롭게~ 🌸")
+            QString::fromUtf8("AI와 함께 🤖"), QString::fromUtf8("듀오 매치 👥"), QString::fromUtf8("여유롭게~ 🌸")
         };
 
         QStringList hosts = {
             QString::fromUtf8("방장1"), QString::fromUtf8("프로게이머"), QString::fromUtf8("친구"),
-            QString::fromUtf8("랭커"), QString::fromUtf8("초보자"), QString::fromUtf8("힐링왕")
+            QString::fromUtf8("AI트레이너"), QString::fromUtf8("듀오마스터"), QString::fromUtf8("힐링왕")
         };
 
         QStringList gameModes = {
-            QString::fromUtf8("클래식"), QString::fromUtf8("듀오"), QString::fromUtf8("클래식"),
-            QString::fromUtf8("듀오"), QString::fromUtf8("연습"), QString::fromUtf8("클래식")
+            QString::fromUtf8("클래식"), QString::fromUtf8("클래식"), QString::fromUtf8("듀오"),
+            QString::fromUtf8("클래식"), QString::fromUtf8("듀오"), QString::fromUtf8("클래식")
         };
 
         for (int i = 0; i < roomNames.size(); ++i) {
@@ -1110,9 +1111,9 @@ namespace Blokus {
     {
         QList<UserInfo> ranking = m_userList_data;
 
-        // 레이팅 순으로 정렬
+        // 승률 순으로 정렬
         std::sort(ranking.begin(), ranking.end(), [](const UserInfo& a, const UserInfo& b) {
-            return a.rating > b.rating;
+            return a.getWinRate() > b.getWinRate();
             });
 
         // 상위 10명만 표시
