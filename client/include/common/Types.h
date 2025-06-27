@@ -8,10 +8,16 @@
 namespace Blokus {
 
     // 전역 상수
-    constexpr int BOARD_SIZE = 20;          // 20x20 게임 보드
+    constexpr int BOARD_SIZE = 20;          // 클래식 모드
+    constexpr int DUO_BOARD_SIZE = 14;      // 🆕 듀오 모드 보드 크기
     constexpr int MAX_PLAYERS = 4;          // 최대 플레이어 수
     constexpr int BLOCKS_PER_PLAYER = 21;   // 플레이어당 블록 수
     constexpr int DEFAULT_TURN_TIME = 30;   // 🔥 기본 턴 제한시간 (30초)
+
+    // 보드 크기 결정 함수
+    inline int getBoardSize(bool isDuoMode) {
+        return isDuoMode ? DUO_BOARD_SIZE : BOARD_SIZE;
+    }
 
     // 위치 타입 정의 (행, 열)
     using Position = std::pair<int, int>;
@@ -191,25 +197,116 @@ namespace Blokus {
         }
     };
 
-    // 플레이어 정보 구조체 (게임 내)
-    struct PlayerInfo {
+    // 플레이어 슬롯 (게임 룸용) - 기존 PlayerInfo를 대체
+    struct PlayerSlot {
         PlayerColor color;          // 플레이어 색상
-        QString name;               // 플레이어 이름
-        int score;                  // 현재 점수
-        int remainingBlocks;        // 남은 블록 수
+        QString username;           // 플레이어 이름 (name → username 변경)
         bool isAI;                  // AI 플레이어 여부
         int aiDifficulty;           // AI 난이도 (1-3)
-        bool isActive;              // 활성 상태
+        bool isHost;                // 🆕 호스트 여부
+        bool isReady;               // 🆕 준비 상태
+        int score;                  // 현재 점수
+        int remainingBlocks;        // 남은 블록 수
 
-        PlayerInfo()
+        PlayerSlot()
             : color(PlayerColor::None)
-            , name(QString::fromUtf8("플레이어"))
-            , score(0)
-            , remainingBlocks(BLOCKS_PER_PLAYER)
+            , username("")
             , isAI(false)
             , aiDifficulty(2)
-            , isActive(true)
+            , isHost(false)
+            , isReady(false)
+            , score(0)
+            , remainingBlocks(BLOCKS_PER_PLAYER)
         {
+        }
+
+        bool isEmpty() const {
+            return username.isEmpty() && !isAI;
+        }
+
+        QString getDisplayName() const {
+            if (isEmpty()) {
+                return QString::fromUtf8("빈 슬롯");
+            }
+            else if (isAI) {
+                return QString::fromUtf8("AI (레벨 %1)").arg(aiDifficulty);
+            }
+            else {
+                return username;
+            }
+        }
+
+        // 🔄 기존 PlayerInfo의 isActive 대신 isEmpty() 사용
+        bool isActive() const {
+            return !isEmpty();
+        }
+    };
+
+    // 게임 룸 정보 (게임 룸용)
+    struct GameRoomInfo {
+        int roomId;
+        QString roomName;
+        QString hostUsername;
+        PlayerColor hostColor;
+        int maxPlayers;
+        QString gameMode;
+        bool isPlaying;
+        QList<PlayerSlot> playerSlots;  // PlayerInfo[] → PlayerSlot[] 변경
+
+        GameRoomInfo()
+            : roomId(0)
+            , roomName(QString::fromUtf8("새 방"))
+            , hostUsername("")
+            , hostColor(PlayerColor::Blue)
+            , maxPlayers(4)
+            , gameMode(QString::fromUtf8("클래식 (4인, 20x20)"))
+            , isPlaying(false)
+        {
+            // 4개 색상 슬롯 초기화
+            for (int i = 0; i < 4; ++i)
+                playerSlots.append(PlayerSlot());
+
+            playerSlots[0].color = PlayerColor::Blue;
+            playerSlots[1].color = PlayerColor::Yellow;
+            playerSlots[2].color = PlayerColor::Red;
+            playerSlots[3].color = PlayerColor::Green;
+        }
+
+        bool isDuoMode() const {
+            return gameMode.contains(QString::fromUtf8("듀오")) || maxPlayers == 2;
+        }
+
+        int getCurrentPlayerCount() const {
+            int count = 0;
+            int slotsToCheck = isDuoMode() ? 2 : 4;
+
+            for (int i = 0; i < slotsToCheck && i < playerSlots.size(); ++i) {
+                if (!playerSlots[i].isEmpty()) count++;
+            }
+            return count;
+        }
+
+        PlayerColor getMyColor(const QString& username) const {
+            for (const auto& slot : playerSlots) {
+                if (slot.username == username) {
+                    return slot.color;
+                }
+            }
+            return PlayerColor::None;
+        }
+
+        bool isMyTurn(const QString& username, PlayerColor currentTurn) const {
+            return getMyColor(username) == currentTurn;
+        }
+
+        QList<PlayerColor> getAvailableColors() const {
+            if (isDuoMode()) {
+                return { PlayerColor::Blue, PlayerColor::Yellow };
+            }
+            else {
+                return { PlayerColor::Blue, PlayerColor::Yellow,
+                        PlayerColor::Red, PlayerColor::Green };
+            }
         }
     };
 
@@ -239,9 +336,10 @@ namespace Blokus {
     namespace Utils {
 
         // 위치 유효성 검사
-        inline bool isPositionValid(const Position& pos) {
-            return pos.first >= 0 && pos.first < BOARD_SIZE &&
-                pos.second >= 0 && pos.second < BOARD_SIZE;
+        inline bool isPositionValid(const Position& pos, bool isDuoMode = false) {
+            int boardSize = getBoardSize(isDuoMode);
+            return pos.first >= 0 && pos.first < boardSize &&
+                pos.second >= 0 && pos.second < boardSize;
         }
 
         // 두 위치 사이의 거리 계산 (맨하탄 거리)

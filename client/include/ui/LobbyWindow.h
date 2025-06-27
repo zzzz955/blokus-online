@@ -108,6 +108,7 @@ namespace Blokus {
         void onLogoutClicked();
         void onUserDoubleClicked();
         void onTabChanged(int index);
+        void onCooldownTimerTick();
 
         // 타이머 이벤트
         void onRefreshTimer();
@@ -147,6 +148,14 @@ namespace Blokus {
         QList<UserInfo> generateDummyUsers();
         QList<RoomInfo> generateDummyRooms();
         QList<UserInfo> generateDummyRanking();
+
+        // 버튼 쿨다운 관리
+        QTimer* m_buttonCooldownTimer;
+        QSet<QPushButton*> m_cooldownButtons;
+        static constexpr int BUTTON_COOLDOWN_MS = 500; // 0.5초 쿨다운
+
+        void setButtonCooldown(QPushButton* button);
+        void enableCooldownButton(QPushButton* button);
 
     private:
         // 사용자 정보

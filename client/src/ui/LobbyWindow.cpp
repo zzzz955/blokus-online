@@ -53,7 +53,9 @@ namespace Blokus {
         m_gameModeCombo = new QComboBox();
         m_gameModeCombo->addItem(QString::fromUtf8("클래식 (4인, 20x20)"), "classic");
         m_gameModeCombo->addItem(QString::fromUtf8("듀오 (2인, 14x14)"), "duo");
-        // 연습 모드 제거 - 대신 방에서 AI 추가 기능 사용
+
+        // 기본값을 클래식으로 설정
+        m_gameModeCombo->setCurrentIndex(0);
 
         // 최대 인원
         QLabel* playersLabel = new QLabel(QString::fromUtf8("최대 인원"));
@@ -129,6 +131,7 @@ namespace Blokus {
             // 듀오 모드는 2인용 고정
             m_maxPlayersSpinBox->setValue(2);
             m_maxPlayersSpinBox->setRange(2, 2);
+            m_maxPlayersSpinBox->setEnabled(false); // 수정 불가
         }
         else {
             // 클래식 모드는 2-4명
@@ -199,6 +202,7 @@ namespace Blokus {
         , m_logoutButton(nullptr)
         , m_refreshTimer(new QTimer(this))
         , m_selectedRoomId(-1)
+        , m_buttonCooldownTimer(new QTimer(this))
     {
         qDebug() << QString::fromUtf8("LobbyWindow 생성자 시작: %1").arg(username);
 
@@ -238,6 +242,11 @@ namespace Blokus {
                 m_refreshTimer->start();
             }
 
+            // 쿨다운 타이머 설정
+            m_buttonCooldownTimer->setSingleShot(false);
+            m_buttonCooldownTimer->setInterval(100); // 100ms마다 체크
+            connect(m_buttonCooldownTimer, &QTimer::timeout, this, &LobbyWindow::onCooldownTimerTick);
+
             // 창 설정
             setWindowTitle(QString::fromUtf8("블로커스 온라인 - 로비 (%1님)").arg(username));
             setMinimumSize(1200, 800);
@@ -271,6 +280,89 @@ namespace Blokus {
         if (m_refreshTimer) {
             m_refreshTimer->stop();
         }
+    }
+
+    // 버튼 쿨다운 설정
+    void LobbyWindow::setButtonCooldown(QPushButton* button)
+    {
+        if (!button || m_cooldownButtons.contains(button)) {
+            return; // 이미 쿨다운 중인 버튼
+        }
+
+        // 버튼 비활성화
+        button->setEnabled(false);
+        m_cooldownButtons.insert(button);
+
+        // 쿨다운 시각적 표시
+        QString originalText = button->text();
+        button->setProperty("originalText", originalText);
+        button->setProperty("cooldownStart", QDateTime::currentMSecsSinceEpoch());
+
+        // 쿨다운 스타일 적용
+        QString cooldownStyle = button->styleSheet() +
+            "QPushButton:disabled { "
+            "background-color: #bdc3c7 !important; "
+            "color: #7f8c8d !important; "
+            "}";
+        button->setStyleSheet(cooldownStyle);
+
+        // 타이머가 실행 중이 아니면 시작
+        if (!m_buttonCooldownTimer->isActive()) {
+            m_buttonCooldownTimer->start();
+        }
+    }
+
+    // 쿨다운 타이머 틱
+    void LobbyWindow::onCooldownTimerTick()
+    {
+        qint64 currentTime = QDateTime::currentMSecsSinceEpoch();
+        QList<QPushButton*> buttonsToEnable;
+
+        for (QPushButton* button : m_cooldownButtons) {
+            qint64 cooldownStart = button->property("cooldownStart").toLongLong();
+            qint64 elapsed = currentTime - cooldownStart;
+
+            if (elapsed >= BUTTON_COOLDOWN_MS) {
+                buttonsToEnable.append(button);
+            }
+            else {
+                // 남은 시간 표시
+                int remainingMs = BUTTON_COOLDOWN_MS - elapsed;
+                double remainingSec = remainingMs / 1000.0;
+                QString originalText = button->property("originalText").toString();
+                button->setText(QString("%1 (%.1f)").arg(originalText).arg(remainingSec));
+            }
+        }
+
+        // 쿨다운 완료된 버튼들 활성화
+        for (QPushButton* button : buttonsToEnable) {
+            enableCooldownButton(button);
+        }
+
+        // 모든 버튼이 활성화되면 타이머 중지
+        if (m_cooldownButtons.isEmpty()) {
+            m_buttonCooldownTimer->stop();
+        }
+    }
+
+    // 버튼 쿨다운 해제
+    void LobbyWindow::enableCooldownButton(QPushButton* button)
+    {
+        if (!button || !m_cooldownButtons.contains(button)) {
+            return;
+        }
+
+        // 원래 텍스트 복원
+        QString originalText = button->property("originalText").toString();
+        button->setText(originalText);
+
+        // 버튼 활성화
+        button->setEnabled(true);
+        m_cooldownButtons.remove(button);
+
+        // 프로퍼티 정리
+        button->setProperty("originalText", QVariant());
+        button->setProperty("cooldownStart", QVariant());
     }
 
     void LobbyWindow::setupUI()
@@ -618,8 +710,17 @@ namespace Blokus {
 
     void LobbyWindow::onCreateRoomClicked()
     {
+        // 쿨다운 체크
+        if (!m_createRoomButton->isEnabled()) {
+            qDebug() << QString::fromUtf8("방 만들기 버튼 쿨다운 중");
+            return;
+        }
+
         CreateRoomDialog dialog(this);
         if (dialog.exec() == QDialog::Accepted) {
+            // 쿨다운 설정 (다이얼로그에서 OK를 눌렀을 때만)
+            setButtonCooldown(m_createRoomButton);
+
             RoomInfo roomInfo = dialog.getRoomInfo();
             roomInfo.roomId = m_roomList_data.size() + 1001; // 임시 ID
             roomInfo.hostName = m_myUsername;
@@ -632,11 +733,20 @@ namespace Blokus {
 
     void LobbyWindow::onJoinRoomClicked()
     {
+        // 쿨다운 체크
+        if (!m_joinRoomButton->isEnabled()) {
+            qDebug() << QString::fromUtf8("입장하기 버튼 쿨다운 중");
+            return;
+        }
+
         if (m_selectedRoomId == -1) {
             QMessageBox::information(this, QString::fromUtf8("알림"),
                 QString::fromUtf8("입장할 방을 선택해주세요."));
             return;
         }
+
+        // 쿨다운 설정
+        setButtonCooldown(m_joinRoomButton);
 
         // 선택된 방 정보 찾기
         RoomInfo* selectedRoom = nullptr;
@@ -682,6 +792,15 @@ namespace Blokus {
 
     void LobbyWindow::onRefreshRoomListClicked()
     {
+        // 쿨다운 체크
+        if (!m_refreshRoomButton->isEnabled()) {
+            qDebug() << QString::fromUtf8("새로고침 버튼 쿨다운 중");
+            return;
+        }
+
+        // 쿨다운 설정
+        setButtonCooldown(m_refreshRoomButton);
+
         addSystemMessage(QString::fromUtf8("방 목록을 새로고침합니다..."));
         emit refreshRoomListRequested();
 
@@ -1077,18 +1196,33 @@ namespace Blokus {
         QList<RoomInfo> rooms;
 
         QStringList roomNames = {
-            QString::fromUtf8("초보자 환영 🔰"), QString::fromUtf8("고수들의 전쟁 ⚔️"), QString::fromUtf8("친목방 😊"),
-            QString::fromUtf8("AI와 함께 🤖"), QString::fromUtf8("듀오 매치 👥"), QString::fromUtf8("여유롭게~ 🌸")
+            QString::fromUtf8("초보자 환영 🔰"),
+            QString::fromUtf8("고수들의 전쟁 ⚔️"),
+            QString::fromUtf8("친목방 😊"),
+            QString::fromUtf8("AI와 함께 🤖"),
+            QString::fromUtf8("듀오 매치 👥"),
+            QString::fromUtf8("듀오 빠른게임 ⚡"),
+            QString::fromUtf8("여유롭게~ 🌸")
         };
 
         QStringList hosts = {
-            QString::fromUtf8("방장1"), QString::fromUtf8("프로게이머"), QString::fromUtf8("친구"),
-            QString::fromUtf8("AI트레이너"), QString::fromUtf8("듀오마스터"), QString::fromUtf8("힐링왕")
+            QString::fromUtf8("방장1"),
+            QString::fromUtf8("프로게이머"),
+            QString::fromUtf8("친구"),
+            QString::fromUtf8("AI트레이너"),
+            QString::fromUtf8("듀오마스터"),
+            QString::fromUtf8("듀오킹"),
+            QString::fromUtf8("힐링왕")
         };
 
         QStringList gameModes = {
-            QString::fromUtf8("클래식"), QString::fromUtf8("클래식"), QString::fromUtf8("듀오"),
-            QString::fromUtf8("클래식"), QString::fromUtf8("듀오"), QString::fromUtf8("클래식")
+            QString::fromUtf8("클래식 (4인, 20x20)"),
+            QString::fromUtf8("클래식 (4인, 20x20)"),
+            QString::fromUtf8("클래식 (4인, 20x20)"),
+            QString::fromUtf8("클래식 (4인, 20x20)"),
+            QString::fromUtf8("듀오 (2인, 20x20)"),
+            QString::fromUtf8("듀오 (2인, 20x20)"),
+            QString::fromUtf8("클래식 (4인, 20x20)")
         };
 
         for (int i = 0; i < roomNames.size(); ++i) {
@@ -1096,11 +1230,16 @@ namespace Blokus {
             room.roomId = 1001 + i;
             room.roomName = roomNames[i];
             room.hostName = hosts[i];
-            room.currentPlayers = (i % 3) + 1;
-            room.maxPlayers = (gameModes[i] == QString::fromUtf8("듀오")) ? 2 : 4;
+
+            // 듀오 모드 처리
+            bool isDuo = gameModes[i].contains(QString::fromUtf8("듀오"));
+            room.maxPlayers = isDuo ? 2 : 4;
+            room.currentPlayers = isDuo ? (i % 2) + 1 : (i % 3) + 1; // 듀오는 1-2명, 클래식은 1-3명
+
             room.isPrivate = (i % 4 == 0);
             room.isPlaying = (i % 5 == 0);
             room.gameMode = gameModes[i];
+
             rooms.append(room);
         }
 
