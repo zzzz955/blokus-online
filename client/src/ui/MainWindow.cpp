@@ -230,7 +230,7 @@ namespace Blokus {
     void MainWindow::setupUI()
     {
         setWindowTitle(QString::fromUtf8("블로커스 온라인"));
-        setMinimumSize(1000, 800);
+        setMinimumSize(1300, 1000);
         resize(1300, 1000);
 
         // 전체 배경색 설정

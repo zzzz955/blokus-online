@@ -79,28 +79,38 @@ namespace Blokus {
         // 블록의 바운딩 박스 계산
         QRect boundingRect = m_block.getBoundingRect();
 
-        // 동적 크기 계산 (블록 크기에 비례)
-        int padding = std::max(6, static_cast<int>(m_blockSize * 0.4));
+        // 동적 크기 계산 (블록 크기에 비례, 더 작게)
+        int padding;
+        if (m_blockSize <= 10) {
+            padding = 4; // 매우 작은 블록은 최소 여백
+        }
+        else if (m_blockSize <= 14) {
+            padding = 6; // 작은 블록은 적은 여백
+        }
+        else {
+            padding = 8; // 큰 블록은 기본 여백
+        }
+
         int width = boundingRect.width() * m_blockSize + padding * 2;
         int height = boundingRect.height() * m_blockSize + padding * 2;
 
-        // 최소 크기 보장
-        width = std::max(width, static_cast<int>(m_blockSize * 1.5));
-        height = std::max(height, static_cast<int>(m_blockSize * 1.5));
+        // 최소 크기 보장 (더 작게)
+        width = std::max(width, static_cast<int>(m_blockSize * 1.2));
+        height = std::max(height, static_cast<int>(m_blockSize * 1.2));
 
         setFixedSize(width, height);
 
-        // 블록 버튼 개별 스타일 설정
+        // 블록 버튼 개별 스타일 설정 (작은 블록용)
         setStyleSheet(
             "BlockButton { "
             "background-color: transparent; "
             "border: none; "
-            "border-radius: 4px; "
+            "border-radius: 3px; "
             "margin: 1px; "
             "} "
             "BlockButton:hover { "
-            "background-color: rgba(255, 255, 255, 25); "
-            "border: 1px solid #bbb; "
+            "background-color: rgba(255, 255, 255, 20); "
+            "border: 1px solid #ccc; "
             "}"
         );
     }
@@ -562,38 +572,42 @@ namespace Blokus {
 
     qreal DirectionPalette::getBlockSize() const
     {
-        // 현재 위젯 크기에 따라 동적으로 블록 크기 조정
-        QSize currentSize = size();
-
+        // 고정된 블록 크기로 변경 (일관성 확보)
         switch (m_direction) {
         case Direction::South:
-            // 남쪽: 너비에 비례하여 조정
-            return std::max(14.0, std::min(20.0, currentSize.width() / 50.0));
+            // 남쪽 (나): 고정 크기
+            return 12.0;
 
         case Direction::North:
-            // 북쪽: 너비에 비례하여 조정 (더 작게)
-            return std::max(10.0, std::min(16.0, currentSize.width() / 60.0));
+            // 북쪽: 고정 크기 (더 작게)
+            return 10.0;
 
         case Direction::East:
         case Direction::West:
-            // 동서쪽: 높이에 비례하여 조정
-            return std::max(8.0, std::min(12.0, currentSize.height() / 50.0));
+            // 동서쪽: 고정 크기 유지
+            return 10.0;
         }
-        return 14.0;
+        return 12.0;
     }
 
     int DirectionPalette::getMaxBlocksPerRow() const
     {
-        // 안전한 최대 열 수 계산
+        // 고정된 열 수로 변경 (일관성 확보)
         switch (m_direction) {
         case Direction::South:
+            // 남쪽: 고정 열 수
+            return 12;
+
         case Direction::North:
-            return std::min(10, std::max(6, width() / 80)); // 안전한 범위
+            // 북쪽: 고정 열 수 (더 많이)
+            return 15;
+
         case Direction::East:
         case Direction::West:
-            return 3; // 고정
+            // 동서쪽: 고정 유지
+            return 3;
         }
-        return 6;
+        return 8;
     }
 
     void DirectionPalette::resizeEvent(QResizeEvent* event)
