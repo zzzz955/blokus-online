@@ -268,14 +268,14 @@ namespace Blokus {
 
     void MainWindow::setupUI()
     {
-        setWindowTitle(QString::fromUtf8("블로커스 온라인 - 베이지 테마"));
-        setMinimumSize(1200, 1000);  // 충분한 크기
-        resize(1400, 1100);          // 더 큰 기본 크기
+        setWindowTitle(QString::fromUtf8("블로커스 온라인 - 반응형 베이지 테마"));
+        setMinimumSize(1000, 800);   // 최소 크기
+        resize(1300, 1000);          // 기본 크기
 
-        // 전체 배경색 설정 - 베이지 테마
+        // 전체 배경색 설정
         setStyleSheet(
             "QMainWindow { "
-            "background-color: #faf0e6; "  // 연한 베이지 배경
+            "background-color: #faf0e6; "
             "}"
         );
 
@@ -288,27 +288,27 @@ namespace Blokus {
         m_gameBoard = new GameBoard(this);
         m_gameBoard->setGameLogic(&m_gameManager->getGameLogic());
 
-        // 메인 레이아웃: 충분한 여백
+        // 메인 레이아웃
         QVBoxLayout* mainLayout = new QVBoxLayout(centralWidget);
-        mainLayout->setContentsMargins(15, 15, 15, 15);
-        mainLayout->setSpacing(10);
+        mainLayout->setContentsMargins(10, 10, 10, 10);
+        mainLayout->setSpacing(8);
 
-        // 상단 게임 정보 패널
+        // 상단 게임 정보 패널 (고정 높이)
         QWidget* gameInfoPanel = createGameInfoPanel();
-        gameInfoPanel->setFixedHeight(55);
+        gameInfoPanel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        gameInfoPanel->setFixedHeight(50);
         mainLayout->addWidget(gameInfoPanel);
 
-        // 중앙 게임 영역 (마작 스타일) - 고정 크기
+        // 중앙 게임 영역 (확장)
         QWidget* gameArea = createMahjongStyleGameArea();
-        mainLayout->addWidget(gameArea);
+        gameArea->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+        mainLayout->addWidget(gameArea, 1); // stretch factor = 1
 
-        // 하단 컨트롤 패널
+        // 하단 컨트롤 패널 (고정 높이)
         QWidget* controlPanel = createCompactControlPanel();
-        controlPanel->setFixedHeight(45);
+        controlPanel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        controlPanel->setFixedHeight(40);
         mainLayout->addWidget(controlPanel);
-
-        // 레이아웃이 확장되지 않도록 설정
-        mainLayout->addStretch(0);
 
         // 메뉴 바 설정
         setupMenuBar();
@@ -325,7 +325,7 @@ namespace Blokus {
         QWidget* gameArea = new QWidget();
         gameArea->setStyleSheet(
             "QWidget { "
-            "background-color: #34495e; "  // 어두운 배경 (베이지와 대비)
+            "background-color: #34495e; "
             "border-radius: 12px; "
             "padding: 10px; "
             "}"
@@ -336,47 +336,33 @@ namespace Blokus {
         gridLayout->setContentsMargins(15, 15, 15, 15);
         gridLayout->setSpacing(12);
 
-        // 팔레트 크기 설정
+        // 팔레트들 가져오기
         QWidget* northPalette = m_improvedPalette->getNorthPalette();
         QWidget* southPalette = m_improvedPalette->getSouthPalette();
         QWidget* eastPalette = m_improvedPalette->getEastPalette();
         QWidget* westPalette = m_improvedPalette->getWestPalette();
 
-        // 크기 제한 설정 (침범 방지)
-        northPalette->setFixedHeight(130);   // 북쪽
-        southPalette->setFixedHeight(200);   // 남쪽 - 더 크게 (보드 침범 안함)
-        eastPalette->setFixedWidth(160);     // 동쪽
-        westPalette->setFixedWidth(160);     // 서쪽
+        // 반응형 크기 정책 설정
+        setupResponsivePalettes(northPalette, southPalette, eastPalette, westPalette);
 
-        // 게임보드 크기 설정 (고정 크기로 침범 방지)
-        m_gameBoard->setFixedSize(550, 550); // 정사각형 고정 크기
+        // 게임보드 반응형 설정
+        m_gameBoard->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+        m_gameBoard->setMinimumSize(400, 400);  // 최소 크기만 설정
 
         // 게임보드 베이지색 스타일
         m_gameBoard->setStyleSheet(
             "QGraphicsView { "
-            "background-color: #f5f5dc; "     // 베이지색 배경
-            "border: 3px solid #8b7355; "     // 진한 베이지 테두리
+            "background-color: #f5f5dc; "
+            "border: 3px solid #8b7355; "
             "border-radius: 8px; "
             "}"
         );
 
         // 3x3 그리드 배치
-        //     0   1   2
-        // 0   .   N   .
-        // 1   W   B   E  
-        // 2   .   S   .
-
-        // 빈 공간에는 투명한 위젯 배치
-        QWidget* corner1 = new QWidget();
-        QWidget* corner2 = new QWidget();
-        QWidget* corner3 = new QWidget();
-        QWidget* corner4 = new QWidget();
-
-        QString cornerStyle = "background: transparent; border: none;";
-        corner1->setStyleSheet(cornerStyle);
-        corner2->setStyleSheet(cornerStyle);
-        corner3->setStyleSheet(cornerStyle);
-        corner4->setStyleSheet(cornerStyle);
+        QWidget* corner1 = createCornerWidget();
+        QWidget* corner2 = createCornerWidget();
+        QWidget* corner3 = createCornerWidget();
+        QWidget* corner4 = createCornerWidget();
 
         gridLayout->addWidget(corner1, 0, 0);
         gridLayout->addWidget(northPalette, 0, 1);
@@ -390,16 +376,92 @@ namespace Blokus {
         gridLayout->addWidget(southPalette, 2, 1);
         gridLayout->addWidget(corner4, 2, 2);
 
-        // 비율 설정 (모든 크기 고정으로 침범 방지)
-        gridLayout->setRowStretch(0, 0);  // 북쪽 고정
-        gridLayout->setRowStretch(1, 0);  // 중앙도 고정 (침범 방지)
-        gridLayout->setRowStretch(2, 0);  // 남쪽 고정
+        // 반응형 비율 설정
+        gridLayout->setRowStretch(0, 0);  // 북쪽: 고정 높이
+        gridLayout->setRowStretch(1, 1);  // 중앙: 확장 (핵심!)
+        gridLayout->setRowStretch(2, 0);  // 남쪽: 고정 높이
 
-        gridLayout->setColumnStretch(0, 0);  // 서쪽 고정
-        gridLayout->setColumnStretch(1, 0);  // 중앙도 고정 (침범 방지)
-        gridLayout->setColumnStretch(2, 0);  // 동쪽 고정
+        gridLayout->setColumnStretch(0, 0);  // 서쪽: 고정 너비
+        gridLayout->setColumnStretch(1, 1);  // 중앙: 확장 (핵심!)
+        gridLayout->setColumnStretch(2, 0);  // 동쪽: 고정 너비
 
         return gameArea;
+    }
+
+    void MainWindow::setupResponsivePalettes(QWidget* north, QWidget* south, QWidget* east, QWidget* west)
+    {
+        // 북쪽 팔레트 - 가로는 확장, 세로는 고정
+        north->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        north->setMinimumHeight(100);
+        north->setMaximumHeight(140);
+
+        // 남쪽 팔레트 - 가로는 확장, 세로는 고정
+        south->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        south->setMinimumHeight(150);
+        south->setMaximumHeight(220);
+
+        // 동쪽 팔레트 - 가로는 고정, 세로는 확장
+        east->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+        east->setMinimumWidth(120);
+        east->setMaximumWidth(180);
+
+        // 서쪽 팔레트 - 가로는 고정, 세로는 확장
+        west->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+        west->setMinimumWidth(120);
+        west->setMaximumWidth(180);
+    }
+
+    QWidget* MainWindow::createCornerWidget()
+    {
+        QWidget* corner = new QWidget();
+        corner->setStyleSheet("background: transparent; border: none;");
+        corner->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+        corner->setFixedSize(20, 20); // 작은 고정 크기
+        return corner;
+    }
+
+    void MainWindow::resizeEvent(QResizeEvent* event)
+    {
+        QMainWindow::resizeEvent(event);
+
+        // 창 크기 변경 시 팔레트 재조정
+        if (m_improvedPalette) {
+            adjustPalettesToWindowSize();
+        }
+    }
+
+    void MainWindow::adjustPalettesToWindowSize()
+    {
+        QSize windowSize = size();
+        qDebug() << QString::fromUtf8("창 크기 변경: %1 x %2").arg(windowSize.width()).arg(windowSize.height());
+
+        // 창 크기에 따른 팔레트 조정
+        QWidget* north = m_improvedPalette->getNorthPalette();
+        QWidget* south = m_improvedPalette->getSouthPalette();
+        QWidget* east = m_improvedPalette->getEastPalette();
+        QWidget* west = m_improvedPalette->getWestPalette();
+
+        if (windowSize.width() < 1200) {
+            // 작은 화면: 팔레트 축소
+            north->setMaximumHeight(120);
+            south->setMaximumHeight(180);
+            east->setMaximumWidth(140);
+            west->setMaximumWidth(140);
+        }
+        else if (windowSize.width() > 1500) {
+            // 큰 화면: 팔레트 확대
+            north->setMaximumHeight(160);
+            south->setMaximumHeight(250);
+            east->setMaximumWidth(200);
+            west->setMaximumWidth(200);
+        }
+        else {
+            // 기본 크기
+            north->setMaximumHeight(140);
+            south->setMaximumHeight(220);
+            east->setMaximumWidth(180);
+            west->setMaximumWidth(180);
+        }
     }
 
     QWidget* MainWindow::createGameInfoPanel()

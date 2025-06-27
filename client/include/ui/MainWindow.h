@@ -36,17 +36,23 @@ namespace Blokus {
         void onToggleReadOnly();
         void onAbout();
 
+    protected:
+        void resizeEvent(QResizeEvent* event) override;  // 새로 추가
+
     private:
         void setupUI();
         void connectSignals();
         void updateGameUI();
         void resetAllBlockStates();
         void clearSelectedBlock(); // 추가된 함수
+        void adjustPalettesToWindowSize();
 
         // UI 생성 함수들
         QWidget* createGameInfoPanel();
         QWidget* createCompactControlPanel();
         QWidget* createMahjongStyleGameArea(); // 추가된 함수
+        QWidget* createCornerWidget();
+        void setupResponsivePalettes(QWidget* north, QWidget* south, QWidget* east, QWidget* west);
         void setupMenuBar();
         void setupToolBar();
         void setupStatusBar();

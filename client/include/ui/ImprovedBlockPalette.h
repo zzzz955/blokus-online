@@ -10,9 +10,11 @@
 #include <QGraphicsItem>
 #include <QPropertyAnimation>
 #include <QGraphicsOpacityEffect>
-#include <QTimer>              // 추가된 헤더
-#include <QDebug>              // 추가된 헤더
-#include <QApplication>        // 추가된 헤더
+#include <QTimer>              
+#include <QDebug>              
+#include <QApplication>        
+#include <QResizeEvent>        // 반응형을 위해 추가
+#include <QSizePolicy>         // 반응형을 위해 추가
 #include <map>
 #include <set>
 
@@ -31,7 +33,8 @@ namespace Blokus {
 
         void setSelected(bool selected);
         void setUsed(bool used);
-        void setEnabled(bool enabled); // override 제거됨
+        void setEnabled(bool enabled);
+        void updateBlockSize(qreal newSize);    // 반응형을 위해 추가
 
         Block getBlock() const { return m_block; }
         BlockType getBlockType() const { return m_block.getType(); }
@@ -88,14 +91,19 @@ namespace Blokus {
     signals:
         void blockSelected(const Block& block);
 
+    protected:
+        void resizeEvent(QResizeEvent* event) override;  // 반응형을 위해 추가
+
     private slots:
         void onBlockButtonClicked(const Block& block);
 
     private:
         void setupLayout();
+        void setupResponsiveSizing();                     // 반응형을 위해 추가
         void updateBlockButtons();
-        void forceLayoutUpdate();
         void reorganizeLayout();
+        void removeFromBlockList(BlockType blockType);   // 블록 제거를 위해 추가
+        void forceLayoutUpdate();                         // 강제 업데이트를 위해 추가
         qreal getBlockSize() const;
         int getMaxBlocksPerRow() const;
         QString getDirectionName() const;
@@ -143,12 +151,12 @@ namespace Blokus {
 
     private:
         void setupPalettes();
-        void setupFixedPlayerAssignments();  // 새로 추가
-        void updatePlayerAssignments();      // 사용 안함 (호환성 유지)
+        void setupFixedPlayerAssignments();  // 고정 플레이어 할당
+        void updatePlayerAssignments();      // 호환성 유지
         void updateBlockAvailability();
 
         PlayerColor m_currentPlayer;
-        PlayerColor m_fixedPlayer;           // 새로 추가 (항상 파랑)
+        PlayerColor m_fixedPlayer;           // 고정 플레이어 (항상 파랑)
         Block m_selectedBlock;
         bool m_hasSelection;
 

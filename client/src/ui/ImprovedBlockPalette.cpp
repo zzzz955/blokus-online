@@ -35,6 +35,15 @@ namespace Blokus {
             .arg(block.getSize()));
     }
 
+    void BlockButton::updateBlockSize(qreal newSize)
+    {
+        if (m_blockSize != newSize) {
+            m_blockSize = newSize;
+            setupGraphics();
+            update();
+        }
+    }
+
     void BlockButton::setSelected(bool selected)
     {
         if (m_isSelected != selected) {
@@ -69,12 +78,15 @@ namespace Blokus {
     {
         // 블록의 바운딩 박스 계산
         QRect boundingRect = m_block.getBoundingRect();
-        int width = boundingRect.width() * m_blockSize + 12;  // 여백 더 크게
-        int height = boundingRect.height() * m_blockSize + 12;
 
-        // 최소 크기 보장 (충분히 크게)
-        width = std::max(width, static_cast<int>(m_blockSize * 2.5));
-        height = std::max(height, static_cast<int>(m_blockSize * 2.5));
+        // 동적 크기 계산 (블록 크기에 비례)
+        int padding = std::max(6, static_cast<int>(m_blockSize * 0.4));
+        int width = boundingRect.width() * m_blockSize + padding * 2;
+        int height = boundingRect.height() * m_blockSize + padding * 2;
+
+        // 최소 크기 보장
+        width = std::max(width, static_cast<int>(m_blockSize * 1.5));
+        height = std::max(height, static_cast<int>(m_blockSize * 1.5));
 
         setFixedSize(width, height);
 
@@ -83,11 +95,11 @@ namespace Blokus {
             "BlockButton { "
             "background-color: transparent; "
             "border: none; "
-            "border-radius: 6px; "
-            "margin: 3px; "
+            "border-radius: 4px; "
+            "margin: 1px; "
             "} "
             "BlockButton:hover { "
-            "background-color: rgba(255, 255, 255, 30); "
+            "background-color: rgba(255, 255, 255, 25); "
             "border: 1px solid #bbb; "
             "}"
         );
@@ -254,40 +266,53 @@ namespace Blokus {
         // 블록 컨테이너 (스크롤 없이 직접 배치)
         m_blockContainer = new QWidget();
         m_blockLayout = new QGridLayout(m_blockContainer);
-        m_blockLayout->setContentsMargins(10, 10, 10, 10);
-        m_blockLayout->setSpacing(8); // 블록 간격 더 크게
+        m_blockLayout->setContentsMargins(8, 8, 8, 8);
+        m_blockLayout->setSpacing(6); // 적당한 간격
 
         // 스크롤 영역 없이 직접 추가
         mainLayout->addWidget(m_blockContainer);
 
-        // 크기 제약 설정
-        if (m_direction == Direction::South) {
-            // 남쪽 (내 블록) - 보드보다 넓게 허용
-            setMinimumHeight(160);
-            setMaximumHeight(200);
-            setMinimumWidth(700);  // 보드보다 넓게
-        }
-        else if (m_direction == Direction::North) {
-            // 북쪽 - 더 크게
-            setMinimumHeight(110);
-            setMaximumHeight(130);
-            setMinimumWidth(600);
-        }
-        else {
-            // 동서쪽 - 세로로 길게
-            setMinimumWidth(130);
-            setMaximumWidth(160);
-            setMinimumHeight(400);
-        }
+        // 반응형 크기 정책 설정
+        setupResponsiveSizing();
 
         // 베이지색 배경 설정
         setStyleSheet(
             "QWidget { "
-            "background-color: #f5f5dc; "  // 베이지색
-            "border: 2px solid #d4c5a0; "  // 베이지색 계열 테두리
-            "border-radius: 10px; "
+            "background-color: #f5f5dc; "
+            "border: 2px solid #d4c5a0; "
+            "border-radius: 8px; "
             "}"
         );
+    }
+
+    void DirectionPalette::setupResponsiveSizing()
+    {
+        switch (m_direction) {
+        case Direction::South:
+            // 남쪽: 가로 확장, 세로 고정
+            setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+            setMinimumHeight(150);
+            setMaximumHeight(220);
+            setMinimumWidth(600);  // 최소 너비 보장
+            break;
+
+        case Direction::North:
+            // 북쪽: 가로 확장, 세로 고정
+            setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+            setMinimumHeight(100);
+            setMaximumHeight(140);
+            setMinimumWidth(500);  // 최소 너비 보장
+            break;
+
+        case Direction::East:
+        case Direction::West:
+            // 동서쪽: 가로 고정, 세로 확장
+            setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+            setMinimumWidth(120);
+            setMaximumWidth(180);
+            setMinimumHeight(300);  // 최소 높이 보장
+            break;
+        }
     }
 
     void DirectionPalette::removeBlock(BlockType blockType)
@@ -449,7 +474,8 @@ namespace Blokus {
 
     void DirectionPalette::reorganizeLayout()
     {
-        qDebug() << QString::fromUtf8("DirectionPalette::reorganizeLayout 호출됨");
+        qDebug() << QString::fromUtf8("🔄 %1 방향 팔레트 재배치 (크기: %2x%3)")
+            .arg(getDirectionName()).arg(width()).arg(height());
 
         // 현재 존재하는 버튼들 수집
         QList<BlockButton*> buttons;
@@ -459,18 +485,22 @@ namespace Blokus {
             }
         }
 
-        // 레이아웃에서 모든 아이템 제거 (위젯은 유지)
+        // 레이아웃에서 모든 아이템 제거
         QLayoutItem* item;
         while ((item = m_blockLayout->takeAt(0)) != nullptr) {
-            delete item; // QLayoutItem만 삭제
+            delete item;
         }
 
-        // 버튼들을 다시 배치
+        // 새로운 크기에 맞춰 재배치
+        qreal newBlockSize = getBlockSize();
         int maxPerRow = getMaxBlocksPerRow();
         int row = 0, col = 0;
 
         for (BlockButton* button : buttons) {
             if (button && button->parent() == m_blockContainer) {
+                // 버튼 크기도 동적으로 조정
+                button->updateBlockSize(newBlockSize);
+
                 m_blockLayout->addWidget(button, row, col);
 
                 col++;
@@ -481,34 +511,69 @@ namespace Blokus {
             }
         }
 
-        qDebug() << QString::fromUtf8("레이아웃 재정렬 완료: %1개 버튼").arg(buttons.size());
+        qDebug() << QString::fromUtf8("✅ 재배치 완료: %1개 버튼, %2열")
+            .arg(buttons.size()).arg(maxPerRow);
 
-        // 강제 업데이트
-        m_blockContainer->updateGeometry();
-        updateGeometry();
-        update();
+        forceLayoutUpdate();
     }
 
     qreal DirectionPalette::getBlockSize() const
     {
+        // 현재 위젯 크기에 따라 동적으로 블록 크기 조정
+        QSize currentSize = size();
+
         switch (m_direction) {
-        case Direction::South: return 16.0; // 남쪽: 조금 작게 (겹침 방지)
-        case Direction::North: return 12.0; // 북쪽: 중간 크기
+        case Direction::South:
+            // 남쪽: 너비에 비례하여 조정
+            return std::max(14.0, std::min(20.0, currentSize.width() / 50.0));
+
+        case Direction::North:
+            // 북쪽: 너비에 비례하여 조정 (더 작게)
+            return std::max(10.0, std::min(16.0, currentSize.width() / 60.0));
+
         case Direction::East:
-        case Direction::West: return 10.0;  // 동서쪽: 작은 크기
+        case Direction::West:
+            // 동서쪽: 높이에 비례하여 조정
+            return std::max(8.0, std::min(12.0, currentSize.height() / 50.0));
         }
         return 14.0;
     }
 
     int DirectionPalette::getMaxBlocksPerRow() const
     {
+        // 현재 크기에 따라 동적으로 열 수 조정
+        QSize currentSize = size();
+        qreal blockSize = getBlockSize();
+
         switch (m_direction) {
-        case Direction::South: return 8;    // 남쪽: 8개씩 (더 많이 배치)
-        case Direction::North: return 9;    // 북쪽: 9개씩 (더 많이)
-        case Direction::East:
-        case Direction::West: return 3;     // 동서쪽: 3개씩
+        case Direction::South:
+        case Direction::North: {
+            // 가로 방향: 현재 너비에 맞춰 계산
+            int availableWidth = currentSize.width() - 40; // 여백 제외
+            int blockWidth = blockSize * 3; // 평균 블록 너비 (추정)
+            int maxCols = std::max(6, availableWidth / blockWidth);
+            return std::min(12, maxCols); // 최대 12개까지
         }
-        return 6;
+
+        case Direction::East:
+        case Direction::West: {
+            // 세로 방향: 고정 열 수 (너비 제한)
+            return 3;
+        }
+        }
+        return 8;
+    }
+
+    void DirectionPalette::resizeEvent(QResizeEvent* event)
+    {
+        QWidget::resizeEvent(event);
+
+        // 크기 변경 시 블록 버튼들 재배치
+        if (m_blockButtons.size() > 0) {
+            QTimer::singleShot(100, this, [this]() {
+                reorganizeLayout();
+                });
+        }
     }
 
     QString DirectionPalette::getDirectionName() const
