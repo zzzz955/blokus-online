@@ -11,6 +11,7 @@ namespace Blokus {
     constexpr int BOARD_SIZE = 20;          // 20x20 게임 보드
     constexpr int MAX_PLAYERS = 4;          // 최대 플레이어 수
     constexpr int BLOCKS_PER_PLAYER = 21;   // 플레이어당 블록 수
+    constexpr int DEFAULT_TURN_TIME = 30;   // 🔥 기본 턴 제한시간 (30초)
 
     // 위치 타입 정의 (행, 열)
     using Position = std::pair<int, int>;
@@ -63,58 +64,35 @@ namespace Blokus {
     // 블록 타입 (폴리오미노 종류)
     enum class BlockType {
         // 1칸 블록
-        Single = 0,         // ■
+        Single = 0,
 
         // 2칸 블록  
-        Domino = 1,         // ■■
+        Domino = 1,
 
         // 3칸 블록
-        TrioLine = 2,       // ■■■
-        TrioAngle = 3,      // ■■
-        //  ■
+        TrioLine = 2,
+        TrioAngle = 3,
 
-// 4칸 블록
-Tetro_I = 4,        // ■■■■
-Tetro_O = 5,        // ■■
-// ■■
-Tetro_T = 6,        // ■■■
-//  ■
-Tetro_L = 7,        // ■■■
-// ■
-Tetro_S = 8,        // ■■
-//  ■■
+        // 4칸 블록
+        Tetro_I=4,
+        Tetro_O=5,
+        Tetro_T=6,
+        Tetro_L=7,
+        Tetro_S=8,
 
-// 5칸 블록 (총 12개)
-Pento_F = 9,        //  ■■
-// ■■
-//  ■
-Pento_I = 10,       // ■■■■■
-Pento_L = 11,       // ■■■■
-// ■
-Pento_N = 12,       // ■■■
-//   ■■
-Pento_P = 13,       // ■■
-// ■■
-// ■
-Pento_T = 14,       // ■■■
-//  ■
-//  ■
-Pento_U = 15,       // ■ ■
-// ■■■
-Pento_V = 16,       // ■
-// ■
-// ■■■
-Pento_W = 17,       // ■
-// ■■
-//  ■■
-Pento_X = 18,       //  ■
-// ■■■
-//  ■
-Pento_Y = 19,       // ■■■■
-//  ■
-Pento_Z = 20        // ■■
-//  ■
-//  ■■
+        // 5칸 블록 (총 12개)
+        Pento_F=9,
+        Pento_I=10,
+        Pento_L=11,
+        Pento_N=12,
+        Pento_P=13,
+        Pento_T=14,
+        Pento_U=15,
+        Pento_V=16,
+        Pento_W=17,
+        Pento_X=18,
+        Pento_Y=19,
+        Pento_Z=20
     };
 
     // 블록 배치 정보 구조체
@@ -156,13 +134,48 @@ Pento_Z = 20        // ■■
         }
     };
 
-    // 플레이어 정보 구조체
+    // 사용자 정보 구조체  
+    struct UserInfo {
+        QString username;           // 사용자명
+        int level;                  // 경험치 레벨 (게임 수에 따라 증가)
+        int totalGames;             // 총 게임 수
+        int wins;                   // 승리 수
+        int losses;                 // 패배 수
+        int averageScore;           // 평균 점수
+        bool isOnline;              // 온라인 상태
+        QString status;             // "로비", "게임중", "자리비움"
+
+        UserInfo()
+            : username(QString::fromUtf8("익명"))
+            , level(1)
+            , totalGames(0)
+            , wins(0)
+            , losses(0)
+            , averageScore(0)
+            , isOnline(true)
+            , status(QString::fromUtf8("로비"))
+        {
+        }
+
+        // 승률 계산
+        double getWinRate() const {
+            return totalGames > 0 ? (double)wins / totalGames * 100.0 : 0.0;
+        }
+
+        // 레벨 계산 (10게임당 1레벨)
+        int calculateLevel() const {
+            return (totalGames / 10) + 1;
+        }
+    };
+
+    // 플레이어 정보 구조체 (게임 내)
     struct PlayerInfo {
         PlayerColor color;          // 플레이어 색상
         QString name;               // 플레이어 이름
         int score;                  // 현재 점수
         int remainingBlocks;        // 남은 블록 수
         bool isAI;                  // AI 플레이어 여부
+        int aiDifficulty;           // AI 난이도 (1-3)
         bool isActive;              // 활성 상태
 
         PlayerInfo()
@@ -171,6 +184,7 @@ Pento_Z = 20        // ■■
             , score(0)
             , remainingBlocks(BLOCKS_PER_PLAYER)
             , isAI(false)
+            , aiDifficulty(2)
             , isActive(true)
         {
         }
@@ -179,17 +193,21 @@ Pento_Z = 20        // ■■
     // 게임 설정 구조체
     struct GameSettings {
         int playerCount;            // 플레이어 수 (2-4)
-        int timeLimit;              // 턴 제한시간 (초, 0=무제한)
+        int turnTimeLimit;          // 🔥 턴 제한시간 (초, 기본 30초)
         bool enableAI;              // AI 플레이어 허용
         int aiDifficulty;           // AI 난이도 (1-3)
         bool showHints;             // 힌트 표시 여부
+        QString gameMode;           // 게임 모드 ("classic", "duo")
+        bool recordStats;           // 통계 기록 여부 (기본 true)
 
         GameSettings()
             : playerCount(4)
-            , timeLimit(0)
+            , turnTimeLimit(DEFAULT_TURN_TIME)  // 🔥 30초 기본값
             , enableAI(true)
             , aiDifficulty(2)
             , showHints(true)
+            , gameMode("classic")
+            , recordStats(true)         // 🔥 통계는 기록, 레이팅은 안함
         {
         }
     };
@@ -229,6 +247,19 @@ Pento_Z = 20        // ■■
             default: return PlayerColor::Blue;
             }
         }
+
+        // 🔥 턴 시간 포맷팅 (30초 → "0:30")
+        inline QString formatTurnTime(int seconds) {
+            int minutes = seconds / 60;
+            int remainingSeconds = seconds % 60;
+            return QString("%1:%2").arg(minutes).arg(remainingSeconds, 2, 10, QChar('0'));
+        }
+
+        // 🔥 시간 초과 여부 확인
+        inline bool isTurnTimeExpired(int remainingSeconds) {
+            return remainingSeconds <= 0;
+        }
+
     } // namespace Utils
 
 } // namespace Blokus

@@ -130,6 +130,7 @@ Makefile
 # vcpkg installed packages
 vcpkg_installed/
 .vcpkg-root
+/vcpkg/
 
 # vcpkg ports (if customized)
 ports/
