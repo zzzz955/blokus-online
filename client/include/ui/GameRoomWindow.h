@@ -1,11 +1,12 @@
-﻿#pragma once
+﻿// client/include/ui/GameRoomWindow.h - 업데이트된 헤더 파일
+
+#pragma once
 
 #include <QMainWindow>
 #include <QWidget>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QGridLayout>
-#include <QSplitter>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
@@ -22,104 +23,54 @@
 #include <QResizeEvent>
 #include <QDebug>
 #include <QList>
+#include <QSet>
 
 #include "ui/GameBoard.h"
-#include "ui/ImprovedBlockPalette.h"
 #include "game/GameLogic.h"
 #include "common/Types.h"
 
 namespace Blokus {
 
-    // 플레이어 슬롯 정보
-    struct PlayerSlot {
-        PlayerColor color;          // 플레이어 색상
-        QString username;           // 플레이어 이름 (빈 슬롯일 경우 "")
-        bool isAI;                  // AI 플레이어 여부
-        int aiDifficulty;           // AI 난이도 (1-3)
-        bool isHost;                // 호스트 여부
-        bool isReady;               // 준비 상태
-        int score;                  // 현재 점수
-        int remainingBlocks;        // 남은 블록 수
+    // 전방 선언
+    class MyBlockPalette;
 
-        PlayerSlot()
-            : color(PlayerColor::None)
-            , username("")
-            , isAI(false)
-            , aiDifficulty(2)
-            , isHost(false)
-            , isReady(false)
-            , score(0)
-            , remainingBlocks(BLOCKS_PER_PLAYER)
-        {
-        }
+    // 내 블록 팔레트 클래스
+    class MyBlockPalette : public QWidget
+    {
+        Q_OBJECT
 
-        bool isEmpty() const {
-            return username.isEmpty() && !isAI;
-        }
+    public:
+        explicit MyBlockPalette(QWidget* parent = nullptr);
 
-        QString getDisplayName() const {
-            if (isEmpty()) {
-                return QString::fromUtf8("빈 슬롯");
-            }
-            else if (isAI) {
-                return QString::fromUtf8("AI (레벨 %1)").arg(aiDifficulty);
-            }
-            else {
-                return username;
-            }
-        }
-    };
+        void setPlayer(PlayerColor player);
+        void removeBlock(BlockType blockType);
+        void resetAllBlocks();
+        void setEnabled(bool enabled);
+        void clearSelection();  // 🆕 선택 해제 함수
 
-    // 게임 룸 정보
-    struct GameRoomInfo {
-        int roomId;
-        QString roomName;
-        QString hostUsername;       // 현재 호스트
-        PlayerColor hostColor;      // 호스트의 색상
-        int maxPlayers;
-        QString gameMode;
-        bool isPlaying;             // 게임 진행 중 여부
-        QList<PlayerSlot> playerSlots;  // 4개 슬롯 (파-노-빨-초)
+    signals:
+        void blockSelected(const Block& block);
 
-        GameRoomInfo()
-            : roomId(0)
-            , roomName(QString::fromUtf8("새 방"))
-            , hostUsername("")
-            , hostColor(PlayerColor::Blue)
-            , maxPlayers(4)
-            , gameMode(QString::fromUtf8("클래식"))
-            , isPlaying(false)
-        {
-            // 4개 색상 슬롯 초기화
-            for (int i = 0; i < 4; ++i)
-                playerSlots.append(PlayerSlot());
+    private slots:
+        void onBlockButtonClicked();
 
-            playerSlots[0].color = PlayerColor::Blue;
-            playerSlots[1].color = PlayerColor::Yellow;
-            playerSlots[2].color = PlayerColor::Red;
-            playerSlots[3].color = PlayerColor::Green;
-        }
+    private:
+        void setupUI();
+        void updateBlockButtons();
+        void clearBlockButtons();
+        QColor getPlayerColor() const;
 
-        int getCurrentPlayerCount() const {
-            int count = 0;
-            for (const auto& slot : playerSlots) {
-                if (!slot.isEmpty()) count++;
-            }
-            return count;
-        }
-
-        PlayerColor getMyColor(const QString& username) const {
-            for (const auto& slot : playerSlots) {
-                if (slot.username == username) {
-                    return slot.color;
-                }
-            }
-            return PlayerColor::None;
-        }
-
-        bool isMyTurn(const QString& username, PlayerColor currentTurn) const {
-            return getMyColor(username) == currentTurn;
-        }
+    private:
+        PlayerColor m_player;
+        QVBoxLayout* m_mainLayout;
+        QScrollArea* m_scrollArea;
+        QWidget* m_blockContainer;
+        QGridLayout* m_blockGrid;
+        std::vector<Block> m_availableBlocks;
+        std::map<BlockType, QPushButton*> m_blockButtons;
+        Block m_selectedBlock;
+        bool m_hasSelection;
+        QPushButton* m_selectedButton;
     };
 
     // 개별 플레이어 슬롯 위젯
@@ -163,8 +114,9 @@ namespace Blokus {
         QLabel* m_usernameLabel;
         QLabel* m_statusLabel;
         QLabel* m_scoreLabel;
-        QPushButton* m_actionButton;   // 상황에 따라 "AI 추가", "제거", "강퇴" 등
-        QWidget* m_hostIndicator;      // 호스트 표시
+        QLabel* m_remainingBlocksLabel;  // 남은 블록 수 표시
+        QPushButton* m_actionButton;
+        QWidget* m_hostIndicator;
     };
 
     // 메인 게임 룸 윈도우
@@ -200,7 +152,6 @@ namespace Blokus {
         // 게임 플레이 시그널
         void blockPlacedRequested(const Block& block, const Position& position);
         void turnSkipRequested();
-        void gameResetRequested();
 
         // 채팅 시그널
         void chatMessageSent(const QString& message);
@@ -209,7 +160,6 @@ namespace Blokus {
         // UI 이벤트 핸들러
         void onLeaveRoomClicked();
         void onGameStartClicked();
-        void onGameResetClicked();
         void onChatSendClicked();
         void onChatReturnPressed();
 
@@ -236,7 +186,7 @@ namespace Blokus {
         void setupMainLayout();
         void setupRoomInfoPanel();       // 상단 룸 정보
         void setupPlayerSlotsPanel();    // 플레이어 슬롯들
-        void setupGameArea();            // 게임 보드 + 팔레트
+        void setupGameArea();            // 게임 보드 + 내 팔레트
         void setupChatPanel();           // 우측 채팅
         void setupControlsPanel();       // 하단 컨트롤
         void setupStyles();
@@ -250,6 +200,14 @@ namespace Blokus {
         // 게임 상태 관리
         void enableGameControls(bool enabled);
         void showGameResults(const std::map<PlayerColor, int>& scores);
+        void showFinalResults();
+        void resetGameToWaitingState();
+        void checkGameEndConditions();
+        void checkAndSkipPlayerTurn();
+
+        // 플레이어 상태 업데이트
+        void updatePlayerScore(PlayerColor player, int scoreToAdd);
+        void updatePlayerRemainingBlocks(PlayerColor player, int change);
 
         // 호스트 권한 확인
         bool isHost() const;
@@ -279,6 +237,7 @@ namespace Blokus {
         QLabel* m_roomNameLabel;
         QLabel* m_roomStatusLabel;
         QLabel* m_currentTurnLabel;
+        QPushButton* m_leaveRoomButton;  // 우측 상단으로 이동
 
         // 플레이어 슬롯들
         QWidget* m_playerSlotsPanel;
@@ -287,9 +246,8 @@ namespace Blokus {
 
         // 게임 영역
         QWidget* m_gameArea;
-        QSplitter* m_gameSplitter;
         GameBoard* m_gameBoard;
-        ImprovedGamePalette* m_blockPalette;
+        MyBlockPalette* m_myBlockPalette;  // 간소화된 내 블록 팔레트
 
         // 채팅 패널
         QWidget* m_chatPanel;
@@ -299,9 +257,7 @@ namespace Blokus {
 
         // 컨트롤 패널
         QWidget* m_controlsPanel;
-        QPushButton* m_leaveRoomButton;
         QPushButton* m_gameStartButton;
-        QPushButton* m_gameResetButton;
         QLabel* m_gameStatusLabel;
         QLabel* m_coordinateLabel;
 

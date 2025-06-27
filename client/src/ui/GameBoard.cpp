@@ -24,6 +24,8 @@ namespace Blokus {
         , m_testBlockIndex(0)
         , m_gameLogic(nullptr)
         , m_hasSelectedBlock(false)  // 선택 상태 추가
+        , m_currentBoardSize(BOARD_SIZE)  // 🆕 기본 20x20
+        , m_isDuoMode(false)              // 🆕 기본 클래식 모드
     {
         setupScene();
         setupStyles();
@@ -81,25 +83,54 @@ namespace Blokus {
         m_playerColors[PlayerColor::None] = QColor(245, 245, 220);     // 베이지색 (빈 칸)
     }
 
+    void GameBoard::setBoardSize(int size)
+    {
+        if (m_currentBoardSize != size) {
+            m_currentBoardSize = size;
+            m_isDuoMode = (size == DUO_BOARD_SIZE);
+
+            qDebug() << QString::fromUtf8("보드 크기 변경: %1x%1 (%2 모드)")
+                .arg(size)
+                .arg(m_isDuoMode ? "듀오" : "클래식");
+
+            initializeBoard();  // 보드 재생성
+        }
+    }
+
+    void GameBoard::setDuoMode(bool isDuoMode)
+    {
+        int newSize = isDuoMode ? DUO_BOARD_SIZE : BOARD_SIZE;
+        setBoardSize(newSize);
+    }
+
     void GameBoard::initializeBoard()
     {
         clearBoard();
 
-        // 보드 상태 초기화
-        for (int row = 0; row < BOARD_SIZE; ++row) {
-            for (int col = 0; col < BOARD_SIZE; ++col) {
+        // 보드 상태 초기화 (동적 크기)
+        m_board.clear();
+        m_board.resize(m_currentBoardSize);
+        for (int row = 0; row < m_currentBoardSize; ++row) {
+            m_board[row].resize(m_currentBoardSize);
+            for (int col = 0; col < m_currentBoardSize; ++col) {
                 m_board[row][col] = PlayerColor::None;
             }
         }
 
         // 시각적 요소 생성
         drawGrid();
-        // drawStartingCorners(); // 시작 모서리 하이라이트 제거
+
+        // 듀오 모드 시작 모서리 표시
+        if (m_isDuoMode) {
+            drawDuoStartingCorners();
+        }
 
         // 뷰 맞춤
         fitBoardToView();
 
-        qDebug() << QString::fromUtf8("보드 초기화 완료");
+        qDebug() << QString::fromUtf8("보드 초기화 완료: %1x%1 (%2 모드)")
+            .arg(m_currentBoardSize)
+            .arg(m_isDuoMode ? "듀오" : "클래식");
     }
 
     void GameBoard::clearBoard()
@@ -120,25 +151,35 @@ namespace Blokus {
     {
         if (!m_scene) return;
 
-        const qreal totalSize = BOARD_SIZE * m_cellSize;
+        const qreal totalSize = m_currentBoardSize * m_cellSize;
+
+        // 듀오 모드는 다른 색상 사용
+        QColor backgroundColor = m_isDuoMode ? QColor(250, 240, 230) : QColor(245, 245, 220);
+        QColor borderColor = m_isDuoMode ? QColor(139, 119, 101) : QColor(139, 119, 101);
 
         // 보드 배경 사각형
-        m_boardRect = m_scene->addRect(0, 0, totalSize, totalSize, m_borderPen, m_emptyBrush);
+        QPen duoBorderPen(borderColor, m_isDuoMode ? 3 : 2, Qt::SolidLine);
+        QBrush duoBrush(backgroundColor);
+
+        m_boardRect = m_scene->addRect(0, 0, totalSize, totalSize, duoBorderPen, duoBrush);
 
         // 격자 셀들 생성
-        m_gridCells.reserve(BOARD_SIZE * BOARD_SIZE);
+        m_gridCells.clear();
+        m_gridCells.reserve(m_currentBoardSize * m_currentBoardSize);
 
-        for (int row = 0; row < BOARD_SIZE; ++row) {
-            for (int col = 0; col < BOARD_SIZE; ++col) {
+        QPen cellPen(QColor(200, 180, 140), 1, Qt::SolidLine);
+
+        for (int row = 0; row < m_currentBoardSize; ++row) {
+            for (int col = 0; col < m_currentBoardSize; ++col) {
                 const qreal x = col * m_cellSize;
                 const qreal y = row * m_cellSize;
 
                 QGraphicsRectItem* cell = m_scene->addRect(
-                    x, y, m_cellSize, m_cellSize, m_gridPen, m_emptyBrush);
+                    x, y, m_cellSize, m_cellSize, cellPen, duoBrush);
 
                 // 셀에 좌표 정보 저장
-                cell->setData(0, row);  // 행
-                cell->setData(1, col);  // 열
+                cell->setData(0, row);
+                cell->setData(1, col);
 
                 m_gridCells.push_back(cell);
             }
@@ -146,6 +187,29 @@ namespace Blokus {
 
         // 씬 크기 설정
         m_scene->setSceneRect(0, 0, totalSize, totalSize);
+    }
+
+    void GameBoard::drawDuoStartingCorners()
+    {
+        if (!m_isDuoMode) return;
+
+        // 듀오 모드 시작 모서리 (14x14 보드)
+        // 파랑: (4, 4), 노랑: (9, 9)
+        const std::vector<Position> duoCorners = {
+            {4, 4},   // 파랑 시작점
+            {9, 9}    // 노랑 시작점
+        };
+
+        const std::vector<PlayerColor> players = {
+            PlayerColor::Blue, PlayerColor::Yellow
+        };
+
+        for (size_t i = 0; i < duoCorners.size(); ++i) {
+            const auto& corner = duoCorners[i];
+            const auto& color = players[i];
+
+            highlightCell(corner.first, corner.second, getPlayerColor(color));
+        }
     }
 
     void GameBoard::drawStartingCorners()
@@ -373,20 +437,34 @@ namespace Blokus {
 
     void GameBoard::setSelectedBlock(const Block& block)
     {
+        qDebug() << QString::fromUtf8("setSelectedBlock 호출: 블록=%1, 플레이어=%2")
+            .arg(BlockFactory::getBlockName(block.getType()))
+            .arg(Utils::playerColorToString(block.getPlayer()));
+
+        // PlayerColor::None이면 선택 해제
+        if (block.getPlayer() == PlayerColor::None) {
+            clearSelection();
+            return;
+        }
+
         m_selectedBlock = block;
-        m_hasSelectedBlock = (block.getPlayer() != PlayerColor::None);
+        m_hasSelectedBlock = true;
+
+        // 🔥 중요: 이 플래그도 true로 설정
+        if (m_gameLogic) {
+            // 현재 플레이어의 색상으로 블록 설정
+            PlayerColor currentPlayer = m_gameLogic->getCurrentPlayer();
+            m_selectedBlock.setPlayer(currentPlayer);
+        }
+
+        qDebug() << QString::fromUtf8("✅ 블록 선택 완료: %1 (hasSelected: %2)")
+            .arg(BlockFactory::getBlockName(block.getType()))
+            .arg(m_hasSelectedBlock);
 
         // 현재 호버 위치에서 미리보기 업데이트
-        if (m_hasSelectedBlock) {
+        if (isCellValid(m_hoveredCell.first, m_hoveredCell.second)) {
             showCurrentBlockPreview();
         }
-        else {
-            hideBlockPreview();
-        }
-
-        qDebug() << QString::fromUtf8("선택된 블록 변경: %1 (선택상태: %2)")
-            .arg(BlockFactory::getBlockName(block.getType()))
-            .arg(m_hasSelectedBlock ? "있음" : "없음");
     }
 
     // ========================================
@@ -395,7 +473,8 @@ namespace Blokus {
 
     bool GameBoard::isCellValid(int row, int col) const
     {
-        return row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE;
+        return row >= 0 && row < m_currentBoardSize &&
+            col >= 0 && col < m_currentBoardSize;
     }
 
     bool GameBoard::isCellOccupied(int row, int col) const
@@ -478,9 +557,40 @@ namespace Blokus {
     // 이벤트 핸들러들
     // ========================================
 
+    bool GameBoard::isGameStarted() const
+    {
+        // GameRoomWindow에서 게임 시작 상태를 확인하는 방법 필요
+        // 또는 GameLogic에서 상태 확인
+        if (m_gameLogic) {
+            // GameLogic의 현재 상태가 Playing인지 확인
+            return true; // 임시로 true, 실제로는 게임 상태 확인 필요
+        }
+        return false;
+    }
+
     void GameBoard::mousePressEvent(QMouseEvent* event)
     {
         if (m_readOnly) {
+            qDebug() << QString::fromUtf8("보드가 읽기 전용 모드");
+            QGraphicsView::mousePressEvent(event);
+            return;
+        }
+
+        // 게임 로직 확인
+        if (!m_gameLogic) {
+            qDebug() << QString::fromUtf8("게임 로직이 설정되지 않음");
+            QGraphicsView::mousePressEvent(event);
+            return;
+        }
+
+        // 블록 선택 상태 확인 (더 자세한 로깅)
+        qDebug() << QString::fromUtf8("마우스 클릭 - hasSelectedBlock: %1, 블록 타입: %2, 블록 플레이어: %3")
+            .arg(m_hasSelectedBlock)
+            .arg(m_hasSelectedBlock ? BlockFactory::getBlockName(m_selectedBlock.getType()) : "없음")
+            .arg(m_hasSelectedBlock ? Utils::playerColorToString(m_selectedBlock.getPlayer()) : "없음");
+
+        if (!m_hasSelectedBlock) {
+            qDebug() << QString::fromUtf8("❌ 블록이 선택되지 않아 배치 불가");
             QGraphicsView::mousePressEvent(event);
             return;
         }
@@ -490,17 +600,13 @@ namespace Blokus {
 
         if (event->button() == Qt::LeftButton) {
             if (isCellValid(boardPos.first, boardPos.second)) {
-                // 좌클릭: 현재 선택된 블록을 해당 위치에 배치 시도
+                qDebug() << QString::fromUtf8("🎯 블록 배치 시도: 위치(%1, %2)").arg(boardPos.first).arg(boardPos.second);
+
                 if (tryPlaceCurrentBlock(boardPos)) {
-                    QString placeMsg = QString::fromUtf8("블록 배치: %1 (위치: %2, %3)")
-                        .arg(BlockFactory::getBlockName(m_selectedBlock.getType()))
-                        .arg(boardPos.first)
-                        .arg(boardPos.second);
-                    qDebug() << placeMsg;
+                    qDebug() << QString::fromUtf8("✅ 블록 배치 성공!");
                 }
                 else {
-                    qDebug() << QString::fromUtf8("블록 배치 불가 - 규칙 위반 (위치: %1, %2)")
-                        .arg(boardPos.first).arg(boardPos.second);
+                    qDebug() << QString::fromUtf8("❌ 블록 배치 실패 - 규칙 위반");
                 }
 
                 emit cellClicked(boardPos.first, boardPos.second);
@@ -947,6 +1053,28 @@ namespace Blokus {
         }
         else {
             qDebug() << QString::fromUtf8("랜덤 블록 배치 실패 - 위치 충돌");
+        }
+    }
+
+    void GameBoard::clearSelection()
+    {
+        m_hasSelectedBlock = false;
+        m_blockSelected = false;
+        m_selectedBlock = Block(BlockType::Single, PlayerColor::None);
+
+        // 미리보기 제거
+        hideBlockPreview();
+
+        qDebug() << QString::fromUtf8("GameBoard 선택 상태 초기화됨");
+    }
+
+    void GameBoard::setBlockSelected(bool selected)
+    {
+        m_blockSelected = selected;
+        m_hasSelectedBlock = selected;
+
+        if (!selected) {
+            hideBlockPreview();
         }
     }
 

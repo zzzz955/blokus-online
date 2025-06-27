@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <QGraphicsView>
 #include <QGraphicsScene>
@@ -29,42 +29,50 @@ namespace Blokus {
         explicit GameBoard(QWidget* parent = nullptr);
         ~GameBoard();
 
-        // °ÔÀÓ ·ÎÁ÷ ¿¬µ¿
+        // ğŸ†• ë³´ë“œ í¬ê¸° ì„¤ì •
+        void setBoardSize(int size);
+        void setDuoMode(bool isDuoMode);
+        int getCurrentBoardSize() const { return m_currentBoardSize; }
+
+        // ê²Œì„ ë¡œì§ ì—°ë™
         void setGameLogic(GameLogic* gameLogic);
         bool tryPlaceCurrentBlock(const Position& position);
         void setSelectedBlock(const Block& block);
 
-        // ±âº» º¸µå »óÅÂ
+        // ê¸°ë³¸ ë³´ë“œ ìƒíƒœ
         bool isCellValid(int row, int col) const;
         bool isCellOccupied(int row, int col) const;
         PlayerColor getCellOwner(int row, int col) const;
 
-        // ½Ã°¢Àû È¿°ú
+        // ì‹œê°ì  íš¨ê³¼
         void highlightCell(int row, int col, const QColor& color);
         void clearHighlights();
 
-        // ÁÂÇ¥ º¯È¯
+        // ì¢Œí‘œ ë³€í™˜
         Position screenToBoard(const QPointF& screenPos) const;
         QPointF boardToScreen(const Position& boardPos) const;
 
-        // »ö»ó °ü¸®
+        // ìƒ‰ìƒ ê´€ë¦¬
         QColor getPlayerColor(PlayerColor player) const;
 
-        // º¸µå °ü¸®
+        // ë³´ë“œ ê´€ë¦¬
         void setBoardReadOnly(bool readOnly);
         void resetBoard();
 
-        // ºí·Ï ¹èÄ¡ °ü·Ã (ÀÎÅÍÆäÀÌ½º È£È¯¼º)
+        // ë¸”ë¡ ë°°ì¹˜ ê´€ë ¨ (ì¸í„°í˜ì´ìŠ¤ í˜¸í™˜ì„±)
         bool canPlaceBlock(const BlockPlacement& placement) const;
         bool placeBlock(const BlockPlacement& placement);
         void removeBlock(const Position& position);
         void showBlockPreview(const BlockPlacement& placement);
         void hideBlockPreview();
 
-        // ºí·Ï ·»´õ¸µ °ü·Ã
+        // ë¸”ë¡ ë Œë”ë§ ê´€ë ¨
         void addBlockToBoard(const Block& block, const Position& position);
         void removeBlockFromBoard(const Position& position);
         void clearAllBlocks();
+
+        void clearSelection();  // ğŸ†• ì„ íƒ ìƒíƒœ ì´ˆê¸°í™”
+        void setBlockSelected(bool selected); // ğŸ†• ë¸”ë¡ ì„ íƒ ìƒíƒœ ì œì–´
 
     signals:
         void cellClicked(int row, int col);
@@ -73,7 +81,7 @@ namespace Blokus {
         void blockRemoved(const Position& position);
         void blockRotated(const Block& block);
         void blockFlipped(const Block& block);
-        void blockPlacedSuccessfully(BlockType blockType, PlayerColor player); // »õ·Î Ãß°¡
+        void blockPlacedSuccessfully(BlockType blockType, PlayerColor player); // ìƒˆë¡œ ì¶”ê°€
 
     protected:
         void mousePressEvent(QMouseEvent* event) override;
@@ -89,73 +97,82 @@ namespace Blokus {
         void onSceneChanged();
 
     private:
-        // ÃÊ±âÈ­
+        // ì´ˆê¸°í™”
         void setupScene();
         void setupStyles();
         void initializeBoard();
         void clearBoard();
 
-        // °İÀÚ ±×¸®±â
+        // ê²©ì ê·¸ë¦¬ê¸°
         void drawGrid();
         void drawStartingCorners();
+        bool isCellValid(int row, int col) const;  // í˜„ì¬ ë³´ë“œ í¬ê¸° ê¸°ì¤€ìœ¼ë¡œ ì²´í¬
 
-        // ºí·Ï ±×·¡ÇÈ °ü·Ã
+        // ë¸”ë¡ ê·¸ë˜í”½ ê´€ë ¨
         BlockGraphicsItem* createBlockGraphicsItem(const Block& block, const Position& position);
         bool isValidBlockPlacement(const Block& block, const Position& position) const;
         bool checkBlokusRules(const Block& block, const Position& position, PlayerColor player) const;
         QColor getPlayerBrushColor(PlayerColor player) const;
         QColor getPlayerBorderColor(PlayerColor player) const;
 
-        // ¹Ì¸®º¸±â °ü·Ã
+        // ë¯¸ë¦¬ë³´ê¸° ê´€ë ¨
         void showCurrentBlockPreview();
 
-        // ºä °ü¸®
+        // ë·° ê´€ë¦¬
         void fitBoardToView();
 
-        // Å×½ºÆ®/µğ¹ö±ë ÇÔ¼öµé
+        // í…ŒìŠ¤íŠ¸/ë””ë²„ê¹… í•¨ìˆ˜ë“¤
         void addTestBlocks();
         void onShowAllBlocks();
         void onClearAllBlocks();
         void onAddRandomBlock();
 
-        // UI ÄÄÆ÷³ÍÆ®
+        // ê²Œì„ ì‹œì‘ ì—¬ë¶€ í™•ì¸
+        bool isGameStarted() const;
+
+        // UI ì»´í¬ë„ŒíŠ¸
         QGraphicsScene* m_scene;
         QGraphicsRectItem* m_boardRect;
 
-        // º¸µå »óÅÂ
+        // ë³´ë“œ ìƒíƒœ
         PlayerColor m_board[BOARD_SIZE][BOARD_SIZE];
         bool m_readOnly;
 
-        // ½Ã°¢Àû ¿ä¼Ò
+        // ì‹œê°ì  ìš”ì†Œ
         qreal m_cellSize;
         std::vector<QGraphicsRectItem*> m_gridCells;
         std::vector<QGraphicsRectItem*> m_highlights;
         std::vector<QGraphicsItem*> m_previewItems;
 
-        // ¸¶¿ì½º/Å°º¸µå »óÅÂ
+        // ë§ˆìš°ìŠ¤/í‚¤ë³´ë“œ ìƒíƒœ
         Position m_hoveredCell;
         bool m_mousePressed;
         QTimer* m_hoverTimer;
 
-        // ºí·Ï °ü¸®
+        // ë¸”ë¡ ê´€ë¦¬
         std::vector<BlockGraphicsItem*> m_blockItems;
         std::map<Position, BlockGraphicsItem*> m_blockMap;
         BlockGraphicsItem* m_currentPreview;
 
-        // ¼±ÅÃµÈ ºí·Ï
+        // ì„ íƒëœ ë¸”ë¡
         Block m_selectedBlock;
-        bool m_hasSelectedBlock; // Ãß°¡µÈ ¸â¹ö º¯¼ö
+        bool m_hasSelectedBlock; // ì¶”ê°€ëœ ë©¤ë²„ ë³€ìˆ˜
         int m_testBlockIndex;
 
-        // °ÔÀÓ ·ÎÁ÷ ¿¬µ¿
+        // ê²Œì„ ë¡œì§ ì—°ë™
         GameLogic* m_gameLogic;
 
-        // ½ºÅ¸ÀÏ
+        // ìŠ¤íƒ€ì¼
         QPen m_gridPen;
         QPen m_borderPen;
         QBrush m_emptyBrush;
         QBrush m_highlightBrush;
         std::map<PlayerColor, QColor> m_playerColors;
+
+        bool m_blockSelected;  // ğŸ†• ë¸”ë¡ ì„ íƒ ìƒíƒœ ì¶”ê°€
+        int m_currentBoardSize;  // ğŸ†• í˜„ì¬ ë³´ë“œ í¬ê¸° (14 ë˜ëŠ” 20)
+        bool m_isDuoMode;        // ğŸ†• ë“€ì˜¤ ëª¨ë“œ ì—¬ë¶€
+        QColor m_duoBorderColor; // ğŸ†• ë“€ì˜¤ ëª¨ë“œ í…Œë‘ë¦¬ ìƒ‰ìƒ
     };
 
 } // namespace Blokus
