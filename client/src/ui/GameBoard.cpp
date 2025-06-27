@@ -23,6 +23,7 @@ namespace Blokus {
         , m_selectedBlock(BlockType::Single, PlayerColor::Blue)
         , m_testBlockIndex(0)
         , m_gameLogic(nullptr)
+        , m_hasSelectedBlock(false)  // 선택 상태 추가
     {
         setupScene();
         setupStyles();
@@ -65,19 +66,19 @@ namespace Blokus {
     void GameBoard::setupStyles()
     {
         // 격자 펜 설정
-        m_gridPen = QPen(QColor(200, 200, 200), 1, Qt::SolidLine);
-        m_borderPen = QPen(QColor(100, 100, 100), 2, Qt::SolidLine);
+        m_gridPen = QPen(QColor(200, 180, 140), 1, Qt::SolidLine);     // 베이지 계열 격자
+        m_borderPen = QPen(QColor(139, 119, 101), 2, Qt::SolidLine);   // 진한 베이지 테두리
 
-        // 브러시 설정
-        m_emptyBrush = QBrush(QColor(245, 245, 245));
-        m_highlightBrush = QBrush(QColor(255, 255, 0, 100));
+        // 브러시 설정 - 베이지색 계열
+        m_emptyBrush = QBrush(QColor(245, 245, 220));                  // 베이지색 (빈 칸)
+        m_highlightBrush = QBrush(QColor(255, 255, 0, 100));           // 하이라이트
 
-        // 플레이어 색상 설정
-        m_playerColors[PlayerColor::Blue] = QColor(52, 152, 219);     // 파랑
-        m_playerColors[PlayerColor::Yellow] = QColor(241, 196, 15);   // 노랑  
-        m_playerColors[PlayerColor::Red] = QColor(231, 76, 60);       // 빨강
-        m_playerColors[PlayerColor::Green] = QColor(46, 204, 113);    // 초록
-        m_playerColors[PlayerColor::None] = QColor(245, 245, 245);    // 빈 칸
+        // 플레이어 색상 설정 (기존 유지)
+        m_playerColors[PlayerColor::Blue] = QColor(52, 152, 219);      // 파랑
+        m_playerColors[PlayerColor::Yellow] = QColor(241, 196, 15);    // 노랑  
+        m_playerColors[PlayerColor::Red] = QColor(231, 76, 60);        // 빨강
+        m_playerColors[PlayerColor::Green] = QColor(46, 204, 113);     // 초록
+        m_playerColors[PlayerColor::None] = QColor(245, 245, 220);     // 베이지색 (빈 칸)
     }
 
     void GameBoard::initializeBoard()
@@ -347,37 +348,45 @@ namespace Blokus {
         Block blockToPlace = m_selectedBlock;
         blockToPlace.setPlayer(currentPlayer);
 
+        qDebug() << QString::fromUtf8("GameBoard::tryPlaceCurrentBlock 시작");
+        qDebug() << QString::fromUtf8("   블록: %1").arg(BlockFactory::getBlockName(blockToPlace.getType()));
+        qDebug() << QString::fromUtf8("   위치: (%1, %2)").arg(position.first).arg(position.second);
+        qDebug() << QString::fromUtf8("   플레이어: %1").arg(Utils::playerColorToString(currentPlayer));
+
         if (m_gameLogic->canPlaceBlock(blockToPlace, position, currentPlayer)) {
             // 게임 로직에서 블록 배치
             if (m_gameLogic->placeBlock(blockToPlace, position, currentPlayer)) {
                 // 시각적으로도 블록 추가
                 addBlockToBoard(blockToPlace, position);
 
-                // 블록 배치 시그널 발생
-                emit blockPlaced(BlockPlacement(
-                    blockToPlace.getType(),
-                    position,
-                    blockToPlace.getRotation(),
-                    blockToPlace.getFlipState(),
-                    currentPlayer
-                ));
+                // 🔥 중요: 성공 시그널 발생
+                qDebug() << QString::fromUtf8("✅ 블록 배치 성공! 시그널 발생");
+                emit blockPlacedSuccessfully(blockToPlace.getType(), currentPlayer);
 
                 return true;
             }
         }
 
+        qDebug() << QString::fromUtf8("❌ 블록 배치 실패");
         return false;
     }
 
     void GameBoard::setSelectedBlock(const Block& block)
     {
         m_selectedBlock = block;
+        m_hasSelectedBlock = (block.getPlayer() != PlayerColor::None);
 
         // 현재 호버 위치에서 미리보기 업데이트
-        showCurrentBlockPreview();
+        if (m_hasSelectedBlock) {
+            showCurrentBlockPreview();
+        }
+        else {
+            hideBlockPreview();
+        }
 
-        qDebug() << QString::fromUtf8("선택된 블록 변경: %1")
-            .arg(BlockFactory::getBlockName(block.getType()));
+        qDebug() << QString::fromUtf8("선택된 블록 변경: %1 (선택상태: %2)")
+            .arg(BlockFactory::getBlockName(block.getType()))
+            .arg(m_hasSelectedBlock ? "있음" : "없음");
     }
 
     // ========================================
@@ -517,8 +526,10 @@ namespace Blokus {
                     // 즉시 호버 이벤트 발생
                     emit cellHovered(m_hoveredCell.first, m_hoveredCell.second);
 
-                    // 즉시 블록 미리보기 업데이트
-                    showCurrentBlockPreview();
+                    // 블록이 선택된 상태에서만 미리보기 표시
+                    if (m_hasSelectedBlock) {
+                        showCurrentBlockPreview();
+                    }
                 }
                 else {
                     // 보드 밖으로 나가면 미리보기 숨김
@@ -554,42 +565,55 @@ namespace Blokus {
 
     void GameBoard::keyPressEvent(QKeyEvent* event)
     {
-        if (m_readOnly) {
-            QGraphicsView::keyPressEvent(event);
-            return;
-        }
+        // 읽기 전용 모드가 아니고 블록이 선택된 상태에서만 키보드 입력 처리
+        if (!m_readOnly && m_hasSelectedBlock) {
+            if (event->key() == Qt::Key_R) {
+                // R키: 블록 회전
+                m_selectedBlock.rotateClockwise();
 
-        if (event->key() == Qt::Key_R) {
-            // R키: 블록 회전만 (배치 안함)
-            m_selectedBlock.rotateClockwise();
+                QString rotationMsg = QString::fromUtf8("블록 회전: %1도")
+                    .arg(static_cast<int>(m_selectedBlock.getRotation()) * 90);
+                qDebug() << rotationMsg;
 
-            QString rotationMsg = QString::fromUtf8("블록 회전: %1도")
-                .arg(static_cast<int>(m_selectedBlock.getRotation()) * 90);
-            qDebug() << rotationMsg;
-
-            // 현재 호버 위치에서 미리보기 즉시 업데이트
-            showCurrentBlockPreview();
-        }
-        else if (event->key() == Qt::Key_F) {
-            // F키: 블록 뒤집기만 (배치 안함)
-            m_selectedBlock.flipHorizontal();
-
-            qDebug() << QString::fromUtf8("블록 뒤집기 적용");
-
-            // 현재 호버 위치에서 미리보기 즉시 업데이트
-            showCurrentBlockPreview();
-        }
-        else if (event->key() == Qt::Key_Delete || event->key() == Qt::Key_Backspace) {
-            // Delete/Backspace키: 현재 호버 위치의 블록 제거 (디버깅용)
-            Position currentPos = m_hoveredCell;
-            if (isCellValid(currentPos.first, currentPos.second) &&
-                m_blockMap.find(currentPos) != m_blockMap.end()) {
-                removeBlockFromBoard(currentPos);
-                qDebug() << QString::fromUtf8("블록 제거: (%1, %2)")
-                    .arg(currentPos.first).arg(currentPos.second);
-
-                // 미리보기 다시 표시
+                // 즉시 미리보기 업데이트
                 showCurrentBlockPreview();
+
+                // 팔레트에도 회전 상태 반영
+                emit blockRotated(m_selectedBlock);
+
+                event->accept();
+                return;
+            }
+            else if (event->key() == Qt::Key_F) {
+                // F키: 블록 뒤집기
+                m_selectedBlock.flipHorizontal();
+
+                qDebug() << QString::fromUtf8("블록 뒤집기 적용");
+
+                // 즉시 미리보기 업데이트
+                showCurrentBlockPreview();
+
+                // 팔레트에도 뒤집기 상태 반영
+                emit blockFlipped(m_selectedBlock);
+
+                event->accept();
+                return;
+            }
+            else if (event->key() == Qt::Key_Delete || event->key() == Qt::Key_Backspace) {
+                // Delete/Backspace키: 현재 호버 위치의 블록 제거 (디버깅용)
+                Position currentPos = m_hoveredCell;
+                if (isCellValid(currentPos.first, currentPos.second) &&
+                    m_blockMap.find(currentPos) != m_blockMap.end()) {
+                    removeBlockFromBoard(currentPos);
+                    qDebug() << QString::fromUtf8("블록 제거: (%1, %2)")
+                        .arg(currentPos.first).arg(currentPos.second);
+
+                    // 미리보기 다시 표시
+                    showCurrentBlockPreview();
+                }
+
+                event->accept();
+                return;
             }
         }
 
@@ -608,6 +632,20 @@ namespace Blokus {
         m_hoverTimer->stop();
         hideBlockPreview(); // 마우스가 보드를 벗어나면 미리보기 숨김
         QGraphicsView::leaveEvent(event);
+    }
+
+    // 포커스 이벤트 처리 추가
+    void GameBoard::focusInEvent(QFocusEvent* event)
+    {
+        // 포커스를 받으면 키보드 입력 준비
+        QGraphicsView::focusInEvent(event);
+        qDebug() << QString::fromUtf8("GameBoard 포커스 획득 - 키보드 입력 활성화");
+    }
+
+    void GameBoard::focusOutEvent(QFocusEvent* event)
+    {
+        QGraphicsView::focusOutEvent(event);
+        qDebug() << QString::fromUtf8("GameBoard 포커스 상실");
     }
 
     void GameBoard::fitBoardToView()
@@ -658,7 +696,8 @@ namespace Blokus {
 
     void GameBoard::showCurrentBlockPreview()
     {
-        if (m_readOnly || !isCellValid(m_hoveredCell.first, m_hoveredCell.second)) {
+        // 선택된 블록이 없거나 읽기 전용이면 미리보기 안함
+        if (!m_hasSelectedBlock || m_readOnly || !isCellValid(m_hoveredCell.first, m_hoveredCell.second)) {
             hideBlockPreview();
             return;
         }
@@ -681,18 +720,20 @@ namespace Blokus {
             canPlace = isValidBlockPlacement(previewBlock, m_hoveredCell);
         }
 
-        // 배치 불가능해도 미리보기는 표시 (빨간색으로)
-        QColor previewColor = getPlayerBrushColor(previewBlock.getPlayer());
-        QColor borderColor = previewColor.darker();
+        // 미리보기 색상 결정
+        QColor previewColor;
+        QColor borderColor;
 
-        if (!canPlace) {
+        if (canPlace) {
+            // 배치 가능하면 기존 색상에 투명도 적용
+            previewColor = getPlayerBrushColor(previewBlock.getPlayer());
+            previewColor.setAlpha(150); // 반투명
+            borderColor = previewColor.darker(150);
+        }
+        else {
             // 배치 불가능하면 빨간색으로 표시
             previewColor = QColor(255, 100, 100, 150); // 반투명 빨간색
             borderColor = QColor(200, 50, 50, 200);    // 진한 빨간색 테두리
-        }
-        else {
-            // 배치 가능하면 기존 색상에 투명도 적용
-            previewColor.setAlpha(150); // 반투명
         }
 
         // 미리보기 블록 생성
