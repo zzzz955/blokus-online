@@ -31,6 +31,7 @@ set(SOURCES
     src/ui/GameBoard.cpp
     src/ui/MainWindow.cpp
     src/ui/ImprovedBlockPalette.cpp # 개선된 4방향 블록 팔레트
+    src/ui/LoginWindow.cpp             # 로그인 화면
     src/game/Block.cpp              # 블록 시스템
     src/game/GameLogic.cpp          # 게임 로직 및 규칙
 )
@@ -40,6 +41,7 @@ set(HEADERS
     include/ui/GameBoard.h
     include/ui/MainWindow.h
     include/ui/ImprovedBlockPalette.h # 개선된 블록 팔레트 헤더
+    include/ui/LoginWindow.h
     include/common/Types.h
     include/game/Block.h            # 블록 헤더
     include/game/GameLogic.h        # 게임 로직 헤더
