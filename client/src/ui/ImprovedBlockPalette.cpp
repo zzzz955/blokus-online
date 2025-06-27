@@ -365,26 +365,53 @@ namespace Blokus {
 
     void DirectionPalette::resetAllBlocks()
     {
-        m_usedBlocks.clear();
+        qDebug() << QString::fromUtf8("🔄 DirectionPalette::resetAllBlocks 시작 (%1)")
+            .arg(getDirectionName());
 
-        // 모든 버튼 삭제
+        // 1단계: 모든 버튼 안전하게 삭제
         for (auto& pair : m_blockButtons) {
-            delete pair.second;
+            if (pair.second) {
+                if (m_blockLayout) {
+                    m_blockLayout->removeWidget(pair.second);
+                }
+                pair.second->setParent(nullptr);
+                pair.second->deleteLater();
+            }
         }
         m_blockButtons.clear();
+        qDebug() << QString::fromUtf8("✅ 모든 버튼 삭제됨");
 
-        // 블록 목록 재생성
+        // 2단계: 레이아웃 완전히 클리어 (안전하게)
+        if (m_blockLayout) {
+            QLayoutItem* item;
+            while ((item = m_blockLayout->takeAt(0)) != nullptr) {
+                delete item;
+            }
+        }
+        qDebug() << QString::fromUtf8("✅ 레이아웃 클리어됨");
+
+        // 3단계: 상태 초기화
+        m_usedBlocks.clear();
+        m_selectedBlockType = BlockType::Single;
+
+        // 4단계: 블록 목록 재생성 (안전하게)
         if (m_player != PlayerColor::None) {
             m_blocks.clear();
             auto allTypes = BlockFactory::getAllBlockTypes();
             for (BlockType type : allTypes) {
                 m_blocks.emplace_back(type, m_player);
             }
+            qDebug() << QString::fromUtf8("✅ 블록 목록 재생성됨: %1개").arg(m_blocks.size());
+
+            // 5단계: 버튼 재생성 (지연 실행으로 안전하게)
+            QTimer::singleShot(100, this, [this]() {
+                updateBlockButtons();
+                });
         }
 
-        // 버튼 재생성
-        updateBlockButtons();
+        qDebug() << QString::fromUtf8("🎉 팔레트 리셋 완료!");
     }
+
 
     void DirectionPalette::highlightBlock(BlockType blockType, bool highlight)
     {
@@ -397,10 +424,15 @@ namespace Blokus {
 
     void DirectionPalette::updateBlockButtons()
     {
+        if (!m_blockLayout || !m_blockContainer) {
+            qDebug() << QString::fromUtf8("❌ 레이아웃이 초기화되지 않음");
+            return;
+        }
+
         qDebug() << QString::fromUtf8("🎨 DirectionPalette::updateBlockButtons 시작 (%1)")
             .arg(getDirectionName());
 
-        // 기존 버튼들 완전히 제거
+        // 기존 버튼들 안전하게 제거
         for (auto& pair : m_blockButtons) {
             if (pair.second) {
                 m_blockLayout->removeWidget(pair.second);
@@ -410,7 +442,7 @@ namespace Blokus {
         }
         m_blockButtons.clear();
 
-        // 레이아웃 완전히 클리어
+        // 레이아웃 클리어
         QLayoutItem* item;
         while ((item = m_blockLayout->takeAt(0)) != nullptr) {
             delete item;
@@ -428,25 +460,36 @@ namespace Blokus {
                 continue;
             }
 
-            BlockButton* button = new BlockButton(block, blockSize);
-            connect(button, &BlockButton::blockClicked, this, &DirectionPalette::onBlockButtonClicked);
+            try {
+                BlockButton* button = new BlockButton(block, blockSize, m_blockContainer);
+                connect(button, &BlockButton::blockClicked, this, &DirectionPalette::onBlockButtonClicked);
 
-            m_blockLayout->addWidget(button, row, col);
-            m_blockButtons[block.getType()] = button;
+                m_blockLayout->addWidget(button, row, col);
+                m_blockButtons[block.getType()] = button;
 
-            createdButtons++;
-            col++;
-            if (col >= maxPerRow) {
-                col = 0;
-                row++;
+                createdButtons++;
+                col++;
+                if (col >= maxPerRow) {
+                    col = 0;
+                    row++;
+                }
+            }
+            catch (...) {
+                qDebug() << QString::fromUtf8("❌ 버튼 생성 실패: %1")
+                    .arg(BlockFactory::getBlockName(block.getType()));
             }
         }
 
         qDebug() << QString::fromUtf8("✅ %1 방향 팔레트: %2개 버튼 생성됨")
             .arg(getDirectionName()).arg(createdButtons);
 
-        // 강제 업데이트
-        forceLayoutUpdate();
+        // 안전한 업데이트
+        if (m_blockContainer) {
+            m_blockContainer->updateGeometry();
+            m_blockContainer->update();
+        }
+        updateGeometry();
+        update();
     }
 
     void DirectionPalette::forceLayoutUpdate()
@@ -541,39 +584,105 @@ namespace Blokus {
 
     int DirectionPalette::getMaxBlocksPerRow() const
     {
-        // 현재 크기에 따라 동적으로 열 수 조정
-        QSize currentSize = size();
-        qreal blockSize = getBlockSize();
-
+        // 안전한 최대 열 수 계산
         switch (m_direction) {
         case Direction::South:
-        case Direction::North: {
-            // 가로 방향: 현재 너비에 맞춰 계산
-            int availableWidth = currentSize.width() - 40; // 여백 제외
-            int blockWidth = blockSize * 3; // 평균 블록 너비 (추정)
-            int maxCols = std::max(6, availableWidth / blockWidth);
-            return std::min(12, maxCols); // 최대 12개까지
-        }
-
+        case Direction::North:
+            return std::min(10, std::max(6, width() / 80)); // 안전한 범위
         case Direction::East:
-        case Direction::West: {
-            // 세로 방향: 고정 열 수 (너비 제한)
-            return 3;
+        case Direction::West:
+            return 3; // 고정
         }
-        }
-        return 8;
+        return 6;
     }
 
     void DirectionPalette::resizeEvent(QResizeEvent* event)
     {
         QWidget::resizeEvent(event);
 
-        // 크기 변경 시 블록 버튼들 재배치
-        if (m_blockButtons.size() > 0) {
-            QTimer::singleShot(100, this, [this]() {
-                reorganizeLayout();
-                });
+        // 크래시 방지: 초기화가 완료된 후에만 재배치
+        if (m_blockButtons.size() > 0 && m_blockContainer && m_blockLayout) {
+            // 즉시 재배치하지 말고 안전한 지연 실행
+            static bool isReorganizing = false;
+            if (!isReorganizing) {
+                isReorganizing = true;
+                QTimer::singleShot(200, this, [this]() {
+                    static bool inProgress = false;
+                    if (!inProgress) {
+                        inProgress = true;
+                        safeReorganizeLayout();
+                        inProgress = false;
+                    }
+                    isReorganizing = false;
+                    });
+            }
         }
+    }
+
+    void DirectionPalette::safeReorganizeLayout()
+    {
+        // 안전한 재배치 함수
+        if (!m_blockLayout || !m_blockContainer) {
+            qDebug() << QString::fromUtf8("❌ 레이아웃이 초기화되지 않음");
+            return;
+        }
+
+        qDebug() << QString::fromUtf8("🔄 %1 방향 팔레트 안전 재배치 시작")
+            .arg(getDirectionName());
+
+        // 현재 존재하는 버튼들 수집
+        QList<BlockButton*> validButtons;
+        for (auto it = m_blockButtons.begin(); it != m_blockButtons.end(); ) {
+            if (it->second && it->second->parent() == m_blockContainer) {
+                validButtons.append(it->second);
+                ++it;
+            }
+            else {
+                // 유효하지 않은 버튼은 맵에서 제거
+                if (it->second) {
+                    it->second->deleteLater();
+                }
+                it = m_blockButtons.erase(it);
+            }
+        }
+
+        if (validButtons.isEmpty()) {
+            qDebug() << QString::fromUtf8("⚠️ 유효한 버튼이 없음");
+            return;
+        }
+
+        // 레이아웃에서 모든 아이템 안전하게 제거
+        QLayoutItem* item;
+        while ((item = m_blockLayout->takeAt(0)) != nullptr) {
+            delete item; // QLayoutItem만 삭제
+        }
+
+        // 새로운 크기에 맞춰 재배치
+        int maxPerRow = getMaxBlocksPerRow();
+        int row = 0, col = 0;
+
+        for (BlockButton* button : validButtons) {
+            if (button && button->parent() == m_blockContainer) {
+                m_blockLayout->addWidget(button, row, col);
+
+                col++;
+                if (col >= maxPerRow) {
+                    col = 0;
+                    row++;
+                }
+            }
+        }
+
+        qDebug() << QString::fromUtf8("✅ 안전 재배치 완료: %1개 버튼, %2열")
+            .arg(validButtons.size()).arg(maxPerRow);
+
+        // 강제 업데이트 (안전하게)
+        if (m_blockContainer) {
+            m_blockContainer->updateGeometry();
+            m_blockContainer->update();
+        }
+        updateGeometry();
+        update();
     }
 
     QString DirectionPalette::getDirectionName() const

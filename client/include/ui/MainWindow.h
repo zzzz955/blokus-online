@@ -32,9 +32,6 @@ namespace Blokus {
         void onBlockSelected(const Block& block);
         void onBlockPlacedSuccessfully(BlockType blockType, PlayerColor player); // 새로 추가
         void onNewGame();
-        void onResetBoard();
-        void onToggleReadOnly();
-        void onAbout();
 
     protected:
         void resizeEvent(QResizeEvent* event) override;  // 새로 추가
@@ -48,13 +45,11 @@ namespace Blokus {
         void adjustPalettesToWindowSize();
 
         // UI 생성 함수들
-        QWidget* createGameInfoPanel();
-        QWidget* createCompactControlPanel();
+        QWidget* createSimpleGameInfoPanel();     // 단순화된 상단 패널
+        QWidget* createSimpleStatusPanel();       // 단순화된 하단 패널
         QWidget* createMahjongStyleGameArea(); // 추가된 함수
         QWidget* createCornerWidget();
         void setupResponsivePalettes(QWidget* north, QWidget* south, QWidget* east, QWidget* west);
-        void setupMenuBar();
-        void setupToolBar();
         void setupStatusBar();
 
         // UI 컴포넌트들
@@ -67,10 +62,7 @@ namespace Blokus {
         QLabel* m_currentPlayerLabel;
 
         // 버튼들
-        QPushButton* m_resetButton;
-        QPushButton* m_readOnlyButton;
         QPushButton* m_newGameButton;
-        QPushButton* m_nextTurnButton; // 제거될 예정이지만 호환성을 위해 유지
 
         // 게임 매니저
         GameStateManager* m_gameManager;

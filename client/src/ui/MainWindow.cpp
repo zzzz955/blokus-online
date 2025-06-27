@@ -15,10 +15,7 @@ namespace Blokus {
         , m_coordinateLabel(nullptr)
         , m_gameStatusLabel(nullptr)
         , m_currentPlayerLabel(nullptr)
-        , m_resetButton(nullptr)
-        , m_readOnlyButton(nullptr)
         , m_newGameButton(nullptr)
-        , m_nextTurnButton(nullptr)
         , m_gameManager(nullptr)
     {
         // 게임 매니저 생성
@@ -122,67 +119,31 @@ namespace Blokus {
 
     void MainWindow::onNewGame()
     {
-        qDebug() << QString::fromUtf8("=== 새 게임 시작 ===");
+        qDebug() << QString::fromUtf8("=== 새 게임 시작 (안전 모드) ===");
 
-        m_gameManager->startNewGame();
-        m_gameBoard->setGameLogic(&m_gameManager->getGameLogic());
-        m_gameBoard->clearAllBlocks();
+        try {
+            // 게임 매니저 초기화
+            m_gameManager->startNewGame();
+            m_gameBoard->setGameLogic(&m_gameManager->getGameLogic());
+            m_gameBoard->clearAllBlocks();
 
-        // 모든 블록을 사용 가능 상태로 리셋
-        resetAllBlockStates();
+            // 팔레트 안전하게 리셋
+            qDebug() << QString::fromUtf8("팔레트 리셋 시작...");
+            m_improvedPalette->resetAllPlayerBlocks();
 
-        // 선택된 블록 해제
-        clearSelectedBlock();
+            // 잠시 대기 후 UI 업데이트
+            QTimer::singleShot(300, this, [this]() {
+                clearSelectedBlock();
+                updateGameUI();
+                statusBar()->showMessage(QString::fromUtf8("새 게임이 시작되었습니다!"), 3000);
+                qDebug() << QString::fromUtf8("새 게임 초기화 완료");
+                });
 
-        updateGameUI();
-
-        statusBar()->showMessage(QString::fromUtf8("새 게임이 시작되었습니다! 파란 플레이어부터 시작합니다."), 3000);
-
-        qDebug() << QString::fromUtf8("새 게임 초기화 완료");
-    }
-
-    void MainWindow::onResetBoard()
-    {
-        m_gameManager->resetGame();
-        m_gameBoard->resetBoard();
-        resetAllBlockStates();
-        clearSelectedBlock();
-        updateGameUI();
-        statusBar()->showMessage(QString::fromUtf8("게임이 초기화되었습니다"), 1000);
-    }
-
-    void MainWindow::onToggleReadOnly()
-    {
-        bool readOnly = !m_gameBoard->property("readOnly").toBool();
-        m_gameBoard->setBoardReadOnly(readOnly);
-        m_gameBoard->setProperty("readOnly", readOnly);
-
-        m_readOnlyButton->setText(readOnly ? QString::fromUtf8("상호작용 활성화") : QString::fromUtf8("상호작용 비활성화"));
-        statusBar()->showMessage(readOnly ? QString::fromUtf8("보드가 읽기 전용입니다") : QString::fromUtf8("보드 상호작용이 활성화되었습니다"), 1000);
-    }
-
-    void MainWindow::onAbout()
-    {
-        QMessageBox::about(this, QString::fromUtf8("블로커스 온라인"),
-            QString::fromUtf8("🎲 블로커스 온라인 - 고급 UI 버전 v4.0\n\n"
-                "✅ 완전히 새로운 마작 스타일 레이아웃!\n\n"
-                "🎮 UI 개선사항:\n"
-                "• 중앙 게임보드 중심 설계\n"
-                "• 4방향 팔레트가 보드에 인접 배치\n"
-                "• 사용된 블록 자동 제거\n"
-                "• 반응형 레이아웃\n"
-                "• 자동 턴 진행\n\n"
-                "🏆 게임 규칙:\n"
-                "• 첫 블록은 아무 모서리에서나 시작 가능\n"
-                "• 이후 블록은 같은 색과 모서리로만 접촉\n"
-                "• 같은 색끼리 변 접촉 금지\n\n"
-                "🎯 플레이 방법:\n"
-                "1. '새 게임'으로 시작\n"
-                "2. 자신의 팔레트에서 블록 선택\n"
-                "3. R/F키로 회전/뒤집기 (호버 상태에서)\n"
-                "4. 좌클릭으로 배치\n"
-                "5. 자동으로 다음 턴 진행\n\n"
-                "개발: SSAFY 포트폴리오 프로젝트"));
+        }
+        catch (...) {
+            qDebug() << QString::fromUtf8("❌ 새 게임 시작 중 오류 발생");
+            statusBar()->showMessage(QString::fromUtf8("게임 시작 중 오류가 발생했습니다"), 3000);
+        }
     }
 
     void MainWindow::updateGameUI()
@@ -268,9 +229,9 @@ namespace Blokus {
 
     void MainWindow::setupUI()
     {
-        setWindowTitle(QString::fromUtf8("블로커스 온라인 - 반응형 베이지 테마"));
-        setMinimumSize(1000, 800);   // 최소 크기
-        resize(1300, 1000);          // 기본 크기
+        setWindowTitle(QString::fromUtf8("블로커스 온라인"));
+        setMinimumSize(1000, 800);
+        resize(1300, 1000);
 
         // 전체 배경색 설정
         setStyleSheet(
@@ -288,36 +249,113 @@ namespace Blokus {
         m_gameBoard = new GameBoard(this);
         m_gameBoard->setGameLogic(&m_gameManager->getGameLogic());
 
-        // 메인 레이아웃
+        // 메인 레이아웃 (단순화)
         QVBoxLayout* mainLayout = new QVBoxLayout(centralWidget);
-        mainLayout->setContentsMargins(10, 10, 10, 10);
-        mainLayout->setSpacing(8);
+        mainLayout->setContentsMargins(15, 15, 15, 15);
+        mainLayout->setSpacing(10);
 
-        // 상단 게임 정보 패널 (고정 높이)
-        QWidget* gameInfoPanel = createGameInfoPanel();
+        // 상단 게임 정보 패널만 유지
+        QWidget* gameInfoPanel = createSimpleGameInfoPanel();
         gameInfoPanel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-        gameInfoPanel->setFixedHeight(50);
+        gameInfoPanel->setFixedHeight(60);
         mainLayout->addWidget(gameInfoPanel);
 
-        // 중앙 게임 영역 (확장)
+        // 중앙 게임 영역 (메인)
         QWidget* gameArea = createMahjongStyleGameArea();
         gameArea->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-        mainLayout->addWidget(gameArea, 1); // stretch factor = 1
+        mainLayout->addWidget(gameArea, 1);
 
-        // 하단 컨트롤 패널 (고정 높이)
-        QWidget* controlPanel = createCompactControlPanel();
-        controlPanel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-        controlPanel->setFixedHeight(40);
-        mainLayout->addWidget(controlPanel);
+        // 하단 상태 표시만 (버튼 제거)
+        QWidget* statusPanel = createSimpleStatusPanel();
+        statusPanel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        statusPanel->setFixedHeight(30);
+        mainLayout->addWidget(statusPanel);
 
-        // 메뉴 바 설정
-        setupMenuBar();
-
-        // 툴바 설정
-        setupToolBar();
-
-        // 상태 바 설정
+        // 상태 바만 유지
         setupStatusBar();
+    }
+
+    QWidget* MainWindow::createSimpleGameInfoPanel()
+    {
+        QWidget* panel = new QWidget();
+        panel->setStyleSheet(
+            "QWidget { "
+            "background-color: #34495e; "
+            "color: white; "
+            "border-radius: 8px; "
+            "padding: 8px; "
+            "}"
+        );
+
+        QHBoxLayout* layout = new QHBoxLayout(panel);
+        layout->setContentsMargins(20, 10, 20, 10);
+
+        // 게임 상태 라벨
+        m_gameStatusLabel = new QLabel(QString::fromUtf8("대기 중"));
+        m_gameStatusLabel->setStyleSheet("font-size: 16px; font-weight: bold;");
+        layout->addWidget(m_gameStatusLabel);
+
+        layout->addStretch();
+
+        // 현재 플레이어 라벨
+        m_currentPlayerLabel = new QLabel(QString::fromUtf8("현재 플레이어: 없음"));
+        m_currentPlayerLabel->setStyleSheet("font-size: 14px;");
+        layout->addWidget(m_currentPlayerLabel);
+
+        layout->addStretch();
+
+        // 새 게임 버튼만 유지
+        m_newGameButton = new QPushButton(QString::fromUtf8("🎮 새 게임"));
+        m_newGameButton->setStyleSheet(
+            "QPushButton { "
+            "font-size: 14px; "
+            "padding: 8px 20px; "
+            "background-color: #27ae60; "
+            "border: none; "
+            "border-radius: 6px; "
+            "color: white; "
+            "font-weight: bold; "
+            "} "
+            "QPushButton:hover { "
+            "background-color: #2ecc71; "
+            "} "
+            "QPushButton:pressed { "
+            "background-color: #229954; "
+            "}"
+        );
+
+        layout->addWidget(m_newGameButton);
+
+        return panel;
+    }
+
+    QWidget* MainWindow::createSimpleStatusPanel()
+    {
+        QWidget* panel = new QWidget();
+        panel->setStyleSheet(
+            "QWidget { "
+            "background-color: #ecf0f1; "
+            "border-radius: 5px; "
+            "padding: 5px; "
+            "}"
+        );
+
+        QHBoxLayout* layout = new QHBoxLayout(panel);
+        layout->setContentsMargins(15, 5, 15, 5);
+
+        // 좌표 표시만 유지
+        m_coordinateLabel = new QLabel(QString::fromUtf8("보드 위에서 마우스를 움직이세요"));
+        m_coordinateLabel->setStyleSheet("font-size: 11px; color: #666;");
+        layout->addWidget(m_coordinateLabel);
+
+        layout->addStretch();
+
+        // 조작법 안내
+        QLabel* helpLabel = new QLabel(QString::fromUtf8("R키: 회전 | F키: 뒤집기 | 좌클릭: 배치"));
+        helpLabel->setStyleSheet("font-size: 10px; color: #888;");
+        layout->addWidget(helpLabel);
+
+        return panel;
     }
 
     QWidget* MainWindow::createMahjongStyleGameArea()
@@ -464,101 +502,10 @@ namespace Blokus {
         }
     }
 
-    QWidget* MainWindow::createGameInfoPanel()
-    {
-        QWidget* panel = new QWidget();
-        panel->setFixedHeight(50);
-        panel->setStyleSheet("QWidget { background-color: #34495e; color: white; border-radius: 5px; }");
-
-        QHBoxLayout* layout = new QHBoxLayout(panel);
-        layout->setContentsMargins(15, 8, 15, 8);
-
-        // 게임 상태 라벨
-        m_gameStatusLabel = new QLabel(QString::fromUtf8("대기 중"));
-        m_gameStatusLabel->setStyleSheet("font-size: 16px; font-weight: bold;");
-        layout->addWidget(m_gameStatusLabel);
-
-        layout->addStretch();
-
-        // 현재 플레이어 라벨
-        m_currentPlayerLabel = new QLabel(QString::fromUtf8("현재 플레이어: 없음"));
-        m_currentPlayerLabel->setStyleSheet("font-size: 14px;");
-        layout->addWidget(m_currentPlayerLabel);
-
-        layout->addStretch();
-
-        // 새 게임 버튼만 유지 (다음턴 버튼 제거)
-        m_newGameButton = new QPushButton(QString::fromUtf8("🎮 새 게임"));
-        m_newGameButton->setStyleSheet("QPushButton { font-size: 12px; padding: 8px 15px; background-color: #27ae60; border: none; border-radius: 4px; } QPushButton:hover { background-color: #2ecc71; }");
-
-        layout->addWidget(m_newGameButton);
-
-        return panel;
-    }
-
-    QWidget* MainWindow::createCompactControlPanel()
-    {
-        QWidget* panel = new QWidget();
-        panel->setFixedHeight(50);
-        panel->setStyleSheet("QWidget { background-color: #ecf0f1; border-radius: 5px; }");
-
-        QHBoxLayout* layout = new QHBoxLayout(panel);
-        layout->setContentsMargins(15, 8, 15, 8);
-
-        // 좌표 표시
-        m_coordinateLabel = new QLabel(QString::fromUtf8("보드 위에서 마우스를 움직이세요"));
-        m_coordinateLabel->setStyleSheet("font-size: 12px; color: #666;");
-        layout->addWidget(m_coordinateLabel);
-
-        layout->addStretch();
-
-        // 조작법 안내
-        QLabel* helpLabel = new QLabel(QString::fromUtf8("R키: 회전 | F키: 뒤집기 | 좌클릭: 배치 | 자동 턴 진행"));
-        helpLabel->setStyleSheet("font-size: 11px; color: #888;");
-        layout->addWidget(helpLabel);
-
-        layout->addStretch();
-
-        // 컨트롤 버튼들
-        m_resetButton = new QPushButton(QString::fromUtf8("🔄"));
-        m_readOnlyButton = new QPushButton(QString::fromUtf8("🔒"));
-
-        m_resetButton->setFixedSize(40, 30);
-        m_readOnlyButton->setFixedSize(40, 30);
-        m_resetButton->setToolTip(QString::fromUtf8("게임 리셋"));
-        m_readOnlyButton->setToolTip(QString::fromUtf8("잠금 모드"));
-
-        layout->addWidget(m_resetButton);
-        layout->addWidget(m_readOnlyButton);
-
-        return panel;
-    }
-
-    void MainWindow::setupMenuBar()
-    {
-        QMenu* gameMenu = menuBar()->addMenu(QString::fromUtf8("게임(&G)"));
-        gameMenu->addAction(QString::fromUtf8("새 게임(&N)"), this, &MainWindow::onNewGame, QKeySequence("Ctrl+N"));
-        gameMenu->addAction(QString::fromUtf8("게임 리셋(&R)"), this, &MainWindow::onResetBoard, QKeySequence("Ctrl+R"));
-        gameMenu->addSeparator();
-        gameMenu->addAction(QString::fromUtf8("종료(&X)"), this, &QWidget::close, QKeySequence("Ctrl+Q"));
-
-        QMenu* helpMenu = menuBar()->addMenu(QString::fromUtf8("도움말(&H)"));
-        helpMenu->addAction(QString::fromUtf8("게임 규칙(&R)"), this, &MainWindow::onAbout, QKeySequence("F1"));
-    }
-
-    void MainWindow::setupToolBar()
-    {
-        QToolBar* toolBar = addToolBar(QString::fromUtf8("메인"));
-
-        toolBar->addAction(QString::fromUtf8("🎮"), this, &MainWindow::onNewGame)->setToolTip(QString::fromUtf8("새 게임 (Ctrl+N)"));
-        toolBar->addAction(QString::fromUtf8("🔄"), this, &MainWindow::onResetBoard)->setToolTip(QString::fromUtf8("게임 리셋 (Ctrl+R)"));
-        toolBar->addSeparator();
-        toolBar->addAction(QString::fromUtf8("ℹ️"), this, &MainWindow::onAbout)->setToolTip(QString::fromUtf8("게임 규칙 (F1)"));
-    }
-
     void MainWindow::setupStatusBar()
     {
-        statusBar()->showMessage(QString::fromUtf8("블로커스 온라인에 오신 것을 환영합니다! 새 게임 버튼을 눌러 시작하세요."), 5000);
+        statusBar()->showMessage(QString::fromUtf8("블로커스 온라인에 오신 것을 환영합니다!"), 5000);
+        statusBar()->setStyleSheet("font-size: 12px; color: #666;");
     }
 
     void MainWindow::connectSignals()
@@ -566,14 +513,12 @@ namespace Blokus {
         // 게임보드 시그널
         connect(m_gameBoard, &GameBoard::cellClicked, this, &MainWindow::onCellClicked);
         connect(m_gameBoard, &GameBoard::cellHovered, this, &MainWindow::onCellHovered);
-        connect(m_gameBoard, &GameBoard::blockPlacedSuccessfully, this, &MainWindow::onBlockPlacedSuccessfully); // 새로 추가
+        connect(m_gameBoard, &GameBoard::blockPlacedSuccessfully, this, &MainWindow::onBlockPlacedSuccessfully);
 
         // 블록 팔레트 시그널
         connect(m_improvedPalette, &ImprovedGamePalette::blockSelected, this, &MainWindow::onBlockSelected);
 
-        // 버튼 시그널
-        connect(m_resetButton, &QPushButton::clicked, this, &MainWindow::onResetBoard);
-        connect(m_readOnlyButton, &QPushButton::clicked, this, &MainWindow::onToggleReadOnly);
+        // 새 게임 버튼만 연결
         connect(m_newGameButton, &QPushButton::clicked, this, &MainWindow::onNewGame);
     }
 

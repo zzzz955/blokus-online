@@ -102,6 +102,7 @@ namespace Blokus {
         void setupResponsiveSizing();                     // 반응형을 위해 추가
         void updateBlockButtons();
         void reorganizeLayout();
+        void safeReorganizeLayout();
         void removeFromBlockList(BlockType blockType);   // 블록 제거를 위해 추가
         void forceLayoutUpdate();                         // 강제 업데이트를 위해 추가
         qreal getBlockSize() const;
