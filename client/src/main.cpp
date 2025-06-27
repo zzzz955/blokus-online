@@ -157,6 +157,10 @@ private:
         connect(m_loginWindow, &Blokus::LoginWindow::loginSuccessful,
             this, &AppController::handleLoginSuccess);
 
+        // 🔥 로그인 창이 닫히면 애플리케이션 종료
+        connect(m_loginWindow, &QMainWindow::destroyed,
+            qApp, &QApplication::quit);
+
         m_loginWindow->show();
     }
 
@@ -177,9 +181,8 @@ private:
             connect(m_lobbyWindow, &Blokus::LobbyWindow::gameStartRequested,
                 this, &AppController::handleGameStartRequest);
 
-            // 로비 창 종료 시 애플리케이션 종료
-            connect(m_lobbyWindow, &QMainWindow::destroyed,
-                qApp, &QApplication::quit);
+            // 🔥 주의: 로비 창이 닫힐 때 애플리케이션 종료하지 않도록 제거
+            // connect(m_lobbyWindow, &QMainWindow::destroyed, qApp, &QApplication::quit);
 
             m_lobbyWindow->show();
             m_lobbyWindow->raise();
