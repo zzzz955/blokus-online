@@ -8,16 +8,10 @@
 namespace Blokus {
 
     // 전역 상수
-    constexpr int BOARD_SIZE = 20;          // 클래식 모드
-    constexpr int DUO_BOARD_SIZE = 14;      // 🆕 듀오 모드 보드 크기
-    constexpr int MAX_PLAYERS = 4;          // 최대 플레이어 수
-    constexpr int BLOCKS_PER_PLAYER = 21;   // 플레이어당 블록 수
-    constexpr int DEFAULT_TURN_TIME = 30;   // 🔥 기본 턴 제한시간 (30초)
-
-    // 보드 크기 결정 함수
-    inline int getBoardSize(bool isDuoMode) {
-        return isDuoMode ? DUO_BOARD_SIZE : BOARD_SIZE;
-    }
+    constexpr int BOARD_SIZE = 20;              // 클래식 모드 (고정)
+    constexpr int MAX_PLAYERS = 4;              // 최대 플레이어 수
+    constexpr int BLOCKS_PER_PLAYER = 21;       // 플레이어당 블록 수
+    constexpr int DEFAULT_TURN_TIME = 30;       // 기본 턴 제한시간 (30초)
 
     // 위치 타입 정의 (행, 열)
     using Position = std::pair<int, int>;
@@ -80,25 +74,25 @@ namespace Blokus {
         TrioAngle = 3,
 
         // 4칸 블록
-        Tetro_I=4,
-        Tetro_O=5,
-        Tetro_T=6,
-        Tetro_L=7,
-        Tetro_S=8,
+        Tetro_I = 4,
+        Tetro_O = 5,
+        Tetro_T = 6,
+        Tetro_L = 7,
+        Tetro_S = 8,
 
         // 5칸 블록 (총 12개)
-        Pento_F=9,
-        Pento_I=10,
-        Pento_L=11,
-        Pento_N=12,
-        Pento_P=13,
-        Pento_T=14,
-        Pento_U=15,
-        Pento_V=16,
-        Pento_W=17,
-        Pento_X=18,
-        Pento_Y=19,
-        Pento_Z=20
+        Pento_F = 9,
+        Pento_I = 10,
+        Pento_L = 11,
+        Pento_N = 12,
+        Pento_P = 13,
+        Pento_T = 14,
+        Pento_U = 15,
+        Pento_V = 16,
+        Pento_W = 17,
+        Pento_X = 18,
+        Pento_Y = 19,
+        Pento_Z = 20
     };
 
     // 블록 배치 정보 구조체
@@ -197,14 +191,14 @@ namespace Blokus {
         }
     };
 
-    // 플레이어 슬롯 (게임 룸용) - 기존 PlayerInfo를 대체
+    // 플레이어 슬롯 (게임 룸용)
     struct PlayerSlot {
         PlayerColor color;          // 플레이어 색상
-        QString username;           // 플레이어 이름 (name → username 변경)
+        QString username;           // 플레이어 이름
         bool isAI;                  // AI 플레이어 여부
         int aiDifficulty;           // AI 난이도 (1-3)
-        bool isHost;                // 🆕 호스트 여부
-        bool isReady;               // 🆕 준비 상태
+        bool isHost;                // 호스트 여부
+        bool isReady;               // 준비 상태
         int score;                  // 현재 점수
         int remainingBlocks;        // 남은 블록 수
 
@@ -236,7 +230,6 @@ namespace Blokus {
             }
         }
 
-        // 🔄 기존 PlayerInfo의 isActive 대신 isEmpty() 사용
         bool isActive() const {
             return !isEmpty();
         }
@@ -251,7 +244,7 @@ namespace Blokus {
         int maxPlayers;
         QString gameMode;
         bool isPlaying;
-        QList<PlayerSlot> playerSlots;  // PlayerInfo[] → PlayerSlot[] 변경
+        QList<PlayerSlot> playerSlots;
 
         GameRoomInfo()
             : roomId(0)
@@ -272,16 +265,10 @@ namespace Blokus {
             playerSlots[3].color = PlayerColor::Green;
         }
 
-        bool isDuoMode() const {
-            return gameMode.contains(QString::fromUtf8("듀오")) || maxPlayers == 2;
-        }
-
         int getCurrentPlayerCount() const {
             int count = 0;
-            int slotsToCheck = isDuoMode() ? 2 : 4;
-
-            for (int i = 0; i < slotsToCheck && i < playerSlots.size(); ++i) {
-                if (!playerSlots[i].isEmpty()) count++;
+            for (const auto& slot : playerSlots) {
+                if (!slot.isEmpty()) count++;
             }
             return count;
         }
@@ -298,36 +285,24 @@ namespace Blokus {
         bool isMyTurn(const QString& username, PlayerColor currentTurn) const {
             return getMyColor(username) == currentTurn;
         }
-
-        QList<PlayerColor> getAvailableColors() const {
-            if (isDuoMode()) {
-                return { PlayerColor::Blue, PlayerColor::Yellow };
-            }
-            else {
-                return { PlayerColor::Blue, PlayerColor::Yellow,
-                        PlayerColor::Red, PlayerColor::Green };
-            }
-        }
     };
 
     // 게임 설정 구조체
     struct GameSettings {
         int playerCount;            // 플레이어 수 (2-4)
-        int turnTimeLimit;          // 🔥 턴 제한시간 (초, 기본 30초)
+        int turnTimeLimit;          // 턴 제한시간 (초, 기본 30초)
         bool enableAI;              // AI 플레이어 허용
         int aiDifficulty;           // AI 난이도 (1-3)
         bool showHints;             // 힌트 표시 여부
-        QString gameMode;           // 게임 모드 ("classic", "duo")
-        bool recordStats;           // 통계 기록 여부 (기본 true)
+        bool recordStats;           // 통계 기록 여부
 
         GameSettings()
             : playerCount(4)
-            , turnTimeLimit(DEFAULT_TURN_TIME)  // 🔥 30초 기본값
+            , turnTimeLimit(DEFAULT_TURN_TIME)
             , enableAI(true)
             , aiDifficulty(2)
             , showHints(true)
-            , gameMode("classic")
-            , recordStats(true)         // 🔥 통계는 기록, 레이팅은 안함
+            , recordStats(true)
         {
         }
     };
@@ -336,10 +311,9 @@ namespace Blokus {
     namespace Utils {
 
         // 위치 유효성 검사
-        inline bool isPositionValid(const Position& pos, bool isDuoMode = false) {
-            int boardSize = getBoardSize(isDuoMode);
-            return pos.first >= 0 && pos.first < boardSize &&
-                pos.second >= 0 && pos.second < boardSize;
+        inline bool isPositionValid(const Position& pos) {
+            return pos.first >= 0 && pos.first < BOARD_SIZE &&
+                pos.second >= 0 && pos.second < BOARD_SIZE;
         }
 
         // 두 위치 사이의 거리 계산 (맨하탄 거리)
@@ -369,14 +343,14 @@ namespace Blokus {
             }
         }
 
-        // 🔥 턴 시간 포맷팅 (30초 → "0:30")
+        // 턴 시간 포맷팅 (30초 → "0:30")
         inline QString formatTurnTime(int seconds) {
             int minutes = seconds / 60;
             int remainingSeconds = seconds % 60;
             return QString("%1:%2").arg(minutes).arg(remainingSeconds, 2, 10, QChar('0'));
         }
 
-        // 🔥 시간 초과 여부 확인
+        // 시간 초과 여부 확인
         inline bool isTurnTimeExpired(int remainingSeconds) {
             return remainingSeconds <= 0;
         }

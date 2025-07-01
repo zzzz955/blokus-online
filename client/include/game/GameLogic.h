@@ -17,11 +17,6 @@ namespace Blokus {
     public:
         GameLogic();
 
-        // 🔥 듀오 모드 관련 함수들 추가
-        void setDuoMode(bool isDuoMode);
-        bool isDuoMode() const { return m_isDuoMode; }
-        int getBoardSize() const { return m_boardSize; }
-
         // 보드 관리
         void initializeBoard();
         void clearBoard();
@@ -59,13 +54,8 @@ namespace Blokus {
         int getPlacedBlockCount(PlayerColor player) const;
 
     private:
-        // 🔥 듀오 모드 관련 멤버 변수들 추가
-        bool m_isDuoMode;                    // 듀오 모드 여부
-        int m_boardSize;                     // 현재 보드 크기 (14 또는 20)
-
-        // 기존 멤버 변수들
         PlayerColor m_currentPlayer;
-        PlayerColor m_board[BOARD_SIZE][BOARD_SIZE];  // 최대 크기로 유지
+        PlayerColor m_board[BOARD_SIZE][BOARD_SIZE];
 
         std::map<PlayerColor, std::set<BlockType>> m_usedBlocks;
         std::map<PlayerColor, std::vector<Position>> m_playerOccupiedCells;

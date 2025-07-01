@@ -1,6 +1,4 @@
-﻿// client/include/ui/GameRoomWindow.h - 오류 수정된 헤더 파일
-
-#pragma once
+﻿#pragma once
 
 #include <QMainWindow>
 #include <QWidget>
@@ -34,7 +32,7 @@ namespace Blokus {
     // 전방 선언
     class MyBlockPalette;
 
-    // 내 블록 팔레트 클래스 (시각적 블록 모양 지원)
+    // 내 블록 팔레트 클래스
     class MyBlockPalette : public QWidget
     {
         Q_OBJECT
@@ -67,7 +65,7 @@ namespace Blokus {
         QWidget* m_blockContainer;
         QGridLayout* m_blockGrid;
         std::vector<Block> m_availableBlocks;
-        std::map<BlockType, QPushButton*> m_blockButtons;  // 🔥 QPushButton*로 유지
+        std::map<BlockType, QPushButton*> m_blockButtons;
         Block m_selectedBlock;
         bool m_hasSelection;
         QPushButton* m_selectedButton;
@@ -184,11 +182,11 @@ namespace Blokus {
         void setupMenuBar();
         void setupStatusBar();
         void setupMainLayout();
-        void setupRoomInfoPanel();       // 상단 룸 정보
-        void setupPlayerSlotsPanel();    // 플레이어 슬롯들
-        void setupGameArea();            // 게임 보드 + 내 팔레트
-        void setupChatPanel();           // 우측 채팅
-        void setupControlsPanel();       // 하단 컨트롤
+        void setupRoomInfoPanel();
+        void setupPlayerSlotsPanel();
+        void setupGameArea();
+        void setupChatPanel();
+        void setupControlsPanel();
         void setupStyles();
 
         // UI 업데이트 함수들
