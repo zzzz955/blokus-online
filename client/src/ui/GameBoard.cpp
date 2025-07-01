@@ -95,7 +95,7 @@ namespace Blokus {
 
         // 시각적 요소 생성
         drawGrid();
-        drawStartingCorners();
+        //drawStartingCorners();
 
         // 뷰 맞춤
         fitBoardToView();
