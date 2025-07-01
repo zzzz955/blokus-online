@@ -5,7 +5,7 @@
 
 #include "ui/LoginWindow.h"
 #include "ui/LobbyWindow.h"
-#include "ui/GameRoomWindow.h"  // 🔥 MainWindow 대신 GameRoomWindow 사용
+#include "ui/GameRoomWindow.h"
 #include "common/Types.h"
 
 using namespace Blokus;
@@ -18,7 +18,7 @@ public:
     AppController()
         : m_loginWindow(nullptr)
         , m_lobbyWindow(nullptr)
-        , m_gameRoomWindow(nullptr)  // 🔥 GameRoomWindow로 변경
+        , m_gameRoomWindow(nullptr)
         , m_currentUsername("")
         , m_currentRoomInfo()
     {
@@ -124,11 +124,11 @@ private slots:
             gameRoomInfo.roomName = roomInfo.roomName;
             gameRoomInfo.hostUsername = m_currentUsername;
             gameRoomInfo.hostColor = PlayerColor::Blue;  // 방장은 항상 파란색
-            gameRoomInfo.maxPlayers = roomInfo.maxPlayers;
-            gameRoomInfo.gameMode = roomInfo.gameMode;
+            gameRoomInfo.maxPlayers = 4;  // 클래식 모드만 지원
+            gameRoomInfo.gameMode = QString::fromUtf8("클래식");
             gameRoomInfo.isPlaying = false;
 
-            // 첫 번째 슬롯(파란색)에 호스트 배치
+            // 첫 번째 슬롯(파란색)에 호스트 배치 - std::array 접근 방식
             gameRoomInfo.playerSlots[0].username = m_currentUsername;
             gameRoomInfo.playerSlots[0].isHost = true;
             gameRoomInfo.playerSlots[0].isReady = true;
@@ -154,7 +154,7 @@ private slots:
             gameRoomInfo.gameMode = QString::fromUtf8("클래식");
             gameRoomInfo.isPlaying = false;
 
-            // 기존 플레이어들 배치 (더미)
+            // 기존 플레이어들 배치 (더미) - std::array 접근 방식
             gameRoomInfo.playerSlots[0].username = QString::fromUtf8("방장");
             gameRoomInfo.playerSlots[0].isHost = true;
             gameRoomInfo.playerSlots[0].isReady = true;
@@ -178,7 +178,6 @@ private slots:
             });
     }
 
-    // 🔥 게임 룸 관련 이벤트 핸들러들
     void handleLeaveRoomRequest()
     {
         qDebug() << QString::fromUtf8("방 나가기 요청");
@@ -290,7 +289,7 @@ private:
         connect(m_loginWindow, &Blokus::LoginWindow::loginSuccessful,
             this, &AppController::handleLoginSuccess);
 
-        // 🔥 로그인 창이 닫히면 애플리케이션 종료
+        // 로그인 창이 닫히면 애플리케이션 종료
         connect(m_loginWindow, &QMainWindow::destroyed,
             qApp, &QApplication::quit);
 
@@ -397,9 +396,9 @@ private:
 private:
     Blokus::LoginWindow* m_loginWindow;
     Blokus::LobbyWindow* m_lobbyWindow;
-    Blokus::GameRoomWindow* m_gameRoomWindow;  // 🔥 GameRoomWindow로 변경
+    Blokus::GameRoomWindow* m_gameRoomWindow;
     QString m_currentUsername;
-    Blokus::GameRoomInfo m_currentRoomInfo;   // 🔥 현재 방 정보 저장
+    Blokus::GameRoomInfo m_currentRoomInfo;
 };
 
 int main(int argc, char* argv[])
@@ -422,7 +421,7 @@ int main(int argc, char* argv[])
     AppController controller;
     controller.start();
 
-    qDebug() << QString::fromUtf8("블로커스 온라인 시작됨 - 게임 룸 시스템 활성화");
+    qDebug() << QString::fromUtf8("블로커스 온라인 시작됨 - 클래식 모드 전용");
 
     return app.exec();
 }

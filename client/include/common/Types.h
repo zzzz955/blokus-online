@@ -2,8 +2,10 @@
 
 #include <utility>
 #include <vector>
+#include <array>
 #include <QString>
 #include <QPoint>
+#include <QList>
 
 namespace Blokus {
 
@@ -235,7 +237,7 @@ namespace Blokus {
         }
     };
 
-    // 게임 룸 정보 (게임 룸용)
+    // 게임 룸 정보 (게임 룸용) - std::array 사용으로 수정
     struct GameRoomInfo {
         int roomId;
         QString roomName;
@@ -244,7 +246,7 @@ namespace Blokus {
         int maxPlayers;
         QString gameMode;
         bool isPlaying;
-        QList<PlayerSlot> playerSlots;
+        std::array<PlayerSlot, 4> playerSlots;  // QList 대신 std::array 사용
 
         GameRoomInfo()
             : roomId(0)
@@ -252,13 +254,10 @@ namespace Blokus {
             , hostUsername("")
             , hostColor(PlayerColor::Blue)
             , maxPlayers(4)
-            , gameMode(QString::fromUtf8("클래식 (4인, 20x20)"))
+            , gameMode(QString::fromUtf8("클래식"))
             , isPlaying(false)
         {
             // 4개 색상 슬롯 초기화
-            for (int i = 0; i < 4; ++i)
-                playerSlots.append(PlayerSlot());
-
             playerSlots[0].color = PlayerColor::Blue;
             playerSlots[1].color = PlayerColor::Yellow;
             playerSlots[2].color = PlayerColor::Red;
