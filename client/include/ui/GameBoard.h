@@ -29,11 +29,6 @@ namespace Blokus {
         explicit GameBoard(QWidget* parent = nullptr);
         ~GameBoard();
 
-        // 🆕 보드 크기 설정
-        void setBoardSize(int size);
-        void setDuoMode(bool isDuoMode);
-        int getCurrentBoardSize() const { return m_currentBoardSize; }
-
         // 게임 로직 연동
         void setGameLogic(GameLogic* gameLogic);
         bool tryPlaceCurrentBlock(const Position& position);
@@ -71,8 +66,8 @@ namespace Blokus {
         void removeBlockFromBoard(const Position& position);
         void clearAllBlocks();
 
-        void clearSelection();  // 🆕 선택 상태 초기화
-        void setBlockSelected(bool selected); // 🆕 블록 선택 상태 제어
+        void clearSelection();
+        void setBlockSelected(bool selected);
 
     signals:
         void cellClicked(int row, int col);
@@ -81,7 +76,7 @@ namespace Blokus {
         void blockRemoved(const Position& position);
         void blockRotated(const Block& block);
         void blockFlipped(const Block& block);
-        void blockPlacedSuccessfully(BlockType blockType, PlayerColor player); // 새로 추가
+        void blockPlacedSuccessfully(BlockType blockType, PlayerColor player);
 
     protected:
         void mousePressEvent(QMouseEvent* event) override;
@@ -106,7 +101,6 @@ namespace Blokus {
         // 격자 그리기
         void drawGrid();
         void drawStartingCorners();
-        void drawDuoStartingCorners();  // 🆕 듀오 모드 시작점
 
         // 블록 그래픽 관련
         BlockGraphicsItem* createBlockGraphicsItem(const Block& block, const Position& position);
@@ -134,8 +128,8 @@ namespace Blokus {
         QGraphicsScene* m_scene;
         QGraphicsRectItem* m_boardRect;
 
-        // 🔥 보드 상태 (동적 크기) - 기존 고정 배열 대신 벡터 사용
-        std::vector<std::vector<PlayerColor>> m_board;
+        // 보드 상태
+        PlayerColor m_board[BOARD_SIZE][BOARD_SIZE];
         bool m_readOnly;
 
         // 시각적 요소
@@ -169,9 +163,7 @@ namespace Blokus {
         QBrush m_highlightBrush;
         std::map<PlayerColor, QColor> m_playerColors;
 
-        bool m_blockSelected;        // 🆕 블록 선택 상태 추가
-        int m_currentBoardSize;      // 🆕 현재 보드 크기 (14 또는 20)
-        bool m_isDuoMode;            // 🆕 듀오 모드 여부
+        bool m_blockSelected;
     };
 
 } // namespace Blokus

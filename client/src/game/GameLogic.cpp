@@ -10,8 +10,6 @@ namespace Blokus {
 
     GameLogic::GameLogic()
         : m_currentPlayer(PlayerColor::Blue)
-        , m_isDuoMode(false)
-        , m_boardSize(BOARD_SIZE)
     {
         initializeBoard();
 
@@ -29,8 +27,8 @@ namespace Blokus {
 
     void GameLogic::clearBoard()
     {
-        for (int row = 0; row < m_boardSize; ++row) {
-            for (int col = 0; col < m_boardSize; ++col) {
+        for (int row = 0; row < BOARD_SIZE; ++row) {
+            for (int col = 0; col < BOARD_SIZE; ++col) {
                 m_board[row][col] = PlayerColor::None;
             }
         }
@@ -57,8 +55,8 @@ namespace Blokus {
 
     bool GameLogic::canPlaceBlock(const Block& block, const Position& position, PlayerColor player) const
     {
-        // 1. 기본 유효성 검사 (동적 보드 경계, 충돌)
-        if (!block.isValidPlacement(position, m_boardSize)) {
+        // 1. 기본 유효성 검사 (보드 경계, 충돌)
+        if (!block.isValidPlacement(position, BOARD_SIZE)) {
             return false;
         }
 
@@ -111,7 +109,6 @@ namespace Blokus {
 
     bool GameLogic::removeBlock(const Position& position)
     {
-        // TODO: 블록 제거 로직 구현 (디버깅용)
         if (!isPositionValid(position)) return false;
 
         PlayerColor owner = getCellOwner(position);
@@ -127,66 +124,27 @@ namespace Blokus {
     {
         PositionList absolutePositions = block.getAbsolutePositions(position);
 
-        // 🔥 듀오 모드 확인 - 듀오 모드면 특별한 시작점 사용
-        bool isDuoMode = (BOARD_SIZE == 14);  // 또는 다른 방법으로 듀오 모드 감지
+        // 클래식 모드: 4개 모서리 중 하나에 닿아야 함
+        std::vector<Position> corners = {
+            {0, 0},                    // 왼쪽 위 모서리
+            {0, BOARD_SIZE - 1},       // 오른쪽 위 모서리  
+            {BOARD_SIZE - 1, 0},       // 왼쪽 아래 모서리
+            {BOARD_SIZE - 1, BOARD_SIZE - 1}  // 오른쪽 아래 모서리
+        };
 
-        if (isDuoMode) {
-            // 🔥 듀오 모드: 각 플레이어별 지정된 시작점
-            std::vector<Position> duoStartPoints;
-
-            switch (player) {
-            case PlayerColor::Blue:
-                duoStartPoints = { {4, 4} };  // 파랑 시작점
-                break;
-            case PlayerColor::Yellow:
-                duoStartPoints = { {9, 9} };  // 노랑 시작점
-                break;
-            default:
-                // 듀오 모드에서는 빨강/초록 사용 안함
-                qDebug() << QString::fromUtf8("듀오 모드에서 잘못된 플레이어 색상: %1")
-                    .arg(Utils::playerColorToString(player));
-                return false;
-            }
-
-            // 블록의 셀 중 하나가 해당 플레이어의 시작점에 정확히 위치해야 함
-            for (const auto& blockPos : absolutePositions) {
-                for (const auto& startPoint : duoStartPoints) {
-                    if (blockPos == startPoint) {
-                        qDebug() << QString::fromUtf8("듀오 모드 첫 블록 규칙 만족: %1 플레이어, 시작점 (%2, %3)")
-                            .arg(Utils::playerColorToString(player))
-                            .arg(blockPos.first).arg(blockPos.second);
-                        return true;
-                    }
+        // 블록의 셀 중 하나가 4개 모서리 중 하나에 정확히 위치해야 함
+        for (const auto& blockPos : absolutePositions) {
+            for (const auto& corner : corners) {
+                if (blockPos == corner) {
+                    qDebug() << QString::fromUtf8("첫 블록 모서리 규칙 만족: (%1, %2)")
+                        .arg(blockPos.first).arg(blockPos.second);
+                    return true;
                 }
             }
-
-            qDebug() << QString::fromUtf8("듀오 모드 첫 블록 규칙 위반: %1 플레이어가 지정된 시작점에 닿지 않음")
-                .arg(Utils::playerColorToString(player));
-            return false;
         }
-        else {
-            // 🔥 클래식 모드: 4개 모서리 중 하나에 닿아야 함
-            std::vector<Position> corners = {
-                {0, 0},                    // 왼쪽 위 모서리
-                {0, BOARD_SIZE - 1},       // 오른쪽 위 모서리  
-                {BOARD_SIZE - 1, 0},       // 왼쪽 아래 모서리
-                {BOARD_SIZE - 1, BOARD_SIZE - 1}  // 오른쪽 아래 모서리
-            };
 
-            // 블록의 셀 중 하나가 4개 모서리 중 하나에 정확히 위치해야 함
-            for (const auto& blockPos : absolutePositions) {
-                for (const auto& corner : corners) {
-                    if (blockPos == corner) {
-                        qDebug() << QString::fromUtf8("클래식 모드 첫 블록 모서리 규칙 만족: (%1, %2)")
-                            .arg(blockPos.first).arg(blockPos.second);
-                        return true;
-                    }
-                }
-            }
-
-            qDebug() << QString::fromUtf8("클래식 모드 첫 블록 모서리 규칙 위반: 4개 코너 중 하나에 닿아야 함");
-            return false;
-        }
+        qDebug() << QString::fromUtf8("첫 블록 모서리 규칙 위반: 4개 코너 중 하나에 닿아야 함");
+        return false;
     }
 
     bool GameLogic::isCornerAdjacencyValid(const Block& block, const Position& position, PlayerColor player) const
@@ -283,8 +241,8 @@ namespace Blokus {
             Block testBlock(blockType, player);
 
             // 모든 가능한 위치와 회전/뒤집기 상태를 테스트
-            for (int row = 0; row < m_boardSize; ++row) {
-                for (int col = 0; col < m_boardSize; ++col) {
+            for (int row = 0; row < BOARD_SIZE; ++row) {
+                for (int col = 0; col < BOARD_SIZE; ++col) {
                     Position testPos = { row, col };
 
                     // 4가지 회전 x 4가지 뒤집기 = 16가지 상태 테스트
@@ -356,13 +314,12 @@ namespace Blokus {
         return scores;
     }
 
-    // printBoard 함수 수정
     void GameLogic::printBoard() const
     {
-        qDebug() << QString::fromUtf8("=== 게임 보드 상태 (%1x%1) ===").arg(m_boardSize);
-        for (int row = 0; row < m_boardSize; ++row) {
+        qDebug() << QString::fromUtf8("=== 게임 보드 상태 (%1x%1) ===").arg(BOARD_SIZE);
+        for (int row = 0; row < BOARD_SIZE; ++row) {
             QString rowStr;
-            for (int col = 0; col < m_boardSize; ++col) {
+            for (int col = 0; col < BOARD_SIZE; ++col) {
                 switch (m_board[row][col]) {
                 case PlayerColor::Blue: rowStr += "B "; break;
                 case PlayerColor::Yellow: rowStr += "Y "; break;
@@ -387,8 +344,8 @@ namespace Blokus {
 
     bool GameLogic::isPositionValid(const Position& pos) const
     {
-        return pos.first >= 0 && pos.first < m_boardSize &&
-            pos.second >= 0 && pos.second < m_boardSize;
+        return pos.first >= 0 && pos.first < BOARD_SIZE &&
+            pos.second >= 0 && pos.second < BOARD_SIZE;
     }
 
     bool GameLogic::hasCollision(const Block& block, const Position& position) const
@@ -440,21 +397,12 @@ namespace Blokus {
 
     Position GameLogic::getPlayerStartCorner(PlayerColor player) const
     {
-        if (m_isDuoMode) {
-            switch (player) {
-            case PlayerColor::Blue: return { 4, 4 };   // 듀오 모드 파랑 시작점
-            case PlayerColor::Yellow: return { 9, 9 }; // 듀오 모드 노랑 시작점
-            default: return { 0, 0 };
-            }
-        }
-        else {
-            switch (player) {
-            case PlayerColor::Blue: return { 0, 0 };                          // 왼쪽 위
-            case PlayerColor::Yellow: return { 0, m_boardSize - 1 };          // 오른쪽 위
-            case PlayerColor::Red: return { m_boardSize - 1, 0 };             // 왼쪽 아래
-            case PlayerColor::Green: return { m_boardSize - 1, m_boardSize - 1 }; // 오른쪽 아래
-            default: return { 0, 0 };
-            }
+        switch (player) {
+        case PlayerColor::Blue: return { 0, 0 };                          // 왼쪽 위
+        case PlayerColor::Yellow: return { 0, BOARD_SIZE - 1 };          // 오른쪽 위
+        case PlayerColor::Red: return { BOARD_SIZE - 1, 0 };             // 왼쪽 아래
+        case PlayerColor::Green: return { BOARD_SIZE - 1, BOARD_SIZE - 1 }; // 오른쪽 아래
+        default: return { 0, 0 };
         }
     }
 
