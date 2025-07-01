@@ -38,10 +38,10 @@ namespace Blokus {
 
     void PlayerSlotWidget::setupUI()
     {
-        setFixedSize(160, 130);
+        setFixedSize(130, 150);
 
         m_mainLayout = new QVBoxLayout(this);
-        m_mainLayout->setContentsMargins(8, 6, 8, 6);
+        m_mainLayout->setContentsMargins(4, 4, 4, 4);
         m_mainLayout->setSpacing(4);
 
         // 색상 표시 프레임
@@ -52,7 +52,7 @@ namespace Blokus {
 
         m_colorLabel = new QLabel(getColorName());
         m_colorLabel->setAlignment(Qt::AlignCenter);
-        m_colorLabel->setStyleSheet("font-weight: bold; font-size: 11px; color: white;");
+        m_colorLabel->setStyleSheet("font-weight: bold; font-size: 12px; color: white;");
 
         QVBoxLayout* colorLayout = new QVBoxLayout(m_colorFrame);
         colorLayout->setContentsMargins(2, 2, 2, 2);
@@ -80,12 +80,12 @@ namespace Blokus {
 
         m_scoreLabel = new QLabel(QString::fromUtf8("점수: 0"));
         m_scoreLabel->setAlignment(Qt::AlignCenter);
-        m_scoreLabel->setStyleSheet("font-size: 10px; color: #34495e;");
+        m_scoreLabel->setStyleSheet("font-size: 10px; color: #95a5a6;");
 
         // 남은 블록 수 표시
         m_remainingBlocksLabel = new QLabel(QString::fromUtf8("블록: 21"));
         m_remainingBlocksLabel->setAlignment(Qt::AlignCenter);
-        m_remainingBlocksLabel->setStyleSheet("font-size: 9px; color: #95a5a6;");
+        m_remainingBlocksLabel->setStyleSheet("font-size: 10px; color: #95a5a6;");
 
         // 액션 버튼
         m_actionButton = new QPushButton(QString::fromUtf8("AI 추가"));
@@ -134,7 +134,7 @@ namespace Blokus {
             "border-radius: 4px; "
             "color: white; "
             "font-weight: bold; "
-            "font-size: 10px; "
+            "font-size: 12px; "
             "padding: 4px; "
             "} "
             "QPushButton:hover { "
@@ -276,7 +276,7 @@ namespace Blokus {
         // AI 추가 다이얼로그
         QDialog dialog(this);
         dialog.setWindowTitle(QString::fromUtf8("AI 플레이어 추가"));
-        dialog.setFixedSize(320, 240);
+        dialog.setFixedSize(480, 240);
         dialog.setModal(true);
 
         // 베이지색 배경 스타일
@@ -288,8 +288,8 @@ namespace Blokus {
         );
 
         QVBoxLayout* mainLayout = new QVBoxLayout(&dialog);
-        mainLayout->setContentsMargins(20, 20, 20, 20);
-        mainLayout->setSpacing(15);
+        mainLayout->setContentsMargins(10, 10, 10, 10);
+        mainLayout->setSpacing(10);
 
         // 타이틀 라벨
         QLabel* titleLabel = new QLabel(QString::fromUtf8("🤖 AI 플레이어 추가"));
@@ -300,8 +300,8 @@ namespace Blokus {
             "font-weight: bold; "
             "color: #2c3e50; "
             "background-color: rgba(255, 255, 255, 150); "
-            "padding: 10px; "
-            "border-radius: 8px; "
+            "padding: 5px; "
+            "border-radius: 4px; "
             "border: 1px solid #d4c5a0; "
             "}"
         );
@@ -316,8 +316,8 @@ namespace Blokus {
             "font-size: 12px; "
             "color: #34495e; "
             "background-color: rgba(255, 255, 255, 100); "
-            "padding: 8px; "
-            "border-radius: 6px; "
+            "padding: 5px; "
+            "border-radius: 4px; "
             "line-height: 1.4; "
             "}"
         );
@@ -333,11 +333,11 @@ namespace Blokus {
         QString buttonBaseStyle =
             "QPushButton { "
             "border: none; "
-            "border-radius: 8px; "
+            "border-radius: 4px; "
             "color: white; "
             "font-weight: bold; "
-            "font-size: 11px; "
-            "padding: 12px 16px; "
+            "font-size: 12px; "
+            "padding: 4px 8px; "
             "min-width: 60px; "
             "min-height: 40px; "
             "} "
@@ -374,11 +374,11 @@ namespace Blokus {
             "QPushButton { "
             "background-color: #95a5a6; "
             "border: none; "
-            "border-radius: 6px; "
+            "border-radius: 4px; "
             "color: white; "
             "font-weight: bold; "
             "font-size: 12px; "
-            "padding: 8px 20px; "
+            "padding: 4px 8px; "
             "min-height: 35px; "
             "} "
             "QPushButton:hover { "
@@ -591,11 +591,11 @@ namespace Blokus {
     void GameRoomWindow::setupPlayerSlotsPanel()
     {
         m_playerSlotsPanel = new QWidget();
-        m_playerSlotsPanel->setFixedHeight(150);
+        m_playerSlotsPanel->setFixedHeight(160);
 
         m_slotsLayout = new QHBoxLayout(m_playerSlotsPanel);
-        m_slotsLayout->setContentsMargins(8, 8, 8, 8);
-        m_slotsLayout->setSpacing(10);
+        m_slotsLayout->setContentsMargins(4, 4, 4, 4);
+        m_slotsLayout->setSpacing(5);
 
         // 4개 슬롯 고정 생성 (클래식 모드만)
         for (int i = 0; i < 4; ++i) {
