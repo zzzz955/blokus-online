@@ -36,6 +36,75 @@ namespace Blokus {
         updatePlayerSlot(emptySlot);
     }
 
+    void PlayerSlotWidget::setupUI()
+    {
+        setFixedSize(160, 130);
+
+        m_mainLayout = new QVBoxLayout(this);
+        m_mainLayout->setContentsMargins(8, 6, 8, 6);
+        m_mainLayout->setSpacing(4);
+
+        // 색상 표시 프레임
+        m_colorFrame = new QFrame();
+        m_colorFrame->setFixedHeight(25);
+        m_colorFrame->setFrameStyle(QFrame::Box | QFrame::Raised);
+        m_colorFrame->setLineWidth(2);
+
+        m_colorLabel = new QLabel(getColorName());
+        m_colorLabel->setAlignment(Qt::AlignCenter);
+        m_colorLabel->setStyleSheet("font-weight: bold; font-size: 11px; color: white;");
+
+        QVBoxLayout* colorLayout = new QVBoxLayout(m_colorFrame);
+        colorLayout->setContentsMargins(2, 2, 2, 2);
+        colorLayout->addWidget(m_colorLabel);
+
+        // 호스트 표시
+        m_hostIndicator = new QWidget();
+        m_hostIndicator->setFixedHeight(15);
+        QLabel* hostLabel = new QLabel(QString::fromUtf8("👑"));
+        hostLabel->setAlignment(Qt::AlignCenter);
+        hostLabel->setStyleSheet("font-size: 10px; font-weight: bold; color: #f39c12;");
+        QVBoxLayout* hostLayout = new QVBoxLayout(m_hostIndicator);
+        hostLayout->setContentsMargins(0, 0, 0, 0);
+        hostLayout->addWidget(hostLabel);
+        m_hostIndicator->hide();
+
+        // 플레이어 정보
+        m_usernameLabel = new QLabel(QString::fromUtf8("빈 슬롯"));
+        m_usernameLabel->setAlignment(Qt::AlignCenter);
+        m_usernameLabel->setStyleSheet("font-size: 11px; font-weight: bold;");
+
+        m_statusLabel = new QLabel(QString::fromUtf8("대기 중"));
+        m_statusLabel->setAlignment(Qt::AlignCenter);
+        m_statusLabel->setStyleSheet("font-size: 10px; color: #7f8c8d;");
+
+        m_scoreLabel = new QLabel(QString::fromUtf8("점수: 0"));
+        m_scoreLabel->setAlignment(Qt::AlignCenter);
+        m_scoreLabel->setStyleSheet("font-size: 10px; color: #34495e;");
+
+        // 남은 블록 수 표시
+        m_remainingBlocksLabel = new QLabel(QString::fromUtf8("블록: 21"));
+        m_remainingBlocksLabel->setAlignment(Qt::AlignCenter);
+        m_remainingBlocksLabel->setStyleSheet("font-size: 9px; color: #95a5a6;");
+
+        // 액션 버튼
+        m_actionButton = new QPushButton(QString::fromUtf8("AI 추가"));
+        m_actionButton->setFixedHeight(25);
+
+        // 레이아웃 구성
+        m_mainLayout->addWidget(m_colorFrame);
+        m_mainLayout->addWidget(m_hostIndicator);
+        m_mainLayout->addWidget(m_usernameLabel);
+        m_mainLayout->addWidget(m_statusLabel);
+        m_mainLayout->addWidget(m_scoreLabel);
+        m_mainLayout->addWidget(m_remainingBlocksLabel);
+        m_mainLayout->addStretch();
+        m_mainLayout->addWidget(m_actionButton);
+
+        // 시그널 연결
+        connect(m_actionButton, &QPushButton::clicked, this, &PlayerSlotWidget::onAddAIClicked);
+    }
+
     void PlayerSlotWidget::setupStyles()
     {
         // 전체 위젯 스타일
@@ -43,7 +112,7 @@ namespace Blokus {
             "PlayerSlotWidget { "
             "background-color: white; "
             "border: 2px solid #ddd; "
-            "border-radius: 8px; "  // 모서리 반경 축소
+            "border-radius: 8px; "
             "}"
         );
 
@@ -52,21 +121,21 @@ namespace Blokus {
         m_colorFrame->setStyleSheet(QString(
             "QFrame { "
             "background-color: %1; "
-            "border: 2px solid %2; "  // 테두리 두께 축소
-            "border-radius: 6px; "    // 모서리 반경 축소
+            "border: 2px solid %2; "
+            "border-radius: 6px; "
             "}"
         ).arg(playerColor.name(), playerColor.darker(150).name()));
 
-        // 버튼 스타일 - 크기 축소
+        // 버튼 스타일
         m_actionButton->setStyleSheet(
             "QPushButton { "
             "background-color: #3498db; "
             "border: none; "
-            "border-radius: 4px; "    // 모서리 반경 축소
+            "border-radius: 4px; "
             "color: white; "
             "font-weight: bold; "
-            "font-size: 10px; "       // 폰트 크기 축소
-            "padding: 4px; "          // 패딩 축소
+            "font-size: 10px; "
+            "padding: 4px; "
             "} "
             "QPushButton:hover { "
             "background-color: #2980b9; "
@@ -161,84 +230,13 @@ namespace Blokus {
         }
     }
 
-    // client/src/ui/GameRoomWindow.cpp - PlayerSlotWidget 크기 축소 및 개선
-
-    void PlayerSlotWidget::setupUI()
-    {
-        setFixedSize(160, 130);  // 200x250 → 160x130 대폭 축소
-
-        m_mainLayout = new QVBoxLayout(this);
-        m_mainLayout->setContentsMargins(8, 6, 8, 6);  // 여백 줄임
-        m_mainLayout->setSpacing(4);  // 간격 줄임
-
-        // 색상 표시 프레임 - 높이 축소
-        m_colorFrame = new QFrame();
-        m_colorFrame->setFixedHeight(25);  // 40px → 25px 축소
-        m_colorFrame->setFrameStyle(QFrame::Box | QFrame::Raised);
-        m_colorFrame->setLineWidth(2);
-
-        m_colorLabel = new QLabel(getColorName());
-        m_colorLabel->setAlignment(Qt::AlignCenter);
-        m_colorLabel->setStyleSheet("font-weight: bold; font-size: 11px; color: white;");  // 폰트 크기 축소
-
-        QVBoxLayout* colorLayout = new QVBoxLayout(m_colorFrame);
-        colorLayout->setContentsMargins(2, 2, 2, 2);
-        colorLayout->addWidget(m_colorLabel);
-
-        // 호스트 표시 - 높이 축소
-        m_hostIndicator = new QWidget();
-        m_hostIndicator->setFixedHeight(15);  // 20px → 15px
-        QLabel* hostLabel = new QLabel(QString::fromUtf8("👑"));
-        hostLabel->setAlignment(Qt::AlignCenter);
-        hostLabel->setStyleSheet("font-size: 10px; font-weight: bold; color: #f39c12;");
-        QVBoxLayout* hostLayout = new QVBoxLayout(m_hostIndicator);
-        hostLayout->setContentsMargins(0, 0, 0, 0);
-        hostLayout->addWidget(hostLabel);
-        m_hostIndicator->hide();
-
-        // 플레이어 정보 - 폰트 크기 축소
-        m_usernameLabel = new QLabel(QString::fromUtf8("빈 슬롯"));
-        m_usernameLabel->setAlignment(Qt::AlignCenter);
-        m_usernameLabel->setStyleSheet("font-size: 11px; font-weight: bold;");
-
-        m_statusLabel = new QLabel(QString::fromUtf8("대기 중"));
-        m_statusLabel->setAlignment(Qt::AlignCenter);
-        m_statusLabel->setStyleSheet("font-size: 10px; color: #7f8c8d;");
-
-        m_scoreLabel = new QLabel(QString::fromUtf8("점수: 0"));
-        m_scoreLabel->setAlignment(Qt::AlignCenter);
-        m_scoreLabel->setStyleSheet("font-size: 10px; color: #34495e;");
-
-        // 남은 블록 수 표시 추가
-        m_remainingBlocksLabel = new QLabel(QString::fromUtf8("블록: 21"));
-        m_remainingBlocksLabel->setAlignment(Qt::AlignCenter);
-        m_remainingBlocksLabel->setStyleSheet("font-size: 9px; color: #95a5a6;");
-
-        // 액션 버튼 - 높이 축소
-        m_actionButton = new QPushButton(QString::fromUtf8("AI 추가"));
-        m_actionButton->setFixedHeight(25);  // 35px → 25px
-
-        // 레이아웃 구성
-        m_mainLayout->addWidget(m_colorFrame);
-        m_mainLayout->addWidget(m_hostIndicator);
-        m_mainLayout->addWidget(m_usernameLabel);
-        m_mainLayout->addWidget(m_statusLabel);
-        m_mainLayout->addWidget(m_scoreLabel);
-        m_mainLayout->addWidget(m_remainingBlocksLabel);
-        m_mainLayout->addStretch();
-        m_mainLayout->addWidget(m_actionButton);
-
-        // 시그널 연결
-        connect(m_actionButton, &QPushButton::clicked, this, &PlayerSlotWidget::onAddAIClicked);
-    }
-
     void PlayerSlotWidget::updatePlayerSlot(const PlayerSlot& slot)
     {
         m_currentSlot = slot;
 
         // 사용자명 업데이트
         QString displayName = slot.getDisplayName();
-        if (displayName.length() > 12) {  // 길이 제한
+        if (displayName.length() > 12) {
             displayName = displayName.left(10) + "...";
         }
         m_usernameLabel->setText(displayName);
@@ -273,19 +271,18 @@ namespace Blokus {
         updateActionButton();
     }
 
-    // AI 추가 다이얼로그 개선
     void PlayerSlotWidget::onAddAIClicked()
     {
-        // 🔥 개선된 AI 추가 다이얼로그 - 베이지색 배경과 깔끔한 레이아웃
+        // AI 추가 다이얼로그
         QDialog dialog(this);
         dialog.setWindowTitle(QString::fromUtf8("AI 플레이어 추가"));
         dialog.setFixedSize(320, 240);
         dialog.setModal(true);
 
-        // 🔥 베이지색 배경 스타일
+        // 베이지색 배경 스타일
         dialog.setStyleSheet(
             "QDialog { "
-            "background-color: #f5f5dc; "  // 베이지색 배경
+            "background-color: #f5f5dc; "
             "border-radius: 12px; "
             "} "
         );
@@ -294,7 +291,7 @@ namespace Blokus {
         mainLayout->setContentsMargins(20, 20, 20, 20);
         mainLayout->setSpacing(15);
 
-        // 🔥 타이틀 라벨
+        // 타이틀 라벨
         QLabel* titleLabel = new QLabel(QString::fromUtf8("🤖 AI 플레이어 추가"));
         titleLabel->setAlignment(Qt::AlignCenter);
         titleLabel->setStyleSheet(
@@ -309,7 +306,7 @@ namespace Blokus {
             "}"
         );
 
-        // 🔥 설명 라벨
+        // 설명 라벨
         QLabel* descLabel = new QLabel(QString::fromUtf8("%1 위치에 AI 플레이어를 추가합니다.\nAI 난이도를 선택해주세요:")
             .arg(getColorName()));
         descLabel->setAlignment(Qt::AlignCenter);
@@ -325,14 +322,14 @@ namespace Blokus {
             "}"
         );
 
-        // 🔥 난이도 버튼들 컨테이너
+        // 난이도 버튼들 컨테이너
         QWidget* buttonContainer = new QWidget();
         buttonContainer->setStyleSheet("background-color: transparent;");
         QHBoxLayout* buttonLayout = new QHBoxLayout(buttonContainer);
         buttonLayout->setSpacing(10);
         buttonLayout->setContentsMargins(0, 0, 0, 0);
 
-        // 🔥 난이도 버튼 스타일
+        // 난이도 버튼 스타일
         QString buttonBaseStyle =
             "QPushButton { "
             "border: none; "
@@ -371,7 +368,7 @@ namespace Blokus {
         buttonLayout->addWidget(normalButton);
         buttonLayout->addWidget(hardButton);
 
-        // 🔥 취소 버튼
+        // 취소 버튼
         QPushButton* cancelButton = new QPushButton(QString::fromUtf8("❌ 취소"));
         cancelButton->setStyleSheet(
             "QPushButton { "
@@ -392,7 +389,7 @@ namespace Blokus {
             "}"
         );
 
-        // 🔥 레이아웃 구성
+        // 레이아웃 구성
         mainLayout->addWidget(titleLabel);
         mainLayout->addWidget(descLabel);
         mainLayout->addSpacing(10);
@@ -400,13 +397,13 @@ namespace Blokus {
         mainLayout->addStretch();
         mainLayout->addWidget(cancelButton);
 
-        // 🔥 시그널 연결
+        // 시그널 연결
         connect(easyButton, &QPushButton::clicked, [&dialog]() { dialog.done(1); });
         connect(normalButton, &QPushButton::clicked, [&dialog]() { dialog.done(2); });
         connect(hardButton, &QPushButton::clicked, [&dialog]() { dialog.done(3); });
         connect(cancelButton, &QPushButton::clicked, [&dialog]() { dialog.reject(); });
 
-        // 🔥 다이얼로그 실행
+        // 다이얼로그 실행
         int result = dialog.exec();
         if (result >= 1 && result <= 3) {
             emit addAIRequested(m_color, result);
@@ -471,21 +468,21 @@ namespace Blokus {
         // 룸 정보 업데이트
         updateRoomInfo(roomInfo);
 
-        // 🔥 초기 상태에서는 게임보드와 팔레트 비활성화
+        // 초기 상태에서는 게임보드와 팔레트 비활성화
         if (m_gameBoard) {
-            m_gameBoard->setBoardReadOnly(true);  // 읽기 전용으로 설정
+            m_gameBoard->setBoardReadOnly(true);
             m_gameBoard->clearSelection();
         }
 
         if (m_myBlockPalette) {
-            m_myBlockPalette->setEnabled(false);  // 비활성화
+            m_myBlockPalette->setEnabled(false);
             m_myBlockPalette->clearSelection();
         }
 
-        // 창 설정 - 크기 축소
+        // 창 설정
         setWindowTitle(QString::fromUtf8("블로커스 온라인 - %1 (%2님)").arg(roomInfo.roomName, myUsername));
-        setMinimumSize(1200, 800);   // 기존 1400x1000 → 1200x800
-        resize(1400, 900);           // 기존 1600x1200 → 1400x900
+        setMinimumSize(1200, 800);
+        resize(1400, 900);
 
         // 화면 중앙에 배치
         QRect screenGeometry = QApplication::desktop()->screenGeometry();
@@ -517,13 +514,13 @@ namespace Blokus {
     void GameRoomWindow::setupMainLayout()
     {
         m_mainLayout = new QVBoxLayout(m_centralWidget);
-        m_mainLayout->setContentsMargins(10, 10, 10, 10);  // 여백 줄임
-        m_mainLayout->setSpacing(8);  // 간격 줄임
+        m_mainLayout->setContentsMargins(10, 10, 10, 10);
+        m_mainLayout->setSpacing(8);
 
-        // 상단 룸 정보 - 높이 줄임
+        // 상단 룸 정보
         setupRoomInfoPanel();
 
-        // 플레이어 슬롯들 - 높이 대폭 줄임
+        // 플레이어 슬롯들 (4개 고정)
         setupPlayerSlotsPanel();
 
         // 메인 게임 영역 (게임보드 + 내 팔레트 + 채팅)
@@ -539,17 +536,17 @@ namespace Blokus {
         setupChatPanel();
 
         // 비율 조정: 게임보드가 훨씬 큰 비중
-        mainGameLayout->addWidget(m_gameArea, 4);      // 게임 영역 비중 증가
-        mainGameLayout->addWidget(m_chatPanel, 1);     // 채팅은 최소 비중
+        mainGameLayout->addWidget(m_gameArea, 4);
+        mainGameLayout->addWidget(m_chatPanel, 1);
 
-        // 하단 컨트롤 - 높이 줄임
+        // 하단 컨트롤
         setupControlsPanel();
 
-        // 메인 레이아웃에 추가 - 비율 조정
-        m_mainLayout->addWidget(m_roomInfoPanel);          // 40px 고정
-        m_mainLayout->addWidget(m_playerSlotsPanel);       // 150px 고정 (기존 270px에서 축소)
-        m_mainLayout->addWidget(mainGameArea, 1);          // 나머지 모든 공간
-        m_mainLayout->addWidget(m_controlsPanel);          // 40px 고정
+        // 메인 레이아웃에 추가
+        m_mainLayout->addWidget(m_roomInfoPanel);
+        m_mainLayout->addWidget(m_playerSlotsPanel);
+        m_mainLayout->addWidget(mainGameArea, 1);
+        m_mainLayout->addWidget(m_controlsPanel);
     }
 
     void GameRoomWindow::setupRoomInfoPanel()
@@ -600,10 +597,8 @@ namespace Blokus {
         m_slotsLayout->setContentsMargins(8, 8, 8, 8);
         m_slotsLayout->setSpacing(10);
 
-        // 슬롯 수 결정 (듀오 모드면 2개, 클래식 모드면 4개)
-        int slotCount = m_roomInfo.isDuoMode() ? 2 : 4;
-
-        for (int i = 0; i < slotCount; ++i) {
+        // 4개 슬롯 고정 생성 (클래식 모드만)
+        for (int i = 0; i < 4; ++i) {
             PlayerColor color = static_cast<PlayerColor>(i + 1);
             PlayerSlotWidget* slotWidget = new PlayerSlotWidget(color, this);
 
@@ -617,19 +612,6 @@ namespace Blokus {
 
             m_playerSlotWidgets.append(slotWidget);
             m_slotsLayout->addWidget(slotWidget);
-        }
-
-        // 듀오 모드 표시
-        if (m_roomInfo.isDuoMode()) {
-            QLabel* duoLabel = new QLabel(QString::fromUtf8("🎯 듀오 모드 (2인전)"));
-            duoLabel->setStyleSheet(
-                "font-size: 12px; font-weight: bold; color: #e67e22; "
-                "background-color: rgba(230, 126, 34, 0.1); "
-                "border: 1px solid #e67e22; border-radius: 5px; "
-                "padding: 5px 10px; margin: 5px;"
-            );
-            duoLabel->setAlignment(Qt::AlignCenter);
-            m_slotsLayout->addWidget(duoLabel);
         }
 
         m_slotsLayout->addStretch();
@@ -966,32 +948,22 @@ namespace Blokus {
 
     void GameRoomWindow::startGame()
     {
-        qDebug() << QString::fromUtf8("🎮 게임 시작 - 초기화 중...");
+        qDebug() << QString::fromUtf8("🎮 게임 시작 - 클래식 모드 초기화 중...");
 
         m_isGameStarted = true;
         m_gameManager->startNewGame();
 
-        // 🔥 듀오 모드 감지 및 보드 크기 설정
-        bool isDuoMode = m_roomInfo.isDuoMode();
-        int boardSize = isDuoMode ? DUO_BOARD_SIZE : BOARD_SIZE;
-
-        qDebug() << QString::fromUtf8("게임 모드: %1 (%2x%2 보드)")
-            .arg(isDuoMode ? "듀오" : "클래식")
-            .arg(boardSize);
+        // 클래식 모드 고정 (20x20 보드)
+        qDebug() << QString::fromUtf8("게임 모드: 클래식 (20x20 보드)");
 
         // 게임보드 설정
         if (m_gameBoard) {
-            // 🔥 중요: 보드 크기 설정 (듀오 모드면 14x14, 클래식 모드면 20x20)
-            m_gameBoard->setBoardSize(boardSize);
-            m_gameBoard->setDuoMode(isDuoMode);
-
             m_gameBoard->setGameLogic(&m_gameManager->getGameLogic());
             m_gameBoard->clearAllBlocks();
-            m_gameBoard->setBoardReadOnly(false);  // 읽기 전용 해제
-            m_gameBoard->clearSelection();  // 선택 상태 초기화
+            m_gameBoard->setBoardReadOnly(false);
+            m_gameBoard->clearSelection();
 
-            qDebug() << QString::fromUtf8("✅ 게임보드 초기화 완료 - %1x%1 크기")
-                .arg(boardSize);
+            qDebug() << QString::fromUtf8("✅ 게임보드 초기화 완료 - 20x20 크기");
         }
 
         // 내 팔레트 설정
@@ -1012,28 +984,10 @@ namespace Blokus {
                 .arg(isMyTurn);
         }
 
-        // 듀오 모드 처리
-        if (isDuoMode) {
-            for (int i = 2; i < 4; ++i) {  // Red, Green 비활성화
-                if (i < m_roomInfo.playerSlots.size()) {
-                    PlayerSlot emptySlot;
-                    emptySlot.color = static_cast<PlayerColor>(i + 1);
-                    m_roomInfo.playerSlots[i] = emptySlot;
-
-                    if (i < m_playerSlotWidgets.size()) {
-                        m_playerSlotWidgets[i]->updatePlayerSlot(emptySlot);
-                        m_playerSlotWidgets[i]->setVisible(false);
-                    }
-                }
-            }
-            qDebug() << QString::fromUtf8("✅ 듀오 모드 설정 완료 - 빨강/초록 슬롯 숨김");
-        }
-
         updateGameControlsState();
         updateRoomInfoDisplay();
 
-        addSystemMessage(QString::fromUtf8("🎮 게임이 시작되었습니다! (%1 모드)")
-            .arg(isDuoMode ? "듀오" : "클래식"));
+        addSystemMessage(QString::fromUtf8("🎮 게임이 시작되었습니다! (클래식 모드)"));
 
         qDebug() << QString::fromUtf8("🎉 게임 시작 완료!");
     }
@@ -1249,22 +1203,6 @@ namespace Blokus {
     {
         if (m_gameManager) {
             PlayerColor currentPlayer = gameManager.getGameLogic().getCurrentPlayer();
-
-            // 🔥 듀오 모드에서는 Blue, Yellow만 순환
-            if (m_roomInfo.isDuoMode()) {
-                // Red나 Green 턴이 오면 다음 플레이어로 넘김
-                if (currentPlayer == PlayerColor::Red || currentPlayer == PlayerColor::Green) {
-                    qDebug() << QString::fromUtf8("듀오 모드에서 %1 턴 스킵")
-                        .arg(Utils::playerColorToString(currentPlayer));
-
-                    // 다음 유효한 플레이어로 이동
-                    PlayerColor nextPlayer = (currentPlayer == PlayerColor::Red) ?
-                        PlayerColor::Blue : PlayerColor::Yellow;
-
-                    m_gameManager->getGameLogic().setCurrentPlayer(nextPlayer);
-                    currentPlayer = nextPlayer;
-                }
-            }
 
             // 내 팔레트 활성화/비활성화
             PlayerColor myColor = m_roomInfo.getMyColor(m_myUsername);

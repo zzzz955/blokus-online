@@ -86,7 +86,7 @@ namespace Blokus {
     {
         clearBoard();
 
-        // 보드 상태 초기화
+        // 보드 상태 초기화 (클래식 모드 고정)
         for (int row = 0; row < BOARD_SIZE; ++row) {
             for (int col = 0; col < BOARD_SIZE; ++col) {
                 m_board[row][col] = PlayerColor::None;
@@ -158,7 +158,7 @@ namespace Blokus {
 
     void GameBoard::drawStartingCorners()
     {
-        // 각 플레이어의 시작 모서리 표시
+        // 각 플레이어의 시작 모서리 표시 (클래식 모드 고정)
         const std::vector<Position> corners = {
             {0, 0},                          // 파랑 (왼쪽 위)
             {0, BOARD_SIZE - 1},            // 노랑 (오른쪽 위)

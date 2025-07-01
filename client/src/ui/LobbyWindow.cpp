@@ -47,17 +47,15 @@ namespace Blokus {
         m_roomNameEdit->setText(QString::fromUtf8("%1님의 방").arg("플레이어"));
         m_roomNameEdit->setMaxLength(30);
 
-        // 게임 모드
+        // 게임 모드 (클래식만)
         QLabel* modeLabel = new QLabel(QString::fromUtf8("게임 모드"));
         modeLabel->setStyleSheet("font-weight: bold;");
         m_gameModeCombo = new QComboBox();
         m_gameModeCombo->addItem(QString::fromUtf8("클래식 (4인, 20x20)"), "classic");
-        m_gameModeCombo->addItem(QString::fromUtf8("듀오 (2인, 14x14)"), "duo");
-
-        // 기본값을 클래식으로 설정
         m_gameModeCombo->setCurrentIndex(0);
+        m_gameModeCombo->setEnabled(false); // 클래식 모드 고정
 
-        // 최대 인원
+        // 최대 인원 (2-4명)
         QLabel* playersLabel = new QLabel(QString::fromUtf8("최대 인원"));
         playersLabel->setStyleSheet("font-weight: bold;");
         m_maxPlayersSpinBox = new QSpinBox();
@@ -95,9 +93,7 @@ namespace Blokus {
         layout->addSpacing(10);
         layout->addWidget(m_buttonBox);
 
-        // 시그널 연결
-        connect(m_gameModeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, &CreateRoomDialog::onGameModeChanged);
+        // 시그널 연결 (onGameModeChanged 제거)
         connect(m_privateCheckBox, &QCheckBox::toggled,
             this, &CreateRoomDialog::onPrivateToggled);
         connect(m_buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
@@ -160,7 +156,7 @@ namespace Blokus {
         room.roomName = m_roomNameEdit->text().trimmed();
         room.maxPlayers = m_maxPlayersSpinBox->value();
         room.isPrivate = m_privateCheckBox->isChecked();
-        room.gameMode = m_gameModeCombo->currentText();
+        room.gameMode = QString::fromUtf8("클래식"); // 고정
 
         if (room.roomName.isEmpty()) {
             room.roomName = QString::fromUtf8("새로운 방");
@@ -1200,8 +1196,7 @@ namespace Blokus {
             QString::fromUtf8("고수들의 전쟁 ⚔️"),
             QString::fromUtf8("친목방 😊"),
             QString::fromUtf8("AI와 함께 🤖"),
-            QString::fromUtf8("듀오 매치 👥"),
-            QString::fromUtf8("듀오 빠른게임 ⚡"),
+            QString::fromUtf8("빠른게임 ⚡"),
             QString::fromUtf8("여유롭게~ 🌸")
         };
 
@@ -1210,19 +1205,8 @@ namespace Blokus {
             QString::fromUtf8("프로게이머"),
             QString::fromUtf8("친구"),
             QString::fromUtf8("AI트레이너"),
-            QString::fromUtf8("듀오마스터"),
-            QString::fromUtf8("듀오킹"),
+            QString::fromUtf8("스피드왕"),
             QString::fromUtf8("힐링왕")
-        };
-
-        QStringList gameModes = {
-            QString::fromUtf8("클래식 (4인, 20x20)"),
-            QString::fromUtf8("클래식 (4인, 20x20)"),
-            QString::fromUtf8("클래식 (4인, 20x20)"),
-            QString::fromUtf8("클래식 (4인, 20x20)"),
-            QString::fromUtf8("듀오 (2인, 20x20)"),
-            QString::fromUtf8("듀오 (2인, 20x20)"),
-            QString::fromUtf8("클래식 (4인, 20x20)")
         };
 
         for (int i = 0; i < roomNames.size(); ++i) {
@@ -1230,15 +1214,11 @@ namespace Blokus {
             room.roomId = 1001 + i;
             room.roomName = roomNames[i];
             room.hostName = hosts[i];
-
-            // 듀오 모드 처리
-            bool isDuo = gameModes[i].contains(QString::fromUtf8("듀오"));
-            room.maxPlayers = isDuo ? 2 : 4;
-            room.currentPlayers = isDuo ? (i % 2) + 1 : (i % 3) + 1; // 듀오는 1-2명, 클래식은 1-3명
-
+            room.maxPlayers = 4; // 클래식 모드만
+            room.currentPlayers = (i % 3) + 1; // 1-3명
             room.isPrivate = (i % 4 == 0);
             room.isPlaying = (i % 5 == 0);
-            room.gameMode = gameModes[i];
+            room.gameMode = QString::fromUtf8("클래식");
 
             rooms.append(room);
         }

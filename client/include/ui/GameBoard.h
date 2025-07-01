@@ -54,7 +54,7 @@ namespace Blokus {
         void setBoardReadOnly(bool readOnly);
         void resetBoard();
 
-        // 블록 배치 관련 (인터페이스 호환성)
+        // 블록 배치 관련
         bool canPlaceBlock(const BlockPlacement& placement) const;
         bool placeBlock(const BlockPlacement& placement);
         void removeBlock(const Position& position);
