@@ -106,7 +106,7 @@ namespace Blokus {
         // 격자 그리기
         void drawGrid();
         void drawStartingCorners();
-        bool isCellValid(int row, int col) const;  // 현재 보드 크기 기준으로 체크
+        void drawDuoStartingCorners();  // 🆕 듀오 모드 시작점
 
         // 블록 그래픽 관련
         BlockGraphicsItem* createBlockGraphicsItem(const Block& block, const Position& position);
@@ -134,8 +134,8 @@ namespace Blokus {
         QGraphicsScene* m_scene;
         QGraphicsRectItem* m_boardRect;
 
-        // 보드 상태
-        PlayerColor m_board[BOARD_SIZE][BOARD_SIZE];
+        // 🔥 보드 상태 (동적 크기) - 기존 고정 배열 대신 벡터 사용
+        std::vector<std::vector<PlayerColor>> m_board;
         bool m_readOnly;
 
         // 시각적 요소
@@ -156,7 +156,7 @@ namespace Blokus {
 
         // 선택된 블록
         Block m_selectedBlock;
-        bool m_hasSelectedBlock; // 추가된 멤버 변수
+        bool m_hasSelectedBlock;
         int m_testBlockIndex;
 
         // 게임 로직 연동
@@ -169,10 +169,9 @@ namespace Blokus {
         QBrush m_highlightBrush;
         std::map<PlayerColor, QColor> m_playerColors;
 
-        bool m_blockSelected;  // 🆕 블록 선택 상태 추가
-        int m_currentBoardSize;  // 🆕 현재 보드 크기 (14 또는 20)
-        bool m_isDuoMode;        // 🆕 듀오 모드 여부
-        QColor m_duoBorderColor; // 🆕 듀오 모드 테두리 색상
+        bool m_blockSelected;        // 🆕 블록 선택 상태 추가
+        int m_currentBoardSize;      // 🆕 현재 보드 크기 (14 또는 20)
+        bool m_isDuoMode;            // 🆕 듀오 모드 여부
     };
 
 } // namespace Blokus
