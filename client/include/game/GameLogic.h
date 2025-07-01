@@ -1,128 +1,131 @@
-#pragma once
+ï»¿#pragma once
 
-#include <vector>
-#include <map>
-#include <set>
-#include <QDebug>
 #include "common/Types.h"
 #include "game/Block.h"
+#include <map>
+#include <set>
+#include <vector>
 
 namespace Blokus {
 
-    /**
-     * @brief ºí·ÎÄ¿½º °ÔÀÓ ±ÔÄ¢°ú ·ÎÁ÷À» °ü¸®ÇÏ´Â Å¬·¡½º
-     */
+    // ========================================
+    // GameLogic í´ë˜ìŠ¤
+    // ========================================
+
     class GameLogic
     {
     public:
-        explicit GameLogic();
-        ~GameLogic() = default;
+        GameLogic();
 
-        // °ÔÀÓ º¸µå »óÅÂ °ü¸®
+        // ğŸ”¥ ë“€ì˜¤ ëª¨ë“œ ê´€ë ¨ í•¨ìˆ˜ë“¤ ì¶”ê°€
+        void setDuoMode(bool isDuoMode);
+        bool isDuoMode() const { return m_isDuoMode; }
+        int getBoardSize() const { return m_boardSize; }
+
+        // ë³´ë“œ ê´€ë¦¬
         void initializeBoard();
         void clearBoard();
+
+        // ì…€ ìƒíƒœ í™•ì¸
         PlayerColor getCellOwner(const Position& pos) const;
         bool isCellOccupied(const Position& pos) const;
 
-        // ºí·Ï ¹èÄ¡ ±ÔÄ¢ °ËÁõ
+        // ë¸”ë¡ ë°°ì¹˜ ê´€ë ¨
         bool canPlaceBlock(const Block& block, const Position& position, PlayerColor player) const;
         bool placeBlock(const Block& block, const Position& position, PlayerColor player);
         bool removeBlock(const Position& position);
 
-        // ºí·ÎÄ¿½º ÇÙ½É ±ÔÄ¢ °ËÁõ
-        bool isFirstBlockValid(const Block& block, const Position& position, PlayerColor player) const;
-        bool isCornerAdjacencyValid(const Block& block, const Position& position, PlayerColor player) const;
-        bool hasNoEdgeAdjacency(const Block& block, const Position& position, PlayerColor player) const;
+        // ê²Œì„ ìƒíƒœ ê´€ë¦¬
+        PlayerColor getCurrentPlayer() const { return m_currentPlayer; }
+        void setCurrentPlayer(PlayerColor player) { m_currentPlayer = player; }
+        PlayerColor getNextPlayer() const;
 
-        // °ÔÀÓ »óÅÂ °ü¸®
+        // ë¸”ë¡ ì‚¬ìš© ê´€ë¦¬
         void setPlayerBlockUsed(PlayerColor player, BlockType blockType);
         bool isBlockUsed(PlayerColor player, BlockType blockType) const;
         std::vector<BlockType> getUsedBlocks(PlayerColor player) const;
         std::vector<BlockType> getAvailableBlocks(PlayerColor player) const;
 
-        // ÅÏ °ü¸®
-        void setCurrentPlayer(PlayerColor player) { m_currentPlayer = player; }
-        PlayerColor getCurrentPlayer() const { return m_currentPlayer; }
-        PlayerColor getNextPlayer() const;
+        // ì²« ë¸”ë¡ ê´€ë¦¬
         bool hasPlayerPlacedFirstBlock(PlayerColor player) const;
 
-        // °ÔÀÓ Á¾·á Á¶°Ç
+        // ê²Œì„ ì§„í–‰ ìƒíƒœ
         bool canPlayerPlaceAnyBlock(PlayerColor player) const;
         bool isGameFinished() const;
         std::map<PlayerColor, int> calculateScores() const;
 
-        // º¸µå »óÅÂ Á¢±Ù
-        const PlayerColor(&getBoard() const)[BOARD_SIZE][BOARD_SIZE]{ return m_board; }
-
-            // µğ¹ö±× ¹× À¯Æ¿¸®Æ¼
+        // ë””ë²„ê¹…
         void printBoard() const;
         int getPlacedBlockCount(PlayerColor player) const;
 
     private:
-        // ³»ºÎ ÇïÆÛ ÇÔ¼öµé
+        // ğŸ”¥ ë“€ì˜¤ ëª¨ë“œ ê´€ë ¨ ë©¤ë²„ ë³€ìˆ˜ë“¤ ì¶”ê°€
+        bool m_isDuoMode;                    // ë“€ì˜¤ ëª¨ë“œ ì—¬ë¶€
+        int m_boardSize;                     // í˜„ì¬ ë³´ë“œ í¬ê¸° (14 ë˜ëŠ” 20)
+
+        // ê¸°ì¡´ ë©¤ë²„ ë³€ìˆ˜ë“¤
+        PlayerColor m_currentPlayer;
+        PlayerColor m_board[BOARD_SIZE][BOARD_SIZE];  // ìµœëŒ€ í¬ê¸°ë¡œ ìœ ì§€
+
+        std::map<PlayerColor, std::set<BlockType>> m_usedBlocks;
+        std::map<PlayerColor, std::vector<Position>> m_playerOccupiedCells;
+        std::map<PlayerColor, bool> m_hasPlacedFirstBlock;
+
+        // ë‚´ë¶€ í—¬í¼ í•¨ìˆ˜ë“¤
         bool isPositionValid(const Position& pos) const;
         bool hasCollision(const Block& block, const Position& position) const;
+
+        bool isFirstBlockValid(const Block& block, const Position& position, PlayerColor player) const;
+        bool isCornerAdjacencyValid(const Block& block, const Position& position, PlayerColor player) const;
+        bool hasNoEdgeAdjacency(const Block& block, const Position& position, PlayerColor player) const;
+
         std::vector<Position> getAdjacentCells(const Position& pos) const;
         std::vector<Position> getDiagonalCells(const Position& pos) const;
         Position getPlayerStartCorner(PlayerColor player) const;
-        bool isAdjacentToSameColorCorner(const Block& block, const Position& position, PlayerColor player) const;
-
-        // ¸â¹ö º¯¼öµé
-        PlayerColor m_board[BOARD_SIZE][BOARD_SIZE];    // °ÔÀÓ º¸µå »óÅÂ
-        PlayerColor m_currentPlayer;                     // ÇöÀç ÅÏ ÇÃ·¹ÀÌ¾î
-
-        // ÇÃ·¹ÀÌ¾îº° »ç¿ëµÈ ºí·Ï ÃßÀû
-        std::map<PlayerColor, std::set<BlockType>> m_usedBlocks;
-
-        // ÇÃ·¹ÀÌ¾îº° Ã¹ ºí·Ï ¹èÄ¡ ¿©ºÎ
-        std::map<PlayerColor, bool> m_hasPlacedFirstBlock;
-
-        // ÇÃ·¹ÀÌ¾îº° ¹èÄ¡µÈ ºí·Ï À§Ä¡ ÃßÀû (±ÔÄ¢ °ËÁõ¿ë)
-        std::map<PlayerColor, std::vector<Position>> m_playerOccupiedCells;
     };
 
-    /**
-     * @brief °ÔÀÓ »óÅÂ¸¦ °ü¸®ÇÏ´Â ¸Å´ÏÀú Å¬·¡½º
-     */
+    // ========================================
+    // GameStateManager í´ë˜ìŠ¤
+    // ========================================
+
     class GameStateManager
     {
     public:
-        explicit GameStateManager();
-        ~GameStateManager() = default;
+        GameStateManager();
 
-        // °ÔÀÓ ¶óÀÌÇÁ»çÀÌÅ¬
+        // ê²Œì„ ìƒíƒœ ê´€ë¦¬
         void startNewGame();
         void resetGame();
         void endGame();
 
-        // ÅÏ °ü¸®
+        // í„´ ê´€ë¦¬
         void nextTurn();
         void skipTurn();
+
+        // ìƒíƒœ í™•ì¸
+        GameState getGameState() const { return m_gameState; }
+        TurnState getTurnState() const { return m_turnState; }
         bool canCurrentPlayerMove() const;
 
-        // °ÔÀÓ ·ÎÁ÷ Á¢±Ù
+        // ê²Œì„ ë¡œì§ ì ‘ê·¼
         GameLogic& getGameLogic() { return m_gameLogic; }
         const GameLogic& getGameLogic() const { return m_gameLogic; }
 
-        // °ÔÀÓ »óÅÂ
-        GameState getGameState() const { return m_gameState; }
-        TurnState getTurnState() const { return m_turnState; }
-
-        void setGameState(GameState state) { m_gameState = state; }
-        void setTurnState(TurnState state) { m_turnState = state; }
-
-        // Åë°è
-        int getTurnNumber() const { return m_turnNumber; }
+        // ìµœì¢… ì ìˆ˜
         std::map<PlayerColor, int> getFinalScores() const;
+
+        // í„´ ì •ë³´
+        int getTurnNumber() const { return m_turnNumber; }
+        PlayerColor getCurrentPlayer() const { return m_gameLogic.getCurrentPlayer(); }
 
     private:
         GameLogic m_gameLogic;
         GameState m_gameState;
         TurnState m_turnState;
-        int m_turnNumber;
 
+        int m_turnNumber;
+        int m_currentPlayerIndex;
         std::vector<PlayerColor> m_playerOrder;
-        size_t m_currentPlayerIndex;
     };
 
 } // namespace Blokus

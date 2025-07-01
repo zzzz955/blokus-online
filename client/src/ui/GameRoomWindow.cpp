@@ -276,88 +276,137 @@ namespace Blokus {
     // AI 추가 다이얼로그 개선
     void PlayerSlotWidget::onAddAIClicked()
     {
-        // 커스텀 다이얼로그 생성
+        // 🔥 개선된 AI 추가 다이얼로그 - 베이지색 배경과 깔끔한 레이아웃
         QDialog dialog(this);
         dialog.setWindowTitle(QString::fromUtf8("AI 플레이어 추가"));
-        dialog.setFixedSize(300, 200);  // 적절한 크기
+        dialog.setFixedSize(320, 240);
+        dialog.setModal(true);
 
-        // 베이지색 배경 스타일
+        // 🔥 베이지색 배경 스타일
         dialog.setStyleSheet(
             "QDialog { "
             "background-color: #f5f5dc; "  // 베이지색 배경
-            "border-radius: 10px; "
+            "border-radius: 12px; "
             "} "
+        );
+
+        QVBoxLayout* mainLayout = new QVBoxLayout(&dialog);
+        mainLayout->setContentsMargins(20, 20, 20, 20);
+        mainLayout->setSpacing(15);
+
+        // 🔥 타이틀 라벨
+        QLabel* titleLabel = new QLabel(QString::fromUtf8("🤖 AI 플레이어 추가"));
+        titleLabel->setAlignment(Qt::AlignCenter);
+        titleLabel->setStyleSheet(
             "QLabel { "
-            "color: #2c3e50; "
-            "font-size: 13px; "
-            "} "
-            "QPushButton { "
-            "background-color: #3498db; "
-            "border: none; "
-            "border-radius: 6px; "
-            "color: white; "
+            "font-size: 16px; "
             "font-weight: bold; "
-            "font-size: 12px; "
-            "padding: 8px 15px; "
-            "min-width: 80px; "
-            "} "
-            "QPushButton:hover { "
-            "background-color: #2980b9; "
-            "} "
-            "QPushButton:pressed { "
-            "background-color: #21618c; "
+            "color: #2c3e50; "
+            "background-color: rgba(255, 255, 255, 150); "
+            "padding: 10px; "
+            "border-radius: 8px; "
+            "border: 1px solid #d4c5a0; "
             "}"
         );
 
-        QVBoxLayout* layout = new QVBoxLayout(&dialog);
-        layout->setContentsMargins(20, 20, 20, 20);
-        layout->setSpacing(15);
-
-        // 설명 라벨
-        QLabel* titleLabel = new QLabel(QString::fromUtf8("%1 위치에 AI 플레이어를 추가합니다.")
+        // 🔥 설명 라벨
+        QLabel* descLabel = new QLabel(QString::fromUtf8("%1 위치에 AI 플레이어를 추가합니다.\nAI 난이도를 선택해주세요:")
             .arg(getColorName()));
-        titleLabel->setAlignment(Qt::AlignCenter);
-        titleLabel->setStyleSheet("font-weight: bold; font-size: 14px; color: #2c3e50;");
-
-        QLabel* descLabel = new QLabel(QString::fromUtf8("AI 난이도를 선택해주세요:"));
         descLabel->setAlignment(Qt::AlignCenter);
-        descLabel->setStyleSheet("font-size: 12px; color: #34495e; margin-bottom: 10px;");
+        descLabel->setWordWrap(true);
+        descLabel->setStyleSheet(
+            "QLabel { "
+            "font-size: 12px; "
+            "color: #34495e; "
+            "background-color: rgba(255, 255, 255, 100); "
+            "padding: 8px; "
+            "border-radius: 6px; "
+            "line-height: 1.4; "
+            "}"
+        );
 
-        // 난이도 버튼들
-        QWidget* buttonWidget = new QWidget();
-        QHBoxLayout* buttonLayout = new QHBoxLayout(buttonWidget);
+        // 🔥 난이도 버튼들 컨테이너
+        QWidget* buttonContainer = new QWidget();
+        buttonContainer->setStyleSheet("background-color: transparent;");
+        QHBoxLayout* buttonLayout = new QHBoxLayout(buttonContainer);
         buttonLayout->setSpacing(10);
+        buttonLayout->setContentsMargins(0, 0, 0, 0);
 
-        QPushButton* easyButton = new QPushButton(QString::fromUtf8("🟢 쉬움"));
-        QPushButton* normalButton = new QPushButton(QString::fromUtf8("🟡 보통"));
-        QPushButton* hardButton = new QPushButton(QString::fromUtf8("🔴 어려움"));
+        // 🔥 난이도 버튼 스타일
+        QString buttonBaseStyle =
+            "QPushButton { "
+            "border: none; "
+            "border-radius: 8px; "
+            "color: white; "
+            "font-weight: bold; "
+            "font-size: 11px; "
+            "padding: 12px 16px; "
+            "min-width: 60px; "
+            "min-height: 40px; "
+            "} "
+            "QPushButton:hover { "
+            "transform: scale(1.05); "
+            "} "
+            "QPushButton:pressed { "
+            "transform: scale(0.95); "
+            "}";
 
-        easyButton->setStyleSheet(easyButton->styleSheet() + "QPushButton { background-color: #27ae60; }");
-        normalButton->setStyleSheet(normalButton->styleSheet() + "QPushButton { background-color: #f39c12; }");
-        hardButton->setStyleSheet(hardButton->styleSheet() + "QPushButton { background-color: #e74c3c; }");
+        QPushButton* easyButton = new QPushButton(QString::fromUtf8("🟢\n쉬움"));
+        QPushButton* normalButton = new QPushButton(QString::fromUtf8("🟡\n보통"));
+        QPushButton* hardButton = new QPushButton(QString::fromUtf8("🔴\n어려움"));
+
+        easyButton->setStyleSheet(buttonBaseStyle +
+            "QPushButton { background-color: #27ae60; } "
+            "QPushButton:hover { background-color: #2ecc71; }");
+
+        normalButton->setStyleSheet(buttonBaseStyle +
+            "QPushButton { background-color: #f39c12; } "
+            "QPushButton:hover { background-color: #e67e22; }");
+
+        hardButton->setStyleSheet(buttonBaseStyle +
+            "QPushButton { background-color: #e74c3c; } "
+            "QPushButton:hover { background-color: #c0392b; }");
 
         buttonLayout->addWidget(easyButton);
         buttonLayout->addWidget(normalButton);
         buttonLayout->addWidget(hardButton);
 
-        // 취소 버튼
-        QPushButton* cancelButton = new QPushButton(QString::fromUtf8("취소"));
-        cancelButton->setStyleSheet(cancelButton->styleSheet() +
-            "QPushButton { background-color: #95a5a6; } "
-            "QPushButton:hover { background-color: #7f8c8d; }");
+        // 🔥 취소 버튼
+        QPushButton* cancelButton = new QPushButton(QString::fromUtf8("❌ 취소"));
+        cancelButton->setStyleSheet(
+            "QPushButton { "
+            "background-color: #95a5a6; "
+            "border: none; "
+            "border-radius: 6px; "
+            "color: white; "
+            "font-weight: bold; "
+            "font-size: 12px; "
+            "padding: 8px 20px; "
+            "min-height: 35px; "
+            "} "
+            "QPushButton:hover { "
+            "background-color: #7f8c8d; "
+            "} "
+            "QPushButton:pressed { "
+            "background-color: #6c7b7d; "
+            "}"
+        );
 
-        layout->addWidget(titleLabel);
-        layout->addWidget(descLabel);
-        layout->addWidget(buttonWidget);
-        layout->addStretch();
-        layout->addWidget(cancelButton);
+        // 🔥 레이아웃 구성
+        mainLayout->addWidget(titleLabel);
+        mainLayout->addWidget(descLabel);
+        mainLayout->addSpacing(10);
+        mainLayout->addWidget(buttonContainer);
+        mainLayout->addStretch();
+        mainLayout->addWidget(cancelButton);
 
-        // 시그널 연결
+        // 🔥 시그널 연결
         connect(easyButton, &QPushButton::clicked, [&dialog]() { dialog.done(1); });
         connect(normalButton, &QPushButton::clicked, [&dialog]() { dialog.done(2); });
         connect(hardButton, &QPushButton::clicked, [&dialog]() { dialog.done(3); });
         connect(cancelButton, &QPushButton::clicked, [&dialog]() { dialog.reject(); });
 
+        // 🔥 다이얼로그 실행
         int result = dialog.exec();
         if (result >= 1 && result <= 3) {
             emit addAIRequested(m_color, result);
@@ -922,14 +971,27 @@ namespace Blokus {
         m_isGameStarted = true;
         m_gameManager->startNewGame();
 
+        // 🔥 듀오 모드 감지 및 보드 크기 설정
+        bool isDuoMode = m_roomInfo.isDuoMode();
+        int boardSize = isDuoMode ? DUO_BOARD_SIZE : BOARD_SIZE;
+
+        qDebug() << QString::fromUtf8("게임 모드: %1 (%2x%2 보드)")
+            .arg(isDuoMode ? "듀오" : "클래식")
+            .arg(boardSize);
+
         // 게임보드 설정
         if (m_gameBoard) {
+            // 🔥 중요: 보드 크기 설정 (듀오 모드면 14x14, 클래식 모드면 20x20)
+            m_gameBoard->setBoardSize(boardSize);
+            m_gameBoard->setDuoMode(isDuoMode);
+
             m_gameBoard->setGameLogic(&m_gameManager->getGameLogic());
             m_gameBoard->clearAllBlocks();
             m_gameBoard->setBoardReadOnly(false);  // 읽기 전용 해제
             m_gameBoard->clearSelection();  // 선택 상태 초기화
 
-            qDebug() << QString::fromUtf8("✅ 게임보드 초기화 완료");
+            qDebug() << QString::fromUtf8("✅ 게임보드 초기화 완료 - %1x%1 크기")
+                .arg(boardSize);
         }
 
         // 내 팔레트 설정
@@ -951,7 +1013,7 @@ namespace Blokus {
         }
 
         // 듀오 모드 처리
-        if (m_roomInfo.isDuoMode()) {
+        if (isDuoMode) {
             for (int i = 2; i < 4; ++i) {  // Red, Green 비활성화
                 if (i < m_roomInfo.playerSlots.size()) {
                     PlayerSlot emptySlot;
@@ -964,13 +1026,14 @@ namespace Blokus {
                     }
                 }
             }
-            qDebug() << QString::fromUtf8("✅ 듀오 모드 설정 완료");
+            qDebug() << QString::fromUtf8("✅ 듀오 모드 설정 완료 - 빨강/초록 슬롯 숨김");
         }
 
         updateGameControlsState();
         updateRoomInfoDisplay();
 
-        addSystemMessage(QString::fromUtf8("🎮 게임이 시작되었습니다!"));
+        addSystemMessage(QString::fromUtf8("🎮 게임이 시작되었습니다! (%1 모드)")
+            .arg(isDuoMode ? "듀오" : "클래식"));
 
         qDebug() << QString::fromUtf8("🎉 게임 시작 완료!");
     }
@@ -1206,10 +1269,17 @@ namespace Blokus {
             // 내 팔레트 활성화/비활성화
             PlayerColor myColor = m_roomInfo.getMyColor(m_myUsername);
             bool isMyTurn = (currentPlayer == myColor);
-            m_myBlockPalette->setEnabled(isMyTurn);
+
+            if (m_myBlockPalette) {
+                m_myBlockPalette->setEnabled(isMyTurn);
+            }
 
             updateGameControlsState();
             updateRoomInfoDisplay();
+
+            qDebug() << QString::fromUtf8("게임 상태 업데이트 - 현재 턴: %1, 내 턴: %2")
+                .arg(Utils::playerColorToString(currentPlayer))
+                .arg(isMyTurn);
         }
     }
 
@@ -1506,6 +1576,190 @@ namespace Blokus {
         QMainWindow::resizeEvent(event);
     }
 
+    class BlockShapeButton : public QPushButton
+    {
+        Q_OBJECT
+
+    public:
+        BlockShapeButton(const Block& block, qreal cellSize, QWidget* parent = nullptr)
+            : QPushButton(parent)
+            , m_block(block)
+            , m_cellSize(cellSize)
+            , m_isCustomSelected(false)
+        {
+            setupButton();
+        }
+
+        void setCustomSelected(bool selected) {
+            if (m_isCustomSelected != selected) {
+                m_isCustomSelected = selected;
+                update();
+            }
+        }
+
+        const Block& getBlock() const { return m_block; }
+
+    protected:
+        void paintEvent(QPaintEvent* event) override {
+            Q_UNUSED(event)
+
+                QPainter painter(this);
+            painter.setRenderHint(QPainter::Antialiasing);
+
+            QColor playerColor = getPlayerColor();
+            QColor borderColor = playerColor.darker(150);
+
+            // 배경 그리기
+            QColor bgColor;
+            if (isDown()) {
+                bgColor = playerColor.lighter(120);
+            }
+            else if (m_isCustomSelected) {
+                bgColor = QColor(255, 215, 0, 100); // 금색 배경
+            }
+            else if (underMouse()) {
+                bgColor = QColor(255, 255, 255, 50); // 하얀 배경
+            }
+            else {
+                bgColor = QColor(0, 0, 0, 0); // 투명
+            }
+
+            if (bgColor.alpha() > 0) {
+                painter.fillRect(rect(), bgColor);
+            }
+
+            // 블록 모양 가져오기
+            PositionList shape = m_block.getCurrentShape();
+            if (shape.empty()) return;
+
+            // 블록의 바운딩 박스 계산
+            int minRow = shape[0].first, maxRow = shape[0].first;
+            int minCol = shape[0].second, maxCol = shape[0].second;
+
+            for (const auto& pos : shape) {
+                minRow = std::min(minRow, pos.first);
+                maxRow = std::max(maxRow, pos.first);
+                minCol = std::min(minCol, pos.second);
+                maxCol = std::max(maxCol, pos.second);
+            }
+
+            int blockWidth = maxCol - minCol + 1;
+            int blockHeight = maxRow - minRow + 1;
+
+            // 버튼 중앙에 블록 그리기
+            qreal totalBlockWidth = blockWidth * m_cellSize;
+            qreal totalBlockHeight = blockHeight * m_cellSize;
+            qreal startX = (width() - totalBlockWidth) / 2.0;
+            qreal startY = (height() - totalBlockHeight) / 2.0;
+
+            // 각 셀 그리기
+            painter.setBrush(QBrush(playerColor));
+            painter.setPen(QPen(borderColor, 1.5));
+
+            for (const auto& pos : shape) {
+                qreal x = startX + (pos.second - minCol) * m_cellSize;
+                qreal y = startY + (pos.first - minRow) * m_cellSize;
+
+                QRectF cellRect(x, y, m_cellSize, m_cellSize);
+                painter.drawRect(cellRect);
+
+                // 3D 효과 (작은 하이라이트)
+                if (m_cellSize >= 8) {
+                    painter.setPen(QPen(playerColor.lighter(150), 1));
+                    painter.drawLine(cellRect.topLeft(), cellRect.topRight());
+                    painter.drawLine(cellRect.topLeft(), cellRect.bottomLeft());
+                    painter.setPen(QPen(borderColor, 1.5)); // 원래 펜으로 복원
+                }
+            }
+
+            // 선택 테두리
+            if (m_isCustomSelected) {
+                painter.setPen(QPen(QColor(255, 215, 0), 3));
+                painter.setBrush(Qt::NoBrush);
+                painter.drawRect(rect().adjusted(1, 1, -1, -1));
+            }
+
+            // 블록 크기 텍스트 (우상단)
+            if (width() > 40) {
+                painter.setPen(QPen(QColor(60, 60, 60), 1));
+                painter.setFont(QFont("Arial", 7, QFont::Bold));
+                QString sizeText = QString::number(shape.size());
+                painter.drawText(rect().adjusted(2, 2, -2, -2), Qt::AlignTop | Qt::AlignRight, sizeText);
+            }
+        }
+
+    private:
+        void setupButton() {
+            // 블록 크기에 따라 버튼 크기 결정
+            PositionList shape = m_block.getCurrentShape();
+            if (shape.empty()) {
+                setFixedSize(50, 40);
+                return;
+            }
+
+            int minRow = shape[0].first, maxRow = shape[0].first;
+            int minCol = shape[0].second, maxCol = shape[0].second;
+
+            for (const auto& pos : shape) {
+                minRow = std::min(minRow, pos.first);
+                maxRow = std::max(maxRow, pos.first);
+                minCol = std::min(minCol, pos.second);
+                maxCol = std::max(maxCol, pos.second);
+            }
+
+            int blockWidth = maxCol - minCol + 1;
+            int blockHeight = maxRow - minRow + 1;
+
+            // 패딩 추가
+            int padding = 8;
+            int buttonWidth = blockWidth * m_cellSize + padding * 2;
+            int buttonHeight = blockHeight * m_cellSize + padding * 2;
+
+            // 최소/최대 크기 보장
+            buttonWidth = std::max(buttonWidth, 45);
+            buttonHeight = std::max(buttonHeight, 35);
+            buttonWidth = std::min(buttonWidth, 80);
+            buttonHeight = std::min(buttonHeight, 70);
+
+            setFixedSize(buttonWidth, buttonHeight);
+
+            // 툴팁 설정
+            setToolTip(QString::fromUtf8("%1 (%2칸)")
+                .arg(BlockFactory::getBlockName(m_block.getType()))
+                .arg(shape.size()));
+
+            // 기본 버튼 스타일 제거
+            setStyleSheet(
+                "QPushButton { "
+                "border: 1px solid #ddd; "
+                "border-radius: 6px; "
+                "background-color: transparent; "
+                "} "
+                "QPushButton:hover { "
+                "border-color: #aaa; "
+                "} "
+                "QPushButton:pressed { "
+                "border-color: #888; "
+                "}"
+            );
+        }
+
+        QColor getPlayerColor() const {
+            switch (m_block.getPlayer()) {
+            case PlayerColor::Blue: return QColor(52, 152, 219);
+            case PlayerColor::Yellow: return QColor(241, 196, 15);
+            case PlayerColor::Red: return QColor(231, 76, 60);
+            case PlayerColor::Green: return QColor(46, 204, 113);
+            default: return QColor(149, 165, 166);
+            }
+        }
+
+    private:
+        Block m_block;
+        qreal m_cellSize;
+        bool m_isCustomSelected;
+    };
+
     MyBlockPalette::MyBlockPalette(QWidget* parent)
         : QWidget(parent)
         , m_player(PlayerColor::Blue)
@@ -1513,9 +1767,9 @@ namespace Blokus {
         , m_scrollArea(nullptr)
         , m_blockContainer(nullptr)
         , m_blockGrid(nullptr)
-        , m_selectedBlock(BlockType::Single, PlayerColor::None)  // 🔥 None으로 초기화
-        , m_hasSelection(false)  // 🔥 false로 초기화
-        , m_selectedButton(nullptr)  // 🔥 nullptr로 초기화
+        , m_selectedBlock(BlockType::Single, PlayerColor::None)
+        , m_hasSelection(false)
+        , m_selectedButton(nullptr)
     {
         setupUI();
     }
@@ -1543,14 +1797,15 @@ namespace Blokus {
         m_scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         m_scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
         m_scrollArea->setStyleSheet(
-            "QScrollArea { border: 1px solid #ddd; border-radius: 6px; }"
+            "QScrollArea { border: 1px solid #ddd; border-radius: 6px; background-color: #f5f5dc; }"
             "QScrollBar:vertical { width: 12px; background-color: #f8f9fa; }"
             "QScrollBar::handle:vertical { background-color: #dee2e6; border-radius: 6px; }"
             "QScrollBar::handle:vertical:hover { background-color: #adb5bd; }"
         );
 
-        // 블록 컨테이너
+        // 블록 컨테이너 (베이지색 배경)
         m_blockContainer = new QWidget();
+        m_blockContainer->setStyleSheet("background-color: #f5f5dc;");
         m_blockGrid = new QGridLayout(m_blockContainer);
         m_blockGrid->setContentsMargins(8, 8, 8, 8);
         m_blockGrid->setSpacing(6);
@@ -1570,10 +1825,10 @@ namespace Blokus {
         m_mainLayout->addWidget(m_scrollArea, 1);
         m_mainLayout->addWidget(helpLabel);
 
-        // 전체 스타일
+        // 전체 스타일 (베이지색 배경)
         setStyleSheet(
             "MyBlockPalette { "
-            "background-color: white; "
+            "background-color: #f5f5dc; "
             "border: 2px solid #3498db; "
             "border-radius: 8px; "
             "}"
@@ -1610,7 +1865,7 @@ namespace Blokus {
             // 팔레트 테두리 색상도 변경
             setStyleSheet(QString(
                 "MyBlockPalette { "
-                "background-color: white; "
+                "background-color: #f5f5dc; "
                 "border: 2px solid %1; "
                 "border-radius: 8px; "
                 "}"
@@ -1622,51 +1877,20 @@ namespace Blokus {
     {
         clearBlockButtons();
 
-        QColor playerColor = getPlayerColor();
-        QColor borderColor = playerColor.darker(150);
+        qreal cellSize = 10.0; // 작은 셀 크기
 
         int row = 0, col = 0;
         const int maxCols = 3; // 3열로 배치
 
         for (const Block& block : m_availableBlocks) {
-            QPushButton* button = new QPushButton();
-            button->setFixedSize(70, 60);  // 적당한 크기
-            button->setProperty("blockType", static_cast<int>(block.getType()));
+            // 🔥 커스텀 블록 모양 버튼 사용
+            BlockShapeButton* shapeButton = new BlockShapeButton(block, cellSize, m_blockContainer);
+            shapeButton->setProperty("blockType", static_cast<int>(block.getType()));
 
-            // 블록 이름과 크기 표시
-            QString buttonText = QString::fromUtf8("%1\n(%2칸)")
-                .arg(BlockFactory::getBlockName(block.getType()))
-                .arg(block.getSize());
-            button->setText(buttonText);
+            connect(shapeButton, &QPushButton::clicked, this, &MyBlockPalette::onBlockButtonClicked);
 
-            // 스타일 설정
-            button->setStyleSheet(QString(
-                "QPushButton { "
-                "background-color: %1; "
-                "border: 2px solid %2; "
-                "border-radius: 6px; "
-                "color: white; "
-                "font-size: 9px; "
-                "font-weight: bold; "
-                "text-align: center; "
-                "} "
-                "QPushButton:hover { "
-                "background-color: %3; "
-                "border-color: %4; "
-                "} "
-                "QPushButton:pressed { "
-                "background-color: %5; "
-                "}"
-            ).arg(playerColor.name())
-                .arg(borderColor.name())
-                .arg(playerColor.lighter(110).name())
-                .arg(borderColor.lighter(110).name())
-                .arg(playerColor.darker(110).name()));
-
-            connect(button, &QPushButton::clicked, this, &MyBlockPalette::onBlockButtonClicked);
-
-            m_blockGrid->addWidget(button, row, col);
-            m_blockButtons[block.getType()] = button;
+            m_blockGrid->addWidget(shapeButton, row, col);
+            m_blockButtons[block.getType()] = shapeButton; // QPushButton*로 저장
 
             col++;
             if (col >= maxCols) {
@@ -1699,7 +1923,7 @@ namespace Blokus {
 
         // 현재 선택된 블록이 제거된 블록이면 선택 해제
         if (m_hasSelection && m_selectedBlock.getType() == blockType) {
-            m_hasSelection = false;
+            clearSelection();
         }
 
         qDebug() << QString::fromUtf8("블록 제거됨: %1 (남은 블록: %2개)")
@@ -1719,7 +1943,7 @@ namespace Blokus {
         }
 
         updateBlockButtons();
-        m_hasSelection = false;
+        clearSelection();
 
         qDebug() << QString::fromUtf8("모든 블록 리셋됨: %1개").arg(m_availableBlocks.size());
     }
@@ -1728,11 +1952,12 @@ namespace Blokus {
     {
         for (auto& pair : m_blockButtons) {
             if (pair.second) {
-                m_blockGrid->removeWidget(pair.second);
+                pair.second->setParent(nullptr);
                 pair.second->deleteLater();
             }
         }
         m_blockButtons.clear();
+        m_selectedButton = nullptr;
     }
 
     void MyBlockPalette::onBlockButtonClicked()
@@ -1747,17 +1972,17 @@ namespace Blokus {
 
         BlockType blockType = static_cast<BlockType>(button->property("blockType").toInt());
 
-        qDebug() << QString::fromUtf8("🎯 팔레트에서 블록 클릭: %1").arg(BlockFactory::getBlockName(blockType));
+        qDebug() << QString::fromUtf8("🎯 시각적 블록 클릭: %1").arg(BlockFactory::getBlockName(blockType));
 
         // 이전 선택 해제
         clearSelection();
 
-        // 새 선택 설정
-        QString selectedStyle = button->styleSheet();
-        selectedStyle.replace("border: 2px solid", "border: 3px solid #f1c40f");
-        button->setStyleSheet(selectedStyle);
-
-        m_selectedButton = button;
+        // 새 선택 설정 - BlockShapeButton으로 캐스팅해서 setCustomSelected 호출
+        BlockShapeButton* shapeButton = qobject_cast<BlockShapeButton*>(button);
+        if (shapeButton) {
+            shapeButton->setCustomSelected(true);
+            m_selectedButton = button;
+        }
 
         // 블록 찾아서 설정
         for (const Block& block : m_availableBlocks) {
@@ -1765,7 +1990,7 @@ namespace Blokus {
                 m_selectedBlock = block;
                 m_hasSelection = true;
 
-                qDebug() << QString::fromUtf8("✅ 블록 선택됨: %1, 시그널 발생")
+                qDebug() << QString::fromUtf8("✅ 시각적 블록 선택됨: %1, 시그널 발생")
                     .arg(BlockFactory::getBlockName(blockType));
 
                 // 🔥 중요: 시그널 발생
@@ -1854,13 +2079,11 @@ namespace Blokus {
 
     void MyBlockPalette::clearSelection()
     {
-        // 모든 버튼의 선택 스타일 제거
+        // 모든 버튼의 선택 상태 제거
         for (auto& pair : m_blockButtons) {
-            if (pair.second) {
-                QString originalStyle = pair.second->styleSheet();
-                // 선택 스타일 제거
-                originalStyle.replace("border: 3px solid #f1c40f;", "border: 2px solid");
-                pair.second->setStyleSheet(originalStyle);
+            BlockShapeButton* shapeButton = qobject_cast<BlockShapeButton*>(pair.second);
+            if (shapeButton) {
+                shapeButton->setCustomSelected(false);
             }
         }
 

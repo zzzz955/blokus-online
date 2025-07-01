@@ -1,4 +1,4 @@
-﻿// client/include/ui/GameRoomWindow.h - 업데이트된 헤더 파일
+﻿// client/include/ui/GameRoomWindow.h - 오류 수정된 헤더 파일
 
 #pragma once
 
@@ -34,7 +34,7 @@ namespace Blokus {
     // 전방 선언
     class MyBlockPalette;
 
-    // 내 블록 팔레트 클래스
+    // 내 블록 팔레트 클래스 (시각적 블록 모양 지원)
     class MyBlockPalette : public QWidget
     {
         Q_OBJECT
@@ -46,7 +46,7 @@ namespace Blokus {
         void removeBlock(BlockType blockType);
         void resetAllBlocks();
         void setEnabled(bool enabled);
-        void clearSelection();  // 🆕 선택 해제 함수
+        void clearSelection();
 
     signals:
         void blockSelected(const Block& block);
@@ -67,7 +67,7 @@ namespace Blokus {
         QWidget* m_blockContainer;
         QGridLayout* m_blockGrid;
         std::vector<Block> m_availableBlocks;
-        std::map<BlockType, QPushButton*> m_blockButtons;
+        std::map<BlockType, QPushButton*> m_blockButtons;  // 🔥 QPushButton*로 유지
         Block m_selectedBlock;
         bool m_hasSelection;
         QPushButton* m_selectedButton;
@@ -114,7 +114,7 @@ namespace Blokus {
         QLabel* m_usernameLabel;
         QLabel* m_statusLabel;
         QLabel* m_scoreLabel;
-        QLabel* m_remainingBlocksLabel;  // 남은 블록 수 표시
+        QLabel* m_remainingBlocksLabel;
         QPushButton* m_actionButton;
         QWidget* m_hostIndicator;
     };
@@ -195,7 +195,6 @@ namespace Blokus {
         void updateRoomInfoDisplay();
         void updatePlayerSlotsDisplay();
         void updateGameControlsState();
-        void updateMyTurnIndicator();
 
         // 게임 상태 관리
         void enableGameControls(bool enabled);
@@ -237,7 +236,7 @@ namespace Blokus {
         QLabel* m_roomNameLabel;
         QLabel* m_roomStatusLabel;
         QLabel* m_currentTurnLabel;
-        QPushButton* m_leaveRoomButton;  // 우측 상단으로 이동
+        QPushButton* m_leaveRoomButton;
 
         // 플레이어 슬롯들
         QWidget* m_playerSlotsPanel;
@@ -247,7 +246,7 @@ namespace Blokus {
         // 게임 영역
         QWidget* m_gameArea;
         GameBoard* m_gameBoard;
-        MyBlockPalette* m_myBlockPalette;  // 간소화된 내 블록 팔레트
+        MyBlockPalette* m_myBlockPalette;
 
         // 채팅 패널
         QWidget* m_chatPanel;
