@@ -29,22 +29,6 @@
 #include "common/Types.h"  // 🔥 Types.h에서 UserInfo, RoomInfo 등을 가져옴
 
 namespace Blokus {
-    // ChatMessage는 로비 채팅용이므로 여기에 유지
-    struct ChatMessage {
-        QString username;
-        QString message;
-        QDateTime timestamp;
-        enum Type { Normal, System, Whisper } type;
-
-        ChatMessage()
-            : username(QString::fromUtf8("시스템"))
-            , message("")
-            , timestamp(QDateTime::currentDateTime())
-            , type(System)
-        {
-        }
-    };
-
     // 방 생성 다이얼로그
     class CreateRoomDialog : public QDialog
     {

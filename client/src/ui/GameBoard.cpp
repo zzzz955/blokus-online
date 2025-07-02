@@ -1,5 +1,6 @@
 ﻿#include "ui/GameBoard.h"
-#include "common/GameRules.h"
+#include "common/GameLogic.h"
+#include "common/QtAdapter.h"
 
 #include <QGraphicsRectItem>
 #include <QGraphicsTextItem>
@@ -27,6 +28,12 @@ namespace Blokus {
         , m_hasSelectedBlock(false)
         , m_blockSelected(false)
     {
+        // 🔥 동적으로 2D 벡터 초기화
+        m_board.resize(BOARD_SIZE);
+        for (int i = 0; i < BOARD_SIZE; ++i) {
+            m_board[i].resize(BOARD_SIZE, PlayerColor::None);
+        }
+
         setupScene();
         setupStyles();
         initializeBoard();
@@ -314,7 +321,10 @@ namespace Blokus {
     {
         // 게임 로직이 있으면 그쪽에서 처리, 없으면 기본 허용
         if (m_gameLogic) {
-            return m_gameLogic->canPlaceBlock(block, position, player);
+            BlockPlacement placement(block.getType(), position, player);
+            placement.rotation = block.getRotation();
+            placement.flip = block.getFlipState();
+            return m_gameLogic->canPlaceBlock(placement);
         }
 
         return true;
@@ -366,8 +376,12 @@ namespace Blokus {
             .arg(BlockFactory::getBlockName(blockToPlace.getType()))
             .arg(position.first).arg(position.second);
 
-        if (m_gameLogic->canPlaceBlock(blockToPlace, position, currentPlayer)) {
-            if (m_gameLogic->placeBlock(blockToPlace, position, currentPlayer)) {
+        BlockPlacement placement(blockToPlace.getType(), position, currentPlayer);
+        placement.rotation = blockToPlace.getRotation();
+        placement.flip = blockToPlace.getFlipState();
+
+        if (m_gameLogic->canPlaceBlock(placement)) {
+            if (m_gameLogic->placeBlock(placement)) {
                 addBlockToBoard(blockToPlace, position);
                 emit blockPlacedSuccessfully(blockToPlace.getType(), currentPlayer);
                 clearSelection();
@@ -698,7 +712,10 @@ namespace Blokus {
 
         bool canPlace = false;
         if (m_gameLogic) {
-            canPlace = m_gameLogic->canPlaceBlock(previewBlock, m_hoveredCell, previewBlock.getPlayer());
+            BlockPlacement placement(previewBlock.getType(), m_hoveredCell, previewBlock.getPlayer());
+            placement.rotation = previewBlock.getRotation();
+            placement.flip = previewBlock.getFlipState();
+            canPlace = m_gameLogic->canPlaceBlock(placement);
         }
         else {
             canPlace = isValidBlockPlacement(previewBlock, m_hoveredCell);
@@ -756,7 +773,7 @@ namespace Blokus {
         block.setFlipState(placement.flip);
 
         if (m_gameLogic) {
-            return m_gameLogic->canPlaceBlock(block, placement.position, placement.player);
+            return m_gameLogic->canPlaceBlock(placement);
         }
         else {
             return isValidBlockPlacement(block, placement.position) &&
@@ -775,7 +792,7 @@ namespace Blokus {
         block.setFlipState(placement.flip);
 
         if (m_gameLogic) {
-            if (m_gameLogic->placeBlock(block, placement.position, placement.player)) {
+            if (m_gameLogic->placeBlock(placement)) {
                 addBlockToBoard(block, placement.position);
                 emit blockPlaced(placement);
                 return true;
@@ -888,7 +905,7 @@ namespace Blokus {
             if (isValidBlockPlacement(block, pos)) {
                 addBlockToBoard(block, pos);
 
-                QRect blockRect = block.getBoundingRect();
+                QRect blockRect = QtAdapter::boundingRectToQRect(block.getBoundingRect());
                 col += blockRect.width() + 1;
                 currentCol++;
 

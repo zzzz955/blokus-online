@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 // Common 라이브러리의 Block을 import
-#include "../../../common/include/common/Block.h"
+#include "common/Block.h"
 #include "common/Types.h"
 
 // Qt 관련 헤더들 (그래픽 아이템용)
@@ -22,7 +22,6 @@ namespace Blokus {
     // ========================================
 
     using Block = Common::Block;
-    using BlockFactory = Common::BlockFactory;
 
     // ========================================
     // Qt 전용 블록 그래픽 아이템
@@ -78,11 +77,11 @@ namespace Blokus {
     public:
         // Qt 전용 편의 함수들
         static QString getBlockNameQt(BlockType type) {
-            return QString::fromUtf8(getBlockName(type).c_str());
+            return QString::fromUtf8(Common::BlockFactory::getBlockName(type).c_str());
         }
 
         static QString getBlockDescriptionQt(BlockType type) {
-            return QString::fromUtf8(getBlockDescription(type).c_str());
+            return QString::fromUtf8(Common::BlockFactory::getBlockDescription(type).c_str());
         }
 
         // Qt 색상 변환
