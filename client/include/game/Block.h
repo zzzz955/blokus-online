@@ -1,110 +1,55 @@
-#pragma once
+ï»¿#pragma once
 
-#include <vector>
-#include <map>
+// Common ë¼ì´ë¸ŒëŸ¬ë¦¬ì˜ Blockì„ import
+#include "../../../common/include/common/Block.h"
+#include "common/Types.h"
+
+// Qt ê´€ë ¨ í—¤ë”ë“¤ (ê·¸ë˜í”½ ì•„ì´í…œìš©)
 #include <QGraphicsItemGroup>
 #include <QGraphicsRectItem>
+#include <QGraphicsSceneMouseEvent>
+#include <QPainter>
 #include <QPen>
 #include <QBrush>
-
-#include "common/Types.h"
+#include <QColor>
+#include <QRect>
+#include <QString>
 
 namespace Blokus {
 
-    /**
-     * @brief ´ÜÀÏ ºí·Ï(Æú¸®¿À¹Ì³ë)À» Á¤ÀÇÇÏ°í °ü¸®ÇÏ´Â Å¬·¡½º
-     *
-     * ÁÖ¿ä ±â´É:
-     * - 21°¡Áö ºí·Ï Å¸ÀÔº° ¸ğ¾ç Á¤ÀÇ
-     * - È¸Àü ¹× µÚÁı±â º¯È¯
-     * - ºí·Ï ·»´õ¸µ ¹× ½Ã°¢È­
-     * - Ãæµ¹ °Ë»ç¿ë ÁÂÇ¥ °è»ê
-     */
-    class Block
-    {
-    public:
-        explicit Block(BlockType type = BlockType::Single, PlayerColor player = PlayerColor::Blue);
-        ~Block() = default;
+    // ========================================
+    // Common ë¼ì´ë¸ŒëŸ¬ë¦¬ íƒ€ì…ë“¤ì„ ê¸°ë³¸ ë„¤ì„ìŠ¤í˜ì´ìŠ¤ë¡œ ê°€ì ¸ì˜¤ê¸°
+    // ========================================
 
-        // ºí·Ï Á¤º¸ Á¢±Ù
-        BlockType getType() const { return m_type; }
-        PlayerColor getPlayer() const { return m_player; }
-        Rotation getRotation() const { return m_rotation; }
-        FlipState getFlipState() const { return m_flipState; }
+    using Block = Common::Block;
+    using BlockFactory = Common::BlockFactory;
 
-        // ºí·Ï º¯È¯
-        void setRotation(Rotation rotation);
-        void setFlipState(FlipState flip);
-        void setPlayer(PlayerColor player) { m_player = player; }
+    // ========================================
+    // Qt ì „ìš© ë¸”ë¡ ê·¸ë˜í”½ ì•„ì´í…œ
+    // ========================================
 
-        // È¸Àü/µÚÁı±â µ¿ÀÛ
-        void rotateClockwise();
-        void rotateCounterclockwise();
-        void flipHorizontal();
-        void flipVertical();
-        void resetTransform();
-
-        // ÁÂÇ¥ °è»ê
-        PositionList getCurrentShape() const;
-        PositionList getAbsolutePositions(const Position& basePos) const;
-        QRect getBoundingRect() const;
-        int getSize() const; // ºí·ÏÀÌ Â÷ÁöÇÏ´Â ¼¿ °³¼ö
-
-        // Ãæµ¹ °Ë»ç
-        bool wouldCollideAt(const Position& basePos, const PositionList& occupiedCells) const;
-
-        // ºí·Ï °ËÁõ
-        bool isValidPlacement(const Position& basePos, int boardSize = BOARD_SIZE) const;
-
-    private:
-        // ±âº» ºí·Ï ¸ğ¾ç Á¤ÀÇ (Á¤Àû µ¥ÀÌÅÍ)
-        static const std::map<BlockType, PositionList> s_blockShapes;
-
-        // º¯È¯ ÇÔ¼öµé
-        PositionList applyRotation(const PositionList& shape, Rotation rotation) const;
-        PositionList applyFlip(const PositionList& shape, FlipState flip) const;
-        PositionList normalizeShape(const PositionList& shape) const;
-
-        // ¸â¹ö º¯¼ö
-        BlockType m_type;
-        PlayerColor m_player;
-        Rotation m_rotation;
-        FlipState m_flipState;
-    };
-
-    /**
-     * @brief ±×·¡ÇÈ ºí·Ï ¾ÆÀÌÅÛ Å¬·¡½º (QGraphicsItemGroup ±â¹İ)
-     *
-     * GameBoard¿¡¼­ ºí·ÏÀ» ½Ã°¢ÀûÀ¸·Î Ç¥ÇöÇÏ±â À§ÇÑ Å¬·¡½º
-     */
     class BlockGraphicsItem : public QGraphicsItemGroup
     {
     public:
         explicit BlockGraphicsItem(const Block& block, qreal cellSize, QGraphicsItem* parent = nullptr);
-        ~BlockGraphicsItem() = default;
 
-        // ºí·Ï ¾÷µ¥ÀÌÆ®
+        // ì—…ë°ì´íŠ¸ í•¨ìˆ˜ë“¤
         void updateBlock(const Block& block);
         void updatePosition(const Position& boardPos, qreal cellSize);
         void updateColors(const QColor& fillColor, const QColor& borderColor);
 
-        // ¹Ì¸®º¸±â ¸ğµå
+        // í‘œì‹œ ëª¨ë“œ
         void setPreviewMode(bool preview);
-        bool isPreviewMode() const { return m_isPreview; }
+        void setDraggable(bool draggable);
 
-        // ºí·Ï Á¤º¸
+        // ë¸”ë¡ ì •ë³´ ì ‘ê·¼
         const Block& getBlock() const { return m_block; }
 
-        // ¸¶¿ì½º ÀÌº¥Æ® (µå·¡±× ¾Ø µå·Ó¿ë)
-        void setDraggable(bool draggable);
-        bool isDraggable() const { return m_isDraggable; }
+        // QGraphicsItem ì¸í„°í˜ì´ìŠ¤
+        QRectF boundingRect() const override;
+        void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = nullptr) override;
 
     protected:
-        // QGraphicsItem ¿À¹ö¶óÀÌµå
-        QRectF boundingRect() const override;
-        void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override;
-
-        // ¸¶¿ì½º ÀÌº¥Æ®
         void mousePressEvent(QGraphicsSceneMouseEvent* event) override;
         void mouseMoveEvent(QGraphicsSceneMouseEvent* event) override;
         void mouseReleaseEvent(QGraphicsSceneMouseEvent* event) override;
@@ -113,38 +58,103 @@ namespace Blokus {
         void rebuildGraphics();
         void clearGraphics();
 
+    private:
         Block m_block;
         qreal m_cellSize;
         bool m_isPreview;
         bool m_isDraggable;
-
-        // ±×·¡ÇÈ ¿ä¼Òµé
-        std::vector<QGraphicsRectItem*> m_cells;
         QColor m_fillColor;
         QColor m_borderColor;
+
+        std::vector<QGraphicsRectItem*> m_cells;
     };
 
-    /**
-     * @brief ºí·Ï ÆÑÅä¸® Å¬·¡½º
-     *
-     * ´Ù¾çÇÑ ºí·ÏÀ» »ı¼ºÇÏ°í °ü¸®ÇÏ´Â À¯Æ¿¸®Æ¼ Å¬·¡½º
-     */
-    class BlockFactory
+    // ========================================
+    // Qt ì „ìš© BlockFactory í™•ì¥
+    // ========================================
+
+    class QtBlockFactory : public Common::BlockFactory
     {
     public:
-        // ºí·Ï »ı¼º
-        static Block createBlock(BlockType type, PlayerColor player = PlayerColor::Blue);
-        static std::vector<Block> createPlayerSet(PlayerColor player);
-        static std::vector<Block> createAllBlocks();
+        // Qt ì „ìš© í¸ì˜ í•¨ìˆ˜ë“¤
+        static QString getBlockNameQt(BlockType type) {
+            return QString::fromUtf8(getBlockName(type).c_str());
+        }
 
-        // ºí·Ï Á¤º¸
-        static QString getBlockName(BlockType type);
-        static QString getBlockDescription(BlockType type);
-        static int getBlockScore(BlockType type); // ºí·ÏÀÇ Á¡¼ö °ª
+        static QString getBlockDescriptionQt(BlockType type) {
+            return QString::fromUtf8(getBlockDescription(type).c_str());
+        }
 
-        // ºí·Ï °ËÁõ
-        static bool isValidBlockType(BlockType type);
-        static std::vector<BlockType> getAllBlockTypes();
+        // Qt ìƒ‰ìƒ ë³€í™˜
+        static QColor getPlayerColorQt(PlayerColor player) {
+            return Utils::getPlayerColor(player);
+        }
+
+        // QRect ë³€í™˜
+        static QRect getBoundingRectQt(const Block& block) {
+            auto rect = block.getBoundingRect();
+            return QRect(rect.left, rect.top, rect.width, rect.height);
+        }
+
+        // ê¸°ì¡´ í•¨ìˆ˜ë“¤ê³¼ì˜ í˜¸í™˜ì„±ì„ ìœ„í•œ alias
+        static QString getBlockName(BlockType type) {
+            return getBlockNameQt(type);
+        }
+
+        static QString getBlockDescription(BlockType type) {
+            return getBlockDescriptionQt(type);
+        }
+
+        static int getBlockScore(BlockType type) {
+            return Common::BlockFactory::getBlockScore(type);
+        }
+
+        static bool isValidBlockType(BlockType type) {
+            return Common::BlockFactory::isValidBlockType(type);
+        }
+
+        static std::vector<BlockType> getAllBlockTypes() {
+            return Common::BlockFactory::getAllBlockTypes();
+        }
     };
+
+    // ========================================
+    // ê¸°ì¡´ ì½”ë“œ í˜¸í™˜ì„±ì„ ìœ„í•œ alias (í´ë¼ì´ì–¸íŠ¸ì—ì„œë§Œ ì‚¬ìš©)
+    // ========================================
+
+    // ê¸°ì¡´ ì½”ë“œì—ì„œ BlockFactory::getBlockName()ì„ ì‚¬ìš©í•˜ë˜ ê³³ë“¤ì„ ìœ„í•´
+    namespace BlockFactory {
+        inline QString getBlockName(BlockType type) {
+            return QtBlockFactory::getBlockNameQt(type);
+        }
+
+        inline QString getBlockDescription(BlockType type) {
+            return QtBlockFactory::getBlockDescriptionQt(type);
+        }
+
+        inline int getBlockScore(BlockType type) {
+            return Common::BlockFactory::getBlockScore(type);
+        }
+
+        inline bool isValidBlockType(BlockType type) {
+            return Common::BlockFactory::isValidBlockType(type);
+        }
+
+        inline std::vector<BlockType> getAllBlockTypes() {
+            return Common::BlockFactory::getAllBlockTypes();
+        }
+
+        inline Block createBlock(BlockType type, PlayerColor player = PlayerColor::None) {
+            return Common::BlockFactory::createBlock(type, player);
+        }
+
+        inline std::vector<Block> createPlayerSet(PlayerColor player) {
+            return Common::BlockFactory::createPlayerSet(player);
+        }
+
+        inline std::vector<Block> createAllBlocks() {
+            return Common::BlockFactory::createAllBlocks();
+        }
+    }
 
 } // namespace Blokus
