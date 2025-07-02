@@ -36,6 +36,7 @@ endif()
 
 # 디렉토리 추가 (개발 단계별로 추가)
 add_subdirectory(client)
+add_subdirectory(common)
 
 # 나중에 추가될 서브 프로젝트들
 # add_subdirectory(server)

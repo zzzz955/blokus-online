@@ -1,121 +1,60 @@
 ﻿#pragma once
 
+// Common 라이브러리의 GameLogic을 import
+#include "../../../common/include/common/GameLogic.h"
 #include "common/Types.h"
-#include "game/Block.h"
-#include <map>
-#include <set>
-#include <vector>
 
 namespace Blokus {
 
     // ========================================
-    // GameLogic 클래스
+    // 기존 코드 호환성을 위한 alias
     // ========================================
 
-    class GameLogic
+    // Common 라이브러리의 GameLogic과 GameStateManager를 기본 네임스페이스로 가져오기
+    using GameLogic = Common::GameLogic;
+    using GameStateManager = Common::GameStateManager;
+
+    // ========================================
+    // Qt 클라이언트 전용 확장 클래스들 (필요한 경우)
+    // ========================================
+
+    // 향후 클라이언트 전용 기능이 필요한 경우를 위한 래퍼 클래스
+    class QtGameLogic : public Common::GameLogic
     {
     public:
-        GameLogic();
+        QtGameLogic() : Common::GameLogic() {}
 
-        // 보드 관리
-        void initializeBoard();
-        void clearBoard();
+        // Qt 전용 편의 함수들 (필요시 추가)
+        QString getPlayerColorString(PlayerColor player) const {
+            return Utils::playerColorToString(player);
+        }
 
-        // 셀 상태 확인
-        PlayerColor getCellOwner(const Position& pos) const;
-        bool isCellOccupied(const Position& pos) const;
+        QColor getPlayerQColor(PlayerColor player) const {
+            return Utils::getPlayerColor(player);
+        }
 
-        // 블록 배치 관련
-        bool canPlaceBlock(const Block& block, const Position& position, PlayerColor player) const;
-        bool placeBlock(const Block& block, const Position& position, PlayerColor player);
-        bool removeBlock(const Position& position);
+        // 기존 인터페이스와의 호환성을 위한 오버로드
+        bool canPlaceBlock(const Block& block, const Position& position, PlayerColor player) const {
+            BlockPlacement placement;
+            placement.type = block.getType();
+            placement.position = position;
+            placement.rotation = block.getRotation();
+            placement.flip = block.getFlipState();
+            placement.player = player;
 
-        // 게임 상태 관리
-        PlayerColor getCurrentPlayer() const { return m_currentPlayer; }
-        void setCurrentPlayer(PlayerColor player) { m_currentPlayer = player; }
-        PlayerColor getNextPlayer() const;
+            return Common::GameLogic::canPlaceBlock(placement);
+        }
 
-        // 블록 사용 관리
-        void setPlayerBlockUsed(PlayerColor player, BlockType blockType);
-        bool isBlockUsed(PlayerColor player, BlockType blockType) const;
-        std::vector<BlockType> getUsedBlocks(PlayerColor player) const;
-        std::vector<BlockType> getAvailableBlocks(PlayerColor player) const;
+        bool placeBlock(const Block& block, const Position& position, PlayerColor player) {
+            BlockPlacement placement;
+            placement.type = block.getType();
+            placement.position = position;
+            placement.rotation = block.getRotation();
+            placement.flip = block.getFlipState();
+            placement.player = player;
 
-        // 첫 블록 관리
-        bool hasPlayerPlacedFirstBlock(PlayerColor player) const;
-
-        // 게임 진행 상태
-        bool canPlayerPlaceAnyBlock(PlayerColor player) const;
-        bool isGameFinished() const;
-        std::map<PlayerColor, int> calculateScores() const;
-
-        // 디버깅
-        void printBoard() const;
-        int getPlacedBlockCount(PlayerColor player) const;
-
-    private:
-        PlayerColor m_currentPlayer;
-        PlayerColor m_board[BOARD_SIZE][BOARD_SIZE];
-
-        std::map<PlayerColor, std::set<BlockType>> m_usedBlocks;
-        std::map<PlayerColor, std::vector<Position>> m_playerOccupiedCells;
-        std::map<PlayerColor, bool> m_hasPlacedFirstBlock;
-
-        // 내부 헬퍼 함수들
-        bool isPositionValid(const Position& pos) const;
-        bool hasCollision(const Block& block, const Position& position) const;
-
-        bool isFirstBlockValid(const Block& block, const Position& position, PlayerColor player) const;
-        bool isCornerAdjacencyValid(const Block& block, const Position& position, PlayerColor player) const;
-        bool hasNoEdgeAdjacency(const Block& block, const Position& position, PlayerColor player) const;
-
-        std::vector<Position> getAdjacentCells(const Position& pos) const;
-        std::vector<Position> getDiagonalCells(const Position& pos) const;
-        Position getPlayerStartCorner(PlayerColor player) const;
-    };
-
-    // ========================================
-    // GameStateManager 클래스
-    // ========================================
-
-    class GameStateManager
-    {
-    public:
-        GameStateManager();
-
-        // 게임 상태 관리
-        void startNewGame();
-        void resetGame();
-        void endGame();
-
-        // 턴 관리
-        void nextTurn();
-        void skipTurn();
-
-        // 상태 확인
-        GameState getGameState() const { return m_gameState; }
-        TurnState getTurnState() const { return m_turnState; }
-        bool canCurrentPlayerMove() const;
-
-        // 게임 로직 접근
-        GameLogic& getGameLogic() { return m_gameLogic; }
-        const GameLogic& getGameLogic() const { return m_gameLogic; }
-
-        // 최종 점수
-        std::map<PlayerColor, int> getFinalScores() const;
-
-        // 턴 정보
-        int getTurnNumber() const { return m_turnNumber; }
-        PlayerColor getCurrentPlayer() const { return m_gameLogic.getCurrentPlayer(); }
-
-    private:
-        GameLogic m_gameLogic;
-        GameState m_gameState;
-        TurnState m_turnState;
-
-        int m_turnNumber;
-        int m_currentPlayerIndex;
-        std::vector<PlayerColor> m_playerOrder;
+            return Common::GameLogic::placeBlock(placement);
+        }
     };
 
 } // namespace Blokus

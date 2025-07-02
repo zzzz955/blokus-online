@@ -1,4 +1,5 @@
 ﻿#include "ui/GameBoard.h"
+#include "common/GameRules.h"
 
 #include <QGraphicsRectItem>
 #include <QGraphicsTextItem>
