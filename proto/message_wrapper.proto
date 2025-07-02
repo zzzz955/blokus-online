@@ -1,0 +1,240 @@
+syntax = "proto3";
+
+package blokus;
+
+option cxx_namespace_prefix = "Blokus::Proto";
+
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+import "common.proto";
+
+// ========================================
+// 메시지 타입 열거형 (라우팅용)
+// ========================================
+
+enum MessageType {
+  // 기본 메시지
+  MESSAGE_TYPE_UNKNOWN = 0;
+  
+  // 연결 및 인증 (100-199)
+  MESSAGE_TYPE_AUTH_REQUEST = 100;
+  MESSAGE_TYPE_AUTH_RESPONSE = 101;
+  MESSAGE_TYPE_REGISTER_REQUEST = 102;
+  MESSAGE_TYPE_REGISTER_RESPONSE = 103;
+  MESSAGE_TYPE_LOGOUT_REQUEST = 104;
+  MESSAGE_TYPE_LOGOUT_RESPONSE = 105;
+  MESSAGE_TYPE_HEARTBEAT = 106;
+  MESSAGE_TYPE_WELCOME = 107;
+  
+  // 로비 시스템 (200-299)
+  MESSAGE_TYPE_GET_ROOM_LIST_REQUEST = 200;
+  MESSAGE_TYPE_ROOM_LIST_RESPONSE = 201;
+  MESSAGE_TYPE_ROOM_LIST_UPDATE = 202;
+  MESSAGE_TYPE_CREATE_ROOM_REQUEST = 203;
+  MESSAGE_TYPE_CREATE_ROOM_RESPONSE = 204;
+  MESSAGE_TYPE_JOIN_ROOM_REQUEST = 205;
+  MESSAGE_TYPE_JOIN_ROOM_RESPONSE = 206;
+  MESSAGE_TYPE_LEAVE_ROOM_REQUEST = 207;
+  MESSAGE_TYPE_LEAVE_ROOM_RESPONSE = 208;
+  MESSAGE_TYPE_PLAYER_JOINED_NOTIFICATION = 209;
+  MESSAGE_TYPE_PLAYER_LEFT_NOTIFICATION = 210;
+  MESSAGE_TYPE_USER_LIST_UPDATE = 211;
+  MESSAGE_TYPE_GET_USER_STATS_REQUEST = 212;
+  MESSAGE_TYPE_USER_STATS_RESPONSE = 213;
+  
+  // 게임 룸 관리 (300-349)
+  MESSAGE_TYPE_ROOM_STATE_UPDATE = 300;
+  MESSAGE_TYPE_ADD_AI_PLAYER_REQUEST = 301;
+  MESSAGE_TYPE_ADD_AI_PLAYER_RESPONSE = 302;
+  MESSAGE_TYPE_REMOVE_PLAYER_REQUEST = 303;
+  MESSAGE_TYPE_REMOVE_PLAYER_RESPONSE = 304;
+  MESSAGE_TYPE_KICK_PLAYER_REQUEST = 305;
+  MESSAGE_TYPE_KICK_PLAYER_RESPONSE = 306;
+  MESSAGE_TYPE_PLAYER_READY_REQUEST = 307;
+  MESSAGE_TYPE_PLAYER_READY_RESPONSE = 308;
+  MESSAGE_TYPE_START_GAME_REQUEST = 309;
+  MESSAGE_TYPE_START_GAME_RESPONSE = 310;
+  
+  // 게임플레이 (350-399)
+  MESSAGE_TYPE_GAME_STARTED_NOTIFICATION = 350;
+  MESSAGE_TYPE_TURN_CHANGED_NOTIFICATION = 351;
+  MESSAGE_TYPE_PLACE_BLOCK_REQUEST = 352;
+  MESSAGE_TYPE_PLACE_BLOCK_RESPONSE = 353;
+  MESSAGE_TYPE_BLOCK_PLACED_NOTIFICATION = 354;
+  MESSAGE_TYPE_GAME_STATE_UPDATE = 355;
+  MESSAGE_TYPE_SKIP_TURN_REQUEST = 356;
+  MESSAGE_TYPE_SKIP_TURN_RESPONSE = 357;
+  MESSAGE_TYPE_GAME_ENDED_NOTIFICATION = 358;
+  MESSAGE_TYPE_GET_GAME_STATE_REQUEST = 359;
+  MESSAGE_TYPE_GAME_STATE_RESPONSE = 360;
+  MESSAGE_TYPE_UNDO_MOVE_REQUEST = 361;
+  MESSAGE_TYPE_UNDO_MOVE_RESPONSE = 362;
+  
+  // 채팅 시스템 (400-449)
+  MESSAGE_TYPE_CHAT_MESSAGE = 400;
+  MESSAGE_TYPE_CHAT_NOTIFICATION = 401;
+  MESSAGE_TYPE_WHISPER_MESSAGE = 402;
+  MESSAGE_TYPE_SYSTEM_MESSAGE = 403;
+  MESSAGE_TYPE_CHAT_HISTORY_REQUEST = 404;
+  MESSAGE_TYPE_CHAT_HISTORY_RESPONSE = 405;
+  
+  // 관리자 기능 (450-499)
+  MESSAGE_TYPE_ADMIN_COMMAND = 450;
+  MESSAGE_TYPE_ADMIN_RESPONSE = 451;
+  MESSAGE_TYPE_SERVER_ANNOUNCEMENT = 452;
+  MESSAGE_TYPE_MAINTENANCE_NOTIFICATION = 453;
+  
+  // 통계 및 랭킹 (500-549)
+  MESSAGE_TYPE_GET_RANKING_REQUEST = 500;
+  MESSAGE_TYPE_RANKING_RESPONSE = 501;
+  MESSAGE_TYPE_RANKING_UPDATE = 502;
+  MESSAGE_TYPE_GAME_REPLAY_REQUEST = 503;
+  MESSAGE_TYPE_GAME_REPLAY_RESPONSE = 504;
+  MESSAGE_TYPE_ACHIEVEMENT_UNLOCKED = 505;
+  
+  // 에러 및 특수 (900-999)
+  MESSAGE_TYPE_ERROR_RESPONSE = 900;
+  MESSAGE_TYPE_RATE_LIMIT_EXCEEDED = 901;
+  MESSAGE_TYPE_SERVER_SHUTDOWN = 902;
+  MESSAGE_TYPE_RECONNECT_REQUEST = 903;
+  MESSAGE_TYPE_RECONNECT_RESPONSE = 904;
+  MESSAGE_TYPE_PING = 905;
+  MESSAGE_TYPE_PONG = 906;
+}
+
+// ========================================
+// 메시지 우선순위 (QoS)
+// ========================================
+
+enum MessagePriority {
+  PRIORITY_LOW = 0;      // 통계, 채팅 등
+  PRIORITY_NORMAL = 1;   // 로비 업데이트, 일반 알림
+  PRIORITY_HIGH = 2;     // 게임 상태 변경
+  PRIORITY_CRITICAL = 3; // 블록 배치, 턴 변경
+}
+
+// ========================================
+// 메시지 래퍼
+// ========================================
+
+message MessageWrapper {
+  // 기본 라우팅 정보
+  MessageType type = 1;
+  uint32 sequence_id = 2;          // 요청-응답 매칭용
+  google.protobuf.Any payload = 3;  // 실제 메시지 데이터
+  
+  // 메타데이터
+  google.protobuf.Timestamp timestamp = 10;
+  string client_version = 11;
+  MessagePriority priority = 12;
+  
+  // 라우팅 정보
+  string target_room = 15;         // 특정 방으로 전송
+  string target_user = 16;         // 특정 사용자에게 전송
+  bool broadcast = 17;             // 전체 브로드캐스트
+  
+  // 전송 옵션
+  bool requires_ack = 20;          // 수신 확인 필요
+  uint32 retry_count = 21;         // 재시도 횟수
+  uint32 timeout_ms = 22;          // 타임아웃 (밀리초)
+  
+  // 압축 및 최적화
+  bool compressed = 25;            // 페이로드 압축 여부
+  string compression_type = 26;    // "gzip", "lz4" 등
+  
+  // 디버깅 및 추적
+  string trace_id = 30;           // 분산 추적용 ID
+  map<string, string> headers = 31; // 커스텀 헤더
+}
+
+// ========================================
+// 메시지 확인 응답
+// ========================================
+
+message MessageAck {
+  uint32 sequence_id = 1;
+  bool success = 2;
+  string error_message = 3;
+  google.protobuf.Timestamp received_at = 4;
+}
+
+// ========================================
+// 배치 메시지 (여러 메시지를 묶어서 전송)
+// ========================================
+
+message BatchMessage {
+  repeated MessageWrapper messages = 1;
+  uint32 batch_id = 2;
+  google.protobuf.Timestamp created_at = 3;
+  bool ordered = 4;  // 순서 보장 필요 여부
+}
+
+// ========================================
+// 연결 상태 관리
+// ========================================
+
+message KeepAlive {
+  google.protobuf.Timestamp timestamp = 1;
+  uint32 client_fps = 2;           // 클라이언트 성능 모니터링
+  float network_latency_ms = 3;    // 네트워크 지연시간
+  uint32 memory_usage_mb = 4;      // 메모리 사용량
+}
+
+message ConnectionStatus {
+  enum Status {
+    CONNECTED = 0;
+    DISCONNECTED = 1;
+    RECONNECTING = 2;
+    TIMEOUT = 3;
+  }
+  
+  Status status = 1;
+  string reason = 2;
+  google.protobuf.Timestamp last_activity = 3;
+  uint32 missed_heartbeats = 4;
+}
+
+// ========================================
+// 세션 복구
+// ========================================
+
+message SessionInfo {
+  string session_token = 1;
+  string username = 2;
+  google.protobuf.Timestamp created_at = 3;
+  google.protobuf.Timestamp last_activity = 4;
+  int32 current_room_id = 5;
+  uint32 last_message_sequence = 6;
+}
+
+message ReconnectInfo {
+  SessionInfo session = 1;
+  uint32 missed_message_count = 2;
+  repeated MessageWrapper missed_messages = 3;
+  bool full_state_required = 4;  // 전체 상태 재전송 필요
+}
+
+// ========================================
+// 메시지 통계 및 모니터링
+// ========================================
+
+message MessageStats {
+  MessageType type = 1;
+  uint64 sent_count = 2;
+  uint64 received_count = 3;
+  uint64 error_count = 4;
+  float average_latency_ms = 5;
+  uint64 total_bytes = 6;
+  google.protobuf.Timestamp last_sent = 7;
+}
+
+message NetworkStats {
+  repeated MessageStats message_stats = 1;
+  uint64 total_messages_sent = 2;
+  uint64 total_messages_received = 3;
+  uint64 total_bytes_sent = 4;
+  uint64 total_bytes_received = 5;
+  float average_latency_ms = 6;
+  uint32 connection_drops = 7;
+  google.protobuf.Timestamp session_start = 8;
+}
