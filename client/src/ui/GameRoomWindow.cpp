@@ -1142,7 +1142,7 @@ namespace Blokus {
         for (auto& slot : m_roomInfo.playerSlots) {
             if (!slot.isEmpty()) {
                 slot.score = 0;
-                slot.remainingBlocks = BLOCKS_PER_PLAYER;
+                slot.remainingBlocks = Common::BLOCKS_PER_PLAYER;
             }
         }
 

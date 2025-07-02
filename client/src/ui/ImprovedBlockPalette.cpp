@@ -1,4 +1,5 @@
 ﻿#include "ui/ImprovedBlockPalette.h"
+#include "common/QtAdapter.h"
 #include <QPainter>
 #include <QMouseEvent>
 #include <QHBoxLayout>
@@ -77,7 +78,7 @@ namespace Blokus {
     void BlockButton::setupGraphics()
     {
         // 블록의 바운딩 박스 계산
-        QRect boundingRect = m_block.getBoundingRect();
+        QRect boundingRect = QtAdapter::boundingRectToQRect(m_block.getBoundingRect());
 
         // 동적 크기 계산 (블록 크기에 비례, 더 작게)
         int padding;
@@ -140,7 +141,7 @@ namespace Blokus {
 
         // 블록 모양 그리기 (중앙 정렬)
         PositionList shape = m_block.getCurrentShape();
-        QRect boundingRect = m_block.getBoundingRect();
+        QRect boundingRect = QtAdapter::boundingRectToQRect(m_block.getBoundingRect());
 
         // 중앙 정렬을 위한 오프셋 계산
         int offsetX = (width() - boundingRect.width() * m_blockSize) / 2;

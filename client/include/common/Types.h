@@ -1,59 +1,44 @@
-#pragma once
+ï»¿#pragma once
 
-// ========================================
-// Common ¶óÀÌºê·¯¸® import
-// ========================================
-#include "../../../common/include/common/Types.h"        // ¼­¹ö¿Í °øÀ¯ÇÏ´Â Common Å¸ÀÔµé
-#include "../../../common/include/common/Utils.h"        // ¼­¹ö¿Í °øÀ¯ÇÏ´Â Common À¯Æ¿¸®Æ¼
-#include "QtAdapter.h"                         // Qt º¯È¯ ¾î´ğÅÍ
+// ğŸ”¥ Common ë¼ì´ë¸ŒëŸ¬ë¦¬ì˜ ëª¨ë“  íƒ€ì…ë“¤ì„ ê°€ì ¸ì˜´
+#include "common/Types.h"
+#include "common/Block.h"
+#include "common/GameLogic.h"
+#include "common/Utils.h"
 
-// ========================================
-// Qt Çì´õµé
-// ========================================
+// Qt ê´€ë ¨ í—¤ë”ë“¤
 #include <QString>
-#include <QList>
 #include <QColor>
-#include <QPoint>
+#include <QRect>
 #include <QDateTime>
 
 namespace Blokus {
 
     // ========================================
-    // Common ¶óÀÌºê·¯¸® Å¸ÀÔµéÀ» ±âº» ³×ÀÓ½ºÆäÀÌ½º·Î °¡Á®¿À±â
+    // Common ë„¤ì„ìŠ¤í˜ì´ìŠ¤ì˜ íƒ€ì…ë“¤ì„ ê¸°ë³¸ìœ¼ë¡œ ê°€ì ¸ì˜¤ê¸°
     // ========================================
+    using PlayerColor = Common::PlayerColor;
+    using BlockType = Common::BlockType;
+    using Position = Common::Position;
+    using PositionList = Common::PositionList;
+    using Rotation = Common::Rotation;
+    using FlipState = Common::FlipState;
+    using GameState = Common::GameState;
+    using TurnState = Common::TurnState;
+    using BlockPlacement = Common::BlockPlacement;
+    using GameSettings = Common::GameSettings;
 
-    // ±âº» Å¸ÀÔµé (±âÁ¸ ÄÚµå¿Í È£È¯)
-    using Common::BOARD_SIZE;
-    using Common::MAX_PLAYERS;
-    using Common::BLOCKS_PER_PLAYER;
-    using Common::DEFAULT_TURN_TIME;
-
-    using Common::Position;
-    using Common::PositionList;
-    using Common::PlayerColor;
-    using Common::Rotation;
-    using Common::FlipState;
-    using Common::GameState;
-    using Common::TurnState;
-    using Common::BlockType;
-    using Common::BlockPlacement;
-    using Common::GameSettings;
-
-    // ========================================
-    // Qt ¾î´ğÅÍ Å¸ÀÔµé·Î ±³Ã¼ (±âÁ¸ ÄÚµå È£È¯¼º À¯Áö)
-    // ========================================
-
-    // ±âÁ¸ ÄÚµå¿¡¼­ »ç¿ëÇÏ´ø Å¸ÀÔ¸íÀ» ±×´ë·Î À¯ÁöÇÏµÇ, ³»ºÎÀûÀ¸·Î´Â Qt ¾î´ğÅÍ »ç¿ë
-    using UserInfo = QtAdapter::QtUserInfo;
-    using RoomInfo = QtAdapter::QtRoomInfo;
-    using PlayerSlot = QtAdapter::QtPlayerSlot;
-    using GameRoomInfo = QtAdapter::QtGameRoomInfo;
+    // ğŸ”¥ Blockê³¼ ê´€ë ¨ í´ë˜ìŠ¤ë“¤ë„ ê°€ì ¸ì˜¤ê¸° (ì„œë²„ì™€ ë™ì¼í•œ ë¡œì§)
+    using Block = Common::Block;
+    //using BlockFactory = Common::BlockFactory;
+    using GameLogic = Common::GameLogic;
+    using GameStateManager = Common::GameStateManager;
 
     // ========================================
-    // Qt Àü¿ë ±¸Á¶Ã¼µé (±âÁ¸ À¯Áö)
+    // Qt ì „ìš© í™•ì¥ íƒ€ì…ë“¤ (Commonì— ì—†ëŠ” ê²ƒë“¤ë§Œ)
     // ========================================
 
-    // ChatMessage´Â Qt Àü¿ëÀÌ¹Ç·Î ±×´ë·Î À¯Áö
+    // Qt ì „ìš© ChatMessage (UI ì „ìš©)
     struct ChatMessage {
         QString username;
         QString message;
@@ -61,113 +46,217 @@ namespace Blokus {
         enum Type { Normal, System, Whisper } type;
 
         ChatMessage()
-            : username(QString::fromUtf8("½Ã½ºÅÛ"))
+            : username(QString::fromUtf8("ì‹œìŠ¤í…œ"))
             , message("")
             , timestamp(QDateTime::currentDateTime())
-            , type(System)
-        {
+            , type(System) {
+        }
+    };
+
+    // Qt í˜¸í™˜ UserInfo (Common::UserInfoë¥¼ Qt ë¬¸ìì—´ë¡œ ë˜í•‘)
+    struct UserInfo {
+        QString username;
+        int level;
+        int totalGames;
+        int wins;
+        int losses;
+        int averageScore;
+        bool isOnline;
+        QString status;
+
+        // ê¸°ë³¸ ìƒì„±ì
+        UserInfo()
+            : username(QString::fromUtf8("ìµëª…"))
+            , level(1), totalGames(0), wins(0), losses(0)
+            , averageScore(0), isOnline(true)
+            , status(QString::fromUtf8("ë¡œë¹„")) {
+        }
+
+        // Common::UserInfoì—ì„œ ë³€í™˜ (ìë™ ë³€í™˜)
+        UserInfo(const Common::UserInfo& common)
+            : username(QString::fromUtf8(common.username.c_str()))
+            , level(common.level), totalGames(common.totalGames)
+            , wins(common.wins), losses(common.losses)
+            , averageScore(common.averageScore), isOnline(common.isOnline)
+            , status(QString::fromUtf8(common.status.c_str())) {
+        }
+
+        // Common::UserInfoë¡œ ë³€í™˜
+        Common::UserInfo toCommon() const {
+            Common::UserInfo common;
+            common.username = username.toUtf8().toStdString();
+            common.level = level;
+            common.totalGames = totalGames;
+            common.wins = wins;
+            common.losses = losses;
+            common.averageScore = averageScore;
+            common.isOnline = isOnline;
+            common.status = status.toUtf8().toStdString();
+            return common;
+        }
+
+        // ê¸°ì¡´ í•¨ìˆ˜ë“¤ ìœ ì§€ (Commonê³¼ ë™ì¼í•œ ë¡œì§)
+        double getWinRate() const {
+            return totalGames > 0 ? static_cast<double>(wins) / totalGames * 100.0 : 0.0;
+        }
+
+        int calculateLevel() const {
+            return (totalGames / 10) + 1;
+        }
+    };
+
+    // Qt í˜¸í™˜ RoomInfo (Common::RoomInfoë¥¼ Qt ë¬¸ìì—´ë¡œ ë˜í•‘)
+    struct RoomInfo {
+        int roomId;
+        QString roomName;
+        QString hostName;
+        int currentPlayers;
+        int maxPlayers;
+        bool isPrivate;
+        bool isPlaying;
+        QString gameMode;
+
+        // ê¸°ë³¸ ìƒì„±ì
+        RoomInfo()
+            : roomId(0), roomName(QString::fromUtf8("ìƒˆ ë°©"))
+            , hostName(QString::fromUtf8("í˜¸ìŠ¤íŠ¸")), currentPlayers(1)
+            , maxPlayers(4), isPrivate(false), isPlaying(false)
+            , gameMode(QString::fromUtf8("í´ë˜ì‹")) {
+        }
+
+        // Common::RoomInfoì—ì„œ ë³€í™˜
+        RoomInfo(const Common::RoomInfo& common)
+            : roomId(common.roomId)
+            , roomName(QString::fromUtf8(common.roomName.c_str()))
+            , hostName(QString::fromUtf8(common.hostName.c_str()))
+            , currentPlayers(common.currentPlayers)
+            , maxPlayers(common.maxPlayers)
+            , isPrivate(common.isPrivate)
+            , isPlaying(common.isPlaying)
+            , gameMode(QString::fromUtf8(common.gameMode.c_str())) {
+        }
+
+        // Common::RoomInfoë¡œ ë³€í™˜
+        Common::RoomInfo toCommon() const {
+            Common::RoomInfo common;
+            common.roomId = roomId;
+            common.roomName = roomName.toUtf8().toStdString();
+            common.hostName = hostName.toUtf8().toStdString();
+            common.currentPlayers = currentPlayers;
+            common.maxPlayers = maxPlayers;
+            common.isPrivate = isPrivate;
+            common.isPlaying = isPlaying;
+            common.gameMode = gameMode.toUtf8().toStdString();
+            return common;
         }
     };
 
     // ========================================
-    // À¯Æ¿¸®Æ¼ ÇÔ¼öµé (±âÁ¸ ÄÚµå È£È¯¼º À¯Áö)
+    // GameRoomInfoì™€ PlayerSlotë„ Common ê¸°ë°˜ìœ¼ë¡œ ìˆ˜ì •
     // ========================================
 
+    struct PlayerSlot {
+        PlayerColor color;
+        QString username;    // Qt ë¬¸ìì—´ ì‚¬ìš©
+        bool isAI;
+        int aiDifficulty;
+        bool isHost;
+        bool isReady;
+        int score;
+        int remainingBlocks;
+
+        PlayerSlot()
+            : color(PlayerColor::None), username("")
+            , isAI(false), aiDifficulty(2), isHost(false)
+            , isReady(false), score(0)
+            , remainingBlocks(Common::BLOCKS_PER_PLAYER) {
+        }  // Common ìƒìˆ˜ ì‚¬ìš©
+
+// Common::PlayerSlotê³¼ ë³€í™˜ (í•„ìš”ì‹œ)
+        PlayerSlot(const Common::PlayerSlot& common)
+            : color(common.color)
+            , username(QString::fromUtf8(common.username.c_str()))
+            , isAI(common.isAI), aiDifficulty(common.aiDifficulty)
+            , isHost(common.isHost), isReady(common.isReady)
+            , score(common.score), remainingBlocks(common.remainingBlocks) {
+        }
+
+        // ê¸°ì¡´ í•¨ìˆ˜ë“¤ ìœ ì§€
+        bool isEmpty() const { return username.isEmpty() && !isAI; }
+
+        QString getDisplayName() const {
+            if (isEmpty()) return QString::fromUtf8("ë¹ˆ ìŠ¬ë¡¯");
+            if (isAI) return QString::fromUtf8("AI (ë ˆë²¨ %1)").arg(aiDifficulty);
+            return username;
+        }
+
+        bool isActive() const { return !isEmpty(); }
+    };
+
+    struct GameRoomInfo {
+        int roomId;
+        QString roomName;
+        QString hostUsername;
+        PlayerColor hostColor;
+        int maxPlayers;
+        QString gameMode;
+        bool isPlaying;
+        std::array<PlayerSlot, 4> playerSlots;
+
+        GameRoomInfo()
+            : roomId(0), roomName(QString::fromUtf8("ìƒˆ ë°©"))
+            , hostUsername(""), hostColor(PlayerColor::Blue)
+            , maxPlayers(Common::MAX_PLAYERS)  // Common ìƒìˆ˜ ì‚¬ìš©
+            , gameMode(QString::fromUtf8("í´ë˜ì‹")), isPlaying(false) {
+
+            // Commonì—ì„œ ì •ì˜ëœ ìƒ‰ìƒ ìˆœì„œ ì‚¬ìš©
+            playerSlots[0].color = PlayerColor::Blue;
+            playerSlots[1].color = PlayerColor::Yellow;
+            playerSlots[2].color = PlayerColor::Red;
+            playerSlots[3].color = PlayerColor::Green;
+        }
+
+        // Common::GameRoomInfoì™€ ë³€í™˜ (í•„ìš”ì‹œ ì¶”ê°€)
+
+        // ê¸°ì¡´ í•¨ìˆ˜ë“¤ ìœ ì§€
+        int getCurrentPlayerCount() const {
+            int count = 0;
+            for (const auto& slot : playerSlots) {
+                if (!slot.isEmpty()) count++;
+            }
+            return count;
+        }
+
+        PlayerColor getMyColor(const QString& username) const {
+            for (const auto& slot : playerSlots) {
+                if (slot.username == username) return slot.color;
+            }
+            return PlayerColor::None;
+        }
+
+        bool isMyTurn(const QString& username, PlayerColor currentTurn) const {
+            return getMyColor(username) == currentTurn;
+        }
+    };
+
+    // ========================================
+    // Utils ë„¤ì„ìŠ¤í˜ì´ìŠ¤ (Common::Utilsë¥¼ Qtë¡œ ë˜í•‘)
+    // ========================================
     namespace Utils {
-
-        // ±âÁ¸ ÄÚµå¿¡¼­ »ç¿ëÇÏ´ø ÇÔ¼ö¸íµéÀ» ±×´ë·Î À¯Áö
-        inline QString playerColorToString(PlayerColor color) {
-            return QtAdapter::Utils::playerColorToString(color);
-        }
-
-        // ÇÔ¼ö ¿À¹ö·Îµå Á¦°Å - QColor ¹İÈ¯ ÇÔ¼ö´Â ´Ù¸¥ ÀÌ¸§ »ç¿ë
-        inline QColor getPlayerColor(PlayerColor color) {
-            return QtAdapter::Utils::playerColorToQColor(color);
-        }
-
-        inline PlayerColor getNextPlayer(PlayerColor current) {
-            return Common::Utils::getNextPlayer(current);
-        }
-
-        inline bool isPositionValid(const Position& pos) {
-            return Common::Utils::isPositionValid(pos);
-        }
-
-        inline int manhattanDistance(const Position& a, const Position& b) {
-            return Common::Utils::manhattanDistance(a, b);
-        }
-
-        inline QString formatTurnTime(int seconds) {
-            return QtAdapter::Utils::formatTurnTime(seconds);
-        }
-
-        inline bool isTurnTimeExpired(int remainingSeconds) {
-            return Common::Utils::isTurnTimeExpired(remainingSeconds);
-        }
-
-        inline QString getBlockName(BlockType blockType) {
-            return QtAdapter::Utils::getBlockName(blockType);
-        }
-
-        inline QString getBlockDescription(BlockType blockType) {
-            return QtAdapter::Utils::getBlockDescription(blockType);
-        }
-
-        inline QPoint positionToQPoint(const Position& pos) {
-            return QtAdapter::Utils::positionToQPoint(pos);
-        }
-
-        inline Position qPointToPosition(const QPoint& point) {
-            return QtAdapter::Utils::qPointToPosition(point);
-        }
-
-    } // namespace Utils
-
-    // ========================================
-    // ¼­¹ö Åë½ÅÀ» À§ÇÑ º¯È¯ ÇïÆÛ (»õ·Î Ãß°¡)
-    // ========================================
-
-    namespace ServerAdapter {
-
-        // Qt Å¸ÀÔÀ» ¼­¹ö Àü¼Û¿ë Common Å¸ÀÔÀ¸·Î º¯È¯
-        inline Common::UserInfo toServer(const UserInfo& qtUser) {
-            return qtUser.toCommon();
-        }
-
-        inline Common::RoomInfo toServer(const RoomInfo& qtRoom) {
-            return qtRoom.toCommon();
-        }
-
-        inline Common::GameRoomInfo toServer(const GameRoomInfo& qtGameRoom) {
-            return qtGameRoom.toCommon();
-        }
-
-        // ¼­¹ö¿¡¼­ ¹ŞÀº Common Å¸ÀÔÀ» Qt Å¸ÀÔÀ¸·Î º¯È¯
-        inline UserInfo fromServer(const Common::UserInfo& serverUser) {
-            return UserInfo(serverUser);
-        }
-
-        inline RoomInfo fromServer(const Common::RoomInfo& serverRoom) {
-            return RoomInfo(serverRoom);
-        }
-
-        inline GameRoomInfo fromServer(const Common::GameRoomInfo& serverGameRoom) {
-            return GameRoomInfo(serverGameRoom);
-        }
-
-        // º¤ÅÍ º¯È¯ ÇïÆÛ
-        inline QList<UserInfo> fromServerUserList(const std::vector<Common::UserInfo>& serverUsers) {
-            return QtAdapter::toQList<UserInfo, Common::UserInfo>(serverUsers);
-        }
-
-        inline QList<RoomInfo> fromServerRoomList(const std::vector<Common::RoomInfo>& serverRooms) {
-            return QtAdapter::toQList<RoomInfo, Common::RoomInfo>(serverRooms);
-        }
-
-        inline std::vector<Common::UserInfo> toServerUserList(const QList<UserInfo>& qtUsers) {
-            return QtAdapter::fromQList<Common::UserInfo, UserInfo>(qtUsers);
-        }
-
-    } // namespace ServerAdapter
+        QString playerColorToString(PlayerColor color);
+        QColor getPlayerColor(PlayerColor color);
+        PlayerColor getNextPlayer(PlayerColor current);
+        bool isPositionValid(const Position& pos, int boardSize = Common::BOARD_SIZE);
+        int manhattanDistance(const Position& a, const Position& b);
+        bool isCornerAdjacent(const Position& pos1, const Position& pos2);
+        bool isEdgeAdjacent(const Position& pos1, const Position& pos2);
+        QString trim(const QString& str);
+        bool isValidUsername(const QString& username);
+        bool isValidRoomName(const QString& roomName);
+        int getBlockScore(BlockType blockType);
+        QString getBlockName(BlockType blockType);
+        QString formatTurnTime(int seconds);
+        bool isTurnTimeExpired(int remainingSeconds);
+    }
 
 } // namespace Blokus
