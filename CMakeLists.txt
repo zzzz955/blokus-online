@@ -35,6 +35,7 @@ if(MSVC)
 endif()
 
 # 디렉토리 추가 (개발 단계별로 추가)
+add_subdirectory(proto)
 add_subdirectory(client)
 add_subdirectory(common)
 

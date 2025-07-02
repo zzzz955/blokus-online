@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package blokus;
 
-option cxx_namespace_prefix = "Blokus::Proto";
-
 import "google/protobuf/timestamp.proto";
 import "common.proto";
 
@@ -134,7 +132,7 @@ message GameEndedNotification {
   map<string, int32> rating_changes = 9; // 플레이어별 레이팅 변화
   
   // 업적 및 보상
-  map<string, repeated string> achievements = 10; // 플레이어별 새로 획득한 업적
+  map<string, string> achievements = 10; // 플레이어별 새로 획득한 업적 (문자열로 수정)
   map<string, int32> experience_gained = 11;     // 플레이어별 경험치 획득
 }
 

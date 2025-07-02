@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package blokus;
 
-option cxx_namespace_prefix = "Blokus::Proto";
-
 import "google/protobuf/timestamp.proto";
 
 // ========================================

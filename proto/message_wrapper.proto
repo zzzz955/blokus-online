@@ -2,11 +2,8 @@ syntax = "proto3";
 
 package blokus;
 
-option cxx_namespace_prefix = "Blokus::Proto";
-
 import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
-import "common.proto";
 
 // ========================================
 // 메시지 타입 열거형 (라우팅용)
