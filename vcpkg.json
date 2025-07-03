@@ -8,9 +8,7 @@
     "protobuf",
     "spdlog",
     "boost-asio",
-    "boost-system", 
-    "boost-thread",
+    "boost-system",
     "nlohmann-json"
-  ],
-  "builtin-baseline": "3f8078010e5ec665602f564df755e41479aafd73"
+  ]
 }
