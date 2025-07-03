@@ -1,0 +1,386 @@
+syntax = "proto3";
+
+package blokus;
+
+import "google/protobuf/timestamp.proto";
+import "common.proto";
+
+// ========================================
+// 게임 관련 열거형
+// ========================================
+
+enum TurnAction {
+  TURN_ACTION_PLACE_BLOCK = 0;
+  TURN_ACTION_SKIP = 1;
+  TURN_ACTION_UNDO = 2;
+  TURN_ACTION_TIMEOUT = 3;
+}
+
+enum GameEndReason {
+  GAME_END_NORMAL = 0;         // 정상 종료 (모든 플레이어 블록 소진 또는 배치 불가)
+  GAME_END_FORFEIT = 1;        // 항복
+  GAME_END_DISCONNECT = 2;     // 플레이어 접속 끊김
+  GAME_END_TIMEOUT = 3;        // 시간 초과
+  GAME_END_SERVER_ERROR = 4;   // 서버 오류
+  GAME_END_ADMIN_STOP = 5;     // 관리자 중단
+}
+
+// ========================================
+// 방 상태 관리
+// ========================================
+
+message RoomStateUpdate {
+  int32 room_id = 1;
+  repeated PlayerSlot player_slots = 2;
+  GameState game_state = 3;
+  
+  // 게임 설정
+  string game_mode = 4;
+  int32 turn_time_seconds = 5;
+  bool allow_undo = 6;
+  bool spectators_allowed = 7;
+  
+  // 현재 게임 정보 (게임 중일 때)
+  PlayerColor current_player = 8;
+  int32 turn_number = 9;
+  int32 remaining_time_seconds = 10;
+  
+  // 방 메타데이터
+  google.protobuf.Timestamp last_updated = 11;
+  int32 version = 12;          // 상태 버전 (충돌 방지)
+}
+
+// ========================================
+// AI 플레이어 관리
+// ========================================
+
+message AddAIPlayerRequest {
+  int32 room_id = 1;
+  PlayerColor color = 2;
+  int32 difficulty = 3;        // 1: 쉬움, 2: 보통, 3: 어려움
+  string ai_name = 4;          // AI 플레이어 이름
+  string ai_personality = 5;   // AI 성격 ("공격적", "수비적", "균형적")
+}
+
+message AddAIPlayerResponse {
+  Result result = 1;
+  PlayerSlot ai_player_slot = 2;
+  string message = 3;
+}
+
+message RemovePlayerRequest {
+  int32 room_id = 1;
+  PlayerColor color = 2;
+  string reason = 3;
+  bool is_kick = 4;            // 강퇴 여부
+}
+
+message RemovePlayerResponse {
+  Result result = 1;
+  string message = 2;
+  bool room_disbanded = 3;     // 방 해체 여부
+}
+
+// ========================================
+// 게임 시작/종료
+// ========================================
+
+message StartGameRequest {
+  int32 room_id = 1;
+  bool force_start = 2;        // 강제 시작 (준비되지 않은 플레이어 있어도)
+}
+
+message StartGameResponse {
+  Result result = 1;
+  string message = 2;
+  google.protobuf.Timestamp game_start_time = 3;
+  int32 estimated_duration_minutes = 4;
+}
+
+message GameStartedNotification {
+  int32 room_id = 1;
+  repeated PlayerSlot players = 2;
+  PlayerColor first_player = 3;
+  
+  // 게임 설정
+  string game_mode = 4;
+  int32 turn_time_seconds = 5;
+  bool allow_undo = 6;
+  int32 max_undo_count = 7;
+  
+  // 초기 게임 상태
+  BoardState initial_board = 8;
+  google.protobuf.Timestamp started_at = 9;
+  string game_id = 10;         // 게임 고유 ID (리플레이용)
+}
+
+message GameEndedNotification {
+  int32 room_id = 1;
+  string game_id = 2;
+  GameEndReason end_reason = 3;
+  
+  // 최종 결과
+  repeated PlayerResult final_results = 4;
+  string winner = 5;           // 승자 (동점인 경우 빈 문자열)
+  
+  // 게임 통계
+  GameStats game_stats = 6;
+  google.protobuf.Timestamp ended_at = 7;
+  int32 game_duration_seconds = 8;
+  
+  // 레이팅 변화
+  map<string, int32> rating_changes = 9; // 플레이어별 레이팅 변화
+  
+  // 업적 및 보상
+  map<string, string> achievements = 10; // 플레이어별 새로 획득한 업적 (문자열로 수정)
+  map<string, int32> experience_gained = 11;     // 플레이어별 경험치 획득
+}
+
+message PlayerResult {
+  string username = 1;
+  PlayerColor color = 2;
+  int32 final_score = 3;
+  int32 blocks_placed = 4;
+  int32 remaining_blocks = 5;
+  bool finished_all_blocks = 6; // 모든 블록 배치 완료
+  
+  // 상세 통계
+  int32 total_moves = 7;
+  int32 undo_count = 8;
+  float average_think_time = 9;
+  int32 longest_think_time = 10;
+  bool disconnected = 11;
+}
+
+// ========================================
+// 턴 관리
+// ========================================
+
+message TurnChangedNotification {
+  int32 room_id = 1;
+  PlayerColor current_player = 2;
+  PlayerColor previous_player = 3;
+  int32 turn_number = 4;
+  
+  // 턴 시간 정보
+  int32 turn_time_seconds = 5;
+  google.protobuf.Timestamp turn_started_at = 6;
+  
+  // 게임 상태
+  int32 moves_made = 7;
+  bool game_nearly_finished = 8; // 게임이 거의 끝나가는지
+  
+  // 이전 턴 정보
+  TurnAction previous_action = 9;
+  string previous_action_details = 10;
+}
+
+// ========================================
+// 블록 배치
+// ========================================
+
+message PlaceBlockRequest {
+  int32 room_id = 1;
+  BlockPlacement block_placement = 2;
+  
+  // 배치 옵션
+  bool confirm_placement = 3;  // 확정 배치 (false면 유효성만 검사)
+  bool use_hint = 4;          // 힌트 사용 여부
+  
+  // 클라이언트 검증 정보
+  int32 client_board_version = 5; // 클라이언트의 보드 버전
+  string move_id = 6;         // 클라이언트에서 생성한 고유 ID
+}
+
+message PlaceBlockResponse {
+  Result result = 1;
+  
+  // 성공 시 정보
+  BlockPlacement confirmed_placement = 2;
+  int32 score_gained = 3;
+  BoardState new_board_state = 4;
+  bool move_accepted = 5;
+  
+  // 검증 결과
+  bool valid_placement = 6;
+  repeated string validation_errors = 7;
+  repeated Position suggested_positions = 8; // 유효한 배치 위치 제안
+  
+  // 게임 상태 변화
+  bool turn_ended = 9;
+  PlayerColor next_player = 10;
+  bool game_ended = 11;
+  
+  // 클라이언트 동기화
+  string move_id = 12;        // 요청에서 받은 move_id 그대로 반환
+  int32 server_board_version = 13;
+}
+
+message BlockPlacedNotification {
+  int32 room_id = 1;
+  string player_username = 2;
+  PlayerColor player_color = 3;
+  BlockPlacement block_placement = 4;
+  
+  // 점수 정보
+  int32 score_gained = 5;
+  int32 new_total_score = 6;
+  int32 remaining_blocks = 7;
+  
+  // 보드 상태
+  BoardState updated_board = 8;
+  
+  // 게임 상태
+  bool turn_ended = 9;
+  PlayerColor next_player = 10;
+  google.protobuf.Timestamp placed_at = 11;
+  
+  // 특별한 상황
+  bool perfect_game = 12;     // 완벽한 게임 (모든 블록 사용)
+  bool game_winning_move = 13; // 게임 승리 결정 수
+  repeated string triggered_achievements = 14; // 이 수로 달성한 업적들
+}
+
+// ========================================
+// 턴 스킵 및 특수 행동
+// ========================================
+
+message SkipTurnRequest {
+  int32 room_id = 1;
+  string reason = 2;          // 스킵 이유
+  bool forced = 3;            // 강제 스킵 (시간 초과 등)
+}
+
+message SkipTurnResponse {
+  Result result = 1;
+  string message = 2;
+  PlayerColor next_player = 3;
+  bool game_ended = 4;        // 모든 플레이어가 스킵하여 게임 종료
+}
+
+message UndoMoveRequest {
+  int32 room_id = 1;
+  int32 moves_to_undo = 2;    // 되돌릴 수의 개수
+  string reason = 3;
+}
+
+message UndoMoveResponse {
+  Result result = 1;
+  BoardState reverted_board = 2;
+  PlayerColor current_player = 3;
+  int32 undo_count_remaining = 4; // 남은 실행취소 횟수
+  string message = 5;
+}
+
+// ========================================
+// 게임 상태 조회
+// ========================================
+
+message GetGameStateRequest {
+  int32 room_id = 1;
+  bool include_board = 2;     // 보드 상태 포함
+  bool include_player_details = 3; // 플레이어 상세 정보 포함
+  bool include_move_history = 4;   // 수 기록 포함
+}
+
+message GameStateResponse {
+  Result result = 1;
+  
+  // 기본 게임 상태
+  GameState game_state = 2;
+  PlayerColor current_player = 3;
+  int32 turn_number = 4;
+  int32 remaining_time_seconds = 5;
+  
+  // 플레이어 정보
+  repeated PlayerSlot players = 6;
+  
+  // 보드 상태 (요청 시에만)
+  BoardState board_state = 7;
+  
+  // 게임 기록 (요청 시에만)
+  repeated GameMove move_history = 8;
+  
+  // 게임 메타데이터
+  google.protobuf.Timestamp game_started_at = 9;
+  string game_id = 10;
+  string game_mode = 11;
+}
+
+message GameMove {
+  int32 move_number = 1;
+  string player_username = 2;
+  PlayerColor player_color = 3;
+  TurnAction action = 4;
+  BlockPlacement block_placement = 5; // action이 PLACE_BLOCK인 경우
+  google.protobuf.Timestamp timestamp = 6;
+  int32 think_time_seconds = 7;
+  int32 score_before = 8;
+  int32 score_after = 9;
+}
+
+// ========================================
+// 실시간 게임 상태 업데이트
+// ========================================
+
+message GameStateUpdate {
+  int32 room_id = 1;
+  int32 update_version = 2;   // 업데이트 버전 (순서 보장)
+  
+  // 변경된 정보만 포함 (델타 업데이트)
+  optional PlayerColor current_player = 3;
+  optional int32 remaining_time = 4;
+  optional BoardState board_changes = 5;
+  repeated PlayerSlot updated_players = 6;
+  
+  // 메타데이터
+  google.protobuf.Timestamp updated_at = 7;
+  string update_reason = 8;   // "block_placed", "turn_changed", "player_joined" 등
+}
+
+// ========================================
+// 게임 분석 및 힌트
+// ========================================
+
+message GetHintRequest {
+  int32 room_id = 1;
+  PlayerColor player = 2;
+  int32 hint_level = 3;       // 1: 간단한 힌트, 2: 상세한 힌트, 3: 최적 수
+}
+
+message GetHintResponse {
+  Result result = 1;
+  
+  // 힌트 정보
+  repeated BlockPlacement suggested_moves = 2;
+  repeated string explanations = 3; // 각 수에 대한 설명
+  int32 hint_quality = 4;     // 힌트 품질 점수 (1-100)
+  
+  // 분석 정보
+  int32 possible_moves_count = 5;
+  float win_probability = 6;   // 승률 예측
+  string strategy_advice = 7;  // 전략 조언
+}
+
+// ========================================
+// 관전 시스템
+// ========================================
+
+message SpectatorJoinRequest {
+  int32 room_id = 1;
+  bool silent_join = 2;       // 조용히 입장 (알림 없음)
+}
+
+message SpectatorJoinResponse {
+  Result result = 1;
+  GameStateResponse current_state = 2; // 현재 게임 상태
+  int32 spectator_count = 3;
+  string welcome_message = 4;
+}
+
+message SpectatorNotification {
+  int32 room_id = 1;
+  string spectator_username = 2;
+  bool joined = 3;            // true: 입장, false: 퇴장
+  int32 total_spectators = 4;
+}

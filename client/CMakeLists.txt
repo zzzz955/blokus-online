@@ -96,6 +96,7 @@ target_link_libraries(BlokusClient
     Qt5::Network
     spdlog::spdlog
     nlohmann_json::nlohmann_json
+    BlokusProto
 )
 
 # Windows 특정 설정

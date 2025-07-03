@@ -26,6 +26,13 @@ target_include_directories(${LIB_NAME} PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
+# ========================================
+# 라이브러리 링크
+# ========================================
+target_link_libraries(BlokusCommon
+    BlokusProto
+)
+
 # C++ 표준 설정
 target_compile_features(${LIB_NAME} PUBLIC cxx_std_20)
 
