@@ -1150,9 +1150,7 @@ namespace Blokus {
         QList<UserInfo> users;
 
         QStringList usernames = {
-            QString::fromUtf8("블로커스마스터"), QString::fromUtf8("테트리스킹"), QString::fromUtf8("퍼즐러버"),
-            QString::fromUtf8("전략가"), QString::fromUtf8("보드게임러"), QString::fromUtf8("게임고수"),
-            QString::fromUtf8("초보자"), QString::fromUtf8("중급자"), QString::fromUtf8("고급자")
+            QString::fromUtf8("더미 유저")
         };
 
         QStringList statuses = {
@@ -1192,21 +1190,11 @@ namespace Blokus {
         QList<RoomInfo> rooms;
 
         QStringList roomNames = {
-            QString::fromUtf8("초보자 환영 🔰"),
-            QString::fromUtf8("고수들의 전쟁 ⚔️"),
-            QString::fromUtf8("친목방 😊"),
-            QString::fromUtf8("AI와 함께 🤖"),
-            QString::fromUtf8("빠른게임 ⚡"),
-            QString::fromUtf8("여유롭게~ 🌸")
+            QString::fromUtf8("TestRoom")
         };
 
         QStringList hosts = {
-            QString::fromUtf8("방장1"),
-            QString::fromUtf8("프로게이머"),
-            QString::fromUtf8("친구"),
-            QString::fromUtf8("AI트레이너"),
-            QString::fromUtf8("스피드왕"),
-            QString::fromUtf8("힐링왕")
+            QString::fromUtf8("방장1")
         };
 
         for (int i = 0; i < roomNames.size(); ++i) {
