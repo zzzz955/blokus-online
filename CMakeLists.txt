@@ -16,6 +16,8 @@ find_package(protobuf CONFIG REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Core Widgets Gui Svg Network)
 find_package(spdlog CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
+
+# Boost 설정 - system만 사용 (thread 패키지 제외)
 find_package(Boost REQUIRED COMPONENTS system)
 
 # 디렉토리 추가
@@ -30,4 +32,5 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "Protobuf found: ${protobuf_FOUND}")
 message(STATUS "Qt5 found: ${Qt5_FOUND}")
 message(STATUS "Boost found: ${Boost_FOUND}")
+message(STATUS "Boost components: system (thread 패키지 제외)")
 message(STATUS "=============================")

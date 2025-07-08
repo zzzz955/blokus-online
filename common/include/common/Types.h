@@ -5,22 +5,45 @@
 #include <array>
 #include <string>
 #include <cstdint>
+#include <chrono>
 
 namespace Blokus {
     namespace Common {
-        // 전역 상수
+
+        // ========================================
+        // 기본 상수 정의 (기존 클라이언트와 호환)
+        // ========================================
+
         constexpr int BOARD_SIZE = 20;              // 클래식 모드 (고정)
         constexpr int MAX_PLAYERS = 4;              // 최대 플레이어 수
-        constexpr int BLOCKS_PER_PLAYER = 21;       // 플레이어당 블록 수
+        constexpr int BLOCKS_PER_PLAYER = 21;       // 플레이어당 블록 수 (기존 이름 유지)
         constexpr int DEFAULT_TURN_TIME = 30;       // 기본 턴 제한시간 (30초)
 
-        // 위치 타입 정의 (행, 열)
+        // 서버 관련 상수
+        constexpr int MAX_CONCURRENT_USERS = 1000;
+        constexpr uint16_t DEFAULT_SERVER_PORT = 7777;
+
+        // 게임 관련 상수
+        constexpr int MIN_PLAYERS_TO_START = 2;
+        constexpr int MAX_ROOM_NAME_LENGTH = 50;
+        constexpr int MAX_USERNAME_LENGTH = 20;
+        constexpr int MIN_USERNAME_LENGTH = 3;
+
+        // ========================================
+        // 기존 클라이언트 호환 타입 정의
+        // ========================================
+
+        // 위치 타입 정의 (행, 열) - 기존과 동일
         using Position = std::pair<int, int>;
 
-        // 위치 벡터 타입 (블록 모양 정의용)
+        // 위치 벡터 타입 (블록 모양 정의용) - 기존과 동일
         using PositionList = std::vector<Position>;
 
-        // 플레이어 색상 열거형
+        // ========================================
+        // 열거형 정의 (기존 클라이언트와 호환)
+        // ========================================
+
+        // 플레이어 색상 열거형 - 기존과 동일
         enum class PlayerColor : uint8_t {
             None = 0,   // 빈 칸
             Blue = 1,   // 파랑 (플레이어 1)
@@ -29,7 +52,15 @@ namespace Blokus {
             Green = 4   // 초록 (플레이어 4)
         };
 
-        // 블록 회전 상태
+        // 블록 타입 (기존 클라이언트에서 사용)
+        enum class BlockType : uint8_t {
+            I1 = 1, I2 = 2, I3 = 3, I4 = 4, I5 = 5,
+            L4 = 6, L5 = 7, N = 8, P = 9, T4 = 10,
+            T5 = 11, U = 12, V3 = 13, V5 = 14, W = 15,
+            X = 16, Y = 17, Z4 = 18, Z5 = 19, F = 20, O = 21
+        };
+
+        // 블록 회전 상태 - 기존과 동일
         enum class Rotation : uint8_t {
             Degree_0 = 0,   // 0도
             Degree_90 = 1,  // 90도 시계방향
@@ -37,7 +68,7 @@ namespace Blokus {
             Degree_270 = 3  // 270도 시계방향
         };
 
-        // 블록 뒤집기 상태  
+        // 블록 뒤집기 상태 - 기존과 동일
         enum class FlipState : uint8_t {
             Normal = 0,     // 정상
             Horizontal = 1, // 수평 뒤집기
@@ -45,7 +76,7 @@ namespace Blokus {
             Both = 3        // 양쪽 뒤집기
         };
 
-        // 게임 상태
+        // 게임 상태 - 기존과 동일
         enum class GameState : uint8_t {
             Waiting,     // 대기 중
             Playing,     // 게임 중
@@ -53,61 +84,30 @@ namespace Blokus {
             Paused       // 일시정지
         };
 
-        // 턴 상태
-        enum class TurnState : uint8_t {
-            Waiting,     // 대기 중
-            Thinking,    // 생각 중
-            Placing,     // 블록 배치 중
-            Confirming,  // 확인 중
-            Finished     // 턴 완료
+        // 턴 상태 (서버용 추가)
+        enum class TurnState {
+            WaitingForMove,    // 이동 대기
+            PlacingBlock,      // 블록 배치 중
+            TurnComplete,      // 턴 완료
+            Skipped           // 턴 건너뜀
         };
 
-        // 블록 타입 (폴리오미노 종류)
-        enum class BlockType : uint8_t {
-            // 1칸 블록
-            Single = 0,
+        // ========================================
+        // 기존 클라이언트 호환 구조체
+        // ========================================
 
-            // 2칸 블록  
-            Domino = 1,
-
-            // 3칸 블록
-            TrioLine = 2,
-            TrioAngle = 3,
-
-            // 4칸 블록
-            Tetro_I = 4,
-            Tetro_O = 5,
-            Tetro_T = 6,
-            Tetro_L = 7,
-            Tetro_S = 8,
-
-            // 5칸 블록 (총 12개)
-            Pento_F = 9,
-            Pento_I = 10,
-            Pento_L = 11,
-            Pento_N = 12,
-            Pento_P = 13,
-            Pento_T = 14,
-            Pento_U = 15,
-            Pento_V = 16,
-            Pento_W = 17,
-            Pento_X = 18,
-            Pento_Y = 19,
-            Pento_Z = 20
-        };
-
-        // 블록 배치 정보 구조체
+        // 블록 배치 정보 - 기존과 동일
         struct BlockPlacement {
-            BlockType type;         // 블록 타입
-            Position position;      // 배치 위치 (기준점)
-            Rotation rotation;      // 회전 상태
-            FlipState flip;         // 뒤집기 상태
-            PlayerColor player;     // 소유 플레이어
+            BlockType type;             // 블록 타입
+            Position position;          // 보드 위치 (행, 열)
+            Rotation rotation;          // 회전 상태
+            FlipState flip;             // 뒤집기 상태
+            PlayerColor player;         // 소유 플레이어
 
             // 기본 생성자
             BlockPlacement()
-                : type(BlockType::Single)
-                , position({ 0, 0 })
+                : type(BlockType::I1)
+                , position(0, 0)
                 , rotation(Rotation::Degree_0)
                 , flip(FlipState::Normal)
                 , player(PlayerColor::None)
@@ -135,7 +135,24 @@ namespace Blokus {
             }
         };
 
-        // 사용자 정보 구조체  
+        // 게임 설정 - 기존과 호환
+        struct GameSettings {
+            int turnTimeLimit;          // 턴 제한시간 (초)
+            bool allowSpectators;       // 관전 허용
+            std::string gameMode;       // "클래식", "듀얼" 등
+
+            GameSettings()
+                : turnTimeLimit(DEFAULT_TURN_TIME)
+                , allowSpectators(true)
+                , gameMode("클래식")
+            {
+            }
+        };
+
+        // ========================================
+        // 사용자 정보 구조체 - 기존과 동일
+        // ========================================
+
         struct UserInfo {
             std::string username;       // 사용자명
             int level;                  // 경험치 레벨 (게임 수에 따라 증가)
@@ -158,18 +175,18 @@ namespace Blokus {
             {
             }
 
-            // 승률 계산
+            // 승률 계산 - 기존과 동일
             double getWinRate() const {
                 return totalGames > 0 ? static_cast<double>(wins) / totalGames * 100.0 : 0.0;
             }
 
-            // 레벨 계산 (10게임당 1레벨)
+            // 레벨 계산 (10게임당 1레벨) - 기존과 동일
             int calculateLevel() const {
                 return (totalGames / 10) + 1;
             }
         };
 
-        // 방 정보 구조체
+        // 방 정보 구조체 - 기존과 동일
         struct RoomInfo {
             int roomId;
             std::string roomName;
@@ -193,7 +210,7 @@ namespace Blokus {
             }
         };
 
-        // 플레이어 슬롯 (게임 룸용)
+        // 플레이어 슬롯 (게임 룸용) - 기존과 동일
         struct PlayerSlot {
             PlayerColor color;          // 플레이어 색상
             std::string username;       // 플레이어 이름
@@ -212,99 +229,118 @@ namespace Blokus {
                 , isHost(false)
                 , isReady(false)
                 , score(0)
-                , remainingBlocks(BLOCKS_PER_PLAYER)
+                , remainingBlocks(BLOCKS_PER_PLAYER)  // 기존 상수명 유지
             {
-            }
-
-            bool isEmpty() const {
-                return username.empty() && !isAI;
-            }
-
-            std::string getDisplayName() const {
-                if (isEmpty()) {
-                    return "빈 슬롯";
-                }
-                else if (isAI) {
-                    return "AI (레벨 " + std::to_string(aiDifficulty) + ")";
-                }
-                else {
-                    return username;
-                }
-            }
-
-            bool isActive() const {
-                return !isEmpty();
             }
         };
 
-        // 게임 룸 정보 (게임 룸용)
-        struct GameRoomInfo {
-            int roomId;
-            std::string roomName;
-            std::string hostUsername;
-            PlayerColor hostColor;
-            int maxPlayers;
-            std::string gameMode;
-            bool isPlaying;
-            std::array<PlayerSlot, 4> playerSlots;
+        // ========================================
+        // 서버용 확장 구조체 (클라이언트 호환성 유지)
+        // ========================================
 
-            GameRoomInfo()
-                : roomId(0)
-                , roomName("새 방")
-                , hostUsername("")
-                , hostColor(PlayerColor::Blue)
-                , maxPlayers(4)
-                , gameMode("클래식")
-                , isPlaying(false)
-            {
-                // 4개 색상 슬롯 초기화
-                playerSlots[0].color = PlayerColor::Blue;
-                playerSlots[1].color = PlayerColor::Yellow;
-                playerSlots[2].color = PlayerColor::Red;
-                playerSlots[3].color = PlayerColor::Green;
-            }
+        // 게임 세션 관리용 (서버 전용)
+        struct GameSession {
+            int roomId = 0;
+            GameState state = GameState::Waiting;
+            std::array<PlayerSlot, MAX_PLAYERS> players;
+            int currentPlayerIndex = 0;
+            int turnNumber = 1;
+            std::chrono::system_clock::time_point startTime;
+            std::chrono::system_clock::time_point lastMoveTime;
 
-            int getCurrentPlayerCount() const {
-                int count = 0;
-                for (const auto& slot : playerSlots) {
-                    if (!slot.isEmpty()) count++;
-                }
-                return count;
-            }
+            // 게임 설정
+            GameSettings settings;
 
-            PlayerColor getMyColor(const std::string& username) const {
-                for (const auto& slot : playerSlots) {
-                    if (slot.username == username) {
-                        return slot.color;
-                    }
+            GameSession() = default;
+            explicit GameSession(int roomId_) : roomId(roomId_) {}
+
+            // 유틸리티 함수
+            PlayerColor getCurrentPlayerColor() const {
+                if (currentPlayerIndex >= 0 && currentPlayerIndex < MAX_PLAYERS) {
+                    return players[currentPlayerIndex].color;
                 }
                 return PlayerColor::None;
             }
 
-            bool isMyTurn(const std::string& username, PlayerColor currentTurn) const {
-                return getMyColor(username) == currentTurn;
+            bool isPlayerTurn(PlayerColor color) const {
+                return getCurrentPlayerColor() == color;
+            }
+
+            void nextTurn() {
+                currentPlayerIndex = (currentPlayerIndex + 1) % MAX_PLAYERS;
+                if (currentPlayerIndex == 0) {
+                    turnNumber++;
+                }
+            }
+
+            bool canStartGame() const {
+                int activePlayers = 0;
+                for (const auto& slot : players) {
+                    if (slot.color != PlayerColor::None && !slot.username.empty()) {
+                        activePlayers++;
+                    }
+                }
+                return activePlayers >= MIN_PLAYERS_TO_START;
             }
         };
 
-        // 게임 설정 구조체
-        struct GameSettings {
-            int playerCount;            // 플레이어 수 (2-4)
-            int turnTimeLimit;          // 턴 제한시간 (초, 기본 30초)
-            bool enableAI;              // AI 플레이어 허용
-            int aiDifficulty;           // AI 난이도 (1-3)
-            bool showHints;             // 힌트 표시 여부
-            bool recordStats;           // 통계 기록 여부
+        // ========================================
+        // 유틸리티 함수들 (기존 호환)
+        // ========================================
 
-            GameSettings()
-                : playerCount(4)
-                , turnTimeLimit(DEFAULT_TURN_TIME)
-                , enableAI(true)
-                , aiDifficulty(2)
-                , showHints(true)
-                , recordStats(true)
-            {
+        // 문자열 변환 함수들
+        inline std::string playerColorToString(PlayerColor color) {
+            switch (color) {
+            case PlayerColor::Blue: return "Blue";
+            case PlayerColor::Yellow: return "Yellow";
+            case PlayerColor::Red: return "Red";
+            case PlayerColor::Green: return "Green";
+            case PlayerColor::None: return "None";
+            default: return "Unknown";
             }
-        };
+        }
+
+        inline std::string gameStateToString(GameState state) {
+            switch (state) {
+            case GameState::Waiting: return "Waiting";
+            case GameState::Playing: return "Playing";
+            case GameState::Finished: return "Finished";
+            case GameState::Paused: return "Paused";
+            default: return "Unknown";
+            }
+        }
+
+        inline PlayerColor stringToPlayerColor(const std::string& str) {
+            if (str == "Blue") return PlayerColor::Blue;
+            if (str == "Yellow") return PlayerColor::Yellow;
+            if (str == "Red") return PlayerColor::Red;
+            if (str == "Green") return PlayerColor::Green;
+            return PlayerColor::None;
+        }
+
+        inline GameState stringToGameState(const std::string& str) {
+            if (str == "Waiting") return GameState::Waiting;
+            if (str == "Playing") return GameState::Playing;
+            if (str == "Finished") return GameState::Finished;
+            if (str == "Paused") return GameState::Paused;
+            return GameState::Waiting;
+        }
+
+        // 검증 함수들
+        inline bool isValidUsername(const std::string& username) {
+            return username.length() >= MIN_USERNAME_LENGTH &&
+                username.length() <= MAX_USERNAME_LENGTH &&
+                !username.empty();
+        }
+
+        inline bool isValidRoomName(const std::string& roomName) {
+            return !roomName.empty() && roomName.length() <= MAX_ROOM_NAME_LENGTH;
+        }
+
+        inline bool isValidPosition(const Position& pos) {
+            return pos.first >= 0 && pos.first < BOARD_SIZE &&
+                pos.second >= 0 && pos.second < BOARD_SIZE;
+        }
 
     } // namespace Common
 } // namespace Blokus
