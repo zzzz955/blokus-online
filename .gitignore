@@ -115,6 +115,8 @@ server/src/*.pb.cc
 server/src/*.pb.h
 client/src/*.pb.cc
 client/src/*.pb.h
+proto/*.pb.cc
+proto/*.pb.h
 
 # CMake (if used later)
 CMakeCache.txt
