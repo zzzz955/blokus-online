@@ -11,12 +11,12 @@ namespace Blokus {
     namespace Common {
 
         // ========================================
-        // 기본 상수 정의 (기존 클라이언트와 호환)
+        // 기본 상수 정의
         // ========================================
 
         constexpr int BOARD_SIZE = 20;              // 클래식 모드 (고정)
         constexpr int MAX_PLAYERS = 4;              // 최대 플레이어 수
-        constexpr int BLOCKS_PER_PLAYER = 21;       // 플레이어당 블록 수 (기존 이름 유지)
+        constexpr int BLOCKS_PER_PLAYER = 21;       // 플레이어당 블록 수
         constexpr int DEFAULT_TURN_TIME = 30;       // 기본 턴 제한시간 (30초)
 
         // 서버 관련 상수
@@ -30,20 +30,20 @@ namespace Blokus {
         constexpr int MIN_USERNAME_LENGTH = 3;
 
         // ========================================
-        // 기존 클라이언트 호환 타입 정의
+        // 기본 타입 정의
         // ========================================
 
-        // 위치 타입 정의 (행, 열) - 기존과 동일
+        // 위치 타입 정의 (행, 열)
         using Position = std::pair<int, int>;
 
-        // 위치 벡터 타입 (블록 모양 정의용) - 기존과 동일
+        // 위치 벡터 타입 (블록 모양 정의용)
         using PositionList = std::vector<Position>;
 
         // ========================================
-        // 열거형 정의 (기존 클라이언트와 호환)
+        // 열거형 정의
         // ========================================
 
-        // 플레이어 색상 열거형 - 기존과 동일
+        // 플레이어 색상 열거형
         enum class PlayerColor : uint8_t {
             None = 0,   // 빈 칸
             Blue = 1,   // 파랑 (플레이어 1)
@@ -52,15 +52,41 @@ namespace Blokus {
             Green = 4   // 초록 (플레이어 4)
         };
 
-        // 블록 타입 (기존 클라이언트에서 사용)
+        // 블록 타입 (직관적이고 일관성 있는 명명)
         enum class BlockType : uint8_t {
-            I1 = 1, I2 = 2, I3 = 3, I4 = 4, I5 = 5,
-            L4 = 6, L5 = 7, N = 8, P = 9, T4 = 10,
-            T5 = 11, U = 12, V3 = 13, V5 = 14, W = 15,
-            X = 16, Y = 17, Z4 = 18, Z5 = 19, F = 20, O = 21
+            // 1칸 블록
+            Single = 1,
+
+            // 2칸 블록  
+            Domino = 2,
+
+            // 3칸 블록
+            TrioLine = 3,       // 3일자
+            TrioAngle = 4,      // 3꺾임
+
+            // 4칸 블록 (테트로미노)
+            Tetro_I = 5,        // 4일자
+            Tetro_O = 6,        // 정사각형
+            Tetro_T = 7,        // T자
+            Tetro_L = 8,        // L자
+            Tetro_S = 9,        // S자 (Z자)
+
+            // 5칸 블록 (펜토미노)
+            Pento_F = 10,       // F자
+            Pento_I = 11,       // 5일자
+            Pento_L = 12,       // 5L자
+            Pento_N = 13,       // N자
+            Pento_P = 14,       // P자
+            Pento_T = 15,       // 5T자
+            Pento_U = 16,       // U자
+            Pento_V = 17,       // V자
+            Pento_W = 18,       // W자
+            Pento_X = 19,       // X자
+            Pento_Y = 20,       // Y자
+            Pento_Z = 21        // 5Z자
         };
 
-        // 블록 회전 상태 - 기존과 동일
+        // 블록 회전 상태
         enum class Rotation : uint8_t {
             Degree_0 = 0,   // 0도
             Degree_90 = 1,  // 90도 시계방향
@@ -68,7 +94,7 @@ namespace Blokus {
             Degree_270 = 3  // 270도 시계방향
         };
 
-        // 블록 뒤집기 상태 - 기존과 동일
+        // 블록 뒤집기 상태
         enum class FlipState : uint8_t {
             Normal = 0,     // 정상
             Horizontal = 1, // 수평 뒤집기
@@ -76,7 +102,7 @@ namespace Blokus {
             Both = 3        // 양쪽 뒤집기
         };
 
-        // 게임 상태 - 기존과 동일
+        // 게임 상태
         enum class GameState : uint8_t {
             Waiting,     // 대기 중
             Playing,     // 게임 중
@@ -84,8 +110,8 @@ namespace Blokus {
             Paused       // 일시정지
         };
 
-        // 턴 상태 (서버용 추가)
-        enum class TurnState {
+        // 턴 상태 (서버용)
+        enum class TurnState : uint8_t {
             WaitingForMove,    // 이동 대기
             PlacingBlock,      // 블록 배치 중
             TurnComplete,      // 턴 완료
@@ -93,10 +119,10 @@ namespace Blokus {
         };
 
         // ========================================
-        // 기존 클라이언트 호환 구조체
+        // 구조체 정의
         // ========================================
 
-        // 블록 배치 정보 - 기존과 동일
+        // 블록 배치 정보
         struct BlockPlacement {
             BlockType type;             // 블록 타입
             Position position;          // 보드 위치 (행, 열)
@@ -106,7 +132,7 @@ namespace Blokus {
 
             // 기본 생성자
             BlockPlacement()
-                : type(BlockType::I1)
+                : type(BlockType::Single)
                 , position(0, 0)
                 , rotation(Rotation::Degree_0)
                 , flip(FlipState::Normal)
@@ -135,7 +161,7 @@ namespace Blokus {
             }
         };
 
-        // 게임 설정 - 기존과 호환
+        // 게임 설정
         struct GameSettings {
             int turnTimeLimit;          // 턴 제한시간 (초)
             bool allowSpectators;       // 관전 허용
@@ -150,7 +176,7 @@ namespace Blokus {
         };
 
         // ========================================
-        // 사용자 정보 구조체 - 기존과 동일
+        // 사용자 정보 구조체
         // ========================================
 
         struct UserInfo {
@@ -175,18 +201,18 @@ namespace Blokus {
             {
             }
 
-            // 승률 계산 - 기존과 동일
+            // 승률 계산
             double getWinRate() const {
                 return totalGames > 0 ? static_cast<double>(wins) / totalGames * 100.0 : 0.0;
             }
 
-            // 레벨 계산 (10게임당 1레벨) - 기존과 동일
+            // 레벨 계산 (10게임당 1레벨)
             int calculateLevel() const {
                 return (totalGames / 10) + 1;
             }
         };
 
-        // 방 정보 구조체 - 기존과 동일
+        // 방 정보 구조체
         struct RoomInfo {
             int roomId;
             std::string roomName;
@@ -210,7 +236,7 @@ namespace Blokus {
             }
         };
 
-        // 플레이어 슬롯 (게임 룸용) - 기존과 동일
+        // 플레이어 슬롯 (게임 룸용)
         struct PlayerSlot {
             PlayerColor color;          // 플레이어 색상
             std::string username;       // 플레이어 이름
@@ -229,13 +255,13 @@ namespace Blokus {
                 , isHost(false)
                 , isReady(false)
                 , score(0)
-                , remainingBlocks(BLOCKS_PER_PLAYER)  // 기존 상수명 유지
+                , remainingBlocks(BLOCKS_PER_PLAYER)
             {
             }
         };
 
         // ========================================
-        // 서버용 확장 구조체 (클라이언트 호환성 유지)
+        // 서버용 확장 구조체
         // ========================================
 
         // 게임 세션 관리용 (서버 전용)
@@ -285,7 +311,7 @@ namespace Blokus {
         };
 
         // ========================================
-        // 유틸리티 함수들 (기존 호환)
+        // 유틸리티 함수들
         // ========================================
 
         // 문자열 변환 함수들

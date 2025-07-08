@@ -199,9 +199,9 @@ namespace Blokus {
         };
 
         // ========================================
-        // 함수 타입 정의
+        // 함수 타입 정의 (이름 변경)
         // ========================================
-        using MessageHandler = std::function<MessageResult(ClientSessionPtr, const std::string&)>;
+        using MessageHandlerFunc = std::function<MessageResult(ClientSessionPtr, const std::string&)>;
         using ErrorCallback = std::function<void(const std::string&, const std::exception&)>;
 
         // ========================================

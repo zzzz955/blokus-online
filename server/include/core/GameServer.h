@@ -7,10 +7,12 @@
 #include <unordered_map>
 #include <mutex>
 #include <shared_mutex>
+#include <queue>
 
 #include <boost/asio.hpp>
+#include <google/protobuf/message.h>
 
-#include "server/common/ServerTypes.h"
+#include "common/ServerTypes.h"
 #include "common/Types.h"
 
 namespace Blokus {

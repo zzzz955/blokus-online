@@ -6,27 +6,41 @@ if(MSVC)
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS UNICODE _UNICODE)
 endif()
 
-# 서버 소스 파일들 (추후 구현)
+# 서버 소스 파일들 (실제로 구현된 파일만)
 set(SERVER_SOURCES
     main.cpp
-    # src/GameServer.cpp
-    # src/ClientConnection.cpp
-    # src/RoomManager.cpp
-    # src/GameManager.cpp
-    # src/MessageHandler.cpp
-    # src/DatabaseManager.cpp
-    # src/RedisManager.cpp
+    # src/core/GameServer.cpp
+    # src/core/Session.cpp
+    # src/core/EventSystem.cpp
+    # src/game/GameRoom.cpp
+    # src/handler/MessageHandler.cpp
+    # src/manager/NetworkManager.cpp
+    # src/manager/RoomManager.cpp
+    # src/manager/DatabaseManager.cpp
+    # src/manager/ConfigManager.cpp
+    # src/service/AuthenticationService.cpp
+    # src/util/ServerUtils.cpp
+    # src/util/Logger.cpp
+    # src/monitor/MetricsCollector.cpp
+    # src/security/RateLimiter.cpp
 )
 
 set(SERVER_HEADERS
-    include/server/GameServer.h
-    include/server/ServerTypes.h
-    # include/server/ClientConnection.h
-    # include/server/RoomManager.h
-    # include/server/GameManager.h
-    # include/server/MessageHandler.h
-    # include/server/DatabaseManager.h
-    # include/server/RedisManager.h
+    include/common/ServerTypes.h
+    include/core/GameServer.h
+    include/core/Session.h
+    include/core/EventSystem.h
+    include/game/GameRoom.h
+    include/handler/MessageHandler.h
+    include/manager/NetworkManager.h
+    include/manager/RoomManager.h
+    include/manager/DatabaseManager.h
+    include/manager/ConfigManager.h
+    include/service/AuthenticationService.h
+    include/util/ServerUtils.h
+    include/util/Logger.h
+    include/monitor/MetricsCollector.h
+    include/security/RateLimiter.h
 )
 
 # 실행 파일 생성
