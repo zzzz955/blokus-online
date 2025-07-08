@@ -3,18 +3,26 @@
 #include <memory>
 #include <vector>
 #include <unordered_set>
+#include <unordered_map>
 #include <string>
 #include <mutex>
+#include <shared_mutex>
 #include <atomic>
 #include <chrono>
 
 #include "common/Types.h"
 #include "common/GameLogic.h"
+#include "server/common/ServerTypes.h"
 
 namespace Blokus {
     namespace Server {
 
-        // 개별 게임 방을 나타내는 클래스
+        // 전방 선언
+        class NetworkManager;
+
+        // ========================================
+        // 개별 게임방을 나타내는 클래스
+        // ========================================
         class GameRoom {
         public:
             explicit GameRoom(const Common::RoomInfo& roomInfo, uint32_t hostSessionId);
@@ -72,10 +80,13 @@ namespace Blokus {
             void addChatMessage(const std::string& username, const std::string& message);
             std::vector<std::string> getRecentChatMessages(size_t count = 10) const;
 
-            // 타이밍 관리
+            // 타임스탬프 관리
             std::chrono::steady_clock::time_point getCreationTime() const { return m_creationTime; }
             std::chrono::steady_clock::time_point getLastActivity() const { return m_lastActivity; }
             void updateActivity();
+
+            // 네트워크 매니저 설정 (메시지 브로드캐스트용)
+            void setNetworkManager(NetworkManager* networkManager) { m_networkManager = networkManager; }
 
         private:
             // 내부 헬퍼 함수들
@@ -84,6 +95,10 @@ namespace Blokus {
             void resetGameState();                                // 게임 상태 초기화
             Common::PlayerColor findAvailableColor() const;      // 사용 가능한 색상 찾기
             void broadcastToRoom(const std::string& message);    // 방 내 브로드캐스트
+
+            // 플레이어 슬롯 관리
+            void updatePlayerSlots();                             // 플레이어 슬롯 정보 갱신
+            bool isPlayerSlotAvailable(Common::PlayerColor color) const;
 
         private:
             // 방 기본 정보
@@ -109,11 +124,14 @@ namespace Blokus {
             static constexpr size_t MAX_CHAT_HISTORY = 100;      // 최대 채팅 보관 수
 
             // 동기화
-            mutable std::mutex m_roomMutex;                       // 방 상태 보호용 뮤텍스
+            mutable std::shared_mutex m_roomMutex;                // 방 상태 보호용 뮤텍스
 
-            // 타이밍 정보
+            // 타임스탬프 정보
             std::chrono::steady_clock::time_point m_creationTime; // 방 생성 시간
             std::chrono::steady_clock::time_point m_lastActivity; // 마지막 활동 시간
+
+            // 네트워크 관리자 (메시지 전송용)
+            NetworkManager* m_networkManager = nullptr;          // 약한 참조
         };
 
     } // namespace Server

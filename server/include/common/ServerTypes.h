@@ -4,14 +4,28 @@
 #include <string>
 #include <chrono>
 #include <memory>
+#include <functional>
 
 namespace Blokus {
     namespace Server {
 
         // ========================================
+        // 전방 선언
+        // ========================================
+        class ClientSession;
+        class GameRoom;
+        class UserInfo;
+
+        // ========================================
+        // 타입 별칭 정의
+        // ========================================
+        using ClientSessionPtr = std::shared_ptr<ClientSession>;
+        using GameRoomPtr = std::shared_ptr<GameRoom>;
+        using UserInfoPtr = std::shared_ptr<UserInfo>;
+
+        // ========================================
         // 서버 상수
         // ========================================
-
         constexpr uint16_t DEFAULT_SERVER_PORT = 7777;
         constexpr int MAX_CONCURRENT_USERS = 1000;
         constexpr int DEFAULT_THREAD_POOL_SIZE = 4;
@@ -29,9 +43,86 @@ namespace Blokus {
         constexpr std::chrono::seconds ROOM_IDLE_TIMEOUT{ 600 };  // 10분
 
         // ========================================
-        // 서버 설정 구조체
+        // 열거형 정의
         // ========================================
 
+        // 클라이언트 연결 상태
+        enum class ConnectionState {
+            Connecting,      // 연결 중
+            Connected,       // 연결됨
+            Authenticating,  // 인증 중
+            Authenticated,   // 인증됨
+            InLobby,        // 로비에 있음
+            InRoom,         // 방에 있음
+            InGame,         // 게임 중
+            Disconnecting,  // 연결 해제 중
+            Disconnected    // 연결 해제됨
+        };
+
+        // 세션 상태
+        enum class SessionState {
+            Active,
+            Idle,
+            Expired,
+            Invalid
+        };
+
+        // 방 상태
+        enum class RoomState {
+            Waiting,    // 대기 중
+            Playing,    // 게임 중
+            Finished,   // 게임 종료
+            Disbanded   // 방 해체
+        };
+
+        // 메시지 타입 (간소화된 버전)
+        enum class MessageType {
+            Unknown = 0,
+            Auth = 100,
+            Lobby = 200,
+            Room = 300,
+            Game = 400,
+            Chat = 500,
+            Error = 900
+        };
+
+        // 메시지 처리 결과
+        enum class MessageResult {
+            Success,
+            Failed,
+            InvalidFormat,
+            UnknownType,
+            InternalError
+        };
+
+        // 서버 오류 코드
+        enum class ServerErrorCode {
+            None = 0,
+            ConnectionFailed = 1000,
+            AuthenticationFailed = 1001,
+            SessionExpired = 1002,
+            TooManyConnections = 1003,
+            RoomNotFound = 2000,
+            RoomFull = 2001,
+            RoomPasswordIncorrect = 2002,
+            AlreadyInRoom = 2003,
+            NotInRoom = 2004,
+            NotRoomHost = 2005,
+            GameNotStarted = 3000,
+            GameAlreadyStarted = 3001,
+            InvalidMove = 3002,
+            NotYourTurn = 3003,
+            DatabaseError = 4000,
+            RedisError = 4001,
+            InternalError = 4002,
+            ServiceUnavailable = 4003
+        };
+
+        // ========================================
+        // 구조체 정의
+        // ========================================
+
+        // 서버 설정
         struct ServerConfig {
             uint16_t port = DEFAULT_SERVER_PORT;
             int maxConnections = MAX_CONCURRENT_USERS;
@@ -60,26 +151,7 @@ namespace Blokus {
             bool enableSsl = false;
         };
 
-        // ========================================
-        // 클라이언트 연결 상태
-        // ========================================
-
-        enum class ConnectionState {
-            Connecting,      // 연결 중
-            Connected,       // 연결됨
-            Authenticating,  // 인증 중
-            Authenticated,   // 인증됨
-            InLobby,        // 로비에 있음
-            InRoom,         // 방에 있음
-            InGame,         // 게임 중
-            Disconnecting,  // 연결 해제 중
-            Disconnected    // 연결 해제됨
-        };
-
-        // ========================================
         // 서버 통계 정보
-        // ========================================
-
         struct ServerStats {
             // 연결 통계
             int currentConnections = 0;
@@ -106,44 +178,7 @@ namespace Blokus {
             std::chrono::system_clock::time_point lastStatsUpdate;
         };
 
-        // ========================================
-        // 에러 코드 정의
-        // ========================================
-
-        enum class ServerErrorCode {
-            None = 0,
-
-            // 연결 관련 에러
-            ConnectionFailed = 1000,
-            AuthenticationFailed = 1001,
-            SessionExpired = 1002,
-            TooManyConnections = 1003,
-
-            // 방 관련 에러
-            RoomNotFound = 2000,
-            RoomFull = 2001,
-            RoomPasswordIncorrect = 2002,
-            AlreadyInRoom = 2003,
-            NotInRoom = 2004,
-            NotRoomHost = 2005,
-
-            // 게임 관련 에러
-            GameNotStarted = 3000,
-            GameAlreadyStarted = 3001,
-            InvalidMove = 3002,
-            NotYourTurn = 3003,
-
-            // 서버 내부 에러
-            DatabaseError = 4000,
-            RedisError = 4001,
-            InternalError = 4002,
-            ServiceUnavailable = 4003
-        };
-
-        // ========================================
         // 클라이언트 세션 정보
-        // ========================================
-
         struct ClientSession {
             std::string sessionId;
             std::string username;
@@ -164,11 +199,20 @@ namespace Blokus {
         };
 
         // ========================================
+        // 함수 타입 정의
+        // ========================================
+        using MessageHandler = std::function<MessageResult(ClientSessionPtr, const std::string&)>;
+        using ErrorCallback = std::function<void(const std::string&, const std::exception&)>;
+
+        // ========================================
         // 유틸리티 함수들
         // ========================================
-
         std::string errorCodeToString(ServerErrorCode code);
         std::string connectionStateToString(ConnectionState state);
+        std::string sessionStateToString(SessionState state);
+        std::string roomStateToString(RoomState state);
+        std::string messageTypeToString(MessageType type);
+
         bool isValidUsername(const std::string& username);
         bool isValidRoomName(const std::string& roomName);
         std::string generateSessionId();

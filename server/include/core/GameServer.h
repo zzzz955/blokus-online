@@ -6,10 +6,11 @@
 #include <vector>
 #include <unordered_map>
 #include <mutex>
+#include <shared_mutex>
 
 #include <boost/asio.hpp>
 
-#include "ServerTypes.h"
+#include "server/common/ServerTypes.h"
 #include "common/Types.h"
 
 namespace Blokus {
@@ -56,9 +57,9 @@ namespace Blokus {
             void acceptNewConnections();
 
             // 클라이언트 관리
-            void addClient(std::shared_ptr<ClientConnection> client);
+            void addClient(ClientSessionPtr client);
             void removeClient(const std::string& sessionId);
-            std::shared_ptr<ClientConnection> getClient(const std::string& sessionId);
+            ClientSessionPtr getClient(const std::string& sessionId);
 
             // 정리 및 타이머 관련
             void cleanup();
@@ -93,7 +94,7 @@ namespace Blokus {
             std::unique_ptr<RedisManager> m_redisManager;
 
             // 클라이언트 관리
-            std::unordered_map<std::string, std::shared_ptr<ClientConnection>> m_clients;
+            std::unordered_map<std::string, ClientSessionPtr> m_clients;
             mutable std::shared_mutex m_clientsMutex;
 
             // 통계
@@ -157,50 +158,6 @@ namespace Blokus {
         };
 
         // ========================================
-        // 방 관리자 클래스
-        // ========================================
-
-        class RoomManager {
-        public:
-            RoomManager();
-            ~RoomManager();
-
-            // 방 생명주기
-            int createRoom(const std::string& hostId, const Blokus::Common::RoomInfo& roomInfo);
-            bool deleteRoom(int roomId);
-
-            // 방 참가/탈퇴
-            bool joinRoom(int roomId, const std::string& userId, const std::string& password = "");
-            bool leaveRoom(int roomId, const std::string& userId);
-
-            // 방 정보 조회
-            std::vector<Blokus::Common::RoomInfo> getRoomList() const;
-            std::optional<Blokus::Common::RoomInfo> getRoomInfo(int roomId) const;
-            bool isRoomHost(int roomId, const std::string& userId) const;
-
-            // 방 설정 변경
-            bool updateRoomSettings(int roomId, const std::string& hostId,
-                const Blokus::Common::RoomInfo& newSettings);
-
-            // 상태 관리
-            void cleanupEmptyRooms();
-            int getActiveRoomCount() const;
-
-        private:
-            // 방 데이터 구조
-            struct Room {
-                Blokus::Common::RoomInfo info;
-                std::vector<std::string> players;
-                std::chrono::system_clock::time_point createdAt;
-                std::chrono::system_clock::time_point lastActivity;
-            };
-
-            std::unordered_map<int, Room> m_rooms;
-            mutable std::shared_mutex m_roomsMutex;
-            std::atomic<int> m_nextRoomId{ 1 };
-        };
-
-        // ========================================
         // 게임 관리자 클래스 (스텁)
         // ========================================
 
@@ -224,25 +181,7 @@ namespace Blokus {
         };
 
         // ========================================
-        // 메시지 핸들러 클래스 (스텁)
-        // ========================================
-
-        class MessageHandler {
-        public:
-            MessageHandler(GameServer* server);
-            ~MessageHandler();
-
-            // 메시지 처리
-            void handleMessage(std::shared_ptr<ClientConnection> client, const std::string& message);
-
-        private:
-            GameServer* m_server;
-
-            // 추후 protobuf 메시지 처리 구현 예정
-        };
-
-        // ========================================
-        // 데이터베이스 관리자 클래스 (스텁)  
+        // 데이터베이스 관리자 클래스 (스텁)
         // ========================================
 
         class DatabaseManager {
