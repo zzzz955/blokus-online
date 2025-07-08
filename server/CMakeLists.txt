@@ -6,31 +6,27 @@ if(MSVC)
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS UNICODE _UNICODE)
 endif()
 
-# 서버 소스 파일들
+# 서버 소스 파일들 (추후 구현)
 set(SERVER_SOURCES
     main.cpp
-    src/GameServer.cpp
-    src/ClientSession.cpp
-    src/Room.cpp
-    src/UserManager.cpp
-    src/MessageHandler.cpp
-    src/NetworkManager.cpp
-    src/AuthenticationService.cpp
-    src/GameService.cpp
-    src/ProtocolHandler.cpp
+    # src/GameServer.cpp
+    # src/ClientConnection.cpp
+    # src/RoomManager.cpp
+    # src/GameManager.cpp
+    # src/MessageHandler.cpp
+    # src/DatabaseManager.cpp
+    # src/RedisManager.cpp
 )
 
 set(SERVER_HEADERS
     include/server/GameServer.h
-    include/server/ClientSession.h
-    include/server/Room.h
-    include/server/UserManager.h
-    include/server/MessageHandler.h
-    include/server/NetworkManager.h
-    include/server/AuthenticationService.h
-    include/server/GameService.h
-    include/server/ProtocolHandler.h
     include/server/ServerTypes.h
+    # include/server/ClientConnection.h
+    # include/server/RoomManager.h
+    # include/server/GameManager.h
+    # include/server/MessageHandler.h
+    # include/server/DatabaseManager.h
+    # include/server/RedisManager.h
 )
 
 # 실행 파일 생성
@@ -47,6 +43,7 @@ target_include_directories(BlokusServer PRIVATE
 # 라이브러리 링크
 target_link_libraries(BlokusServer PRIVATE
     BlokusCommon
+    BlokusProto
     spdlog::spdlog
     nlohmann_json::nlohmann_json
     Boost::system
@@ -54,9 +51,8 @@ target_link_libraries(BlokusServer PRIVATE
 
 # Windows 설정
 if(WIN32)
-    target_link_libraries(BlokusServer PRIVATE
-        ws2_32
-        mswsock
+    set_target_properties(BlokusServer PROPERTIES
+        WIN32_EXECUTABLE FALSE  # 콘솔 애플리케이션
     )
 endif()
 

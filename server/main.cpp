@@ -6,7 +6,6 @@
 
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
-#include <spdlog/sinks/rotating_file_sink.h>
 
 #include "server/GameServer.h"
 #include "server/ServerTypes.h"
@@ -24,23 +23,16 @@ void signalHandler(int signal) {
     }
 }
 
-// 로깅 시스템 초기화
+// 로깅 시스템 초기화 (콘솔 출력만)
 void initializeLogging() {
     try {
-        // 콘솔 출력용 싱크
+        // 콘솔 출력용 싱크만 사용
         auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
         console_sink->set_level(spdlog::level::info);
         console_sink->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] [thread %t] %v");
 
-        // 파일 출력용 싱크 (10MB씩 최대 3개 파일 로테이션)
-        auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
-            "logs/blokus-server.log", 1024 * 1024 * 10, 3);
-        file_sink->set_level(spdlog::level::debug);
-        file_sink->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] [thread %t] %v");
-
-        // 멀티 싱크 로거 생성
-        std::vector<spdlog::sink_ptr> sinks{ console_sink, file_sink };
-        auto logger = std::make_shared<spdlog::logger>("blokus_server", sinks.begin(), sinks.end());
+        // 콘솔 전용 로거 생성
+        auto logger = std::make_shared<spdlog::logger>("blokus_server", console_sink);
         logger->set_level(spdlog::level::debug);
 
         // 기본 로거로 설정
@@ -60,14 +52,14 @@ void printServerInfo() {
     spdlog::info("=== 블로커스 온라인 서버 ===");
     spdlog::info("버전: 1.0.0");
     spdlog::info("게임 모드: 클래식 (20x20 보드)");
-    spdlog::info("최대 동시 접속자: {}", Blokus::Common::MAX_CONCURRENT_USERS);
-    spdlog::info("포트: {}", Blokus::Common::DEFAULT_SERVER_PORT);
+    spdlog::info("최대 동시 접속자: {}", Blokus::Server::MAX_CONCURRENT_USERS);
+    spdlog::info("포트: {}", Blokus::Server::DEFAULT_SERVER_PORT);
     spdlog::info("========================");
 }
 
 int main(int argc, char* argv[]) {
     try {
-        // 로깅 시스템 초기화
+        // 로깅 시스템 초기화 (콘솔만)
         initializeLogging();
 
         // 서버 정보 출력
