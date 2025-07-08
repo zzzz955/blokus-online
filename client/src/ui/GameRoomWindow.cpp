@@ -193,7 +193,7 @@ namespace Blokus {
             m_actionButton->setVisible(true);
             m_actionButton->setStyleSheet(
                 "QPushButton { background-color: #e74c3c; color: white; border: none; "
-                "border-radius: 6px; font-weight: bold; font-size: 12px; padding: 6px; } "
+                "border-radius: 6px; font-weight: bold; font-size: 12px; padding: 4px; } "
                 "QPushButton:hover { background-color: #c0392b; }"
             );
             disconnect(m_actionButton, nullptr, nullptr, nullptr);
@@ -564,11 +564,11 @@ namespace Blokus {
         m_roomStatusLabel->setStyleSheet("font-size: 12px; color: #7f8c8d;");
 
         m_currentTurnLabel = new QLabel();
-        m_currentTurnLabel->setStyleSheet("font-size: 12px; font-weight: bold; color: #3498db;");
+        m_currentTurnLabel->setStyleSheet("font-size: 14px; font-weight: bold; color: #34495e;");
 
         // 방 나가기 버튼을 우측 상단에 배치
         m_leaveRoomButton = new QPushButton(QString::fromUtf8("🚪 방 나가기"));
-        m_leaveRoomButton->setFixedSize(100, 30);
+        m_leaveRoomButton->setFixedSize(120, 30);
         m_leaveRoomButton->setStyleSheet(
             "QPushButton { "
             "background-color: #e74c3c; color: white; border: none; "
