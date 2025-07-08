@@ -1,46 +1,10 @@
 #include "common/GameLogic.h"
+#include "common/Block.h"  // Block 클래스 사용
 #include "common/Utils.h"
 #include <algorithm>
 
 namespace Blokus {
     namespace Common {
-
-        // ========================================
-        // 블록 모양 정의 (정적 데이터)
-        // ========================================
-
-        static const std::map<BlockType, PositionList> s_blockShapes = {
-            // 1칸 블록
-            { BlockType::Single, { {0, 0} } },
-
-            // 2칸 블록
-            { BlockType::Domino, { {0, 0}, {0, 1} } },
-
-            // 3칸 블록
-            { BlockType::TrioLine, { {0, 0}, {0, 1}, {0, 2} } },
-            { BlockType::TrioAngle, { {0, 0}, {0, 1}, {1, 1} } },
-
-            // 4칸 블록 (테트로미노)
-            { BlockType::Tetro_I, { {0, 0}, {0, 1}, {0, 2}, {0, 3} } },
-            { BlockType::Tetro_O, { {0, 0}, {0, 1}, {1, 0}, {1, 1} } },
-            { BlockType::Tetro_T, { {0, 0}, {0, 1}, {0, 2}, {1, 1} } },
-            { BlockType::Tetro_L, { {0, 0}, {0, 1}, {0, 2}, {1, 0} } },
-            { BlockType::Tetro_S, { {0, 0}, {0, 1}, {1, 1}, {1, 2} } },
-
-            // 5칸 블록 (펜토미노)
-            { BlockType::Pento_F, { {0, 1}, {0, 2}, {1, 0}, {1, 1}, {2, 1} } },
-            { BlockType::Pento_I, { {0, 0}, {0, 1}, {0, 2}, {0, 3}, {0, 4} } },
-            { BlockType::Pento_L, { {0, 0}, {0, 1}, {0, 2}, {0, 3}, {1, 0} } },
-            { BlockType::Pento_N, { {0, 0}, {0, 1}, {0, 2}, {1, 2}, {1, 3} } },
-            { BlockType::Pento_P, { {0, 0}, {0, 1}, {1, 0}, {1, 1}, {2, 0} } },
-            { BlockType::Pento_T, { {0, 0}, {0, 1}, {0, 2}, {1, 1}, {2, 1} } },
-            { BlockType::Pento_U, { {0, 0}, {0, 2}, {1, 0}, {1, 1}, {1, 2} } },
-            { BlockType::Pento_V, { {0, 0}, {1, 0}, {2, 0}, {2, 1}, {2, 2} } },
-            { BlockType::Pento_W, { {0, 0}, {1, 0}, {1, 1}, {2, 1}, {2, 2} } },
-            { BlockType::Pento_X, { {0, 1}, {1, 0}, {1, 1}, {1, 2}, {2, 1} } },
-            { BlockType::Pento_Y, { {0, 0}, {0, 1}, {0, 2}, {0, 3}, {1, 1} } },
-            { BlockType::Pento_Z, { {0, 0}, {0, 1}, {1, 1}, {2, 1}, {2, 2} } }
-        };
 
         // ========================================
         // GameLogic 구현
@@ -118,8 +82,13 @@ namespace Blokus {
                 return false;
             }
 
-            // 보드에 블록 배치
-            PositionList absolutePositions = getBlockShape(placement);
+            // 보드에 블록 배치 (Block 클래스 사용)
+            Block block(placement.type, placement.player);
+            block.setRotation(placement.rotation);
+            block.setFlipState(placement.flip);
+            
+            PositionList absolutePositions = block.getAbsolutePositions(placement.position);
+            
             for (const auto& pos : absolutePositions) {
                 m_board[pos.first][pos.second] = placement.player;
                 m_playerOccupiedCells[placement.player].push_back(pos);
@@ -181,9 +150,20 @@ namespace Blokus {
         {
             std::vector<BlockType> available;
 
-            // 모든 블록 타입 순회
-            for (int i = 0; i <= static_cast<int>(BlockType::Pento_Z); ++i) {
-                BlockType blockType = static_cast<BlockType>(i);
+            // 기존 Types.h의 모든 블록 타입 사용 (Block.cpp와 동일)
+            std::vector<BlockType> allTypes = {
+                BlockType::Single,
+                BlockType::Domino,
+                BlockType::TrioLine, BlockType::TrioAngle,
+                BlockType::Tetro_I, BlockType::Tetro_O, BlockType::Tetro_T,
+                BlockType::Tetro_L, BlockType::Tetro_S,
+                BlockType::Pento_F, BlockType::Pento_I, BlockType::Pento_L,
+                BlockType::Pento_N, BlockType::Pento_P, BlockType::Pento_T,
+                BlockType::Pento_U, BlockType::Pento_V, BlockType::Pento_W,
+                BlockType::Pento_X, BlockType::Pento_Y, BlockType::Pento_Z
+            };
+
+            for (BlockType blockType : allTypes) {
                 if (!isBlockUsed(player, blockType)) {
                     available.push_back(blockType);
                 }
@@ -306,7 +286,12 @@ namespace Blokus {
 
         bool GameLogic::hasCollision(const BlockPlacement& placement) const
         {
-            PositionList absolutePositions = getBlockShape(placement);
+            // Block 클래스를 사용하여 충돌 검사
+            Block block(placement.type, placement.player);
+            block.setRotation(placement.rotation);
+            block.setFlipState(placement.flip);
+
+            PositionList absolutePositions = block.getAbsolutePositions(placement.position);
 
             for (const auto& pos : absolutePositions) {
                 if (!isPositionValid(pos) || isCellOccupied(pos)) {
@@ -319,7 +304,12 @@ namespace Blokus {
 
         bool GameLogic::isFirstBlockValid(const BlockPlacement& placement) const
         {
-            PositionList absolutePositions = getBlockShape(placement);
+            // Block 클래스를 사용하여 첫 블록 검증
+            Block block(placement.type, placement.player);
+            block.setRotation(placement.rotation);
+            block.setFlipState(placement.flip);
+
+            PositionList absolutePositions = block.getAbsolutePositions(placement.position);
 
             // 클래식 모드: 4개 모서리 중 하나에 닿아야 함
             std::vector<Position> corners = {
@@ -344,7 +334,11 @@ namespace Blokus {
         bool GameLogic::isCornerAdjacencyValid(const BlockPlacement& placement) const
         {
             // 같은 색 블록과 모서리로 접촉해야 함
-            PositionList absolutePositions = getBlockShape(placement);
+            Block block(placement.type, placement.player);
+            block.setRotation(placement.rotation);
+            block.setFlipState(placement.flip);
+
+            PositionList absolutePositions = block.getAbsolutePositions(placement.position);
 
             for (const auto& blockPos : absolutePositions) {
                 std::vector<Position> diagonals = getDiagonalCells(blockPos);
@@ -362,7 +356,11 @@ namespace Blokus {
         bool GameLogic::hasNoEdgeAdjacency(const BlockPlacement& placement) const
         {
             // 같은 색 블록과 변으로 접촉하면 안됨
-            PositionList absolutePositions = getBlockShape(placement);
+            Block block(placement.type, placement.player);
+            block.setRotation(placement.rotation);
+            block.setFlipState(placement.flip);
+
+            PositionList absolutePositions = block.getAbsolutePositions(placement.position);
 
             for (const auto& blockPos : absolutePositions) {
                 std::vector<Position> adjacents = getAdjacentCells(blockPos);
@@ -422,101 +420,9 @@ namespace Blokus {
             }
         }
 
-        PositionList GameLogic::getBlockShape(const BlockPlacement& placement) const
-        {
-            auto it = s_blockShapes.find(placement.type);
-            if (it == s_blockShapes.end()) {
-                return { {0, 0} };
-            }
-
-            PositionList shape = it->second;
-
-            // 변환 적용
-            shape = applyTransformation(shape, placement.rotation, placement.flip);
-
-            // 정규화
-            shape = normalizeShape(shape);
-
-            // 절대 위치로 변환
-            PositionList absolutePositions;
-            for (const auto& relativePos : shape) {
-                Position absolutePos = {
-                    placement.position.first + relativePos.first,
-                    placement.position.second + relativePos.second
-                };
-                absolutePositions.push_back(absolutePos);
-            }
-
-            return absolutePositions;
-        }
-
-        PositionList GameLogic::applyTransformation(const PositionList& shape, Rotation rotation, FlipState flip) const
-        {
-            PositionList transformedShape = shape;
-
-            // 뒤집기 적용
-            for (auto& pos : transformedShape) {
-                switch (flip) {
-                case FlipState::Horizontal:
-                    pos = { pos.first, -pos.second };
-                    break;
-                case FlipState::Vertical:
-                    pos = { -pos.first, pos.second };
-                    break;
-                case FlipState::Both:
-                    pos = { -pos.first, -pos.second };
-                    break;
-                default:
-                    break;
-                }
-            }
-
-            // 회전 적용
-            for (auto& pos : transformedShape) {
-                switch (rotation) {
-                case Rotation::Degree_90:
-                    pos = { pos.second, -pos.first };
-                    break;
-                case Rotation::Degree_180:
-                    pos = { -pos.first, -pos.second };
-                    break;
-                case Rotation::Degree_270:
-                    pos = { -pos.second, pos.first };
-                    break;
-                default:
-                    break;
-                }
-            }
-
-            return transformedShape;
-        }
-
-        PositionList GameLogic::normalizeShape(const PositionList& shape) const
-        {
-            if (shape.empty()) {
-                return shape;
-            }
-
-            // 최소 좌표 찾기
-            int minRow = shape[0].first;
-            int minCol = shape[0].second;
-
-            for (const auto& pos : shape) {
-                minRow = std::min(minRow, pos.first);
-                minCol = std::min(minCol, pos.second);
-            }
-
-            // 정규화된 형태로 변환
-            PositionList normalizedShape;
-            for (const auto& pos : shape) {
-                normalizedShape.push_back({
-                    pos.first - minRow,
-                    pos.second - minCol
-                    });
-            }
-
-            return normalizedShape;
-        }
+        // getBlockShape는 제거 - Block 클래스를 직접 사용
+        // applyTransformation은 제거 - Block 클래스를 직접 사용
+        // normalizeShape는 제거 - Block 클래스를 직접 사용
 
         // ========================================
         // GameStateManager 구현
@@ -524,7 +430,7 @@ namespace Blokus {
 
         GameStateManager::GameStateManager()
             : m_gameState(GameState::Waiting)
-            , m_turnState(TurnState::Waiting)
+            , m_turnState(TurnState::WaitingForMove)  // Types.h의 TurnState 사용
             , m_turnNumber(1)
             , m_currentPlayerIndex(0)
         {
@@ -539,7 +445,7 @@ namespace Blokus {
         {
             resetGame();
             m_gameState = GameState::Playing;
-            m_turnState = TurnState::Thinking;
+            m_turnState = TurnState::WaitingForMove;
             m_gameLogic.setCurrentPlayer(m_playerOrder[0]);
         }
 
@@ -547,7 +453,7 @@ namespace Blokus {
         {
             m_gameLogic.clearBoard();
             m_gameState = GameState::Waiting;
-            m_turnState = TurnState::Waiting;
+            m_turnState = TurnState::WaitingForMove;
             m_turnNumber = 1;
             m_currentPlayerIndex = 0;
         }
@@ -555,7 +461,7 @@ namespace Blokus {
         void GameStateManager::endGame()
         {
             m_gameState = GameState::Finished;
-            m_turnState = TurnState::Finished;
+            m_turnState = TurnState::TurnComplete;
         }
 
         void GameStateManager::nextTurn()
@@ -577,12 +483,13 @@ namespace Blokus {
                 endGame();
             }
             else {
-                m_turnState = TurnState::Thinking;
+                m_turnState = TurnState::WaitingForMove;
             }
         }
 
         void GameStateManager::skipTurn()
         {
+            m_turnState = TurnState::Skipped;
             nextTurn();
         }
 

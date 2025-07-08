@@ -14,7 +14,8 @@ namespace Blokus {
                 case PlayerColor::Yellow: return "노랑";
                 case PlayerColor::Red: return "빨강";
                 case PlayerColor::Green: return "초록";
-                default: return "없음";
+                case PlayerColor::None: return "없음";
+                default: return "알 수 없음";
                 }
             }
 

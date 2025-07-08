@@ -11,7 +11,7 @@
 #include <spdlog/spdlog.h>
 
 #include "common/Types.h"
-#include "server/ServerTypes.h"
+#include "server/common/ServerTypes.h"
 
 namespace Blokus {
     namespace Server {

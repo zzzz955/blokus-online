@@ -1,8 +1,9 @@
 #pragma once
 
-#include "server/ServerTypes.h"
+#include "server/common/ServerTypes.h"
 #include <string>
 #include <chrono>
+#include <vector>
 
 namespace Blokus {
     namespace Server {
@@ -16,13 +17,16 @@ namespace Blokus {
             std::string messageTypeToString(MessageType type);
 
             // 서버 상태를 문자열로 변환
-            std::string serverStateToString(ServerState state);
+            std::string connectionStateToString(ConnectionState state);
 
             // 세션 상태를 문자열로 변환
             std::string sessionStateToString(SessionState state);
 
             // 방 상태를 문자열로 변환
             std::string roomStateToString(RoomState state);
+
+            // 에러 코드를 문자열로 변환
+            std::string errorCodeToString(ServerErrorCode code);
 
             // ========================================
             // 시간 관련 유틸리티
@@ -31,7 +35,7 @@ namespace Blokus {
             // 현재 시간을 ISO 8601 형식 문자열로 변환
             std::string currentTimeToString();
 
-            // 타임스탬프를 문자열로 변환
+            // 타임포인트를 문자열로 변환
             std::string timePointToString(const std::chrono::steady_clock::time_point& timePoint);
 
             // 지속 시간을 사람이 읽기 쉬운 형식으로 변환
@@ -39,6 +43,10 @@ namespace Blokus {
 
             // 현재 유닉스 타임스탬프 반환
             uint64_t getCurrentTimestamp();
+
+            // 타임아웃 확인
+            bool isTimedOut(const std::chrono::steady_clock::time_point& lastActivity,
+                std::chrono::seconds timeout);
 
             // ========================================
             // 네트워크 관련 유틸리티
@@ -52,6 +60,9 @@ namespace Blokus {
 
             // 포트 번호 유효성 검증
             bool isValidPort(int port);
+
+            // 네트워크 주소 파싱
+            std::pair<std::string, int> parseAddress(const std::string& address);
 
             // ========================================
             // 보안 관련 유틸리티
@@ -69,6 +80,9 @@ namespace Blokus {
             // UUID 생성
             std::string generateUUID();
 
+            // 솔트 생성
+            std::string generateSalt(size_t length = 16);
+
             // ========================================
             // 데이터 검증 유틸리티
             // ========================================
@@ -85,18 +99,21 @@ namespace Blokus {
             // JSON 문자열 유효성 검증
             bool isValidJson(const std::string& jsonString);
 
+            // 메시지 크기 검증
+            bool isValidMessageSize(size_t messageSize, size_t maxSize = MAX_MESSAGE_SIZE);
+
             // ========================================
             // 로깅 관련 유틸리티
             // ========================================
 
-            // 클라이언트 정보를 로그용 문자열로 변환
+            // 클라이언트 정보를 로깅용 문자열로 변환
             std::string formatClientInfo(uint32_t sessionId, const std::string& remoteAddress);
 
-            // 게임 이벤트를 로그용 문자열로 변환
-            std::string formatGameEvent(const GameEvent& event);
+            // 서버 통계를 로깅용 문자열로 변환
+            std::string formatServerStats(const ServerStats& stats);
 
-            // 서버 통계를 로그용 문자열로 변환
-            std::string formatServerStats(const ServerStatistics& stats);
+            // 에러 정보를 로깅용 문자열로 변환
+            std::string formatErrorInfo(ServerErrorCode code, const std::string& context);
 
             // ========================================
             // 성능 측정 유틸리티
@@ -147,8 +164,12 @@ namespace Blokus {
             // 문자열 대문자 변환
             std::string toUpper(const std::string& str);
 
-            // 문자열에서 특수 문자 이스케이프
+            // 문자열에서 특수 문자 이스케이핑
             std::string escapeString(const std::string& str);
+
+            // URL 인코딩/디코딩
+            std::string urlEncode(const std::string& str);
+            std::string urlDecode(const std::string& str);
 
             // ========================================
             // 게임 관련 유틸리티
@@ -162,6 +183,22 @@ namespace Blokus {
 
             // 게임 상태를 문자열로 변환
             std::string gameStateToString(Common::GameState state);
+
+            // 플레이어 순서 섞기
+            std::vector<Common::PlayerColor> shufflePlayerOrder(const std::vector<Common::PlayerColor>& players);
+
+            // ========================================
+            // 설정 파일 관련 유틸리티
+            // ========================================
+
+            // 설정 파일 로드
+            bool loadConfigFromFile(const std::string& filename, ServerConfig& config);
+
+            // 설정 파일 저장
+            bool saveConfigToFile(const std::string& filename, const ServerConfig& config);
+
+            // 환경 변수에서 설정 로드
+            void loadConfigFromEnvironment(ServerConfig& config);
 
         } // namespace Utils
     } // namespace Server

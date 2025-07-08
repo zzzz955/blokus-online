@@ -6,7 +6,7 @@ namespace Blokus {
     namespace Common {
 
         // ========================================
-        // 정적 블록 모양 정의
+        // 정적 블록 모양 정의 (Types.h와 일치)
         // ========================================
 
         const std::map<BlockType, PositionList> Block::s_blockShapes = {
@@ -53,7 +53,7 @@ namespace Blokus {
             , m_flipState(FlipState::Normal)
         {
             if (s_blockShapes.find(type) == s_blockShapes.end()) {
-                // Qt의 qWarning 대신 표준 방식 사용 (나중에 로깅 시스템으로 교체 가능)
+                // 잘못된 블록 타입인 경우 기본값으로 설정
                 m_type = BlockType::Single;
             }
         }
@@ -332,8 +332,20 @@ namespace Blokus {
         {
             std::vector<Block> playerBlocks;
 
-            for (int i = 0; i <= static_cast<int>(BlockType::Pento_Z); ++i) {
-                BlockType type = static_cast<BlockType>(i);
+            // 모든 블록 타입 순회
+            std::vector<BlockType> allTypes = {
+                BlockType::Single,
+                BlockType::Domino,
+                BlockType::TrioLine, BlockType::TrioAngle,
+                BlockType::Tetro_I, BlockType::Tetro_O, BlockType::Tetro_T,
+                BlockType::Tetro_L, BlockType::Tetro_S,
+                BlockType::Pento_F, BlockType::Pento_I, BlockType::Pento_L,
+                BlockType::Pento_N, BlockType::Pento_P, BlockType::Pento_T,
+                BlockType::Pento_U, BlockType::Pento_V, BlockType::Pento_W,
+                BlockType::Pento_X, BlockType::Pento_Y, BlockType::Pento_Z
+            };
+
+            for (BlockType type : allTypes) {
                 playerBlocks.emplace_back(type, player);
             }
 
@@ -379,11 +391,17 @@ namespace Blokus {
 
         std::vector<BlockType> BlockFactory::getAllBlockTypes()
         {
-            std::vector<BlockType> types;
-            for (int i = 0; i <= static_cast<int>(BlockType::Pento_Z); ++i) {
-                types.push_back(static_cast<BlockType>(i));
-            }
-            return types;
+            return {
+                BlockType::Single,
+                BlockType::Domino,
+                BlockType::TrioLine, BlockType::TrioAngle,
+                BlockType::Tetro_I, BlockType::Tetro_O, BlockType::Tetro_T,
+                BlockType::Tetro_L, BlockType::Tetro_S,
+                BlockType::Pento_F, BlockType::Pento_I, BlockType::Pento_L,
+                BlockType::Pento_N, BlockType::Pento_P, BlockType::Pento_T,
+                BlockType::Pento_U, BlockType::Pento_V, BlockType::Pento_W,
+                BlockType::Pento_X, BlockType::Pento_Y, BlockType::Pento_Z
+            };
         }
 
         int BlockFactory::getBlockCategory(BlockType type)
