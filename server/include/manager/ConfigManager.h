@@ -1,161 +1,130 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
-#include <mutex>
-#include <optional>
-#include <chrono>
+#include <cstdlib>
+#include <spdlog/spdlog.h>
 
 namespace Blokus {
     namespace Server {
 
         // ========================================
-        // 통합 설정 관리자 클래스
+        // 간단한 환경변수 헬퍼 함수들
+        // ========================================
+        inline std::string getEnvString(const char* name, const char* defaultValue = "") {
+            const char* value = std::getenv(name);
+            return value ? std::string(value) : std::string(defaultValue);
+        }
+
+        inline int getEnvInt(const char* name, int defaultValue = 0) {
+            const char* value = std::getenv(name);
+            return value ? std::atoi(value) : defaultValue;
+        }
+
+        inline bool getEnvBool(const char* name, bool defaultValue = false) {
+            const char* value = std::getenv(name);
+            if (!value) return defaultValue;
+            std::string val(value);
+            return (val == "true" || val == "1" || val == "yes");
+        }
+
+        // ========================================
+        // 간단한 설정 관리자 클래스
         // ========================================
         class ConfigManager {
         public:
-            // 싱글톤 패턴
-            static ConfigManager& getInstance();
+            static void initialize() {
+                // 서버 설정
+                serverPort = getEnvInt("SERVER_PORT", 7777);
+                maxClients = getEnvInt("SERVER_MAX_CLIENTS", 1000);
+                threadPoolSize = getEnvInt("SERVER_THREAD_POOL_SIZE", 4);
 
-            // 초기화 (환경변수 + .env 파일 로드)
-            bool initialize(const std::string& envFilePath = ".env");
-            void shutdown();
+                // 데이터베이스 설정
+                dbHost = getEnvString("DB_HOST", "localhost");
+                dbPort = getEnvString("DB_PORT", "5432");
+                dbUser = getEnvString("DB_USER", "admin");
+                dbPassword = getEnvString("DB_PASSWORD", "admin");
+                dbName = getEnvString("DB_NAME", "blokus_online");
+                dbPoolSize = getEnvInt("DB_POOL_SIZE", 10);
+
+                // PostgreSQL 연결 문자열 생성
+                dbConnectionString = "host=" + dbHost + " port=" + dbPort +
+                    " user=" + dbUser + " password=" + dbPassword +
+                    " dbname=" + dbName + " client_encoding=UTF8";
+
+                // 보안 설정
+                jwtSecret = getEnvString("JWT_SECRET", "dev_secret_change_in_production");
+                sessionTimeoutHours = getEnvInt("SESSION_TIMEOUT_HOURS", 24);
+                passwordSaltRounds = getEnvInt("PASSWORD_SALT_ROUNDS", 12);
+
+                // 로깅 설정
+                logLevel = getEnvString("LOG_LEVEL", "info");
+                logDirectory = getEnvString("LOG_DIRECTORY", "logs");
+
+                // 개발 설정
+                debugMode = getEnvBool("DEBUG_MODE", false);
+                enableSqlLogging = getEnvBool("ENABLE_SQL_LOGGING", false);
+
+                spdlog::info("환경변수 불러오기 완료! 서버 포트: {}, DB: {}@{}:{}/{}",
+                    serverPort, dbUser, dbHost, dbPort, dbName);
+
+                if (debugMode) {
+                    printConfig();
+                }
+            }
+
+            static bool validate() {
+                if (dbHost.empty() || dbUser.empty() || dbName.empty()) {
+                    spdlog::error("필수 DB 설정이 누락되었습니다: DB_HOST, DB_USER, DB_NAME");
+                    return false;
+                }
+                return true;
+            }
+
+            static void printConfig() {
+                spdlog::info("=== Configuration Settings ===");
+                spdlog::info("SERVER_PORT={}", serverPort);
+                spdlog::info("SERVER_MAX_CLIENTS={}", maxClients);
+                spdlog::info("DB_HOST={}", dbHost);
+                spdlog::info("DB_PORT={}", dbPort);
+                spdlog::info("DB_USER={}", dbUser);
+                spdlog::info("DB_PASSWORD=***MASKED***");
+                spdlog::info("DB_NAME={}", dbName);
+                spdlog::info("LOG_LEVEL={}", logLevel);
+                spdlog::info("DEBUG_MODE={}", debugMode ? "true" : "false");
+                spdlog::info("==============================");
+            }
 
             // ========================================
-            // 기본 값 접근 메서드
-            // ========================================
-            std::optional<std::string> getString(const std::string& key);
-            std::string getString(const std::string& key, const std::string& defaultValue);
-            int getInt(const std::string& key, int defaultValue = 0);
-            bool getBool(const std::string& key, bool defaultValue = false);
-            double getDouble(const std::string& key, double defaultValue = 0.0);
-
-            // 설정 값 변경 (런타임)
-            void set(const std::string& key, const std::string& value);
-
-            // ========================================
-            // 구조화된 설정 접근 (캐시됨)
+            // 설정 값들 (public static)
             // ========================================
 
             // 서버 설정
-            struct ServerConfig {
-                uint16_t port;
-                int maxConnections;
-                int threadPoolSize;
-                std::chrono::seconds heartbeatInterval;
-                std::chrono::seconds clientTimeout;
-
-                void loadFromConfig(ConfigManager& config);
-            };
+            static int serverPort;
+            static int maxClients;
+            static int threadPoolSize;
 
             // 데이터베이스 설정
-            struct DatabaseConfig {
-                std::string host;
-                int port;
-                std::string user;
-                std::string password;
-                std::string database;
-                int poolSize;
-                bool enableSqlLogging;
-
-                void loadFromConfig(ConfigManager& config);
-                std::string getConnectionString() const;
-            };
+            static std::string dbHost;
+            static std::string dbPort;
+            static std::string dbUser;
+            static std::string dbPassword;
+            static std::string dbName;
+            static std::string dbConnectionString;
+            static int dbPoolSize;
 
             // 보안 설정
-            struct SecurityConfig {
-                std::string jwtSecret;
-                std::chrono::hours sessionTimeout;
-                int maxLoginAttempts;
-                std::chrono::minutes loginBanTime;
-                int minPasswordLength;
-                int passwordSaltRounds;
-
-                void loadFromConfig(ConfigManager& config);
-            };
-
-            // 게임 룰 설정
-            struct GameConfig {
-                int maxPlayersPerRoom;
-                int minPlayersToStart;
-                std::chrono::seconds turnTimeout;
-                int maxRoomsPerUser;
-                bool allowSpectators;
-                bool allowAI;
-                int maxAIPlayersPerRoom;
-
-                void loadFromConfig(ConfigManager& config);
-            };
+            static std::string jwtSecret;
+            static int sessionTimeoutHours;
+            static int passwordSaltRounds;
 
             // 로깅 설정
-            struct LoggingConfig {
-                std::string level;
-                std::string logDirectory;
-                size_t maxFileSize;
-                size_t maxFiles;
-                bool enableConsoleLogging;
-                bool enableFileLogging;
+            static std::string logLevel;
+            static std::string logDirectory;
 
-                void loadFromConfig(ConfigManager& config);
-            };
-
-            // 구조화된 설정 접근자들
-            const ServerConfig& getServerConfig();
-            const DatabaseConfig& getDatabaseConfig();
-            const SecurityConfig& getSecurityConfig();
-            const GameConfig& getGameConfig();
-            const LoggingConfig& getLoggingConfig();
-
-            // ========================================
-            // 유틸리티 메서드
-            // ========================================
-            bool isInitialized() const { return m_isInitialized; }
-            void printLoadedConfig() const;
-            bool validateConfig() const;
-            std::vector<std::string> getValidationErrors() const;
-
-        private:
-            ConfigManager() = default;
-            ~ConfigManager() = default;
-            ConfigManager(const ConfigManager&) = delete;
-            ConfigManager& operator=(const ConfigManager&) = delete;
-
-            // .env 파일 로드
-            bool loadFromFile(const std::string& envFilePath);
-
-            // 시스템 환경변수 로드
-            bool loadFromEnvironment();
-
-            // 문자열 파싱 헬퍼
-            std::string trim(const std::string& str);
-            std::pair<std::string, std::string> parseLine(const std::string& line);
-
-            // 캐시 무효화
-            void invalidateCache();
-
-        private:
-            // 원시 키-값 저장소
-            std::unordered_map<std::string, std::string> m_configValues;
-            mutable std::mutex m_configMutex;
-
-            // 구조화된 설정 캐시
-            mutable std::optional<ServerConfig> m_serverConfig;
-            mutable std::optional<DatabaseConfig> m_databaseConfig;
-            mutable std::optional<SecurityConfig> m_securityConfig;
-            mutable std::optional<GameConfig> m_gameConfig;
-            mutable std::optional<LoggingConfig> m_loggingConfig;
-            mutable std::mutex m_cacheMutex;
-
-            bool m_isInitialized = false;
+            // 개발 설정
+            static bool debugMode;
+            static bool enableSqlLogging;
         };
-
-        // ========================================
-        // 편의 매크로 (선택적 사용)
-        // ========================================
-#define CONFIG ConfigManager::getInstance()
-#define GET_CONFIG_STRING(key, defaultVal) CONFIG.getString(key, defaultVal)
-#define GET_CONFIG_INT(key, defaultVal) CONFIG.getInt(key, defaultVal)
-#define GET_CONFIG_BOOL(key, defaultVal) CONFIG.getBool(key, defaultVal)
 
     } // namespace Server
 } // namespace Blokus

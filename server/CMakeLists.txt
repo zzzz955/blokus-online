@@ -4,6 +4,7 @@ cmake_minimum_required(VERSION 3.24)
 if(MSVC)
     add_compile_options(/utf-8)
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS UNICODE _UNICODE)
+    add_compile_definitions(SPDLOG_WCHAR_TO_UTF8_SUPPORT)
 endif()
 
 # 서버 소스 파일들

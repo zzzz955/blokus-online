@@ -1,135 +1,107 @@
-#pragma once
+ï»¿#pragma once
+// DatabaseManager.h - ê°„ë‹¨í•˜ê³  ëª…í™•í•œ ì¸í„°í˜ì´ìŠ¤
 
-#include "manager/ConfigManager.h"
 #include <string>
 #include <vector>
 #include <memory>
-#include <future>
-#include <functional>
-#include <pqxx/pqxx>
+#include <optional>
+#include <cstdint>
 
 namespace Blokus {
     namespace Server {
 
-        // ========================================
-        // »ç¿ëÀÚ Á¤º¸ ±¸Á¶Ã¼
-        // ========================================
+        // ğŸ”¥ ì‚¬ìš©ì ì •ë³´ êµ¬ì¡°ì²´
         struct UserAccount {
             uint32_t userId;
             std::string username;
-            std::string email;
             std::string passwordHash;
-            std::chrono::system_clock::time_point createdAt;
-            std::chrono::system_clock::time_point lastLoginAt;
-            bool isActive;
+            std::string displayName;
+            std::string avatarUrl;
             int totalGames;
             int wins;
             int losses;
+            int draws;
+            int rating;
+            int level;
+            bool isActive;
+
+            // ê³„ì‚°ëœ í•„ë“œ
+            double getWinRate() const;
         };
 
-        // ========================================
-        // °ÔÀÓ ±â·Ï ±¸Á¶Ã¼
-        // ========================================
-        struct GameRecord {
-            uint32_t gameId;
-            std::vector<uint32_t> playerIds;
-            uint32_t winnerId;
-            std::chrono::system_clock::time_point startTime;
-            std::chrono::system_clock::time_point endTime;
-            std::string gameData; // JSON ÇüÅÂÀÇ °ÔÀÓ »ó¼¼ µ¥ÀÌÅÍ
+        // ğŸ”¥ ì‹œìŠ¤í…œ í†µê³„ êµ¬ì¡°ì²´
+        struct DatabaseStats {
+            int totalUsers;
+            int activeUsers;
+            int onlineUsers;
+            int totalGames;
+            int totalStats;
         };
 
-        // ========================================
-        // µ¥ÀÌÅÍº£ÀÌ½º °ü¸®ÀÚ Å¬·¡½º
-        // ========================================
+        // ğŸ”¥ ì „ë°© ì„ ì–¸ (êµ¬í˜„ë¶€ ìˆ¨ê¹€)
+        class ConnectionPool;
+
+        // ğŸ”¥ DatabaseManager í´ë˜ìŠ¤
         class DatabaseManager {
         public:
-            explicit DatabaseManager();
+            DatabaseManager();
             ~DatabaseManager();
 
-            // ÃÊ±âÈ­
+            // ì´ˆê¸°í™”/ì •ë¦¬
             bool initialize();
             void shutdown();
-            bool isConnected() const { return m_isInitialized.load(); }
 
             // ========================================
-            // »ç¿ëÀÚ °ü¸®
+            // ì‚¬ìš©ì ê´€ë¦¬
             // ========================================
 
-            // È¸¿ø°¡ÀÔ/·Î±×ÀÎ
-            std::future<bool> createUser(const std::string& username, const std::string& email,
-                const std::string& passwordHash);
-            std::future<std::optional<UserAccount>> getUserByUsername(const std::string& username);
-            std::future<std::optional<UserAccount>> getUserByEmail(const std::string& email);
-            std::future<std::optional<UserAccount>> getUserById(uint32_t userId);
+            // ì‚¬ìš©ì ì¡°íšŒ
+            std::optional<UserAccount> getUserByUsername(const std::string& username);
+            std::optional<UserAccount> getUserById(uint32_t userId);
 
-            // »ç¿ëÀÚ Á¤º¸ ¾÷µ¥ÀÌÆ®
-            std::future<bool> updateUserLastLogin(uint32_t userId);
-            std::future<bool> updateUserGameStats(uint32_t userId, bool won);
-            std::future<bool> updateUserPassword(uint32_t userId, const std::string& newPasswordHash);
+            // ì‚¬ìš©ì ìƒì„±/ìˆ˜ì •
+            bool createUser(const std::string& username, const std::string& passwordHash);
+            bool updateUserLastLogin(const std::string& username);
+            bool updateUserLastLogin(uint32_t userId);
+            bool setUserActive(uint32_t userId, bool active);
 
-            // »ç¿ëÀÚ »óÅÂ °ü¸®
-            std::future<bool> setUserActive(uint32_t userId, bool active);
-            std::future<bool> deleteUser(uint32_t userId);
+            // ì¸ì¦
+            std::optional<UserAccount> authenticateUser(const std::string& username, const std::string& passwordHash);
+            bool isUsernameAvailable(const std::string& username);
 
             // ========================================
-            // °ÔÀÓ ±â·Ï °ü¸®
+            // ê²Œì„ í†µê³„
             // ========================================
 
-            // °ÔÀÓ ±â·Ï ÀúÀå/Á¶È¸
-            std::future<uint32_t> createGameRecord(const std::vector<uint32_t>& playerIds,
-                const std::string& gameData);
-            std::future<bool> finishGameRecord(uint32_t gameId, uint32_t winnerId,
-                const std::string& finalGameData);
-            std::future<std::vector<GameRecord>> getUserGameHistory(uint32_t userId, int limit = 10);
-            std::future<std::optional<GameRecord>> getGameRecord(uint32_t gameId);
+            bool updateGameStats(uint32_t userId, bool won, bool draw = false, int score = 0);
+            bool updateUserRating(uint32_t userId, int opponentRating, bool won, bool draw = false);
 
             // ========================================
-            // ¼¼¼Ç °ü¸® (¿É¼Ç)
+            // ì¡°íšŒ ê¸°ëŠ¥
             // ========================================
 
-            std::future<bool> createSession(const std::string& sessionToken, uint32_t userId);
-            std::future<std::optional<uint32_t>> getUserBySession(const std::string& sessionToken);
-            std::future<bool> deleteSession(const std::string& sessionToken);
-            std::future<bool> cleanupExpiredSessions();
+            DatabaseStats getStats();
+            std::vector<UserAccount> getRanking(const std::string& orderBy = "rating", int limit = 100, int offset = 0);
+            std::vector<std::string> getOnlineUsers();
 
             // ========================================
-            // Åë°è Á¶È¸
+            // ì¹œêµ¬ ì‹œìŠ¤í…œ (ì¶”í›„ í™•ì¥)
             // ========================================
 
-            struct DatabaseStats {
-                int totalUsers;
-                int activeUsers; // ÃÖ±Ù 30ÀÏ ³» ·Î±×ÀÎ
-                int totalGames;
-                int gamesThisWeek;
-                double averageGameDuration;
-            };
+            bool sendFriendRequest(uint32_t requesterId, uint32_t addresseeId);
+            bool acceptFriendRequest(uint32_t requesterId, uint32_t addresseeId);
+            std::vector<std::string> getFriends(uint32_t userId);
 
-            std::future<DatabaseStats> getStats();
+            // ========================================
+            // í…ŒìŠ¤íŠ¸/ê´€ë¦¬ ê¸°ëŠ¥
+            // ========================================
 
-        private:
-            // ¿¬°á Ç® °ü¸® (¼±¾ğ¸¸)
-            class ConnectionPool;
-            std::unique_ptr<ConnectionPool> m_connectionPool;
-
-            // ºñµ¿±â ÀÛ¾÷ °ü¸®
-            void executeAsync(std::function<void()> task);
-            std::vector<std::future<void>> m_pendingTasks;
-
-            // SQL ÇïÆÛ
-            template<typename T>
-            std::future<T> executeQuery(std::function<T(pqxx::connection&)> queryFunc);
-
-            // ½ºÅ°¸¶ °ü¸® (Á¦°ÅµÊ - ¹°¸® DB ¼³°è ¿Ï·á ÈÄ »ç¿ë)
-            // bool createTables();
-            // bool migrateSchema();
-            // int getCurrentSchemaVersion();
-
-            // °³¹ß¿ë ´õ¹Ì µ¥ÀÌÅÍ
             bool insertDummyData();
 
-            std::atomic<bool> m_isInitialized{ false };
-            std::string m_connectionString;
+        private:
+            // Pimpl íŒ¨í„´ìœ¼ë¡œ êµ¬í˜„ë¶€ ìˆ¨ê¹€
+            std::unique_ptr<ConnectionPool> dbPool_;
+            bool isInitialized_;
         };
 
     } // namespace Server
