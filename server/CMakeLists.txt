@@ -6,9 +6,11 @@ if(MSVC)
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS UNICODE _UNICODE)
 endif()
 
-# 서버 소스 파일들 (실제로 구현된 파일만)
+# 서버 소스 파일들
 set(SERVER_SOURCES
     main.cpp
+    src/manager/ConfigManager.cpp
+    src/manager/DatabaseManager.cpp
     # src/core/GameServer.cpp
     # src/core/Session.cpp
     # src/core/EventSystem.cpp
@@ -16,15 +18,11 @@ set(SERVER_SOURCES
     # src/handler/MessageHandler.cpp
     # src/manager/NetworkManager.cpp
     # src/manager/RoomManager.cpp
-    # src/manager/DatabaseManager.cpp
-    # src/manager/ConfigManager.cpp
     # src/service/AuthenticationService.cpp
-    # src/util/ServerUtils.cpp
     # src/util/Logger.cpp
-    # src/monitor/MetricsCollector.cpp
-    # src/security/RateLimiter.cpp
 )
 
+# 핵심 헤더 파일들
 set(SERVER_HEADERS
     include/common/ServerTypes.h
     include/core/GameServer.h
@@ -45,6 +43,10 @@ add_executable(BlokusServer
     ${SERVER_SOURCES} 
     ${SERVER_HEADERS}
 )
+
+# C++ 표준 설정 (호환성을 위해 17로 변경)
+set_property(TARGET BlokusServer PROPERTY CXX_STANDARD 17)
+set_property(TARGET BlokusServer PROPERTY CXX_STANDARD_REQUIRED ON)
 
 # 인클루드 디렉토리
 target_include_directories(BlokusServer PRIVATE
@@ -76,7 +78,17 @@ endif()
 
 # 컴파일러 플래그
 if(MSVC)
-    target_compile_options(BlokusServer PRIVATE /W4 /permissive-)
+    target_compile_options(BlokusServer PRIVATE 
+        /W4 
+        /permissive-
+        /Zc:preprocessor  # 전처리기 호환성
+        /D_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING
+    )
+    target_compile_definitions(BlokusServer PRIVATE
+        NOMINMAX
+        WIN32_LEAN_AND_MEAN
+        _WIN32_WINNT=0x0601  # Windows 7+
+    )
 endif()
 
 # 소스 그룹
