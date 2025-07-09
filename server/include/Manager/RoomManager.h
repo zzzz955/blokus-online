@@ -1,6 +1,6 @@
 #pragma once
 
-#include "server/common/ServerTypes.h"
+#include "common/ServerTypes.h"
 #include "common/Types.h"
 #include "common/GameLogic.h"
 #include <vector>

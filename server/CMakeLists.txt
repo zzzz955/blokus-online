@@ -37,10 +37,7 @@ set(SERVER_HEADERS
     include/manager/DatabaseManager.h
     include/manager/ConfigManager.h
     include/service/AuthenticationService.h
-    include/util/ServerUtils.h
     include/util/Logger.h
-    include/monitor/MetricsCollector.h
-    include/security/RateLimiter.h
 )
 
 # 실행 파일 생성
@@ -54,6 +51,10 @@ target_include_directories(BlokusServer PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
+# PostgreSQL 및 기타 라이브러리 찾기
+find_package(libpqxx CONFIG REQUIRED)
+find_package(OpenSSL REQUIRED)
+
 # 라이브러리 링크
 target_link_libraries(BlokusServer PRIVATE
     BlokusCommon
@@ -61,6 +62,9 @@ target_link_libraries(BlokusServer PRIVATE
     spdlog::spdlog
     nlohmann_json::nlohmann_json
     Boost::system
+    libpqxx::pqxx
+    OpenSSL::SSL
+    OpenSSL::Crypto
 )
 
 # Windows 설정

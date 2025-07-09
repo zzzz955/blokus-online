@@ -12,12 +12,12 @@
 
 #include "common/Types.h"
 #include "common/GameLogic.h"
-#include "server/common/ServerTypes.h"
+#include "common/ServerTypes.h"
 
 namespace Blokus {
     namespace Server {
 
-        // 전방 선언
+        // 전방 선언 (순환 참조 방지)
         class NetworkManager;
 
         // ========================================
@@ -61,7 +61,7 @@ namespace Blokus {
             Common::PlayerColor getPlayerColor(uint32_t sessionId) const;
             uint32_t getPlayerByColor(Common::PlayerColor color) const;
 
-            // AI 플레이어 관리
+            // AI 플레이어 관리 (나중에 구현)
             bool addAIPlayer(Common::PlayerColor color, int difficulty);
             bool removeAIPlayer(Common::PlayerColor color);
             std::vector<Common::PlayerColor> getAIPlayers() const;

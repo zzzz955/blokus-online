@@ -1,6 +1,6 @@
 #pragma once
 
-#include "server/common/ServerTypes.h"
+#include "common/ServerTypes.h"
 #include <string>
 #include <map>
 #include <mutex>

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "server/common/ServerTypes.h"
+#include "common/ServerTypes.h"
 #include <functional>
 #include <unordered_map>
 #include <string>
