@@ -85,15 +85,6 @@ namespace Blokus {
             std::future<std::optional<GameRecord>> getGameRecord(uint32_t gameId);
 
             // ========================================
-            // 세션 관리 (옵션)
-            // ========================================
-
-            std::future<bool> createSession(const std::string& sessionToken, uint32_t userId);
-            std::future<std::optional<uint32_t>> getUserBySession(const std::string& sessionToken);
-            std::future<bool> deleteSession(const std::string& sessionToken);
-            std::future<bool> cleanupExpiredSessions();
-
-            // ========================================
             // 통계 조회
             // ========================================
 
@@ -119,11 +110,6 @@ namespace Blokus {
             // SQL 헬퍼
             template<typename T>
             std::future<T> executeQuery(std::function<T(pqxx::connection&)> queryFunc);
-
-            // 스키마 관리 (제거됨 - 물리 DB 설계 완료 후 사용)
-            // bool createTables();
-            // bool migrateSchema();
-            // int getCurrentSchemaVersion();
 
             // 개발용 더미 데이터
             bool insertDummyData();

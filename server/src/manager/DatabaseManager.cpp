@@ -1,8 +1,8 @@
-#include "manager/DatabaseManager.h"
+ï»¿#include "manager/DatabaseManager.h"
 #include "manager/ConfigManager.h"
 #include <spdlog/spdlog.h>
 
-// pqxx Çì´õ Ãæµ¹ ¹æÁö
+// pqxx í—¤ë” ì¶©ëŒ ë°©ì§€
 #ifdef _WIN32
 #include <winsock2.h>
 #include <windows.h>
@@ -18,7 +18,7 @@ namespace Blokus {
     namespace Server {
 
         // ========================================
-        // ConnectionPool ±¸Çö
+        // ConnectionPool êµ¬í˜„
         // ========================================
         class DatabaseManager::ConnectionPool {
         public:
@@ -27,7 +27,7 @@ namespace Blokus {
 
                 spdlog::info("Creating database connection pool with {} connections", poolSize);
 
-                // ÃÊ±â ¿¬°á »ı¼º
+                // ì´ˆê¸° ì—°ê²° ìƒì„±
                 for (size_t i = 0; i < poolSize; ++i) {
                     try {
                         auto conn = std::make_unique<pqxx::connection>(connectionString);
@@ -60,7 +60,7 @@ namespace Blokus {
             std::unique_ptr<pqxx::connection> acquire() {
                 std::unique_lock<std::mutex> lock(m_poolMutex);
 
-                // »ç¿ë °¡´ÉÇÑ ¿¬°áÀÌ ÀÖÀ» ¶§±îÁö ´ë±â (ÃÖ´ë 5ÃÊ)
+                // ì‚¬ìš© ê°€ëŠ¥í•œ ì—°ê²°ì´ ìˆì„ ë•Œê¹Œì§€ ëŒ€ê¸° (ìµœëŒ€ 5ì´ˆ)
                 if (!m_poolCondition.wait_for(lock, std::chrono::seconds(5),
                     [this] { return !m_availableConnections.empty(); })) {
                     throw std::runtime_error("Database connection pool timeout");
@@ -69,7 +69,7 @@ namespace Blokus {
                 auto conn = std::move(m_availableConnections.front());
                 m_availableConnections.pop();
 
-                // ¿¬°á »óÅÂ È®ÀÎ
+                // ì—°ê²° ìƒíƒœ í™•ì¸
                 if (!conn->is_open()) {
                     try {
                         conn = std::make_unique<pqxx::connection>(m_connectionString);
@@ -105,10 +105,9 @@ namespace Blokus {
         };
 
         // ========================================
-        // DatabaseManager ±¸Çö
+        // DatabaseManager êµ¬í˜„
         // ========================================
-        DatabaseManager::DatabaseManager()
-        {
+        DatabaseManager::DatabaseManager() {
         }
 
         DatabaseManager::~DatabaseManager() {
@@ -122,40 +121,53 @@ namespace Blokus {
             }
 
             try {
-                // ConfigManager¿¡¼­ DB ¼³Á¤ ÀĞ±â
-                auto& config = ConfigManager::getInstance();
-                const auto& dbConfig = config.getDatabaseConfig();
+                spdlog::info("Initializing database connection...");
+                spdlog::debug("Database configuration:");
+                spdlog::debug("  Host: {}", ConfigManager::dbHost);
+                spdlog::debug("  Port: {}", ConfigManager::dbPort);
+                spdlog::debug("  Database: {}", ConfigManager::dbName);
+                spdlog::debug("  User: {}", ConfigManager::dbUser);
+                spdlog::debug("  Pool Size: {}", ConfigManager::dbPoolSize);
 
-                spdlog::info("Connecting to database: {}@{}:{}/{}",
-                    dbConfig.user, dbConfig.host, dbConfig.port, dbConfig.database);
+                // ì—°ê²° ë¬¸ìì—´ ì§ì ‘ ì‚¬ìš©
+                m_connectionString = ConfigManager::dbConnectionString;
+                spdlog::debug("Connection string: {}", m_connectionString);
 
-                // ¿¬°á ¹®ÀÚ¿­ »ı¼º
-                m_connectionString = dbConfig.getConnectionString();
+                // ì—°ê²° í’€ ìƒì„±
+                spdlog::info("Creating database connection pool...");
+                m_connectionPool = std::make_unique<ConnectionPool>(m_connectionString, ConfigManager::dbPoolSize);
 
-                // ¿¬°á Ç® »ı¼º
-                m_connectionPool = std::make_unique<ConnectionPool>(m_connectionString, dbConfig.poolSize);
-
-                // ¿¬°á Å×½ºÆ®
+                // ì—°ê²° í…ŒìŠ¤íŠ¸
+                spdlog::info("Testing database connection...");
                 auto testConn = m_connectionPool->acquire();
                 if (!testConn->is_open()) {
                     spdlog::error("Failed to establish database connection");
                     return false;
                 }
+
+                spdlog::info("Database connection test successful");
                 m_connectionPool->release(std::move(testConn));
 
-                // ´õ¹Ì µ¥ÀÌÅÍ »ğÀÔ (°³¹ß¿ë)
-                if (dbConfig.enableSqlLogging) {
+                // ë”ë¯¸ ë°ì´í„° ì‚½ì… (ê°œë°œìš©)
+                if (ConfigManager::enableSqlLogging) {
+                    spdlog::info("Inserting dummy data for development...");
                     if (!insertDummyData()) {
                         spdlog::warn("Failed to insert dummy data (may already exist)");
                     }
                 }
 
-                spdlog::info("DatabaseManager initialized successfully");
+                m_isInitialized = true;
+                spdlog::info("âœ… DatabaseManager initialized successfully");
                 return true;
 
             }
             catch (const std::exception& e) {
-                spdlog::error("Failed to initialize DatabaseManager: {}", e.what());
+                spdlog::error("âŒ Failed to initialize DatabaseManager: {}", e.what());
+                spdlog::error("Please check:");
+                spdlog::error("  1. PostgreSQL server is running");
+                spdlog::error("  2. Database credentials are correct");
+                spdlog::error("  3. Database '{}' exists", ConfigManager::dbName);
+                spdlog::error("  4. Network connectivity to database server");
                 return false;
             }
         }
@@ -165,7 +177,7 @@ namespace Blokus {
 
             spdlog::info("Shutting down DatabaseManager...");
 
-            // ´ë±â ÁßÀÎ ºñµ¿±â ÀÛ¾÷ ¿Ï·á ´ë±â
+            // ëŒ€ê¸° ì¤‘ì¸ ë¹„ë™ê¸° ì‘ì—… ì™„ë£Œ ëŒ€ê¸°
             for (auto& future : m_pendingTasks) {
                 if (future.valid()) {
                     future.wait();
@@ -173,7 +185,7 @@ namespace Blokus {
             }
             m_pendingTasks.clear();
 
-            // ¿¬°á Ç® ÇØÁ¦
+            // ì—°ê²° í’€ í•´ì œ
             m_connectionPool.reset();
 
             m_isInitialized = false;
@@ -185,7 +197,7 @@ namespace Blokus {
                 auto conn = m_connectionPool->acquire();
                 pqxx::work txn(*conn);
 
-                // ´õ¹Ì »ç¿ëÀÚ µ¥ÀÌÅÍ
+                // ë”ë¯¸ ì‚¬ìš©ì ë°ì´í„°
                 const std::vector<std::tuple<std::string, std::string, std::string>> dummyUsers = {
                     {"testuser1", "$2b$12$dummy.hash.for.password1", "test1@example.com"},
                     {"testuser2", "$2b$12$dummy.hash.for.password2", "test2@example.com"},
@@ -194,7 +206,7 @@ namespace Blokus {
                     {"blokus789", "$2b$12$dummy.hash.for.password5", "blokus@example.com"}
                 };
 
-                // »ç¿ëÀÚ »ğÀÔ (Áßº¹ ½Ã ¹«½Ã)
+                // ì‚¬ìš©ì ì‚½ì… (ì¤‘ë³µ ì‹œ ë¬´ì‹œ)
                 for (const auto& [username, passwordHash, email] : dummyUsers) {
                     try {
                         auto result = txn.exec_params(
@@ -206,13 +218,13 @@ namespace Blokus {
                         if (!result.empty()) {
                             int userId = result[0][0].as<int>();
 
-                            // °ÔÀÓ Åë°è »ı¼º (À¯È¿ÇÑ °ªÀ¸·Î)
+                            // ê²Œì„ í†µê³„ ìƒì„± (ìœ íš¨í•œ ê°’ìœ¼ë¡œ)
                             int totalGames = std::rand() % 50;
                             int wins = std::rand() % (totalGames + 1);  // wins <= totalGames
                             int losses = std::rand() % (totalGames - wins + 1);  // wins + losses <= totalGames
                             int rating = 1200 + (std::rand() % 600) - 300;  // 900 ~ 1800
 
-                            // »ç¿ëÀÚ Åë°è »ğÀÔ
+                            // ì‚¬ìš©ì í†µê³„ ì‚½ì…
                             txn.exec_params(
                                 "INSERT INTO user_stats (user_id, total_games, wins, losses, rating) "
                                 "VALUES ($1, $2, $3, $4, $5) ON CONFLICT (user_id) DO NOTHING",
@@ -242,7 +254,7 @@ namespace Blokus {
         }
 
         // ========================================
-        // ºñµ¿±â Äõ¸® ½ÇÇà ÇïÆÛ
+        // ë¹„ë™ê¸° ì¿¼ë¦¬ ì‹¤í–‰ í—¬í¼
         // ========================================
         template<typename T>
         std::future<T> DatabaseManager::executeQuery(std::function<T(pqxx::connection&)> queryFunc) {
@@ -265,7 +277,7 @@ namespace Blokus {
         }
 
         // ========================================
-        // »ç¿ëÀÚ °ü¸® ±¸Çö
+        // ì‚¬ìš©ì ê´€ë¦¬ êµ¬í˜„
         // ========================================
         std::future<bool> DatabaseManager::createUser(const std::string& username,
             const std::string& email,
@@ -281,7 +293,7 @@ namespace Blokus {
                 if (!result.empty()) {
                     int userId = result[0][0].as<int>();
 
-                    // »ç¿ëÀÚ Åë°è Å×ÀÌºí¿¡µµ ÃÊ±â µ¥ÀÌÅÍ »ğÀÔ
+                    // ì‚¬ìš©ì í†µê³„ í…Œì´ë¸”ì—ë„ ì´ˆê¸° ë°ì´í„° ì‚½ì…
                     txn.exec_params(
                         "INSERT INTO user_stats (user_id) VALUES ($1)",
                         userId
@@ -336,24 +348,24 @@ namespace Blokus {
 
                 DatabaseStats stats;
 
-                // ÀüÃ¼ »ç¿ëÀÚ ¼ö
+                // ì „ì²´ ì‚¬ìš©ì ìˆ˜
                 auto result = txn.exec("SELECT COUNT(*) FROM users");
                 stats.totalUsers = result[0][0].as<int>();
 
-                // È°¼º »ç¿ëÀÚ ¼ö (ÃÖ±Ù 30ÀÏ)
+                // í™œì„± ì‚¬ìš©ì ìˆ˜ (ìµœê·¼ 30ì¼)
                 result = txn.exec(
                     "SELECT COUNT(*) FROM users WHERE created_at > NOW() - INTERVAL '30 days'"
                 );
                 stats.activeUsers = result[0][0].as<int>();
 
-                // ÀüÃ¼ °ÔÀÓ ¼ö
+                // ì „ì²´ ê²Œì„ ìˆ˜
                 result = txn.exec("SELECT COALESCE(SUM(total_games), 0) FROM user_stats");
                 stats.totalGames = result[0][0].as<int>();
 
-                // ÀÌ¹ø ÁÖ °ÔÀÓ ¼ö (ÀÓ½Ã·Î 0)
+                // ì´ë²ˆ ì£¼ ê²Œì„ ìˆ˜ (ì„ì‹œë¡œ 0)
                 stats.gamesThisWeek = 0;
 
-                // Æò±Õ °ÔÀÓ ½Ã°£ (ÀÓ½Ã·Î 0)
+                // í‰ê·  ê²Œì„ ì‹œê°„ (ì„ì‹œë¡œ 0)
                 stats.averageGameDuration = 0.0;
 
                 txn.commit();
