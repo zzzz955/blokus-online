@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include "common/ServerTypes.h"
 #include <spdlog/spdlog.h>
@@ -11,7 +11,7 @@ namespace Blokus {
     namespace Server {
 
         // ========================================
-        // ·Î±ë ½Ã½ºÅÛ Å¬·¡½º
+        // ë¡œê¹… ì‹œìŠ¤í…œ í´ë˜ìŠ¤
         // ========================================
         class Logger {
         public:
@@ -24,14 +24,14 @@ namespace Blokus {
                 Critical = 5
             };
 
-            // ½Ì±ÛÅæ ÆĞÅÏ
+            // ì‹±ê¸€í†¤ íŒ¨í„´
             static Logger& getInstance();
 
-            // ÃÊ±âÈ­ ¹× Á¤¸®
+            // ì´ˆê¸°í™” ë° ì •ë¦¬
             bool initialize(const std::string& logDirectory = "logs");
             void shutdown();
 
-            // ±âº» ·Î±ë ÇÔ¼öµé
+            // ê¸°ë³¸ ë¡œê¹… í•¨ìˆ˜ë“¤
             template<typename... Args>
             void trace(const std::string& format, Args&&... args) {
                 if (m_mainLogger) m_mainLogger->trace(format, std::forward<Args>(args)...);
@@ -62,21 +62,21 @@ namespace Blokus {
                 if (m_mainLogger) m_mainLogger->critical(format, std::forward<Args>(args)...);
             }
 
-            // Æ¯¼ö ·Î±ë ÇÔ¼öµé
+            // íŠ¹ìˆ˜ ë¡œê¹… í•¨ìˆ˜ë“¤
             void logClientConnection(uint32_t sessionId, const std::string& remoteAddress);
             void logClientDisconnection(uint32_t sessionId, const std::string& reason);
             void logGameEvent(int roomId, const std::string& eventType, const std::string& details);
             void logServerError(ServerErrorCode errorCode, const std::string& context);
             void logPerformanceMetric(const std::string& metric, double value);
 
-            // ¼³Á¤
+            // ì„¤ì •
             void setLogLevel(Level level);
             void enableFileLogging(bool enable);
             void enableConsoleLogging(bool enable);
             void setMaxFileSize(size_t maxSize);
             void setMaxFiles(size_t maxFiles);
 
-            // Åë°è
+            // í†µê³„
             struct LogStats {
                 uint64_t totalMessages = 0;
                 uint64_t errorMessages = 0;
@@ -92,30 +92,30 @@ namespace Blokus {
             Logger(const Logger&) = delete;
             Logger& operator=(const Logger&) = delete;
 
-            // ·Î°Å ÀÎ½ºÅÏ½ºµé
+            // ë¡œê±° ì¸ìŠ¤í„´ìŠ¤ë“¤
             std::shared_ptr<spdlog::logger> m_mainLogger;
-            std::shared_ptr<spdlog::logger> m_gameLogger;      // °ÔÀÓ ÀÌº¥Æ® Àü¿ë
-            std::shared_ptr<spdlog::logger> m_networkLogger;   // ³×Æ®¿öÅ© ÀÌº¥Æ® Àü¿ë
-            std::shared_ptr<spdlog::logger> m_errorLogger;     // ¿¡·¯ Àü¿ë
+            std::shared_ptr<spdlog::logger> m_gameLogger;      // ê²Œì„ ì´ë²¤íŠ¸ ì „ìš©
+            std::shared_ptr<spdlog::logger> m_networkLogger;   // ë„¤íŠ¸ì›Œí¬ ì´ë²¤íŠ¸ ì „ìš©
+            std::shared_ptr<spdlog::logger> m_errorLogger;     // ì—ëŸ¬ ì „ìš©
 
-            // ¼³Á¤
+            // ì„¤ì •
             bool m_isInitialized = false;
             std::string m_logDirectory;
             Level m_currentLevel = Level::Info;
             size_t m_maxFileSize = 1024 * 1024 * 10; // 10MB
             size_t m_maxFiles = 5;
 
-            // Åë°è
+            // í†µê³„
             mutable LogStats m_stats;
             mutable std::mutex m_statsMutex;
 
-            // ÇïÆÛ ÇÔ¼öµé
+            // í—¬í¼ í•¨ìˆ˜ë“¤
             void updateStats(Level level);
             std::string formatClientInfo(uint32_t sessionId, const std::string& address);
         };
 
         // ========================================
-        // ÆíÀÇ ¸ÅÅ©·Îµé
+        // í¸ì˜ ë§¤í¬ë¡œë“¤
         // ========================================
 #define LOG_TRACE(...) Blokus::Server::Logger::getInstance().trace(__VA_ARGS__)
 #define LOG_DEBUG(...) Blokus::Server::Logger::getInstance().debug(__VA_ARGS__)
@@ -124,7 +124,7 @@ namespace Blokus {
 #define LOG_ERROR(...) Blokus::Server::Logger::getInstance().error(__VA_ARGS__)
 #define LOG_CRITICAL(...) Blokus::Server::Logger::getInstance().critical(__VA_ARGS__)
 
-// Æ¯¼ö ·Î±ë ¸ÅÅ©·Îµé
+// íŠ¹ìˆ˜ ë¡œê¹… ë§¤í¬ë¡œë“¤
 #define LOG_CLIENT_CONNECT(sessionId, address) \
             Blokus::Server::Logger::getInstance().logClientConnection(sessionId, address)
 
