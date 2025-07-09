@@ -1,72 +1,118 @@
 #pragma once
 
-#include "common/ServerTypes.h"
 #include <string>
-#include <map>
+#include <unordered_map>
 #include <mutex>
+#include <optional>
+#include <chrono>
 
 namespace Blokus {
     namespace Server {
 
         // ========================================
-        // 설정 관리자 클래스
+        // 통합 설정 관리자 클래스
         // ========================================
         class ConfigManager {
         public:
             // 싱글톤 패턴
             static ConfigManager& getInstance();
 
-            // 초기화
-            bool loadFromFile(const std::string& configFile);
-            bool loadFromEnvironment();
-            bool saveToFile(const std::string& configFile);
+            // 초기화 (환경변수 + .env 파일 로드)
+            bool initialize(const std::string& envFilePath = ".env");
+            void shutdown();
 
-            // 서버 설정 접근
-            const ServerConfig& getServerConfig() const { return m_serverConfig; }
-            void setServerConfig(const ServerConfig& config);
+            // ========================================
+            // 기본 값 접근 메서드
+            // ========================================
+            std::optional<std::string> getString(const std::string& key);
+            std::string getString(const std::string& key, const std::string& defaultValue);
+            int getInt(const std::string& key, int defaultValue = 0);
+            bool getBool(const std::string& key, bool defaultValue = false);
+            double getDouble(const std::string& key, double defaultValue = 0.0);
 
-            // 개별 설정 값 접근
-            template<typename T>
-            T getValue(const std::string& key, const T& defaultValue = T{}) const;
+            // 설정 값 변경 (런타임)
+            void set(const std::string& key, const std::string& value);
 
-            template<typename T>
-            void setValue(const std::string& key, const T& value);
+            // ========================================
+            // 구조화된 설정 접근 (캐시됨)
+            // ========================================
 
-            // 설정 검증
-            bool validateConfig() const;
-            std::vector<std::string> getConfigErrors() const;
+            // 서버 설정
+            struct ServerConfig {
+                uint16_t port;
+                int maxConnections;
+                int threadPoolSize;
+                std::chrono::seconds heartbeatInterval;
+                std::chrono::seconds clientTimeout;
 
-            // 런타임 설정 변경
-            void reloadConfig();
-            bool isConfigChanged() const;
-
-            // 게임 룰 설정
-            struct GameRules {
-                int maxPlayersPerRoom = 4;
-                int minPlayersToStart = 2;
-                int turnTimeoutSeconds = 120;
-                int maxRoomsPerUser = 1;
-                bool allowSpectators = true;
-                bool allowAI = true;
-                int maxAIPlayersPerRoom = 2;
+                void loadFromConfig(ConfigManager& config);
             };
 
-            const GameRules& getGameRules() const { return m_gameRules; }
-            void setGameRules(const GameRules& rules);
+            // 데이터베이스 설정
+            struct DatabaseConfig {
+                std::string host;
+                int port;
+                std::string user;
+                std::string password;
+                std::string database;
+                int poolSize;
+                bool enableSqlLogging;
+
+                void loadFromConfig(ConfigManager& config);
+                std::string getConnectionString() const;
+            };
 
             // 보안 설정
-            struct SecuritySettings {
-                int maxLoginAttempts = 5;
-                int loginBanTimeMinutes = 15;
-                int sessionTimeoutHours = 24;
-                bool requireEmailVerification = false;
-                int minPasswordLength = 8;
-                bool enableRateLimiting = true;
-                int maxMessagesPerMinute = 60;
+            struct SecurityConfig {
+                std::string jwtSecret;
+                std::chrono::hours sessionTimeout;
+                int maxLoginAttempts;
+                std::chrono::minutes loginBanTime;
+                int minPasswordLength;
+                int passwordSaltRounds;
+
+                void loadFromConfig(ConfigManager& config);
             };
 
-            const SecuritySettings& getSecuritySettings() const { return m_securitySettings; }
-            void setSecuritySettings(const SecuritySettings& settings);
+            // 게임 룰 설정
+            struct GameConfig {
+                int maxPlayersPerRoom;
+                int minPlayersToStart;
+                std::chrono::seconds turnTimeout;
+                int maxRoomsPerUser;
+                bool allowSpectators;
+                bool allowAI;
+                int maxAIPlayersPerRoom;
+
+                void loadFromConfig(ConfigManager& config);
+            };
+
+            // 로깅 설정
+            struct LoggingConfig {
+                std::string level;
+                std::string logDirectory;
+                size_t maxFileSize;
+                size_t maxFiles;
+                bool enableConsoleLogging;
+                bool enableFileLogging;
+
+                void loadFromConfig(ConfigManager& config);
+            };
+
+            // 구조화된 설정 접근자들
+            const ServerConfig& getServerConfig();
+            const DatabaseConfig& getDatabaseConfig();
+            const SecurityConfig& getSecurityConfig();
+            const GameConfig& getGameConfig();
+            const LoggingConfig& getLoggingConfig();
+
+            // ========================================
+            // 유틸리티 메서드
+            // ========================================
+            bool isInitialized() const { return m_isInitialized; }
+            void printLoadedConfig() const;
+            bool validateConfig() const;
+            std::vector<std::string> getValidationErrors() const;
 
         private:
             ConfigManager() = default;
@@ -74,82 +120,42 @@ namespace Blokus {
             ConfigManager(const ConfigManager&) = delete;
             ConfigManager& operator=(const ConfigManager&) = delete;
 
-            // 내부 설정 로딩
-            bool loadServerConfig(const std::map<std::string, std::string>& configMap);
-            bool loadGameRules(const std::map<std::string, std::string>& configMap);
-            bool loadSecuritySettings(const std::map<std::string, std::string>& configMap);
+            // .env 파일 로드
+            bool loadFromFile(const std::string& envFilePath);
 
-            // 파일 처리
-            std::map<std::string, std::string> parseConfigFile(const std::string& filename);
-            std::map<std::string, std::string> getEnvironmentVariables();
-            bool writeConfigFile(const std::string& filename, const std::map<std::string, std::string>& config);
+            // 시스템 환경변수 로드
+            bool loadFromEnvironment();
 
-            // 검증 헬퍼
-            bool validateServerConfig() const;
-            bool validateGameRules() const;
-            bool validateSecuritySettings() const;
+            // 문자열 파싱 헬퍼
+            std::string trim(const std::string& str);
+            std::pair<std::string, std::string> parseLine(const std::string& line);
 
-            // 타입 변환 헬퍼
-            template<typename T>
-            T convertValue(const std::string& value) const;
-
-            std::string convertToString(const std::string& value) const { return value; }
-            std::string convertToString(int value) const { return std::to_string(value); }
-            std::string convertToString(bool value) const { return value ? "true" : "false"; }
-            std::string convertToString(double value) const { return std::to_string(value); }
+            // 캐시 무효화
+            void invalidateCache();
 
         private:
-            ServerConfig m_serverConfig;
-            GameRules m_gameRules;
-            SecuritySettings m_securitySettings;
-
-            std::map<std::string, std::string> m_customSettings;
+            // 원시 키-값 저장소
+            std::unordered_map<std::string, std::string> m_configValues;
             mutable std::mutex m_configMutex;
 
-            std::string m_lastConfigFile;
-            std::time_t m_lastFileModified = 0;
+            // 구조화된 설정 캐시
+            mutable std::optional<ServerConfig> m_serverConfig;
+            mutable std::optional<DatabaseConfig> m_databaseConfig;
+            mutable std::optional<SecurityConfig> m_securityConfig;
+            mutable std::optional<GameConfig> m_gameConfig;
+            mutable std::optional<LoggingConfig> m_loggingConfig;
+            mutable std::mutex m_cacheMutex;
+
             bool m_isInitialized = false;
         };
 
         // ========================================
-        // 템플릿 함수 구현
+        // 편의 매크로 (선택적 사용)
         // ========================================
-        template<typename T>
-        T ConfigManager::getValue(const std::string& key, const T& defaultValue) const {
-            std::lock_guard<std::mutex> lock(m_configMutex);
-
-            auto it = m_customSettings.find(key);
-            if (it != m_customSettings.end()) {
-                return convertValue<T>(it->second);
-            }
-
-            return defaultValue;
-        }
-
-        template<typename T>
-        void ConfigManager::setValue(const std::string& key, const T& value) {
-            std::lock_guard<std::mutex> lock(m_configMutex);
-            m_customSettings[key] = convertToString(value);
-        }
-
-        template<typename T>
-        T ConfigManager::convertValue(const std::string& value) const {
-            if constexpr (std::is_same_v<T, std::string>) {
-                return value;
-            }
-            else if constexpr (std::is_same_v<T, int>) {
-                return std::stoi(value);
-            }
-            else if constexpr (std::is_same_v<T, bool>) {
-                return value == "true" || value == "1";
-            }
-            else if constexpr (std::is_same_v<T, double>) {
-                return std::stod(value);
-            }
-            else {
-                return T{};
-            }
-        }
+#define CONFIG ConfigManager::getInstance()
+#define GET_CONFIG_STRING(key, defaultVal) CONFIG.getString(key, defaultVal)
+#define GET_CONFIG_INT(key, defaultVal) CONFIG.getInt(key, defaultVal)
+#define GET_CONFIG_BOOL(key, defaultVal) CONFIG.getBool(key, defaultVal)
 
     } // namespace Server
 } // namespace Blokus

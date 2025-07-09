@@ -113,45 +113,15 @@ namespace Blokus {
             InvalidMove = 3002,
             NotYourTurn = 3003,
             DatabaseError = 4000,
-            RedisError = 4001,
             InternalError = 4002,
             ServiceUnavailable = 4003
         };
 
         // ========================================
-        // 구조체 정의
+        // 구조체 정의 (설정 관련 제거됨)
         // ========================================
 
-        // 서버 설정
-        struct ServerConfig {
-            uint16_t port = DEFAULT_SERVER_PORT;
-            int maxConnections = MAX_CONCURRENT_USERS;
-            int threadPoolSize = DEFAULT_THREAD_POOL_SIZE;
-
-            // 데이터베이스 설정
-            std::string dbHost = "localhost";
-            std::string dbPort = "5432";
-            std::string dbName = "blokus_online";
-            std::string dbUser = "blokus_user";
-            std::string dbPassword = "";
-
-            // Redis 설정
-            std::string redisHost = "localhost";
-            int redisPort = 6379;
-            std::string redisPassword = "";
-
-            // 보안 설정
-            std::string jwtSecret = "blokus_secret_key_change_in_production";
-            std::chrono::hours sessionDuration{ 24 };
-
-            // 성능 튜닝
-            int maxRoomsPerUser = 1;
-            int messageQueueSize = 1000;
-            bool enableCompression = true;
-            bool enableSsl = false;
-        };
-
-        // 서버 통계 정보
+        // 서버 통계 정보 (런타임 상태)
         struct ServerStats {
             // 연결 통계
             int currentConnections = 0;
@@ -199,7 +169,7 @@ namespace Blokus {
         };
 
         // ========================================
-        // 함수 타입 정의 (이름 변경)
+        // 함수 타입 정의
         // ========================================
         using MessageHandlerFunc = std::function<MessageResult(ClientSessionPtr, const std::string&)>;
         using ErrorCallback = std::function<void(const std::string&, const std::exception&)>;

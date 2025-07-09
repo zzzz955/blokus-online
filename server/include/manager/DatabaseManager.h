@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/ServerTypes.h"
+#include "manager/ConfigManager.h"
 #include <string>
 #include <vector>
 #include <memory>
@@ -44,7 +44,7 @@ namespace Blokus {
         // ========================================
         class DatabaseManager {
         public:
-            explicit DatabaseManager(const ServerConfig& config);
+            explicit DatabaseManager();
             ~DatabaseManager();
 
             // 초기화
@@ -108,24 +108,8 @@ namespace Blokus {
             std::future<DatabaseStats> getStats();
 
         private:
-            // 연결 풀 관리
-            class ConnectionPool {
-            public:
-                ConnectionPool(const std::string& connectionString, size_t poolSize);
-                ~ConnectionPool();
-
-                std::unique_ptr<pqxx::connection> acquire();
-                void release(std::unique_ptr<pqxx::connection> conn);
-
-            private:
-                std::string m_connectionString;
-                std::queue<std::unique_ptr<pqxx::connection>> m_availableConnections;
-                std::mutex m_poolMutex;
-                std::condition_variable m_poolCondition;
-                size_t m_maxPoolSize;
-                std::atomic<size_t> m_currentPoolSize{ 0 };
-            };
-
+            // 연결 풀 관리 (선언만)
+            class ConnectionPool;
             std::unique_ptr<ConnectionPool> m_connectionPool;
 
             // 비동기 작업 관리
@@ -136,12 +120,14 @@ namespace Blokus {
             template<typename T>
             std::future<T> executeQuery(std::function<T(pqxx::connection&)> queryFunc);
 
-            // 스키마 관리
-            bool createTables();
-            bool migrateSchema();
-            int getCurrentSchemaVersion();
+            // 스키마 관리 (제거됨 - 물리 DB 설계 완료 후 사용)
+            // bool createTables();
+            // bool migrateSchema();
+            // int getCurrentSchemaVersion();
 
-            ServerConfig m_config;
+            // 개발용 더미 데이터
+            bool insertDummyData();
+
             std::atomic<bool> m_isInitialized{ false };
             std::string m_connectionString;
         };
