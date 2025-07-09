@@ -51,6 +51,10 @@ target_include_directories(BlokusServer PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
+# PostgreSQL 및 기타 라이브러리 찾기
+find_package(libpqxx CONFIG REQUIRED)
+find_package(OpenSSL REQUIRED)
+
 # 라이브러리 링크
 target_link_libraries(BlokusServer PRIVATE
     BlokusCommon
