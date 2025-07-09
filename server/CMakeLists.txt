@@ -37,10 +37,7 @@ set(SERVER_HEADERS
     include/manager/DatabaseManager.h
     include/manager/ConfigManager.h
     include/service/AuthenticationService.h
-    include/util/ServerUtils.h
     include/util/Logger.h
-    include/monitor/MetricsCollector.h
-    include/security/RateLimiter.h
 )
 
 # 角青 颇老 积己
@@ -61,6 +58,9 @@ target_link_libraries(BlokusServer PRIVATE
     spdlog::spdlog
     nlohmann_json::nlohmann_json
     Boost::system
+    libpqxx::pqxx
+    OpenSSL::SSL
+    OpenSSL::Crypto
 )
 
 # Windows 汲沥

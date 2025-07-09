@@ -1,6 +1,6 @@
 #pragma once
 
-#include "server/common/ServerTypes.h"
+#include "common/ServerTypes.h"
 #include <boost/asio.hpp>
 #include <memory>
 #include <unordered_map>

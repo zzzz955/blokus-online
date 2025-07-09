@@ -9,6 +9,8 @@
     "spdlog",
     "boost-asio",
     "boost-system",
-    "nlohmann-json"
+    "nlohmann-json",
+    "libpqxx",
+    "openssl"
   ]
 }

@@ -11,13 +11,12 @@
 #include <spdlog/spdlog.h>
 
 #include "common/Types.h"
-#include "server/common/ServerTypes.h"
+#include "common/ServerTypes.h"
 
 namespace Blokus {
     namespace Server {
 
-        // 전방 선언
-        class GameServer;
+        // 전방 선언 (순환 참조 방지)
         class MessageHandler;
 
         // 클라이언트 연결을 나타내는 세션 클래스
@@ -53,6 +52,9 @@ namespace Blokus {
 
             // 소켓 접근 (서버에서 사용)
             boost::asio::ip::tcp::socket& getSocket() { return m_socket; }
+
+            // 메시지 핸들러 설정 (의존성 주입)
+            void setMessageHandler(std::shared_ptr<MessageHandler> handler) { m_messageHandler = handler; }
 
         private:
             // 네트워크 I/O 처리
@@ -94,8 +96,8 @@ namespace Blokus {
             // 활동 추적
             std::chrono::steady_clock::time_point m_lastActivity; // 마지막 활동 시간
 
-            // 메시지 핸들러
-            std::unique_ptr<MessageHandler> m_messageHandler;     // 메시지 처리기
+            // 메시지 핸들러 (의존성 주입)
+            std::shared_ptr<MessageHandler> m_messageHandler;     // 메시지 처리기
         };
 
     } // namespace Server
