@@ -4,6 +4,7 @@
 #include <string>
 #include <atomic>
 #include <chrono>
+#include <queue>
 #include <boost/asio.hpp>
 #include <spdlog/spdlog.h>
 
@@ -36,6 +37,11 @@ namespace Blokus::Server {
         void setDisconnectCallback(SessionEventCallback callback) { disconnectCallback_ = callback; }
         void setMessageCallback(MessageEventCallback callback) { messageCallback_ = callback; }
 
+        // 세션 제어
+        void start();
+        void stop();
+        bool isActive() const { return active_.load(); }
+
         // 메시지 송수신
         void sendMessage(const std::string& message);
         void sendBinary(const std::vector<uint8_t>& data);
@@ -65,6 +71,7 @@ namespace Blokus::Server {
         void startRead();
         void handleRead(const boost::system::error_code& error, size_t bytesTransferred);
         void handleWrite(const boost::system::error_code& error, size_t bytesTransferred);
+        void doWrite();
 
         // 메시지 처리
         void processMessage(const std::string& message);
@@ -77,6 +84,9 @@ namespace Blokus::Server {
         // 콜백 호출
         void notifyDisconnect();
         void notifyMessage(const std::string& message);
+
+        // 유틸리티 함수
+        std::string generateSessionId();
 
     private:
         // 네트워크
@@ -99,8 +109,9 @@ namespace Blokus::Server {
         // 버퍼 관리
         std::array<char, 8192> readBuffer_;
         std::string messageBuffer_;
-        std::vector<std::string> outgoingMessages_;
+        std::queue<std::string> outgoingMessages_;  // 벡터 대신 큐 사용
         std::mutex sendMutex_;
+        bool writing_{ false };  // 현재 쓰기 중인지 플래그
 
         // 메시지 핸들러
         std::unique_ptr<MessageHandler> messageHandler_;

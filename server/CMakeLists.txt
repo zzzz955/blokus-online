@@ -13,7 +13,7 @@ set(SERVER_SOURCES
     src/manager/ConfigManager.cpp
     src/manager/DatabaseManager.cpp
     src/core/GameServer.cpp
-    # src/core/Session.cpp
+    src/core/Session.cpp
     # src/core/EventSystem.cpp
     # src/game/GameRoom.cpp
     # src/handler/MessageHandler.cpp
