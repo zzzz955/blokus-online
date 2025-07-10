@@ -6,93 +6,113 @@
 #include <vector>
 #include <unordered_map>
 #include <mutex>
-#include <shared_mutex>
-
 #include <boost/asio.hpp>
+#include <spdlog/spdlog.h>
 
+// 기존 정의된 타입들 사용
 #include "common/ServerTypes.h"
-#include "common/Types.h"
+#include "manager/ConfigManager.h"
 
-namespace Blokus {
-    namespace Server {
+// 전방 선언
+namespace Blokus::Server {
+	class Session;
+	class NetworkManager;
+	class DatabaseManager;
 
-        // 전방 선언 (순환 참조 방지)
-        class Session;
-        class RoomManager;
-        class MessageHandler;
-        // DatabaseManager, RedisManager는 우선 제거 (오버스펙)
+	// 메인 게임 서버 클래스
+	class GameServer {
+	public:
+		explicit GameServer();
+		~GameServer();
 
-        // ========================================
-        // 메인 게임 서버 클래스
-        // ========================================
+		// 기본 서버 제어
+		bool initialize();
+		void start();
+		void stop();
+		void run();
 
-        class GameServer {
-        public:
-            explicit GameServer(const ServerConfig& config);
-            ~GameServer();
+		bool isRunning() const { return running_.load(); }
 
-            // 서버 생명주기
-            void start();
-            void stop();
-            void run();  // 메인 루프 (블로킹)
+		// ConfigManager를 통해 설정 접근
+		static int getServerPort() { return ConfigManager::serverPort; }
+		static int getMaxClients() { return ConfigManager::maxClients; }
+		static int getThreadPoolSize() { return ConfigManager::threadPoolSize; }
 
-            bool isRunning() const { return m_running.load(); }
-            const ServerConfig& getConfig() const { return m_config; }
-            ServerStats getStats() const;
+		// 클라이언트 관리
+		void addSession(std::shared_ptr<Session> session);
+		void removeSession(const std::string& sessionId);
 
-            // 클라이언트 관리
-            void addClient(std::shared_ptr<Session> session);
-            void removeClient(const std::string& sessionId);
-            std::shared_ptr<Session> getClient(const std::string& sessionId);
+		// 세션 조회 - 일시적 사용용 (shared_ptr)
+		std::shared_ptr<Session> getSession(const std::string& sessionId);
 
-        private:
-            // 초기화 관련
-            void initializeComponents();
-            void startAcceptor();
-            void startHeartbeatTimer();
+		// 세션 조회 - 관찰용 (weak_ptr) - 생명주기에 영향 없음
+		std::weak_ptr<Session> getSessionWeak(const std::string& sessionId);
 
-            // 네트워크 관련
-            void handleAccept(std::shared_ptr<Session> newSession,
-                const boost::system::error_code& error);
-            void acceptNewConnections();
+		// 안전한 세션 작업 - 람다로 작업 전달
+		bool withSession(const std::string& sessionId,
+			std::function<void(std::shared_ptr<Session>)> action);
 
-            // 정리 및 타이밍 관련
-            void cleanup();
-            void performHeartbeat();
-            void updateStats();
-            void cleanupIdleConnections();
+		// 접근자
+		boost::asio::io_context& getIOContext() { return ioContext_; }
 
-            // 에러 핸들링
-            void handleError(const std::string& context, const std::exception& e);
+		// 통계 접근자
+		int getCurrentConnections() const {
+			std::lock_guard<std::mutex> lock(statsMutex_);
+			return stats_.currentConnections;
+		}
 
-        private:
-            // 설정 및 상태
-            ServerConfig m_config;
-            std::atomic<bool> m_running{ false };
-            std::atomic<bool> m_accepting{ false };
+		ServerStats getStats() const {
+			std::lock_guard<std::mutex> lock(statsMutex_);
+			return stats_;
+		}
 
-            // Boost.Asio 관련
-            boost::asio::io_context m_ioContext;
-            boost::asio::ip::tcp::acceptor m_acceptor;
-            std::vector<std::thread> m_threadPool;
+	private:
+		// 내부 초기화 함수들
+		bool initializeConfig();
+		bool initializeDatabase();
+		bool initializeNetwork();
 
-            // 타이머들
-            boost::asio::steady_timer m_heartbeatTimer;
-            boost::asio::steady_timer m_statsTimer;
-            boost::asio::steady_timer m_cleanupTimer;
+		// 네트워크 처리
+		void startAccepting();
+		void handleNewConnection(std::shared_ptr<Session> session,
+			const boost::system::error_code& error);
 
-            // 컴포넌트들 (필수만 유지)
-            std::unique_ptr<RoomManager> m_roomManager;
-            std::unique_ptr<MessageHandler> m_messageHandler;
+		// 세션 이벤트 핸들러 (콜백으로 호출됨)
+		void onSessionDisconnect(const std::string& sessionId);
+		void onSessionMessage(const std::string& sessionId, const std::string& message);
 
-            // 클라이언트 관리
-            std::unordered_map<std::string, std::shared_ptr<Session>> m_clients;
-            mutable std::shared_mutex m_clientsMutex;
+		// MessageHandler 콜백 처리 함수들
+		void handleAuthentication(const std::string& sessionId, const std::string& username, bool success);
+		void handleRoomAction(const std::string& sessionId, const std::string& action, const std::string& data);
+		void handleChatBroadcast(const std::string& sessionId, const std::string& message);
 
-            // 통계
-            mutable std::mutex m_statsMutex;
-            ServerStats m_stats;
-        };
+		// 정리 작업
+		void startHeartbeatTimer();
+		void handleHeartbeat();
+		void cleanupSessions();
 
-    } // namespace Server
-} // namespace Blokus
+	private:
+		// 기본 상태
+		std::atomic<bool> running_{ false };
+
+		// Boost.Asio 핵심
+		boost::asio::io_context ioContext_;
+		boost::asio::ip::tcp::acceptor acceptor_;
+		std::vector<std::thread> threadPool_;
+
+		// 타이머
+		std::unique_ptr<boost::asio::steady_timer> heartbeatTimer_;
+
+		// 매니저들 (향후 구현 예정)
+		//std::unique_ptr<NetworkManager> networkManager_;
+
+		// 세션 관리
+		std::unordered_map<std::string, std::shared_ptr<Session>> sessions_;
+		std::mutex sessionsMutex_;
+
+		// 서버 통계 (ServerTypes.h의 ServerStats 사용)
+		ServerStats stats_;
+		mutable std::mutex statsMutex_;
+	};
+
+} // namespace Blokus::Server

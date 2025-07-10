@@ -1,72 +1,91 @@
 #pragma once
 
-#include "common/ServerTypes.h"
-#include <functional>
-#include <unordered_map>
+#pragma once
+
 #include <string>
 #include <memory>
+#include <functional>
+#include <unordered_map>
+#include <cstdint>
 
-// Protobuf 관련 헤더
-#include <google/protobuf/message.h>
+// 기존 정의 사용
+#include "common/ServerTypes.h"
 
-namespace Blokus {
-    namespace Server {
+// Protobuf 전방 선언 (blokus 네임스페이스)
+namespace google::protobuf {
+    class Message;
+}
 
-        // 전방 선언
-        class GameServer;
+namespace blokus {
+    class MessageWrapper;     // message_wrapper.proto에서 생성
+    enum MessageType : int;   // message_wrapper.proto에서 생성
+}
 
-        // ========================================
-        // 메시지 핸들러 클래스 (ProtocolHandler 기능 통합)
-        // ========================================
-        class MessageHandler {
-        public:
-            explicit MessageHandler(GameServer* server);
-            ~MessageHandler();
+namespace Blokus::Server {
 
-            // 메시지 처리 (메인 진입점)
-            MessageResult processMessage(ClientSessionPtr client, const std::string& message);
+    // 전방 선언 (순환 참조 방지)
+    class Session;
 
-            // Protobuf 직렬화/역직렬화 (ProtocolHandler 기능 통합)
-            std::string serializeMessage(const google::protobuf::Message& message);
-            bool deserializeMessage(const std::string& data, google::protobuf::Message& message);
+    // 메시지 이벤트 콜백 타입들
+    using AuthCallback = std::function<void(const std::string& sessionId, const std::string& username, bool success)>;
+    using RoomCallback = std::function<void(const std::string& sessionId, const std::string& action, const std::string& data)>;
+    using ChatCallback = std::function<void(const std::string& sessionId, const std::string& message)>;
 
-            // 메시지 래핑/언래핑
-            std::string wrapMessage(MessageType messageType, const std::string& payload);
-            bool unwrapMessage(const std::string& data, MessageType& messageType, std::string& payload);
+    // 단순화된 메시지 핸들러 클래스 (브로커 역할만)
+    class MessageHandler {
+    public:
+        explicit MessageHandler(Session* session);
+        ~MessageHandler();
 
-            // 핸들러 등록
-            void registerHandler(MessageType messageType, MessageHandler handler);
+        // 메시지 처리 (현재: 텍스트 우선)
+        void handleMessage(const std::string& rawMessage);
 
-        private:
-            // 개별 메시지 핸들러들
-            MessageResult handleAuthentication(ClientSessionPtr client, const std::string& payload);
-            MessageResult handleCreateRoom(ClientSessionPtr client, const std::string& payload);
-            MessageResult handleJoinRoom(ClientSessionPtr client, const std::string& payload);
-            MessageResult handleLeaveRoom(ClientSessionPtr client, const std::string& payload);
-            MessageResult handleGameMove(ClientSessionPtr client, const std::string& payload);
-            MessageResult handleChat(ClientSessionPtr client, const std::string& payload);
-            MessageResult handleHeartbeat(ClientSessionPtr client, const std::string& payload);
-            MessageResult handleLobbyRequest(ClientSessionPtr client, const std::string& payload);
+        // 콜백 설정 (GameServer에서 설정)
+        void setAuthCallback(AuthCallback callback) { authCallback_ = callback; }
+        void setRoomCallback(RoomCallback callback) { roomCallback_ = callback; }
+        void setChatCallback(ChatCallback callback) { chatCallback_ = callback; }
 
-            // 메시지 압축/해제 (선택적)
-            std::string compressMessage(const std::string& data);
-            std::string decompressMessage(const std::string& data);
+        // 응답 전송 (현재: 텍스트 기반)
+        void sendTextMessage(const std::string& message);
+        void sendError(const std::string& errorMessage);
 
-            // 메시지 검증
-            bool validateMessage(const std::string& message);
-            bool validateSession(ClientSessionPtr client);
+        // TODO: 향후 Protobuf 지원
+        void sendProtobufMessage(blokus::MessageType type, const google::protobuf::Message& payload);
 
-            // 에러 응답 생성
-            std::string createErrorResponse(ServerErrorCode errorCode, const std::string& message);
+    private:
+        // 현재 단계: 텍스트 메시지 처리
+        void handleTextMessage(const std::string& rawMessage);
+        void handleAuthMessage(const std::string& authData);
+        void handleRoomMessage(const std::string& roomData);
+        void handleChatMessage(const std::string& chatData);
 
-        private:
-            GameServer* m_server;
-            std::unordered_map<MessageType, std::function<MessageResult(ClientSessionPtr, const std::string&)>> m_handlers;
+        // TODO: 2단계에서 구현 예정 (현재는 사용하지 않음)
+        /*
+        bool parseProtobufMessage(const std::string& data, blokus::MessageWrapper* wrapper);
+        void handleProtobufMessage(const blokus::MessageWrapper* wrapper);
+        void routeAuthMessage(const blokus::MessageWrapper* wrapper);
+        void routeRoomMessage(const blokus::MessageWrapper* wrapper);
+        void routeChatMessage(const blokus::MessageWrapper* wrapper);
+        void routeHeartbeat(const blokus::MessageWrapper* wrapper);
+        void sendAckResponse(uint32_t sequenceId, bool success, const std::string& errorMessage);
+        bool validateMessage(const blokus::MessageWrapper* wrapper);
+        std::string extractPayloadData(const blokus::MessageWrapper* wrapper);
+        */
 
-            // 설정
-            bool m_compressionEnabled = false;
-            size_t m_maxMessageSize = MAX_MESSAGE_SIZE;
-        };
+    private:
+        Session* session_;  // 소유하지 않음, 단순 참조
 
-    } // namespace Server
-} // namespace Blokus
+        // 시퀀스 관리
+        uint32_t sequenceId_{ 0 };
+        uint32_t lastReceivedSequence_{ 0 };
+
+        // 콜백들 (GameServer와의 통신)
+        AuthCallback authCallback_;
+        RoomCallback roomCallback_;
+        ChatCallback chatCallback_;
+
+        // 메시지 라우팅 테이블
+        std::unordered_map<int, std::function<void(const blokus::MessageWrapper&)>> handlers_;
+    };
+
+} // namespace Blokus::Server

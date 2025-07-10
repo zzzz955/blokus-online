@@ -1,193 +1,160 @@
-﻿// main.cpp - 인코딩 문제 해결
+﻿// main.cpp - 블로커스 온라인 서버 테스트
 
+#include "core/GameServer.h"
 #include "manager/ConfigManager.h"
 #include "manager/DatabaseManager.h"
-#include "util/Logger.h"
 #include <spdlog/spdlog.h>
-#include <ctime>
 #include <iostream>
+#include <csignal>
+#include <memory>
 
-using namespace Blokus::Server;
+#ifdef _WIN32
+#include <windows.h>
+#include <io.h>
+#include <fcntl.h>
+#endif
+
+// 전역 서버 인스턴스 (시그널 핸들러에서 사용)
+std::unique_ptr<Blokus::Server::GameServer> g_server;
+
+// 시그널 핸들러 (Ctrl+C 처리)
+void signalHandler(int signal) {
+    if (signal == SIGINT || signal == SIGTERM) {
+        spdlog::info("Shutdown signal received. Stopping server safely...");
+        if (g_server) {
+            g_server->stop();
+        }
+    }
+}
 
 int main() {
     try {
-        // 로깅 설정
-        spdlog::set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] %v");
-        spdlog::set_level(spdlog::level::info);
+        // ========================================
+        // 1. 콘솔 인코딩 및 로깅 시스템 초기화
+        // ========================================
 
-        // 🔥 이모지 제거하고 한글만 사용
-        spdlog::info("블로커스 온라인 서버 시작");
+#ifdef _WIN32
+        // Windows 콘솔 UTF-8 설정
+        SetConsoleOutputCP(CP_UTF8);
+        SetConsoleCP(CP_UTF8);
 
-        // ConfigManager 초기화
-        spdlog::info("설정 불러오기...");
-        ConfigManager::initialize();
+        // 콘솔 모드 설정 (이모지 지원)
+        HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+        DWORD dwMode = 0;
+        GetConsoleMode(hOut, &dwMode);
+        dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+        SetConsoleMode(hOut, dwMode);
+#endif
 
-        if (!ConfigManager::validate()) {
-            spdlog::error("설정 검증 실패");
+        // 로깅 패턴 설정 (이모지 제거, 영문만 사용)
+        spdlog::set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] [%t] %v");
+        spdlog::set_level(spdlog::level::debug);  // 개발용 상세 로그
+
+        spdlog::info("Blokus Online Server v1.0.0");
+        spdlog::info("========================================");
+
+        // ========================================
+        // 2. 설정 및 환경 초기화
+        // ========================================
+        spdlog::info("Initializing configuration...");
+
+        Blokus::Server::ConfigManager::initialize();
+        if (!Blokus::Server::ConfigManager::validate()) {
+            spdlog::error("Configuration validation failed");
             return 1;
         }
 
-        spdlog::info("환경변수 불러오기 완료! 서버 포트: {}, DB: {}@{}:{}/{}",
-            ConfigManager::serverPort,
-            ConfigManager::dbUser, ConfigManager::dbHost, ConfigManager::dbPort, ConfigManager::dbName);
-
-        // 서버 설정 정보 출력
+        // 설정 정보 출력 (영문으로)
         spdlog::info("Server Configuration:");
-        spdlog::info("  Port: {}", ConfigManager::serverPort);
-        spdlog::info("  Max Clients: {}", ConfigManager::maxClients);
-        spdlog::info("  Thread Pool Size: {}", ConfigManager::threadPoolSize);
+        spdlog::info("  Port: {}", Blokus::Server::ConfigManager::serverPort);
+        spdlog::info("  Max Clients: {}", Blokus::Server::ConfigManager::maxClients);
+        spdlog::info("  Thread Pool Size: {}", Blokus::Server::ConfigManager::threadPoolSize);
+        spdlog::info("  Debug Mode: {}", Blokus::Server::ConfigManager::debugMode ? "ON" : "OFF");
 
-        // 데이터베이스 설정 정보 출력
-        spdlog::info("Database Configuration:");
-        spdlog::info("  Host: {}:{}", ConfigManager::dbHost, ConfigManager::dbPort);
-        spdlog::info("  Database: {}", ConfigManager::dbName);
-        spdlog::info("  User: {}", ConfigManager::dbUser);
-        spdlog::info("  Pool Size: {}", ConfigManager::dbPoolSize);
+        // ========================================
+        // 3. 게임 서버 생성 및 실행
+        // ========================================
+        spdlog::info("Starting game server...");
 
-        // DatabaseManager 초기화
-        spdlog::info("PostgreSQL 서버가 {}:{}에서 실행 중인지 확인하세요",
-            ConfigManager::dbHost, ConfigManager::dbPort);
+        g_server = std::make_unique<Blokus::Server::GameServer>();
 
-        DatabaseManager dbManager;
-        if (!dbManager.initialize()) {
-            spdlog::error("데이터베이스 초기화 실패");
-            return 1;
-        }
+        // 시그널 핸들러 등록 (Ctrl+C 처리)
+        std::signal(SIGINT, signalHandler);
+        std::signal(SIGTERM, signalHandler);
 
-        // 🔥 데이터베이스 테스트 시작
-        spdlog::info("데이터베이스 작업 테스트 중...");
+        // ========================================
+        // 4. 서버 실행 (초기화 포함)
+        // ========================================
+        spdlog::info("========================================");
 
-        // 통계 조회 테스트
-        spdlog::info("데이터베이스 통계 조회 중...");
-        auto stats = dbManager.getStats();
-        spdlog::info("Database Statistics:");
-        spdlog::info("  Total Users: {}", stats.totalUsers);
-        spdlog::info("  Active Users: {}", stats.activeUsers);
-        spdlog::info("  Online Users: {}", stats.onlineUsers);
-        spdlog::info("  Total Games: {}", stats.totalGames);
-        spdlog::info("  Total Stats: {}", stats.totalStats);
+        // 서버 안내 메시지
+        spdlog::info("Starting Blokus Online Server...");
+        spdlog::info("Port: {}", Blokus::Server::ConfigManager::serverPort);
+        spdlog::info("Max Clients: {}", Blokus::Server::ConfigManager::maxClients);
+        spdlog::info("");
 
-        // 사용자 조회 테스트
-        spdlog::info("사용자 조회 테스트...");
-        auto userOpt = dbManager.getUserByUsername("testuser1");
-        if (userOpt.has_value()) {
-            const auto& user = userOpt.value();
-            spdlog::info("사용자 발견: {} (ID: {}, 표시명: {})",
-                user.username, user.userId, user.displayName);
-            spdlog::info("  게임: {} (승: {}, 패: {}, 무: {})",
-                user.totalGames, user.wins, user.losses, user.draws);
-            spdlog::info("  레이팅: {}, 레벨: {}", user.rating, user.level);
-            spdlog::info("  승률: {:.1f}%, 활성: {}",
-                user.getWinRate(), user.isActive ? "예" : "아니오");
-        }
-        else {
-            spdlog::warn("사용자 'testuser1'을 찾을 수 없습니다");
-        }
+        // 클라이언트 연결 안내
+        spdlog::info("Client test methods:");
+        spdlog::info("  Telnet: telnet localhost {}", Blokus::Server::ConfigManager::serverPort);
+        spdlog::info("  Test commands:");
+        spdlog::info("    - ping");
+        spdlog::info("    - auth:player1:password123");
+        spdlog::info("    - room:list");
+        spdlog::info("    - chat:Hello everyone!");
+        spdlog::info("");
+        spdlog::info("Press Ctrl+C to stop");
+        spdlog::info("========================================");
 
-        // 사용자명 중복 체크 테스트
-        spdlog::info("사용자명 사용 가능 여부 테스트...");
-        if (dbManager.isUsernameAvailable("testuser1")) {
-            spdlog::info("사용자명 'testuser1' 사용 가능");
-        }
-        else {
-            spdlog::info("사용자명 'testuser1' 이미 사용 중");
-        }
+        // run()이 모든 초기화를 수행하고 실행함
+        g_server->run();
 
-        // 새 사용자 생성 테스트
-        spdlog::info("사용자 생성 테스트...");
-        std::string testUsername = "newuser" + std::to_string(std::time(nullptr));
-        std::string testPasswordHash = "$2b$12$dummy.hash.for.new.user";
+        // ========================================
+        // 5. 정리 및 종료
+        // ========================================
+        spdlog::info("Cleaning up server resources...");
+        g_server.reset();
 
-        // 사용자명 중복 체크
-        if (dbManager.isUsernameAvailable(testUsername)) {
-            spdlog::info("사용자명 '{}'가 사용 가능합니다. 사용자 생성 중...", testUsername);
-
-            if (dbManager.createUser(testUsername, testPasswordHash)) {
-                spdlog::info("사용자 생성 성공: {}", testUsername);
-
-                // 로그인 시간 업데이트 테스트
-                if (dbManager.updateUserLastLogin(testUsername)) {
-                    spdlog::info("로그인 시간 업데이트 성공: {}", testUsername);
-                }
-
-                // 생성된 사용자 조회 확인
-                auto newUserOpt = dbManager.getUserByUsername(testUsername);
-                if (newUserOpt.has_value()) {
-                    spdlog::info("검증 완료: 새 사용자 ID {}", newUserOpt->userId);
-                }
-            }
-            else {
-                spdlog::warn("사용자 생성 실패: {}", testUsername);
-            }
-        }
-        else {
-            spdlog::warn("사용자명 '{}'는 사용할 수 없습니다", testUsername);
-        }
-
-        // 인증 테스트
-        spdlog::info("사용자 인증 테스트...");
-        auto authUserOpt = dbManager.authenticateUser("testuser1", "$2b$12$dummy.hash.for.password1");
-        if (authUserOpt.has_value()) {
-            spdlog::info("testuser1 인증 성공");
-        }
-        else {
-            spdlog::warn("testuser1 인증 실패");
-        }
-
-        // ID로 사용자 조회 테스트
-        spdlog::info("ID로 사용자 조회 테스트...");
-        if (userOpt.has_value()) {
-            auto userByIdOpt = dbManager.getUserById(userOpt->userId);
-            if (userByIdOpt.has_value()) {
-                spdlog::info("ID로 사용자 발견: {} -> {}",
-                    userOpt->userId, userByIdOpt->username);
-            }
-        }
-
-        // 게임 통계 업데이트 테스트
-        spdlog::info("게임 통계 업데이트 테스트...");
-        if (userOpt.has_value()) {
-            if (dbManager.updateGameStats(userOpt->userId, true, false, 85)) {
-                spdlog::info("게임 통계 업데이트 완료 (승리, 85점) 사용자 ID: {}",
-                    userOpt->userId);
-            }
-        }
-
-        // 최종 통계 확인
-        spdlog::info("최종 통계 확인...");
-        auto finalStats = dbManager.getStats();
-        spdlog::info("Final Database Statistics:");
-        spdlog::info("  Total Users: {}", finalStats.totalUsers);
-        spdlog::info("  Active Users: {}", finalStats.activeUsers);
-        spdlog::info("  Online Users: {}", finalStats.onlineUsers);
-        spdlog::info("  Total Games: {}", finalStats.totalGames);
-
-        spdlog::info("모든 데이터베이스 테스트가 성공적으로 완료되었습니다!");
-        spdlog::info("서버가 개발 준비 상태입니다");
-
-        // 빌드 정보 출력
-        spdlog::info("Build Information:");
-        spdlog::info("  CMake-based build system");
-        spdlog::info("  Simple header/source separation");
-        spdlog::info("  PostgreSQL connection pooling");
-        spdlog::info("  Synchronous database operations");
-
-        // 정리
-        spdlog::info("리소스 정리 중...");
-        dbManager.shutdown();
-        spdlog::info("종료 완료");
+        spdlog::info("Server shutdown complete");
+        spdlog::info("========================================");
 
     }
     catch (const std::exception& e) {
-        spdlog::error("서버 오류: {}", e.what());
-        spdlog::error("가능한 원인:");
-        spdlog::error("  1. PostgreSQL 서버가 실행되지 않음");
-        spdlog::error("  2. 데이터베이스 연결 매개변수가 잘못됨");
-        spdlog::error("  3. 데이터베이스 테이블이 생성되지 않음");
-        spdlog::error("  4. 네트워크 연결 문제");
+        // ========================================
+        // 예외 처리
+        // ========================================
+        spdlog::error("Server execution error: {}", e.what());
+        spdlog::error("Possible causes:");
+        spdlog::error("  1. Port {} already in use", Blokus::Server::ConfigManager::serverPort);
+        spdlog::error("  2. Insufficient network permissions");
+        spdlog::error("  3. Configuration file error");
+        spdlog::error("  4. Missing required libraries");
+
+        if (g_server) {
+            g_server->stop();
+            g_server.reset();
+        }
+
         return 1;
     }
 
-    spdlog::info("서버 테스트 완료!");
     return 0;
 }
+
+// ========================================
+// 개발자 노트:
+// 
+// 🎯 테스트 시나리오:
+// 1. 서버 시작 → "서버가 실행 중입니다" 메시지 확인
+// 2. telnet localhost 7777 → 연결 성공 확인  
+// 3. "ping" 입력 → "pong" 응답 확인
+// 4. "auth:test:1234" → "AUTH_SUCCESS:test" 응답 확인
+// 5. "room:list" → 방 목록 응답 확인
+// 6. "chat:hello" → 채팅 브로드캐스트 확인
+// 7. Ctrl+C → 안전한 종료 확인
+//
+// 🐛 디버깅 팁:
+// - 로그 레벨을 debug로 설정해서 상세 정보 확인
+// - 다중 클라이언트 연결해서 브로드캐스트 테스트
+// - 네트워크 도구로 연결 상태 모니터링
+// 
+// ========================================
