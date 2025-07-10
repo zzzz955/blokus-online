@@ -1,72 +1,75 @@
 #pragma once
 
-#include "common/ServerTypes.h"
-#include <functional>
-#include <unordered_map>
 #include <string>
 #include <memory>
+#include <functional>
+#include <unordered_map>
 
-// Protobuf 관련 헤더
-#include <google/protobuf/message.h>
+// 기존 정의 사용
+#include "common/ServerTypes.h"
 
-namespace Blokus {
-    namespace Server {
+namespace Blokus::Server {
 
-        // 전방 선언
-        class GameServer;
+    // 전방 선언
+    class Session;
+    class GameServer;
 
-        // ========================================
-        // 메시지 핸들러 클래스 (ProtocolHandler 기능 통합)
-        // ========================================
-        class MessageHandler {
-        public:
-            explicit MessageHandler(GameServer* server);
-            ~MessageHandler();
+    // ServerTypes.h의 MessageType 사용
 
-            // 메시지 처리 (메인 진입점)
-            MessageResult processMessage(ClientSessionPtr client, const std::string& message);
+    // 메시지 구조체
+    struct Message {
+        MessageType type;
+        std::string data;
+        std::string sessionId;
 
-            // Protobuf 직렬화/역직렬화 (ProtocolHandler 기능 통합)
-            std::string serializeMessage(const google::protobuf::Message& message);
-            bool deserializeMessage(const std::string& data, google::protobuf::Message& message);
+        Message(MessageType t = MessageType::Unknown, const std::string& d = "", const std::string& sid = "")
+            : type(t), data(d), sessionId(sid) {
+        }
+    };
 
-            // 메시지 래핑/언래핑
-            std::string wrapMessage(MessageType messageType, const std::string& payload);
-            bool unwrapMessage(const std::string& data, MessageType& messageType, std::string& payload);
+    // 메시지 핸들러 클래스
+    class MessageHandler {
+    public:
+        explicit MessageHandler(Session* session, GameServer* server);
+        ~MessageHandler();
 
-            // 핸들러 등록
-            void registerHandler(MessageType messageType, MessageHandler handler);
+        // 메시지 처리
+        void handleMessage(const std::string& rawMessage);
+        void sendResponse(MessageType type, const std::string& data);
+        void sendError(const std::string& errorMessage);
 
-        private:
-            // 개별 메시지 핸들러들
-            MessageResult handleAuthentication(ClientSessionPtr client, const std::string& payload);
-            MessageResult handleCreateRoom(ClientSessionPtr client, const std::string& payload);
-            MessageResult handleJoinRoom(ClientSessionPtr client, const std::string& payload);
-            MessageResult handleLeaveRoom(ClientSessionPtr client, const std::string& payload);
-            MessageResult handleGameMove(ClientSessionPtr client, const std::string& payload);
-            MessageResult handleChat(ClientSessionPtr client, const std::string& payload);
-            MessageResult handleHeartbeat(ClientSessionPtr client, const std::string& payload);
-            MessageResult handleLobbyRequest(ClientSessionPtr client, const std::string& payload);
+    private:
+        // 메시지 파싱
+        Message parseMessage(const std::string& rawMessage);
+        std::string serializeMessage(MessageType type, const std::string& data);
 
-            // 메시지 압축/해제 (선택적)
-            std::string compressMessage(const std::string& data);
-            std::string decompressMessage(const std::string& data);
+        // 개별 메시지 핸들러들
+        void handlePing(const Message& msg);
+        void handleLogin(const Message& msg);
+        void handleRegister(const Message& msg);
+        void handleLogout(const Message& msg);
 
-            // 메시지 검증
-            bool validateMessage(const std::string& message);
-            bool validateSession(ClientSessionPtr client);
+        void handleGetRoomList(const Message& msg);
+        void handleCreateRoom(const Message& msg);
+        void handleJoinRoom(const Message& msg);
+        void handleLeaveRoom(const Message& msg);
 
-            // 에러 응답 생성
-            std::string createErrorResponse(ServerErrorCode errorCode, const std::string& message);
+        void handleStartGame(const Message& msg);
+        void handleGameMove(const Message& msg);
 
-        private:
-            GameServer* m_server;
-            std::unordered_map<MessageType, std::function<MessageResult(ClientSessionPtr, const std::string&)>> m_handlers;
+        // 유틸리티
+        MessageType stringToMessageType(const std::string& typeStr);
+        std::string messageTypeToString(MessageType type);
+        bool validateMessage(const Message& msg);
 
-            // 설정
-            bool m_compressionEnabled = false;
-            size_t m_maxMessageSize = MAX_MESSAGE_SIZE;
-        };
+    private:
+        Session* session_;
+        GameServer* server_;
 
-    } // namespace Server
-} // namespace Blokus
+        // 메시지 핸들러 맵
+        std::unordered_map<MessageType, std::function<void(const Message&)>> handlers_;
+
+        void initializeHandlers();
+    };
+
+} // namespace Blokus::Server

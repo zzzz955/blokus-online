@@ -1,121 +1,71 @@
 #pragma once
 
-#include "common/ServerTypes.h"
-#include <boost/asio.hpp>
 #include <memory>
-#include <unordered_map>
-#include <unordered_set>
-#include <mutex>
-#include <shared_mutex>
+#include <string>
+#include <vector>
+#include <functional>
+#include <boost/asio.hpp>
 
-namespace Blokus {
-    namespace Server {
+namespace Blokus::Server {
 
-        // 전방 선언
-        class GameServer;
+    // 전방 선언
+    class Session;
+    class GameServer;
 
-        // ========================================
-        // 네트워크 관리자 클래스
-        // ========================================
-        class NetworkManager {
-        public:
-            explicit NetworkManager(boost::asio::io_context& ioContext, GameServer* server);
-            ~NetworkManager();
+    // 네트워크 이벤트 콜백 타입들
+    using ConnectionCallback = std::function<void(std::shared_ptr<Session>)>;
+    using DisconnectionCallback = std::function<void(const std::string& sessionId)>;
+    using MessageCallback = std::function<void(const std::string& sessionId, const std::string& message)>;
 
-            // 네트워크 관리
-            void broadcastToRoom(int roomId, const std::string& message);
-            void broadcastToAll(const std::string& message, const std::string& excludeClientId = "");
-            void sendToClient(const std::string& clientId, const std::string& message);
-            void disconnectClient(const std::string& clientId);
+    // 네트워크 관리자
+    class NetworkManager {
+    public:
+        explicit NetworkManager(GameServer* server);
+        ~NetworkManager();
 
-            // 클라이언트 관리
-            void addClient(ClientSessionPtr client);
-            void removeClient(const std::string& clientId);
-            ClientSessionPtr getClient(const std::string& clientId);
+        // 초기화 및 제어
+        bool initialize(const std::string& host, int port);
+        void start();
+        void stop();
 
-            // 방 기반 관리
-            void addClientToRoom(const std::string& clientId, int roomId);
-            void removeClientFromRoom(const std::string& clientId, int roomId);
-            std::vector<std::string> getClientsInRoom(int roomId) const;
+        // 연결 관리
+        void startAccepting();
+        void broadcastMessage(const std::string& message);
+        void sendToSession(const std::string& sessionId, const std::string& message);
 
-            // 상태 조회
-            size_t getConnectedClientsCount() const;
-            size_t getRoomClientCount(int roomId) const;
-            std::vector<std::string> getAllClientIds() const;
+        // 콜백 설정
+        void setConnectionCallback(ConnectionCallback callback) { connectionCallback_ = callback; }
+        void setDisconnectionCallback(DisconnectionCallback callback) { disconnectionCallback_ = callback; }
+        void setMessageCallback(MessageCallback callback) { messageCallback_ = callback; }
 
-            // 연결 품질 관리
-            void updateClientLatency(const std::string& clientId, double latencyMs);
-            double getClientLatency(const std::string& clientId) const;
-            void checkConnectionHealth();
+        // 통계
+        size_t getActiveConnections() const;
+        std::vector<std::string> getSessionIds() const;
 
-            // 메시지 큐 관리
-            void enableMessageQueue(bool enable) { m_messageQueueEnabled = enable; }
-            void flushMessageQueue();
-            size_t getQueuedMessageCount() const;
+    private:
+        // 내부 처리 함수들
+        void handleAccept(std::shared_ptr<Session> newSession,
+            const boost::system::error_code& error);
+        void createNewSession();
 
-        private:
-            // 클라이언트 메타데이터
-            struct ClientMetadata {
-                ClientSessionPtr session;
-                int currentRoomId = -1;
-                double latencyMs = 0.0;
-                std::chrono::steady_clock::time_point lastPing;
-                bool isHealthy = true;
+        // 콜백 호출
+        void onConnection(std::shared_ptr<Session> session);
+        void onDisconnection(const std::string& sessionId);
+        void onMessage(const std::string& sessionId, const std::string& message);
 
-                ClientMetadata() = default;
-                explicit ClientMetadata(ClientSessionPtr sess)
-                    : session(sess), lastPing(std::chrono::steady_clock::now()) {
-                }
-            };
+    private:
+        GameServer* server_;
+        boost::asio::ip::tcp::acceptor acceptor_;
 
-            // 메시지 큐 아이템
-            struct QueuedMessage {
-                std::string targetClientId;
-                std::string message;
-                std::chrono::steady_clock::time_point timestamp;
-                int priority = 0;  // 높을수록 우선순위 높음
+        // 콜백들
+        ConnectionCallback connectionCallback_;
+        DisconnectionCallback disconnectionCallback_;
+        MessageCallback messageCallback_;
 
-                QueuedMessage(const std::string& target, const std::string& msg, int prio = 0)
-                    : targetClientId(target), message(msg), priority(prio),
-                    timestamp(std::chrono::steady_clock::now()) {
-                }
-            };
+        // 상태
+        bool running_{ false };
+        std::string host_;
+        int port_;
+    };
 
-            // 내부 헬퍼 함수들
-            void doSendToClient(const std::string& clientId, const std::string& message);
-            void queueMessage(const std::string& clientId, const std::string& message, int priority = 0);
-            void processMessageQueue();
-            void removeClientFromAllRooms(const std::string& clientId);
-            bool isClientHealthy(const std::string& clientId) const;
-
-        private:
-            boost::asio::io_context& m_ioContext;
-            GameServer* m_server;
-
-            // 클라이언트 관리
-            std::unordered_map<std::string, ClientMetadata> m_clients;
-            mutable std::shared_mutex m_clientsMutex;
-
-            // 방별 클라이언트 관리
-            std::unordered_map<int, std::unordered_set<std::string>> m_roomClients;  // roomId -> clientIds
-            mutable std::shared_mutex m_roomClientsMutex;
-
-            // 메시지 큐
-            std::vector<QueuedMessage> m_messageQueue;
-            std::mutex m_messageQueueMutex;
-            bool m_messageQueueEnabled = false;
-            size_t m_maxQueueSize = 10000;
-
-            // 연결 건강성 관리
-            std::chrono::seconds m_healthCheckInterval{ 30 };
-            std::chrono::seconds m_maxPingAge{ 60 };
-            boost::asio::steady_timer m_healthCheckTimer;
-
-            // 통계
-            std::atomic<uint64_t> m_messagesSent{ 0 };
-            std::atomic<uint64_t> m_messagesQueued{ 0 };
-            std::atomic<uint64_t> m_messagesDropped{ 0 };
-        };
-
-    } // namespace Server
-} // namespace Blokus
+} // namespace Blokus::Server
