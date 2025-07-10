@@ -81,6 +81,11 @@ namespace Blokus::Server {
 		void onSessionDisconnect(const std::string& sessionId);
 		void onSessionMessage(const std::string& sessionId, const std::string& message);
 
+		// MessageHandler 콜백 처리 함수들
+		void handleAuthentication(const std::string& sessionId, const std::string& username, bool success);
+		void handleRoomAction(const std::string& sessionId, const std::string& action, const std::string& data);
+		void handleChatBroadcast(const std::string& sessionId, const std::string& message);
+
 		// 정리 작업
 		void startHeartbeatTimer();
 		void handleHeartbeat();
@@ -98,8 +103,8 @@ namespace Blokus::Server {
 		// 타이머
 		std::unique_ptr<boost::asio::steady_timer> heartbeatTimer_;
 
-		// 매니저들
-		std::unique_ptr<NetworkManager> networkManager_;
+		// 매니저들 (향후 구현 예정)
+		//std::unique_ptr<NetworkManager> networkManager_;
 
 		// 세션 관리
 		std::unordered_map<std::string, std::shared_ptr<Session>> sessions_;

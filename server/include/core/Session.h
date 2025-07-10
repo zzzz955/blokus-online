@@ -37,11 +37,6 @@ namespace Blokus::Server {
         void setDisconnectCallback(SessionEventCallback callback) { disconnectCallback_ = callback; }
         void setMessageCallback(MessageEventCallback callback) { messageCallback_ = callback; }
 
-        // 세션 제어
-        void start();
-        void stop();
-        bool isActive() const { return active_.load(); }
-
         // 메시지 송수신
         void sendMessage(const std::string& message);
         void sendBinary(const std::vector<uint8_t>& data);
@@ -66,6 +61,9 @@ namespace Blokus::Server {
         boost::asio::ip::tcp::socket& getSocket() { return socket_; }
         std::string getRemoteAddress() const;
 
+        // MessageHandler 접근
+        MessageHandler* getMessageHandler() const { return messageHandler_.get(); }
+
     private:
         // 비동기 읽기/쓰기
         void startRead();
@@ -85,7 +83,7 @@ namespace Blokus::Server {
         void notifyDisconnect();
         void notifyMessage(const std::string& message);
 
-        // 유틸리티 함수
+        // 유틸리티
         std::string generateSessionId();
 
     private:

@@ -1,5 +1,6 @@
 ﻿#include "core/GameServer.h"
 #include "core/Session.h"
+#include "handler/MessageHandler.h"  // MessageHandler 완전한 정의 필요
 #include "manager/ConfigManager.h"
 #include "manager/DatabaseManager.h"
 #include <spdlog/spdlog.h>
@@ -19,7 +20,7 @@ namespace Blokus::Server {
         , ioContext_()
         , acceptor_(ioContext_)
         , heartbeatTimer_(nullptr)
-        //, networkManager_(nullptr)
+        // , networkManager_(nullptr)  // 현재는 사용하지 않음
     {
         spdlog::info("GameServer 인스턴스 생성");
     }
@@ -210,6 +211,23 @@ namespace Blokus::Server {
         session->setMessageCallback([this](const std::string& id, const std::string& msg) {
             onSessionMessage(id, msg);
             });
+
+        // MessageHandler 콜백 설정
+        if (session->getMessageHandler()) {
+            auto handler = session->getMessageHandler();
+
+            handler->setAuthCallback([this](const std::string& id, const std::string& username, bool success) {
+                handleAuthentication(id, username, success);
+                });
+
+            handler->setRoomCallback([this](const std::string& id, const std::string& action, const std::string& data) {
+                handleRoomAction(id, action, data);
+                });
+
+            handler->setChatCallback([this](const std::string& id, const std::string& message) {
+                handleChatBroadcast(id, message);
+                });
+        }
     }
 
     void GameServer::removeSession(const std::string& sessionId) {
@@ -279,15 +297,33 @@ namespace Blokus::Server {
 
     bool GameServer::initializeDatabase() {
         try {
-            // DatabaseManager는 싱글톤이므로 별도 인스턴스 생성 없이 사용
-            // 실제 DB 연결은 나중에 필요할 때 수행
-            spdlog::info("데이터베이스 설정 확인 완료");
-            return true;
+            // 여기서 실제 DB 매니저 초기화
+            // 현재는 싱글톤 패턴이므로 연결 테스트만 수행
+            spdlog::info("Testing database connectivity...");
+
+            // TODO: 실제 DatabaseManager 인스턴스 생성 및 관리
+            // dbManager_ = std::make_unique<DatabaseManager>();
+            // if (!dbManager_->initialize()) return false;
+
+            // 현재는 간단한 연결 테스트만
+            DatabaseManager testManager;
+            if (testManager.initialize()) {
+                auto stats = testManager.getStats();
+                spdlog::info("Database connected successfully");
+                spdlog::info("DB Stats: {} users, {} games", stats.totalUsers, stats.totalGames);
+                testManager.shutdown();
+                return true;
+            }
+            else {
+                spdlog::warn("Database connection failed - server will run without DB features");
+                return true; // DB 없이도 서버 실행 허용
+            }
 
         }
         catch (const std::exception& e) {
-            spdlog::error("데이터베이스 초기화 예외: {}", e.what());
-            return false;
+            spdlog::error("Database initialization error: {}", e.what());
+            spdlog::warn("Continuing without database support");
+            return true; // DB 실패해도 서버 계속 실행
         }
     }
 
@@ -371,15 +407,126 @@ namespace Blokus::Server {
     }
 
     void GameServer::onSessionMessage(const std::string& sessionId, const std::string& message) {
-        // 메시지 핸들링은 추후 MessageHandler 구현 시 연동
+        // 메시지 핸들링은 Session의 MessageHandler가 처리하므로
+        // 여기서는 단순 로깅만 수행
         spdlog::debug("세션 {}에서 메시지 수신: {}", sessionId, message.substr(0, 100));
+    }
 
-        // 간단한 ping 응답 예시
-        if (message == "ping") {
-            withSession(sessionId, [](auto session) {
-                session->sendMessage("pong");
-                });
+    // ========================================
+    // MessageHandler 콜백 처리 함수들
+    // ========================================
+
+    void GameServer::handleAuthentication(const std::string& sessionId, const std::string& username, bool success) {
+        auto session = getSession(sessionId);
+        if (!session) {
+            spdlog::warn("존재하지 않는 세션에서 인증 시도: {}", sessionId);
+            return;
         }
+
+        if (success) {
+            spdlog::info("사용자 인증 성공: {} (세션: {})", username, sessionId);
+
+            // TODO: DatabaseManager를 통한 실제 인증 처리
+            // - 사용자 정보 DB에서 조회
+            // - 마지막 로그인 시간 업데이트
+            // - 사용자 통계 갱신
+
+            // 현재는 간단한 응답만
+            session->sendMessage("WELCOME:" + username);
+
+            // 통계 업데이트
+            {
+                std::lock_guard<std::mutex> lock(statsMutex_);
+                // stats_.authenticatedUsers++; // 향후 추가
+            }
+
+        }
+        else {
+            spdlog::warn("사용자 인증 실패: {} (세션: {})", username, sessionId);
+            // 연결 유지하되 재시도 허용
+        }
+    }
+
+    void GameServer::handleRoomAction(const std::string& sessionId, const std::string& action, const std::string& data) {
+        auto session = getSession(sessionId);
+        if (!session || !session->isAuthenticated()) {
+            spdlog::warn("비인증 세션에서 방 액션 시도: {} - {}", sessionId, action);
+            if (session) {
+                session->sendMessage("ERROR:Authentication required for room actions");
+            }
+            return;
+        }
+
+        spdlog::info("방 액션 처리: {} -> {} (데이터: {})", session->getUsername(), action, data);
+
+        // TODO: RoomManager 구현 후 실제 방 관리 로직 연결
+        if (action == "list") {
+            // 방 목록 요청
+            std::string roomList = "ROOM_LIST:1:TestRoom1:2/4,2:TestRoom2:1/4,3:MyGame:3/4";
+            session->sendMessage(roomList);
+
+        }
+        else if (action == "create") {
+            // 방 생성 요청
+            std::string roomName = data.empty() ? "New Room" : data;
+            spdlog::info("방 생성 요청: {} by {}", roomName, session->getUsername());
+
+            // 더미 방 ID 생성
+            static int nextRoomId = 100;
+            int roomId = ++nextRoomId;
+
+            session->sendMessage("ROOM_CREATED:" + std::to_string(roomId) + ":" + roomName);
+
+        }
+        else if (action == "join") {
+            // 방 참가 요청
+            std::string roomId = data;
+            spdlog::info("방 참가 요청: 방ID {} by {}", roomId, session->getUsername());
+
+            // 간단한 검증
+            if (roomId.empty()) {
+                session->sendMessage("ERROR:Room ID required");
+            }
+            else {
+                session->sendMessage("ROOM_JOINED:" + roomId + ":BLUE"); // 더미 색상
+            }
+
+        }
+        else if (action == "leave") {
+            // 방 나가기 요청
+            spdlog::info("방 나가기 요청: {}", session->getUsername());
+            session->sendMessage("ROOM_LEFT:OK");
+
+        }
+        else {
+            session->sendMessage("ERROR:Unknown room action: " + action);
+        }
+    }
+
+    void GameServer::handleChatBroadcast(const std::string& sessionId, const std::string& message) {
+        auto session = getSession(sessionId);
+        if (!session || !session->isAuthenticated()) {
+            spdlog::warn("비인증 세션에서 채팅 시도: {}", sessionId);
+            return;
+        }
+
+        std::string username = session->getUsername();
+        std::string chatMessage = "CHAT:" + username + ":" + message;
+
+        spdlog::info("채팅 브로드캐스트: {} -> {}", username, message);
+
+        // 모든 인증된 세션에 브로드캐스트
+        std::lock_guard<std::mutex> lock(sessionsMutex_);
+        int broadcastCount = 0;
+
+        for (const auto& [otherSessionId, otherSession] : sessions_) {
+            if (otherSession && otherSession->isAuthenticated()) {
+                otherSession->sendMessage(chatMessage);
+                broadcastCount++;
+            }
+        }
+
+        spdlog::debug("채팅 메시지를 {}개 세션에 브로드캐스트", broadcastCount);
     }
 
     // ========================================

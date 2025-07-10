@@ -49,8 +49,8 @@ namespace Blokus::Server {
             std::string remoteAddr = getRemoteAddress();
             spdlog::info("세션 시작: {} (클라이언트: {})", sessionId_, remoteAddr);
 
-            // 메시지 핸들러 초기화
-            messageHandler_ = std::make_unique<MessageHandler>(this, nullptr);
+            // 메시지 핸들러 초기화 (GameServer 참조 제거)
+            messageHandler_ = std::make_unique<MessageHandler>(this);
 
             // 상태 업데이트
             state_ = ConnectionState::Connected;

@@ -1,39 +1,39 @@
-#include "handler/MessageHandler.h"
+ï»¿#include "handler/MessageHandler.h"
 #include "core/Session.h"
 #include <spdlog/spdlog.h>
 
 namespace Blokus::Server {
 
     // ========================================
-    // »ı¼ºÀÚ ¹× ¼Ò¸êÀÚ
+    // ìƒì„±ì ë° ì†Œë©¸ì
     // ========================================
 
     MessageHandler::MessageHandler(Session* session)
         : session_(session)
     {
-        // ÇÚµé·¯ Å×ÀÌºí ÃÊ±âÈ­´Â ÇÏÁö ¾ÊÀ½ (´Ü¼øÈ­)
-        spdlog::debug("MessageHandler »ı¼º: ¼¼¼Ç {}",
+        // í•¸ë“¤ëŸ¬ í…Œì´ë¸” ì´ˆê¸°í™”ëŠ” í•˜ì§€ ì•ŠìŒ (ë‹¨ìˆœí™”)
+        spdlog::debug("MessageHandler ìƒì„±: ì„¸ì…˜ {}",
             session_ ? session_->getSessionId() : "nullptr");
     }
 
     MessageHandler::~MessageHandler() {
-        spdlog::debug("MessageHandler ¼Ò¸ê");
+        spdlog::debug("MessageHandler ì†Œë©¸");
     }
 
     // ========================================
-    // ¸Ş½ÃÁö Ã³¸® (ÇöÀç: ÅØ½ºÆ® ¿ì¼±)
+    // ë©”ì‹œì§€ ì²˜ë¦¬ (í˜„ì¬: í…ìŠ¤íŠ¸ ìš°ì„ )
     // ========================================
 
     void MessageHandler::handleMessage(const std::string& rawMessage) {
         if (!session_) {
-            spdlog::error("SessionÀÌ nullÀÔ´Ï´Ù");
+            spdlog::error("Sessionì´ nullì…ë‹ˆë‹¤");
             return;
         }
 
-        // ÇöÀç ´Ü°è: ÅØ½ºÆ® ¸Ş½ÃÁö¸¸ Ã³¸®
+        // í˜„ì¬ ë‹¨ê³„: í…ìŠ¤íŠ¸ ë©”ì‹œì§€ë§Œ ì²˜ë¦¬
         handleTextMessage(rawMessage);
 
-        // TODO: ÇâÈÄ Protobuf Áö¿ø Ãß°¡
+        // TODO: í–¥í›„ Protobuf ì§€ì› ì¶”ê°€
         // if (isProtobufMessage(rawMessage)) {
         //     handleProtobufMessage(rawMessage);
         // } else {
@@ -43,37 +43,37 @@ namespace Blokus::Server {
 
     void MessageHandler::handleTextMessage(const std::string& rawMessage) {
         try {
-            spdlog::debug("ÅØ½ºÆ® ¸Ş½ÃÁö ¼ö½Å ({}): {}",
+            spdlog::debug("í…ìŠ¤íŠ¸ ë©”ì‹œì§€ ìˆ˜ì‹  ({}): {}",
                 session_->getSessionId(),
                 rawMessage.length() > 100 ? rawMessage.substr(0, 100) + "..." : rawMessage);
 
-            // °£´ÜÇÑ ¸í·É¾î ÆÄ½Ì
+            // ê°„ë‹¨í•œ ëª…ë ¹ì–´ íŒŒì‹±
             if (rawMessage == "ping") {
                 sendTextMessage("pong");
             }
             else if (rawMessage.starts_with("auth:")) {
-                handleAuthMessage(rawMessage.substr(5)); // "auth:" Á¦°Å
+                handleAuthMessage(rawMessage.substr(5)); // "auth:" ì œê±°
             }
             else if (rawMessage.starts_with("room:")) {
-                handleRoomMessage(rawMessage.substr(5)); // "room:" Á¦°Å
+                handleRoomMessage(rawMessage.substr(5)); // "room:" ì œê±°
             }
             else if (rawMessage.starts_with("chat:")) {
-                handleChatMessage(rawMessage.substr(5)); // "chat:" Á¦°Å
+                handleChatMessage(rawMessage.substr(5)); // "chat:" ì œê±°
             }
             else {
-                spdlog::warn("¾Ë ¼ö ¾ø´Â ¸Ş½ÃÁö Çü½Ä: {}", rawMessage);
+                spdlog::warn("ì•Œ ìˆ˜ ì—†ëŠ” ë©”ì‹œì§€ í˜•ì‹: {}", rawMessage);
                 sendError("Unknown message format. Try: ping, auth:user:pass, room:list, chat:message");
             }
 
         }
         catch (const std::exception& e) {
-            spdlog::error("ÅØ½ºÆ® ¸Ş½ÃÁö Ã³¸® Áß ¿À·ù: {}", e.what());
+            spdlog::error("í…ìŠ¤íŠ¸ ë©”ì‹œì§€ ì²˜ë¦¬ ì¤‘ ì˜¤ë¥˜: {}", e.what());
             sendError("Text message processing error");
         }
     }
 
     // ========================================
-    // ¸Ş½ÃÁö Àü¼Û
+    // ë©”ì‹œì§€ ì „ì†¡
     // ========================================
 
     void MessageHandler::sendTextMessage(const std::string& message) {
@@ -87,13 +87,13 @@ namespace Blokus::Server {
     }
 
     // ========================================
-    // °³º° ¸Ş½ÃÁö Ã³¸® (Äİ¹é È£Ãâ)
+    // ê°œë³„ ë©”ì‹œì§€ ì²˜ë¦¬ (ì½œë°± í˜¸ì¶œ)
     // ========================================
 
     void MessageHandler::handleAuthMessage(const std::string& authData) {
         if (!session_) return;
 
-        // °£´ÜÇÑ ÆÄ½Ì: "username:password"
+        // ê°„ë‹¨í•œ íŒŒì‹±: "username:password"
         size_t colonPos = authData.find(':');
         if (colonPos == std::string::npos) {
             sendError("Invalid auth format. Use 'username:password'");
@@ -103,9 +103,9 @@ namespace Blokus::Server {
         std::string username = authData.substr(0, colonPos);
         std::string password = authData.substr(colonPos + 1);
 
-        spdlog::info("ÀÎÁõ ½Ãµµ: {} (¼¼¼Ç: {})", username, session_->getSessionId());
+        spdlog::info("ì¸ì¦ ì‹œë„: {} (ì„¸ì…˜: {})", username, session_->getSessionId());
 
-        // °£´ÜÇÑ °ËÁõ
+        // ê°„ë‹¨í•œ ê²€ì¦
         bool success = (username.length() >= 3 && password.length() >= 4);
 
         if (success) {
@@ -116,7 +116,7 @@ namespace Blokus::Server {
             sendTextMessage("AUTH_FAILED:Invalid credentials");
         }
 
-        // Äİ¹é È£Ãâ (GameServer¿¡ ¾Ë¸²)
+        // ì½œë°± í˜¸ì¶œ (GameServerì— ì•Œë¦¼)
         if (authCallback_) {
             authCallback_(session_->getSessionId(), username, success);
         }
@@ -128,31 +128,31 @@ namespace Blokus::Server {
             return;
         }
 
-        spdlog::info("¹æ °ü·Ã ¿äÃ»: {} (¼¼¼Ç: {})", roomData, session_->getSessionId());
+        spdlog::info("ë°© ê´€ë ¨ ìš”ì²­: {} (ì„¸ì…˜: {})", roomData, session_->getSessionId());
 
-        // °£´ÜÇÑ ¹æ ¸í·É¾î Ã³¸®
+        // ê°„ë‹¨í•œ ë°© ëª…ë ¹ì–´ ì²˜ë¦¬
         if (roomData == "list") {
-            // ¹æ ¸ñ·Ï ¿äÃ»
+            // ë°© ëª©ë¡ ìš”ì²­
             if (roomCallback_) {
                 roomCallback_(session_->getSessionId(), "list", "");
             }
         }
         else if (roomData.starts_with("create:")) {
-            // ¹æ »ı¼º ¿äÃ»
-            std::string roomName = roomData.substr(7); // "create:" Á¦°Å
+            // ë°© ìƒì„± ìš”ì²­
+            std::string roomName = roomData.substr(7); // "create:" ì œê±°
             if (roomCallback_) {
                 roomCallback_(session_->getSessionId(), "create", roomName);
             }
         }
         else if (roomData.starts_with("join:")) {
-            // ¹æ Âü°¡ ¿äÃ»
-            std::string roomId = roomData.substr(5); // "join:" Á¦°Å
+            // ë°© ì°¸ê°€ ìš”ì²­
+            std::string roomId = roomData.substr(5); // "join:" ì œê±°
             if (roomCallback_) {
                 roomCallback_(session_->getSessionId(), "join", roomId);
             }
         }
         else if (roomData == "leave") {
-            // ¹æ ³ª°¡±â ¿äÃ»
+            // ë°© ë‚˜ê°€ê¸° ìš”ì²­
             if (roomCallback_) {
                 roomCallback_(session_->getSessionId(), "leave", "");
             }
@@ -168,21 +168,21 @@ namespace Blokus::Server {
             return;
         }
 
-        spdlog::info("Ã¤ÆÃ ¸Ş½ÃÁö: {} -> {}", session_->getUsername(), chatData);
+        spdlog::info("ì±„íŒ… ë©”ì‹œì§€: {} -> {}", session_->getUsername(), chatData);
 
-        // Äİ¹é È£Ãâ (ºê·ÎµåÄ³½ºÆ®¸¦ À§ÇØ)
+        // ì½œë°± í˜¸ì¶œ (ë¸Œë¡œë“œìºìŠ¤íŠ¸ë¥¼ ìœ„í•´)
         if (chatCallback_) {
             chatCallback_(session_->getSessionId(), chatData);
         }
     }
 
     // ========================================
-    // Protobuf Áö¿ø (ÇâÈÄ È®Àå¿ë)
+    // Protobuf ì§€ì› (í–¥í›„ í™•ì¥ìš©)
     // ========================================
 
     void MessageHandler::sendProtobufMessage(blokus::MessageType type, const google::protobuf::Message& payload) {
-        // TODO: protobuf ¸Ş½ÃÁö ±¸Çö
-        spdlog::warn("Protobuf ¸Ş½ÃÁö´Â ¾ÆÁ÷ ±¸ÇöµÇÁö ¾Ê¾Ò½À´Ï´Ù");
+        // TODO: protobuf ë©”ì‹œì§€ êµ¬í˜„
+        spdlog::warn("Protobuf ë©”ì‹œì§€ëŠ” ì•„ì§ êµ¬í˜„ë˜ì§€ ì•Šì•˜ìŠµë‹ˆë‹¤");
         sendError("Protobuf not implemented yet");
     }
 
@@ -191,7 +191,7 @@ namespace Blokus::Server {
     //        return wrapper.ParseFromString(data);
     //    }
     //    catch (const std::exception& e) {
-    //        spdlog::debug("Protobuf ÆÄ½Ì ½ÇÆĞ: {}", e.what());
+    //        spdlog::debug("Protobuf íŒŒì‹± ì‹¤íŒ¨: {}", e.what());
     //        return false;
     //    }
     //}
@@ -202,10 +202,10 @@ namespace Blokus::Server {
     //        return;
     //    }
 
-    //    // ½ÃÄö½º ID ¾÷µ¥ÀÌÆ®
+    //    // ì‹œí€€ìŠ¤ ID ì—…ë°ì´íŠ¸
     //    lastReceivedSequence_ = wrapper.sequence_id();
 
-    //    // ¸Ş½ÃÁö Å¸ÀÔº° ¶ó¿ìÆÃ
+    //    // ë©”ì‹œì§€ íƒ€ì…ë³„ ë¼ìš°íŒ…
     //    switch (wrapper.type()) {
     //    case blokus::MESSAGE_TYPE_AUTH_REQUEST:
     //        routeAuthMessage(wrapper);
@@ -227,42 +227,42 @@ namespace Blokus::Server {
     //        sendError("Unhandled message type");
     //    }
 
-    //    // ACK ÀÀ´ä (ÇÊ¿äÇÑ °æ¿ì)
+    //    // ACK ì‘ë‹µ (í•„ìš”í•œ ê²½ìš°)
     //    if (wrapper.requires_ack()) {
     //        sendAckResponse(wrapper.sequence_id(), true, "");
     //    }
     //}
 
     //void MessageHandler::sendAckResponse(uint32_t sequenceId, bool success, const std::string& errorMessage) {
-    //    // TODO: Protobuf ACK ¸Ş½ÃÁö ±¸Çö
+    //    // TODO: Protobuf ACK ë©”ì‹œì§€ êµ¬í˜„
     //    std::string ackMsg = success ? "ACK:" + std::to_string(sequenceId) :
     //        "NACK:" + std::to_string(sequenceId) + ":" + errorMessage;
     //    sendTextMessage(ackMsg);
     //}
 
     //void MessageHandler::routeAuthMessage(const blokus::MessageWrapper& wrapper) {
-    //    // TODO: protobuf ÀÎÁõ ¸Ş½ÃÁö ¶ó¿ìÆÃ
+    //    // TODO: protobuf ì¸ì¦ ë©”ì‹œì§€ ë¼ìš°íŒ…
     //}
 
     //void MessageHandler::routeRoomMessage(const blokus::MessageWrapper& wrapper) {
-    //    // TODO: protobuf ¹æ ¸Ş½ÃÁö ¶ó¿ìÆÃ
+    //    // TODO: protobuf ë°© ë©”ì‹œì§€ ë¼ìš°íŒ…
     //}
 
     //void MessageHandler::routeChatMessage(const blokus::MessageWrapper& wrapper) {
-    //    // TODO: protobuf Ã¤ÆÃ ¸Ş½ÃÁö ¶ó¿ìÆÃ
+    //    // TODO: protobuf ì±„íŒ… ë©”ì‹œì§€ ë¼ìš°íŒ…
     //}
 
     //void MessageHandler::routeHeartbeat(const blokus::MessageWrapper& wrapper) {
-    //    // TODO: protobuf ÇÏÆ®ºñÆ® Ã³¸®
+    //    // TODO: protobuf í•˜íŠ¸ë¹„íŠ¸ ì²˜ë¦¬
     //}
 
     //bool MessageHandler::validateMessage(const blokus::MessageWrapper& wrapper) {
-    //    // TODO: protobuf ¸Ş½ÃÁö °ËÁõ
+    //    // TODO: protobuf ë©”ì‹œì§€ ê²€ì¦
     //    return true;
     //}
 
     //std::string MessageHandler::extractPayloadData(const blokus::MessageWrapper& wrapper) {
-    //    // TODO: protobuf ÆäÀÌ·Îµå ÃßÃâ
+    //    // TODO: protobuf í˜ì´ë¡œë“œ ì¶”ì¶œ
     //    return "";
     //}
 
