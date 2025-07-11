@@ -1,65 +1,97 @@
-#pragma once
-
-#pragma once
+ï»¿#pragma once
 
 #include <string>
 #include <memory>
 #include <functional>
 #include <unordered_map>
+#include <vector>
 #include <cstdint>
 
-// ±âÁ¸ Á¤ÀÇ »ç¿ë
+// ê¸°ì¡´ ì •ì˜ ì‚¬ìš©
 #include "common/ServerTypes.h"
 
-// Protobuf Àü¹æ ¼±¾ğ (blokus ³×ÀÓ½ºÆäÀÌ½º)
+// Protobuf ì „ë°© ì„ ì–¸ (blokus ë„¤ì„ìŠ¤í˜ì´ìŠ¤)
 namespace google::protobuf {
     class Message;
 }
 
 namespace blokus {
-    class MessageWrapper;     // message_wrapper.proto¿¡¼­ »ı¼º
-    enum MessageType : int;   // message_wrapper.proto¿¡¼­ »ı¼º
+    class MessageWrapper;     // message_wrapper.protoì—ì„œ ìƒì„±
+    enum MessageType : int;   // message_wrapper.protoì—ì„œ ìƒì„±
 }
 
 namespace Blokus::Server {
 
-    // Àü¹æ ¼±¾ğ (¼øÈ¯ ÂüÁ¶ ¹æÁö)
+    // ì „ë°© ì„ ì–¸ (ìˆœí™˜ ì°¸ì¡° ë°©ì§€)
     class Session;
+    class AuthenticationService;
+    class RoomManager;
 
-    // ¸Ş½ÃÁö ÀÌº¥Æ® Äİ¹é Å¸ÀÔµé
+    // ë©”ì‹œì§€ ì´ë²¤íŠ¸ ì½œë°± íƒ€ì…ë“¤
     using AuthCallback = std::function<void(const std::string& sessionId, const std::string& username, bool success)>;
+    using RegisterCallback = std::function<void(const std::string& sessionId, const std::string& username,
+        const std::string& email, const std::string& password)>;
     using RoomCallback = std::function<void(const std::string& sessionId, const std::string& action, const std::string& data)>;
     using ChatCallback = std::function<void(const std::string& sessionId, const std::string& message)>;
 
-    // ´Ü¼øÈ­µÈ ¸Ş½ÃÁö ÇÚµé·¯ Å¬·¡½º (ºê·ÎÄ¿ ¿ªÇÒ¸¸)
+    // ë‹¨ìˆœí™”ëœ ë©”ì‹œì§€ í•¸ë“¤ëŸ¬ í´ë˜ìŠ¤ (ë¸Œë¡œì»¤ ì—­í•  + ì¸ì¦ í†µí•©)
     class MessageHandler {
     public:
-        explicit MessageHandler(Session* session);
+        explicit MessageHandler(Session* session, RoomManager* roomManager = nullptr, AuthenticationService* authService = nullptr);
         ~MessageHandler();
 
-        // ¸Ş½ÃÁö Ã³¸® (ÇöÀç: ÅØ½ºÆ® ¿ì¼±)
+        // ë©”ì‹œì§€ ì²˜ë¦¬ (í˜„ì¬: í…ìŠ¤íŠ¸ ìš°ì„ )
         void handleMessage(const std::string& rawMessage);
 
-        // Äİ¹é ¼³Á¤ (GameServer¿¡¼­ ¼³Á¤)
+        // ì½œë°± ì„¤ì • (GameServerì—ì„œ ì„¤ì •)
         void setAuthCallback(AuthCallback callback) { authCallback_ = callback; }
+        void setRegisterCallback(RegisterCallback callback) { registerCallback_ = callback; }
         void setRoomCallback(RoomCallback callback) { roomCallback_ = callback; }
         void setChatCallback(ChatCallback callback) { chatCallback_ = callback; }
 
-        // ÀÀ´ä Àü¼Û (ÇöÀç: ÅØ½ºÆ® ±â¹İ)
+        // ì‘ë‹µ ì „ì†¡ (í˜„ì¬: í…ìŠ¤íŠ¸ ê¸°ë°˜)
         void sendTextMessage(const std::string& message);
         void sendError(const std::string& errorMessage);
 
-        // TODO: ÇâÈÄ Protobuf Áö¿ø
+        // TODO: í–¥í›„ Protobuf ì§€ì›
         void sendProtobufMessage(blokus::MessageType type, const google::protobuf::Message& payload);
 
     private:
-        // ÇöÀç ´Ü°è: ÅØ½ºÆ® ¸Ş½ÃÁö Ã³¸®
+        // í˜„ì¬ ë‹¨ê³„: í…ìŠ¤íŠ¸ ë©”ì‹œì§€ ì²˜ë¦¬
         void handleTextMessage(const std::string& rawMessage);
+
+        // ë©”ì‹œì§€ íŒŒì‹± ìœ í‹¸ë¦¬í‹°
+        std::vector<std::string> splitMessage(const std::string& message, char delimiter = ':');
+        void sendResponse(const std::string& response);
+
+        // ì¸ì¦ ê´€ë ¨ í•¸ë“¤ëŸ¬ë“¤ (AuthenticationService í†µí•©)
+        void handleAuth(const std::vector<std::string>& params);
+        void handleRegister(const std::vector<std::string>& params);
+        void handleLoginGuest(const std::vector<std::string>& params);
+        void handleLogout(const std::vector<std::string>& params);
+        void handleSessionValidate(const std::vector<std::string>& params);
+
+        // ë°© ê´€ë ¨ í•¸ë“¤ëŸ¬ë“¤ (RoomManager í†µí•©)
+        void handleCreateRoom(const std::vector<std::string>& params);
+        void handleJoinRoom(const std::vector<std::string>& params);
+        void handleLeaveRoom(const std::vector<std::string>& params);
+        void handleRoomList(const std::vector<std::string>& params);
+        void handlePlayerReady(const std::vector<std::string>& params);
+        void handleStartGame(const std::vector<std::string>& params);
+
+        // ê²Œì„ ê´€ë ¨ í•¸ë“¤ëŸ¬ë“¤
+        void handleGameMove(const std::vector<std::string>& params);
+
+        // ê¸°ë³¸ í•¸ë“¤ëŸ¬ë“¤
+        void handlePing(const std::vector<std::string>& params);
+        void handleChat(const std::vector<std::string>& params);
+
+        // ê¸°ì¡´ ì½œë°± ë°©ì‹ (í•˜ìœ„ í˜¸í™˜ì„±)
         void handleAuthMessage(const std::string& authData);
         void handleRoomMessage(const std::string& roomData);
         void handleChatMessage(const std::string& chatData);
 
-        // TODO: 2´Ü°è¿¡¼­ ±¸Çö ¿¹Á¤ (ÇöÀç´Â »ç¿ëÇÏÁö ¾ÊÀ½)
+        // TODO: 2ë‹¨ê³„ì—ì„œ êµ¬í˜„ ì˜ˆì • (í˜„ì¬ëŠ” ì‚¬ìš©í•˜ì§€ ì•ŠìŒ)
         /*
         bool parseProtobufMessage(const std::string& data, blokus::MessageWrapper* wrapper);
         void handleProtobufMessage(const blokus::MessageWrapper* wrapper);
@@ -73,19 +105,25 @@ namespace Blokus::Server {
         */
 
     private:
-        Session* session_;  // ¼ÒÀ¯ÇÏÁö ¾ÊÀ½, ´Ü¼ø ÂüÁ¶
+        Session* session_;  // ì†Œìœ í•˜ì§€ ì•ŠìŒ, ë‹¨ìˆœ ì°¸ì¡°
+        RoomManager* roomManager_;  // ğŸ”¥ ìƒˆë¡œ ì¶”ê°€: RoomManager ì°¸ì¡°
+        AuthenticationService* authService_;  // ğŸ”¥ ìƒˆë¡œ ì¶”ê°€: AuthService ì°¸ì¡°
 
-        // ½ÃÄö½º °ü¸®
+        // ì‹œí€€ìŠ¤ ê´€ë¦¬
         uint32_t sequenceId_{ 0 };
         uint32_t lastReceivedSequence_{ 0 };
 
-        // Äİ¹éµé (GameServer¿ÍÀÇ Åë½Å)
+        // ì½œë°±ë“¤ (GameServerì™€ì˜ í†µì‹ )
         AuthCallback authCallback_;
+        RegisterCallback registerCallback_;  // ğŸ”¥ ìƒˆë¡œ ì¶”ê°€
         RoomCallback roomCallback_;
         ChatCallback chatCallback_;
 
-        // ¸Ş½ÃÁö ¶ó¿ìÆÃ Å×ÀÌºí
-        std::unordered_map<int, std::function<void(const blokus::MessageWrapper&)>> handlers_;
+        // ğŸ”¥ ìƒˆë¡œ ì¶”ê°€: ë©”ì‹œì§€ í•¸ë“¤ëŸ¬ í…Œì´ë¸”
+        std::unordered_map<std::string, std::function<void(const std::vector<std::string>&)>> handlers_;
+
+        // ë©”ì‹œì§€ ë¼ìš°íŒ… í…Œì´ë¸” (Protobufìš©)
+        std::unordered_map<int, std::function<void(const blokus::MessageWrapper&)>> protobufHandlers_;
     };
 
 } // namespace Blokus::Server

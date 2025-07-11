@@ -1,8 +1,10 @@
 ﻿#include "core/GameServer.h"
 #include "core/Session.h"
-#include "handler/MessageHandler.h"  // MessageHandler 완전한 정의 필요
-#include "manager/ConfigManager.h"
+#include "handler/MessageHandler.h"
+#include "manager/RoomManager.h"
+#include "service/AuthenticationService.h"
 #include "manager/DatabaseManager.h"
+#include "manager/ConfigManager.h"
 #include <spdlog/spdlog.h>
 #include <chrono>
 #include <functional>
@@ -20,7 +22,7 @@ namespace Blokus::Server {
         , ioContext_()
         , acceptor_(ioContext_)
         , heartbeatTimer_(nullptr)
-        // , networkManager_(nullptr)  // 현재는 사용하지 않음
+        , cleanupTimer_(nullptr)
     {
         spdlog::info("GameServer 인스턴스 생성");
     }
@@ -52,13 +54,19 @@ namespace Blokus::Server {
                 return false;
             }
 
-            // 3. 네트워크 초기화
+            // 3. 서비스 초기화 (새로 추가)
+            if (!initializeServices()) {
+                spdlog::error("서비스 초기화 실패");
+                return false;
+            }
+
+            // 4. 네트워크 초기화
             if (!initializeNetwork()) {
                 spdlog::error("네트워크 초기화 실패");
                 return false;
             }
 
-            // 4. 통계 초기화
+            // 5. 통계 초기화
             {
                 std::lock_guard<std::mutex> lock(statsMutex_);
                 stats_.serverStartTime = std::chrono::system_clock::now();
@@ -69,7 +77,6 @@ namespace Blokus::Server {
 
             spdlog::info("GameServer 초기화 완료");
             return true;
-
         }
         catch (const std::exception& e) {
             spdlog::error("GameServer 초기화 중 예외 발생: {}", e.what());
@@ -105,8 +112,9 @@ namespace Blokus::Server {
         // 연결 수락 시작
         startAccepting();
 
-        // 하트비트 타이머 시작
+        // 하트비트 및 정리 타이머 시작
         startHeartbeatTimer();
+        startCleanupTimer();
 
         spdlog::info("GameServer가 {}:{} 에서 클라이언트 연결을 대기합니다",
             "0.0.0.0", ConfigManager::serverPort);
@@ -122,10 +130,14 @@ namespace Blokus::Server {
 
         // 1. 새로운 연결 차단
         if (acceptor_.is_open()) {
-            acceptor_.close();
+            boost::system::error_code ec;
+            acceptor_.close(ec);
         }
 
-        // 2. 모든 세션 종료
+        // 2. 서비스들 정리
+        cleanupServices();
+
+        // 3. 모든 세션 종료
         {
             std::lock_guard<std::mutex> lock(sessionsMutex_);
             for (auto& [sessionId, session] : sessions_) {
@@ -136,15 +148,18 @@ namespace Blokus::Server {
             sessions_.clear();
         }
 
-        // 3. 타이머 취소
+        // 4. 타이머들 취소
         if (heartbeatTimer_) {
             heartbeatTimer_->cancel();
         }
+        if (cleanupTimer_) {
+            cleanupTimer_->cancel();
+        }
 
-        // 4. IO 컨텍스트 종료
+        // 5. IO 컨텍스트 종료
         ioContext_.stop();
 
-        // 5. 스레드 풀 정리
+        // 6. 스레드 풀 정리
         for (auto& thread : threadPool_) {
             if (thread.joinable()) {
                 thread.join();
@@ -172,6 +187,97 @@ namespace Blokus::Server {
         catch (const std::exception& e) {
             spdlog::error("메인 루프 예외: {}", e.what());
         }
+    }
+
+    // ========================================
+    // 인증 관련 편의 함수들 (새로 추가)
+    // ========================================
+
+    AuthResult GameServer::authenticateUser(const std::string& username, const std::string& password) {
+        if (!authService_) {
+            return AuthResult(false, "인증 서비스가 초기화되지 않았습니다", "", "", "");
+        }
+
+        return authService_->loginUser(username, password);
+    }
+
+    RegisterResult GameServer::registerUser(const std::string& username, const std::string& email, const std::string& password) {
+        if (!authService_) {
+            return RegisterResult(false, "인증 서비스가 초기화되지 않았습니다", "");
+        }
+
+        return authService_->registerUser(username, password);
+    }
+
+    AuthResult GameServer::loginGuest(const std::string& guestName) {
+        if (!authService_) {
+            return AuthResult(false, "인증 서비스가 초기화되지 않았습니다", "", "", "");
+        }
+
+        return authService_->loginGuest(guestName);
+    }
+
+    bool GameServer::logoutUser(const std::string& sessionToken) {
+        if (!authService_) {
+            return false;
+        }
+
+        return authService_->logoutUser(sessionToken);
+    }
+
+    std::optional<SessionInfo> GameServer::validateSession(const std::string& sessionToken) {
+        if (!authService_) {
+            return std::nullopt;
+        }
+
+        return authService_->validateSession(sessionToken);
+    }
+
+    // ========================================
+    // 방 관련 편의 함수들 (새로 추가)
+    // ========================================
+
+    int GameServer::createRoom(const std::string& hostId, const std::string& hostUsername,
+        const std::string& roomName, bool isPrivate, const std::string& password) {
+        if (!roomManager_) {
+            return -1;
+        }
+
+        return roomManager_->createRoom(hostId, hostUsername, roomName, isPrivate, password);
+    }
+
+    bool GameServer::joinRoom(int roomId, std::shared_ptr<Session> client,
+        const std::string& userId, const std::string& username,
+        const std::string& password) {
+        if (!roomManager_) {
+            return false;
+        }
+
+        return roomManager_->joinRoom(roomId, client, userId, username, password);
+    }
+
+    bool GameServer::leaveRoom(int roomId, const std::string& userId) {
+        if (!roomManager_) {
+            return false;
+        }
+
+        return roomManager_->leaveRoom(roomId, userId);
+    }
+
+    std::vector<Blokus::Common::RoomInfo> GameServer::getRoomList() const {
+        if (!roomManager_) {
+            return {};
+        }
+
+        return roomManager_->getRoomList();
+    }
+
+    std::shared_ptr<GameRoom> GameServer::getRoom(int roomId) {
+        if (!roomManager_) {
+            return nullptr;
+        }
+
+        return roomManager_->getRoom(roomId);
     }
 
     // ========================================
@@ -203,6 +309,24 @@ namespace Blokus::Server {
         spdlog::info("새 세션 추가: {} (총 연결: {})",
             sessionId, getCurrentConnections());
 
+        // 🔥 핵심 수정: Session에 MessageHandler가 없으면 생성
+        if (!session->getMessageHandler()) {
+            spdlog::info("🔧 [addSession] MessageHandler 생성 - SessionId: {}", sessionId);
+
+            // MessageHandler 생성 및 설정
+            // 참고: Session 클래스에 setMessageHandler 메서드가 있어야 함
+            auto messageHandler = std::make_unique<MessageHandler>(
+                session.get(),          // Session 포인터
+                roomManager_.get(),     // RoomManager 포인터  
+                authService_.get()      // AuthenticationService 포인터
+            );
+
+            // Session에 MessageHandler 설정 (Session.h에 setMessageHandler 필요)
+            session->setMessageHandler(std::move(messageHandler));
+
+            spdlog::info("✅ [addSession] MessageHandler 생성 완료 - SessionId: {}", sessionId);
+        }
+
         // 세션 콜백 설정
         session->setDisconnectCallback([this](const std::string& id) {
             onSessionDisconnect(id);
@@ -212,12 +336,19 @@ namespace Blokus::Server {
             onSessionMessage(id, msg);
             });
 
-        // MessageHandler 콜백 설정
-        if (session->getMessageHandler()) {
-            auto handler = session->getMessageHandler();
+        // 🔥 핵심 수정: MessageHandler 콜백 설정 (이제 항상 존재함)
+        auto handler = session->getMessageHandler();
+        if (handler) {
+            spdlog::info("🔧 [addSession] MessageHandler 콜백 설정 - SessionId: {}", sessionId);
 
+            // AuthService와 RoomManager 콜백 설정
             handler->setAuthCallback([this](const std::string& id, const std::string& username, bool success) {
                 handleAuthentication(id, username, success);
+                });
+
+            handler->setRegisterCallback([this](const std::string& id, const std::string& username,
+                const std::string& email, const std::string& password) {
+                    handleRegistration(id, username, email, password);
                 });
 
             handler->setRoomCallback([this](const std::string& id, const std::string& action, const std::string& data) {
@@ -227,6 +358,11 @@ namespace Blokus::Server {
             handler->setChatCallback([this](const std::string& id, const std::string& message) {
                 handleChatBroadcast(id, message);
                 });
+
+            spdlog::info("✅ [addSession] MessageHandler 콜백 설정 완료 - SessionId: {}", sessionId);
+        }
+        else {
+            spdlog::error("❌ [addSession] MessageHandler가 여전히 null입니다 - SessionId: {}", sessionId);
         }
     }
 
@@ -287,7 +423,6 @@ namespace Blokus::Server {
             spdlog::info("설정 로드 완료 - 포트: {}, 최대 클라이언트: {}",
                 ConfigManager::serverPort, ConfigManager::maxClients);
             return true;
-
         }
         catch (const std::exception& e) {
             spdlog::error("설정 초기화 예외: {}", e.what());
@@ -297,33 +432,56 @@ namespace Blokus::Server {
 
     bool GameServer::initializeDatabase() {
         try {
-            // 여기서 실제 DB 매니저 초기화
-            // 현재는 싱글톤 패턴이므로 연결 테스트만 수행
-            spdlog::info("Testing database connectivity...");
+            spdlog::info("데이터베이스 연결 테스트 중...");
 
-            // TODO: 실제 DatabaseManager 인스턴스 생성 및 관리
-            // dbManager_ = std::make_unique<DatabaseManager>();
-            // if (!dbManager_->initialize()) return false;
-
-            // 현재는 간단한 연결 테스트만
-            DatabaseManager testManager;
-            if (testManager.initialize()) {
-                auto stats = testManager.getStats();
-                spdlog::info("Database connected successfully");
-                spdlog::info("DB Stats: {} users, {} games", stats.totalUsers, stats.totalGames);
-                testManager.shutdown();
+            // DatabaseManager 인스턴스 생성 및 테스트
+            databaseManager_ = std::make_shared<DatabaseManager>();
+            if (databaseManager_->initialize()) {
+                auto stats = databaseManager_->getStats();
+                spdlog::info("데이터베이스 연결 성공");
+                spdlog::info("DB 통계: {} 사용자, {} 게임", stats.totalUsers, stats.totalGames);
                 return true;
             }
             else {
-                spdlog::warn("Database connection failed - server will run without DB features");
+                spdlog::warn("데이터베이스 연결 실패 - DB 없이 서버 실행");
+                databaseManager_.reset(); // DB 사용 안 함
                 return true; // DB 없이도 서버 실행 허용
             }
-
         }
         catch (const std::exception& e) {
-            spdlog::error("Database initialization error: {}", e.what());
-            spdlog::warn("Continuing without database support");
+            spdlog::error("데이터베이스 초기화 오류: {}", e.what());
+            spdlog::warn("데이터베이스 지원 없이 계속 진행");
+            databaseManager_.reset();
             return true; // DB 실패해도 서버 계속 실행
+        }
+    }
+
+    bool GameServer::initializeServices() {
+        spdlog::info("서비스들 초기화 시작");
+
+        try {
+            // AuthenticationService 초기화
+            authService_ = std::make_unique<AuthenticationService>(databaseManager_);
+            if (!authService_ || !authService_->initialize()) {
+                spdlog::error("AuthenticationService 초기화 실패");
+                return false;
+            }
+            spdlog::info("AuthenticationService 초기화 완료");
+
+            // RoomManager 초기화
+            roomManager_ = std::make_unique<RoomManager>();
+            if (!roomManager_) {
+                spdlog::error("RoomManager 생성 실패");
+                return false;
+            }
+            spdlog::info("RoomManager 초기화 완료");
+
+            spdlog::info("모든 서비스 초기화 완료");
+            return true;
+        }
+        catch (const std::exception& e) {
+            spdlog::error("서비스 초기화 중 예외 발생: {}", e.what());
+            return false;
         }
     }
 
@@ -338,7 +496,6 @@ namespace Blokus::Server {
             spdlog::info("네트워크 초기화 완료 - {}:{}",
                 endpoint.address().to_string(), endpoint.port());
             return true;
-
         }
         catch (const std::exception& e) {
             spdlog::error("네트워크 초기화 예외: {}", e.what());
@@ -383,7 +540,6 @@ namespace Blokus::Server {
                     addSession(session);
                     session->start();
                 }
-
             }
             catch (const std::exception& e) {
                 spdlog::error("새 연결 처리 중 예외: {}", e.what());
@@ -407,13 +563,18 @@ namespace Blokus::Server {
     }
 
     void GameServer::onSessionMessage(const std::string& sessionId, const std::string& message) {
-        // 메시지 핸들링은 Session의 MessageHandler가 처리하므로
-        // 여기서는 단순 로깅만 수행
-        spdlog::debug("세션 {}에서 메시지 수신: {}", sessionId, message.substr(0, 100));
+        // 통계 업데이트
+        {
+            std::lock_guard<std::mutex> lock(statsMutex_);
+            stats_.messagesReceived++;
+        }
+
+        spdlog::debug("세션 {}에서 메시지 수신: {}", sessionId,
+            message.length() > 50 ? message.substr(0, 50) + "..." : message);
     }
 
     // ========================================
-    // MessageHandler 콜백 처리 함수들
+    // MessageHandler 콜백 처리 함수들 (업데이트됨)
     // ========================================
 
     void GameServer::handleAuthentication(const std::string& sessionId, const std::string& username, bool success) {
@@ -426,24 +587,55 @@ namespace Blokus::Server {
         if (success) {
             spdlog::info("사용자 인증 성공: {} (세션: {})", username, sessionId);
 
-            // TODO: DatabaseManager를 통한 실제 인증 처리
-            // - 사용자 정보 DB에서 조회
-            // - 마지막 로그인 시간 업데이트
-            // - 사용자 통계 갱신
-
-            // 현재는 간단한 응답만
-            session->sendMessage("WELCOME:" + username);
-
-            // 통계 업데이트
-            {
-                std::lock_guard<std::mutex> lock(statsMutex_);
-                // stats_.authenticatedUsers++; // 향후 추가
+            // AuthenticationService를 통한 실제 인증 (간단한 형태)
+            if (authService_) {
+                auto authResult = authService_->loginUser(username, "dummy_password"); // 이미 검증됨
+                if (authResult.success) {
+                    session->sendMessage("WELCOME:" + username + ":" + authResult.sessionToken);
+                }
+                else {
+                    session->sendMessage("AUTH_FAILED:" + authResult.message);
+                }
             }
-
+            else {
+                session->sendMessage("WELCOME:" + username);
+            }
         }
         else {
             spdlog::warn("사용자 인증 실패: {} (세션: {})", username, sessionId);
-            // 연결 유지하되 재시도 허용
+            session->sendMessage("AUTH_FAILED:Invalid credentials");
+        }
+    }
+
+    void GameServer::handleRegistration(const std::string& sessionId, const std::string& username,
+        const std::string& email, const std::string& password) {
+        auto session = getSession(sessionId);
+        if (!session) {
+            spdlog::warn("존재하지 않는 세션에서 회원가입 시도: {}", sessionId);
+            return;
+        }
+
+        if (!authService_) {
+            session->sendMessage("REGISTER_FAILED:인증 서비스를 사용할 수 없습니다");
+            return;
+        }
+
+        auto registerResult = authService_->registerUser(username, password);
+
+        if (registerResult.success) {
+            spdlog::info("새 사용자 등록 성공: {} ({})", username, email);
+            session->sendMessage("REGISTER_SUCCESS:" + username);
+
+            // 등록 성공 후 자동 로그인
+            auto loginResult = authService_->loginUser(username, password);
+            if (loginResult.success) {
+                session->setAuthenticated(loginResult.userId, loginResult.username);
+                session->sendMessage("AUTO_LOGIN_SUCCESS:" + loginResult.sessionToken);
+            }
+        }
+        else {
+            spdlog::warn("사용자 등록 실패: {} - {}", username, registerResult.message);
+            session->sendMessage("REGISTER_FAILED:" + registerResult.message);
         }
     }
 
@@ -459,44 +651,63 @@ namespace Blokus::Server {
 
         spdlog::info("방 액션 처리: {} -> {} (데이터: {})", session->getUsername(), action, data);
 
-        // TODO: RoomManager 구현 후 실제 방 관리 로직 연결
+        if (!roomManager_) {
+            session->sendMessage("ERROR:Room service not available");
+            return;
+        }
+
         if (action == "list") {
             // 방 목록 요청
-            std::string roomList = "ROOM_LIST:1:TestRoom1:2/4,2:TestRoom2:1/4,3:MyGame:3/4";
-            session->sendMessage(roomList);
-
+            auto roomList = roomManager_->getRoomList();
+            std::string response = "ROOM_LIST:" + std::to_string(roomList.size());
+            for (const auto& room : roomList) {
+                response += ":" + std::to_string(room.roomId) + "," + room.roomName +
+                    "," + room.hostName + "," + std::to_string(room.currentPlayers) +
+                    "," + std::to_string(room.maxPlayers) + "," +
+                    (room.isPrivate ? "1" : "0") + "," + (room.isPlaying ? "1" : "0");
+            }
+            session->sendMessage(response);
         }
         else if (action == "create") {
             // 방 생성 요청
             std::string roomName = data.empty() ? "New Room" : data;
-            spdlog::info("방 생성 요청: {} by {}", roomName, session->getUsername());
+            std::string userId = session->getUserId();
+            std::string username = session->getUsername();
 
-            // 더미 방 ID 생성
-            static int nextRoomId = 100;
-            int roomId = ++nextRoomId;
-
-            session->sendMessage("ROOM_CREATED:" + std::to_string(roomId) + ":" + roomName);
-
+            int roomId = roomManager_->createRoom(userId, username, roomName);
+            if (roomId > 0) {
+                session->sendMessage("ROOM_CREATED:" + std::to_string(roomId) + ":" + roomName);
+                spdlog::info("방 생성 성공: {} by {} (ID: {})", roomName, username, roomId);
+            }
+            else {
+                session->sendMessage("ERROR:Failed to create room");
+            }
         }
         else if (action == "join") {
             // 방 참가 요청
-            std::string roomId = data;
-            spdlog::info("방 참가 요청: 방ID {} by {}", roomId, session->getUsername());
+            try {
+                int roomId = std::stoi(data);
+                std::string userId = session->getUserId();
+                std::string username = session->getUsername();
 
-            // 간단한 검증
-            if (roomId.empty()) {
-                session->sendMessage("ERROR:Room ID required");
+                if (roomManager_->joinRoom(roomId, session, userId, username)) {
+                    session->sendMessage("ROOM_JOINED:" + std::to_string(roomId));
+                    spdlog::info("방 입장 성공: {} -> 방 {}", username, roomId);
+                }
+                else {
+                    session->sendMessage("ERROR:Failed to join room");
+                }
             }
-            else {
-                session->sendMessage("ROOM_JOINED:" + roomId + ":BLUE"); // 더미 색상
+            catch (const std::exception& e) {
+                session->sendMessage("ERROR:Invalid room ID");
             }
-
         }
         else if (action == "leave") {
             // 방 나가기 요청
+            std::string userId = session->getUserId();
+            // TODO: 현재 방 ID를 세션에서 추적해야 함
             spdlog::info("방 나가기 요청: {}", session->getUsername());
             session->sendMessage("ROOM_LEFT:OK");
-
         }
         else {
             session->sendMessage("ERROR:Unknown room action: " + action);
@@ -530,7 +741,7 @@ namespace Blokus::Server {
     }
 
     // ========================================
-    // 정리 작업
+    // 정리 작업 (업데이트됨)
     // ========================================
 
     void GameServer::startHeartbeatTimer() {
@@ -538,19 +749,55 @@ namespace Blokus::Server {
         handleHeartbeat();
     }
 
+    void GameServer::startCleanupTimer() {
+        cleanupTimer_ = std::make_unique<boost::asio::steady_timer>(ioContext_);
+        cleanupTimer_->expires_after(std::chrono::minutes(5)); // 5분마다 정리
+        cleanupTimer_->async_wait([this](const boost::system::error_code& error) {
+            if (!error && running_.load()) {
+                performCleanup();
+                startCleanupTimer(); // 재귀 호출
+            }
+            });
+    }
+
     void GameServer::handleHeartbeat() {
         if (!running_.load()) {
             return;
         }
 
-        // 30초마다 하트비트 및 정리 작업
+        // 30초마다 하트비트
         heartbeatTimer_->expires_after(std::chrono::seconds(30));
         heartbeatTimer_->async_wait([this](const boost::system::error_code& error) {
             if (!error && running_.load()) {
                 cleanupSessions();
+                logServerStats(); // 통계 로그
                 handleHeartbeat(); // 다음 하트비트 예약
             }
             });
+    }
+
+    void GameServer::performCleanup() {
+        try {
+            spdlog::debug("주기적 정리 작업 시작");
+
+            // 만료된 인증 세션 정리
+            if (authService_) {
+                authService_->cleanupExpiredSessions();
+            }
+
+            // 빈 방 정리
+            if (roomManager_) {
+                roomManager_->cleanupEmptyRooms();
+            }
+
+            // 네트워크 세션 정리
+            cleanupSessions();
+
+            spdlog::debug("주기적 정리 작업 완료");
+        }
+        catch (const std::exception& e) {
+            spdlog::error("정리 작업 중 예외 발생: {}", e.what());
+        }
     }
 
     void GameServer::cleanupSessions() {
@@ -590,6 +837,55 @@ namespace Blokus::Server {
                 }
             }
         }
+    }
+
+    void GameServer::cleanupServices() {
+        spdlog::info("서비스 리소스 정리 시작");
+
+        // AuthenticationService 정리
+        if (authService_) {
+            authService_->shutdown();
+            authService_.reset();
+            spdlog::info("AuthenticationService 정리 완료");
+        }
+
+        // RoomManager 정리
+        if (roomManager_) {
+            roomManager_->broadcastToAllRooms("SERVER_SHUTDOWN");
+            roomManager_.reset();
+            spdlog::info("RoomManager 정리 완료");
+        }
+
+        // DatabaseManager 정리
+        if (databaseManager_) {
+            databaseManager_->shutdown();
+            databaseManager_.reset();
+            spdlog::info("DatabaseManager 정리 완료");
+        }
+
+        spdlog::info("서비스 리소스 정리 완료");
+    }
+
+    void GameServer::logServerStats() {
+        std::lock_guard<std::mutex> lock(statsMutex_);
+
+        size_t roomCount = roomManager_ ? roomManager_->getRoomCount() : 0;
+        size_t playersInRooms = roomManager_ ? roomManager_->getTotalPlayers() : 0;
+        size_t activeAuthSessions = authService_ ? authService_->getActiveSessionCount() : 0;
+
+        auto now = std::chrono::system_clock::now();
+        auto uptime = std::chrono::duration_cast<std::chrono::seconds>(now - stats_.serverStartTime).count();
+
+        spdlog::info("=== 서버 통계 ===");
+        spdlog::info("현재 연결: {}", stats_.currentConnections);
+        spdlog::info("인증된 세션: {}", activeAuthSessions);
+        spdlog::info("총 연결 수: {}", stats_.totalConnectionsToday);
+        spdlog::info("피크 연결: {}", stats_.peakConcurrentConnections);
+        spdlog::info("활성 방 수: {}", roomCount);
+        spdlog::info("방 내 플레이어: {}", playersInRooms);
+        spdlog::info("처리된 메시지: {}", stats_.messagesReceived);
+        spdlog::info("업타임: {}초 ({}분)", uptime, uptime / 60);
+        spdlog::info("================");
     }
 
 } // namespace Blokus::Server

@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <memory>
 #include <atomic>
@@ -9,110 +9,152 @@
 #include <boost/asio.hpp>
 #include <spdlog/spdlog.h>
 
-// ±âÁ¸ Á¤ÀÇµÈ Å¸ÀÔµé »ç¿ë
+// ê¸°ì¡´ ì •ì˜ëœ íƒ€ì…ë“¤ ì‚¬ìš©
 #include "common/ServerTypes.h"
 #include "manager/ConfigManager.h"
+#include "common/Types.h"
 
-// Àü¹æ ¼±¾ğ
+// ì „ë°© ì„ ì–¸
 namespace Blokus::Server {
-	class Session;
-	class NetworkManager;
-	class DatabaseManager;
+    class Session;
+    class NetworkManager;
+    class DatabaseManager;
+    class RoomManager;
+    class AuthenticationService;
+    class MessageHandler;
 
-	// ¸ŞÀÎ °ÔÀÓ ¼­¹ö Å¬·¡½º
-	class GameServer {
-	public:
-		explicit GameServer();
-		~GameServer();
+    struct AuthResult;
+    struct RegisterResult;
+    struct SessionInfo;
 
-		// ±âº» ¼­¹ö Á¦¾î
-		bool initialize();
-		void start();
-		void stop();
-		void run();
+    // ë©”ì¸ ê²Œì„ ì„œë²„ í´ë˜ìŠ¤
+    class GameServer {
+    public:
+        explicit GameServer();
+        ~GameServer();
 
-		bool isRunning() const { return running_.load(); }
+        // ê¸°ë³¸ ì„œë²„ ì œì–´
+        bool initialize();
+        void start();
+        void stop();
+        void run();
+        bool isRunning() const { return running_.load(); }
 
-		// ConfigManager¸¦ ÅëÇØ ¼³Á¤ Á¢±Ù
-		static int getServerPort() { return ConfigManager::serverPort; }
-		static int getMaxClients() { return ConfigManager::maxClients; }
-		static int getThreadPoolSize() { return ConfigManager::threadPoolSize; }
+        // ConfigManagerë¥¼ í†µí•´ ì„¤ì • ì ‘ê·¼
+        static int getServerPort() { return ConfigManager::serverPort; }
+        static int getMaxClients() { return ConfigManager::maxClients; }
+        static int getThreadPoolSize() { return ConfigManager::threadPoolSize; }
 
-		// Å¬¶óÀÌ¾ğÆ® °ü¸®
-		void addSession(std::shared_ptr<Session> session);
-		void removeSession(const std::string& sessionId);
+        // ========================================
+        // ì¸ì¦ ê´€ë ¨ í¸ì˜ í•¨ìˆ˜ë“¤
+        // ========================================
+        AuthResult authenticateUser(const std::string& username, const std::string& password);
+        RegisterResult registerUser(const std::string& username, const std::string& email, const std::string& password);
+        AuthResult loginGuest(const std::string& guestName = "");
+        bool logoutUser(const std::string& sessionToken);
+        std::optional<SessionInfo> validateSession(const std::string& sessionToken);
 
-		// ¼¼¼Ç Á¶È¸ - ÀÏ½ÃÀû »ç¿ë¿ë (shared_ptr)
-		std::shared_ptr<Session> getSession(const std::string& sessionId);
+        // ========================================
+        // ë°© ê´€ë ¨ í¸ì˜ í•¨ìˆ˜ë“¤
+        // ========================================
+        int createRoom(const std::string& hostId, const std::string& hostUsername,
+            const std::string& roomName, bool isPrivate = false, const std::string& password = "");
+        bool joinRoom(int roomId, std::shared_ptr<Session> client, const std::string& userId,
+            const std::string& username, const std::string& password = "");
+        bool leaveRoom(int roomId, const std::string& userId);
+        std::vector<Blokus::Common::RoomInfo> getRoomList() const;
+        std::shared_ptr<class GameRoom> getRoom(int roomId);
 
-		// ¼¼¼Ç Á¶È¸ - °üÂû¿ë (weak_ptr) - »ı¸íÁÖ±â¿¡ ¿µÇâ ¾øÀ½
-		std::weak_ptr<Session> getSessionWeak(const std::string& sessionId);
+        // í´ë¼ì´ì–¸íŠ¸ ê´€ë¦¬
+        void addSession(std::shared_ptr<Session> session);
+        void removeSession(const std::string& sessionId);
 
-		// ¾ÈÀüÇÑ ¼¼¼Ç ÀÛ¾÷ - ¶÷´Ù·Î ÀÛ¾÷ Àü´Ş
-		bool withSession(const std::string& sessionId,
-			std::function<void(std::shared_ptr<Session>)> action);
+        // ì„¸ì…˜ ì¡°íšŒ - ì¼ì‹œì  ì‚¬ìš©ìš© (shared_ptr)
+        std::shared_ptr<Session> getSession(const std::string& sessionId);
 
-		// Á¢±ÙÀÚ
-		boost::asio::io_context& getIOContext() { return ioContext_; }
+        // ì„¸ì…˜ ì¡°íšŒ - ê´€ì°°ìš© (weak_ptr) - ìƒëª…ì£¼ê¸°ì— ì˜í–¥ ì—†ìŒ
+        std::weak_ptr<Session> getSessionWeak(const std::string& sessionId);
 
-		// Åë°è Á¢±ÙÀÚ
-		int getCurrentConnections() const {
-			std::lock_guard<std::mutex> lock(statsMutex_);
-			return stats_.currentConnections;
-		}
+        // ì•ˆì „í•œ ì„¸ì…˜ ì‘ì—… - ëŒë‹¤ë¡œ ì‘ì—… ì „ë‹¬
+        bool withSession(const std::string& sessionId,
+            std::function<void(std::shared_ptr<Session>)> action);
 
-		ServerStats getStats() const {
-			std::lock_guard<std::mutex> lock(statsMutex_);
-			return stats_;
-		}
+        // ì ‘ê·¼ì
+        boost::asio::io_context& getIOContext() { return ioContext_; }
 
-	private:
-		// ³»ºÎ ÃÊ±âÈ­ ÇÔ¼öµé
-		bool initializeConfig();
-		bool initializeDatabase();
-		bool initializeNetwork();
+        // í†µê³„ ì ‘ê·¼ì
+        int getCurrentConnections() const {
+            std::lock_guard<std::mutex> lock(statsMutex_);
+            return stats_.currentConnections;
+        }
 
-		// ³×Æ®¿öÅ© Ã³¸®
-		void startAccepting();
-		void handleNewConnection(std::shared_ptr<Session> session,
-			const boost::system::error_code& error);
+        ServerStats getStats() const {
+            std::lock_guard<std::mutex> lock(statsMutex_);
+            return stats_;
+        }
 
-		// ¼¼¼Ç ÀÌº¥Æ® ÇÚµé·¯ (Äİ¹éÀ¸·Î È£ÃâµÊ)
-		void onSessionDisconnect(const std::string& sessionId);
-		void onSessionMessage(const std::string& sessionId, const std::string& message);
+    private:
+        // ë‚´ë¶€ ì´ˆê¸°í™” í•¨ìˆ˜ë“¤
+        bool initializeConfig();
+        bool initializeDatabase();
+        bool initializeServices(); // ğŸ”¥ ìƒˆë¡œ ì¶”ê°€: RoomManager, AuthService ì´ˆê¸°í™”
+        bool initializeNetwork();
 
-		// MessageHandler Äİ¹é Ã³¸® ÇÔ¼öµé
-		void handleAuthentication(const std::string& sessionId, const std::string& username, bool success);
-		void handleRoomAction(const std::string& sessionId, const std::string& action, const std::string& data);
-		void handleChatBroadcast(const std::string& sessionId, const std::string& message);
+        // ë„¤íŠ¸ì›Œí¬ ì²˜ë¦¬
+        void startAccepting();
+        void handleNewConnection(std::shared_ptr<Session> session,
+            const boost::system::error_code& error);
 
-		// Á¤¸® ÀÛ¾÷
-		void startHeartbeatTimer();
-		void handleHeartbeat();
-		void cleanupSessions();
+        // ì„¸ì…˜ ì´ë²¤íŠ¸ í•¸ë“¤ëŸ¬ (ì½œë°±ìœ¼ë¡œ í˜¸ì¶œë¨)
+        void onSessionDisconnect(const std::string& sessionId);
+        void onSessionMessage(const std::string& sessionId, const std::string& message);
 
-	private:
-		// ±âº» »óÅÂ
-		std::atomic<bool> running_{ false };
+        // MessageHandler ì½œë°± ì²˜ë¦¬ í•¨ìˆ˜ë“¤
+        void handleAuthentication(const std::string& sessionId, const std::string& username, bool success);
+        void handleRegistration(const std::string& sessionId, const std::string& username,
+            const std::string& email, const std::string& password);
+        void handleRoomAction(const std::string& sessionId, const std::string& action, const std::string& data);
+        void handleChatBroadcast(const std::string& sessionId, const std::string& message);
 
-		// Boost.Asio ÇÙ½É
-		boost::asio::io_context ioContext_;
-		boost::asio::ip::tcp::acceptor acceptor_;
-		std::vector<std::thread> threadPool_;
+        // ì •ë¦¬ ì‘ì—…
+        void startHeartbeatTimer();
+        void startCleanupTimer(); // ğŸ”¥ ìƒˆë¡œ ì¶”ê°€: ì£¼ê¸°ì  ì •ë¦¬ ì‘ì—…
+        void handleHeartbeat();
+        void performCleanup(); // ğŸ”¥ ìƒˆë¡œ ì¶”ê°€: í†µí•© ì •ë¦¬ ì‘ì—…
+        void cleanupSessions();
+        void cleanupServices(); // ğŸ”¥ ìƒˆë¡œ ì¶”ê°€: ì„œë¹„ìŠ¤ ì •ë¦¬
 
-		// Å¸ÀÌ¸Ó
-		std::unique_ptr<boost::asio::steady_timer> heartbeatTimer_;
+        // í†µê³„ ë° ë¡œê¹…
+        void logServerStats(); // ğŸ”¥ ìƒˆë¡œ ì¶”ê°€: ì„œë²„ í†µê³„ ë¡œê·¸
 
-		// ¸Å´ÏÀúµé (ÇâÈÄ ±¸Çö ¿¹Á¤)
-		//std::unique_ptr<NetworkManager> networkManager_;
+    private:
+        // ê¸°ë³¸ ìƒíƒœ
+        std::atomic<bool> running_{ false };
 
-		// ¼¼¼Ç °ü¸®
-		std::unordered_map<std::string, std::shared_ptr<Session>> sessions_;
-		std::mutex sessionsMutex_;
+        // Boost.Asio í•µì‹¬
+        boost::asio::io_context ioContext_;
+        boost::asio::ip::tcp::acceptor acceptor_;
+        std::vector<std::thread> threadPool_;
 
-		// ¼­¹ö Åë°è (ServerTypes.hÀÇ ServerStats »ç¿ë)
-		ServerStats stats_;
-		mutable std::mutex statsMutex_;
-	};
+        // íƒ€ì´ë¨¸ë“¤
+        std::unique_ptr<boost::asio::steady_timer> heartbeatTimer_;
+        std::unique_ptr<boost::asio::steady_timer> cleanupTimer_; // ğŸ”¥ ìƒˆë¡œ ì¶”ê°€
+
+        // ğŸ”¥ í•µì‹¬ ì„œë¹„ìŠ¤ë“¤ (ìƒˆë¡œ ì¶”ê°€)
+        std::shared_ptr<DatabaseManager> databaseManager_;
+        std::unique_ptr<RoomManager> roomManager_;
+        std::unique_ptr<AuthenticationService> authService_;
+
+        // ë§¤ë‹ˆì €ë“¤ (í–¥í›„ êµ¬í˜„ ì˜ˆì •)
+        //std::unique_ptr<NetworkManager> networkManager_;
+
+        // ì„¸ì…˜ ê´€ë¦¬
+        std::unordered_map<std::string, std::shared_ptr<Session>> sessions_;
+        std::mutex sessionsMutex_;
+
+        // ì„œë²„ í†µê³„ (ServerTypes.hì˜ ServerStats ì‚¬ìš©)
+        ServerStats stats_;
+        mutable std::mutex statsMutex_;
+    };
 
 } // namespace Blokus::Server
