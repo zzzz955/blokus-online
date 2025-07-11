@@ -15,10 +15,10 @@ set(SERVER_SOURCES
     src/core/GameServer.cpp
     src/core/Session.cpp
     # src/core/EventSystem.cpp
-    # src/game/GameRoom.cpp
+    src/manager/GameRoom.cpp
     src/handler/MessageHandler.cpp
     # src/manager/NetworkManager.cpp
-    # src/manager/RoomManager.cpp
+    src/manager/RoomManager.cpp
     # src/service/AuthenticationService.cpp
     # src/util/Logger.cpp
 )
@@ -29,9 +29,9 @@ set(SERVER_HEADERS
     include/core/GameServer.h
     include/core/Session.h
     include/core/EventSystem.h
-    include/game/GameRoom.h
     include/handler/MessageHandler.h
     include/manager/NetworkManager.h
+    include/manager/GameRoom.h
     include/manager/RoomManager.h
     include/manager/DatabaseManager.h
     include/manager/ConfigManager.h
