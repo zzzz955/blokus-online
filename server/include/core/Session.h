@@ -48,9 +48,42 @@ namespace Blokus::Server {
         const std::string& getUsername() const { return username_; }
         ConnectionState getState() const { return state_; }
 
+        // 의미적으로 명확한 상태 체크 함수들
+        bool isConnected() const { return state_ >= ConnectionState::Connected; }
+        bool isInLobby() const { return state_ == ConnectionState::InLobby; }
+        bool isInRoom() const { return state_ == ConnectionState::InRoom; }
+        bool isInGame() const { return state_ == ConnectionState::InGame; }
+
+        // 상태 변경 가능 여부 체크
+        bool canCreateRoom() const { return isInLobby(); }
+        bool canJoinRoom() const { return isInLobby(); }
+        bool canLeaveRoom() const { return isInRoom() || isInGame(); }
+        bool canStartGame() const { return isInRoom(); }
+        bool canMakeGameMove() const { return isInGame(); }
+
+        // 상태 변경 함수들
+        void setStateToConnected() {
+            state_ = ConnectionState::Connected;
+            spdlog::debug("세션 상태 변경: {} -> Connecting", sessionId_);
+        }
+        void setStateToLobby() {
+            state_ = ConnectionState::InLobby;
+            updateLastActivity();
+            spdlog::debug("세션 상태 변경: {} -> InLobby", sessionId_);
+        }
+        void setStateToInRoom(int roomId = -1) {
+            state_ = ConnectionState::InRoom;
+            updateLastActivity();
+            spdlog::debug("세션 상태 변경: {} -> InRoom (방ID: {})", sessionId_, roomId);
+        }
+        void setStateToInGame() {
+            state_ = ConnectionState::InGame;
+            updateLastActivity();
+            spdlog::debug("세션 상태 변경: {} -> InGame", sessionId_);
+        }
+
         // 인증 관련
         void setAuthenticated(const std::string& userId, const std::string& username);
-        bool isAuthenticated() const { return state_ >= ConnectionState::Authenticated; }
 
         void setState(ConnectionState state) { state_ = state; }
         void updateLastActivity() { lastActivity_ = std::chrono::steady_clock::now(); }

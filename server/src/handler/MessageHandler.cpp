@@ -92,40 +92,10 @@ namespace Blokus::Server {
             if (it != handlers_.end()) {
                 it->second(parts);
             }
-            else {
-                // 하위 호환성을 위한 기존 방식 처리
-                handleTextMessage(rawMessage);
-            }
         }
         catch (const std::exception& e) {
             spdlog::error("메시지 처리 중 예외: {}", e.what());
             sendError("메시지 처리 중 오류가 발생했습니다");
-        }
-    }
-
-    void MessageHandler::handleTextMessage(const std::string& rawMessage) {
-        try {
-            // 기존 방식 (하위 호환성)
-            if (rawMessage == "ping") {
-                sendTextMessage("pong");
-            }
-            else if (rawMessage.starts_with("auth:")) {
-                handleAuthMessage(rawMessage.substr(5));
-            }
-            else if (rawMessage.starts_with("room:")) {
-                handleRoomMessage(rawMessage.substr(5));
-            }
-            else if (rawMessage.starts_with("chat:")) {
-                handleChatMessage(rawMessage.substr(5));
-            }
-            else {
-                spdlog::warn("알 수 없는 메시지 형식: {}", rawMessage);
-                sendError("알 수 없는 명령어입니다. 도움말: ping, auth:user:pass, room:list, chat:message");
-            }
-        }
-        catch (const std::exception& e) {
-            spdlog::error("텍스트 메시지 처리 중 오류: {}", e.what());
-            sendError("텍스트 메시지 처리 오류");
         }
     }
 
@@ -252,7 +222,7 @@ namespace Blokus::Server {
     }
 
     void MessageHandler::handleLogout(const std::vector<std::string>& params) {
-        if (!session_->isAuthenticated()) {
+        if (!session_->isInLobby()) {
             sendError("로그인 상태가 아닙니다");
             return;
         }
@@ -293,8 +263,8 @@ namespace Blokus::Server {
     // ========================================
 
     void MessageHandler::handleCreateRoom(const std::vector<std::string>& params) {
-        if (!session_->isAuthenticated()) {
-            sendError("방 생성은 로그인 후 이용 가능합니다");
+        if (!session_->canCreateRoom()) {
+            sendError("현재 상태에선 방을 생성할 수 없습니다");
             return;
         }
 
@@ -320,6 +290,7 @@ namespace Blokus::Server {
         int roomId = roomManager_->createRoom(userId, username, roomName, isPrivate, password);
 
         if (roomId > 0) {
+            session_->setStateToInRoom();
             sendResponse("ROOM_CREATED:" + std::to_string(roomId) + ":" + roomName);
             spdlog::info("✅ 방 생성 성공: {} by {} (ID: {})", roomName, username, roomId);
         }
@@ -332,18 +303,21 @@ namespace Blokus::Server {
     }
 
     void MessageHandler::handleJoinRoom(const std::vector<std::string>& params) {
-        if (!session_->isAuthenticated()) {
-            sendError("방 입장은 로그인 후 이용 가능합니다");
+        // 🔥 2단계: 상태 기반 예외 처리
+        if (!session_->canJoinRoom()) {
+            sendError("현재 상태에서는 방에 입장할 수 없습니다");
             return;
         }
 
+        // 🔥 3단계: 매니저 유효성 체크
         if (!roomManager_) {
             sendError("방 관리자가 초기화되지 않았습니다");
             return;
         }
 
+        // 🔥 4단계: 파라미터 검증
         if (params.empty()) {
-            sendError("방 ID가 필요합니다");
+            sendError("사용법: room:join:방ID[:비밀번호]");
             return;
         }
 
@@ -354,27 +328,58 @@ namespace Blokus::Server {
             std::string userId = session_->getUserId();
             std::string username = session_->getUsername();
 
-            // Session 포인터를 직접 사용하지 않고 콜백으로 처리
-            sendResponse("ROOM_JOIN_REQUEST:" + std::to_string(roomId));
-            spdlog::info("방 입장 요청: {} -> 방 {}", username, roomId);
+            spdlog::info("방 입장 요청: {} -> 방 {} (현재 상태: {})",
+                username, roomId, session_->isInLobby() ? "Lobby" : "Room");
+
+            // TODO: RoomManager를 통한 실제 방 입장 로직
+            // bool joinResult = roomManager_->joinRoom(roomId, userId, password);
+
+            // 성공 시 상태 변경
+            session_->setStateToInRoom(roomId);
+            sendResponse("ROOM_JOIN_SUCCESS:" + std::to_string(roomId));
+
+            spdlog::info("✅ 방 입장 성공: {} -> 방 {}", username, roomId);
+        }
+        catch (const std::invalid_argument& e) {
+            sendError("잘못된 방 ID 형식입니다");
+            spdlog::warn("방 ID 파싱 오류: {}", params[0]);
+        }
+        catch (const std::out_of_range& e) {
+            sendError("방 ID가 범위를 벗어났습니다");
+            spdlog::warn("방 ID 범위 오류: {}", params[0]);
         }
         catch (const std::exception& e) {
-            sendError("잘못된 방 ID입니다");
+            sendError("방 입장 중 오류가 발생했습니다");
+            spdlog::error("방 입장 처리 중 예외: {}", e.what());
         }
     }
 
     void MessageHandler::handleLeaveRoom(const std::vector<std::string>& params) {
-        if (!session_->isAuthenticated()) {
-            sendError("로그인이 필요합니다");
+        if (!session_->canLeaveRoom()) {
+            sendError("현재 상태에서는 방을 나갈 수 없습니다");
             return;
         }
 
-        std::string userId = session_->getUserId();
-        std::string username = session_->getUsername();
+        try {
+            std::string userId = session_->getUserId();
+            std::string username = session_->getUsername();
 
-        // TODO: 현재 방 ID를 세션에서 추적하거나 파라미터로 받아야 함
-        sendResponse("ROOM_LEFT:OK");
-        spdlog::info("방 나가기 요청: {}", username);
+            spdlog::info("방 나가기 요청: {} (현재 상태: {})",
+                username, session_->isInGame() ? "InGame" : "InRoom");
+
+            // TODO: RoomManager를 통한 실제 방 나가기 로직
+            // roomManager_->leaveRoom(userId);
+
+            // 성공 시 상태 변경
+            session_->setStateToLobby();
+            sendResponse("ROOM_LEFT:OK");
+
+            spdlog::info("✅ 방 나가기 성공: {}", username);
+        }
+        catch (const std::exception& e) {
+            sendError("방 나가기 중 오류가 발생했습니다");
+            spdlog::error("방 나가기 처리 중 예외: {}", e.what());
+        }
     }
 
     void MessageHandler::handleRoomList(const std::vector<std::string>& params) {
@@ -402,8 +407,8 @@ namespace Blokus::Server {
     }
 
     void MessageHandler::handlePlayerReady(const std::vector<std::string>& params) {
-        if (!session_->isAuthenticated()) {
-            sendError("로그인이 필요합니다");
+        if (!session_->isInRoom()) {
+            sendError("방에 있어야 레디를 할 수 있습니다");
             return;
         }
 
@@ -417,14 +422,39 @@ namespace Blokus::Server {
     }
 
     void MessageHandler::handleStartGame(const std::vector<std::string>& params) {
-        if (!session_->isAuthenticated()) {
-            sendError("로그인이 필요합니다");
-            return;
+        if (!session_->canStartGame()) {
+            if (session_->isInLobby()) {
+                sendError("방에 입장한 후 게임을 시작할 수 있습니다");
+                return;
+            }
+            else if (session_->isInGame()) {
+                sendError("이미 게임이 진행 중입니다");
+                return;
+            }
+            else {
+                sendError("현재 상태에서는 게임을 시작할 수 없습니다");
+                return;
+            }
         }
 
-        // TODO: 호스트 권한 확인 및 게임 시작 로직
-        sendResponse("GAME_START_REQUEST:OK");
-        spdlog::info("게임 시작 요청: {}", session_->getUsername());
+        try {
+            std::string username = session_->getUsername();
+
+            spdlog::info("게임 시작 요청: {} (방 상태에서)", username);
+
+            // TODO: 호스트 권한 확인 및 게임 시작 로직
+            // TODO: RoomManager를 통한 게임 시작 검증
+
+            // 성공 시 상태 변경
+            session_->setStateToInGame();
+            sendResponse("GAME_START_SUCCESS");
+
+            spdlog::info("✅ 게임 시작 성공: {}", username);
+        }
+        catch (const std::exception& e) {
+            sendError("게임 시작 중 오류가 발생했습니다");
+            spdlog::error("게임 시작 처리 중 예외: {}", e.what());
+        }
     }
 
     // ========================================
@@ -432,25 +462,65 @@ namespace Blokus::Server {
     // ========================================
 
     void MessageHandler::handleGameMove(const std::vector<std::string>& params) {
-        if (!session_->isAuthenticated()) {
-            sendError("로그인이 필요합니다");
-            return;
+        if (!session_->canMakeGameMove()) {
+            if (session_->isInLobby()) {
+                sendError("게임에 참여한 후 이동할 수 있습니다");
+                return;
+            }
+            else if (session_->isInRoom()) {
+                sendError("게임이 시작된 후 이동할 수 있습니다");
+                return;
+            }
+            else {
+                sendError("현재 상태에서는 게임 이동을 할 수 없습니다");
+                return;
+            }
         }
 
-        if (params.size() < 2) {
+        if (params.size() < 4) {
             sendError("사용법: game:move:x:y:blocktype:rotation");
             return;
         }
 
-        // TODO: 게임 이동 로직 구현
-        std::string moveData;
-        for (size_t i = 0; i < params.size(); ++i) {
-            if (i > 0) moveData += ":";
-            moveData += params[i];
-        }
+        try {
+            // 파라미터 파싱 및 검증
+            int x = std::stoi(params[0]);
+            int y = std::stoi(params[1]);
+            std::string blockType = params[2];
+            int rotation = std::stoi(params[3]);
 
-        sendResponse("GAME_MOVE:OK");
-        spdlog::info("게임 이동: {} -> {}", session_->getUsername(), moveData);
+            // 범위 검증
+            if (x < 0 || x >= 20 || y < 0 || y >= 20) {
+                sendError("좌표가 보드 범위를 벗어났습니다 (0-19)");
+                return;
+            }
+
+            if (rotation < 0 || rotation >= 4) {
+                sendError("회전값이 잘못되었습니다 (0-3)");
+                return;
+            }
+
+            std::string username = session_->getUsername();
+            spdlog::info("게임 이동: {} -> ({},{}) 블록:{} 회전:{}",
+                username, x, y, blockType, rotation);
+
+            // TODO: 게임 로직 처리
+            sendResponse("GAME_MOVE:OK");
+
+            spdlog::info("✅ 게임 이동 성공: {}", username);
+        }
+        catch (const std::invalid_argument& e) {
+            sendError("숫자 형식이 잘못되었습니다");
+            spdlog::warn("게임 이동 파라미터 파싱 오류: {}", e.what());
+        }
+        catch (const std::out_of_range& e) {
+            sendError("숫자가 범위를 벗어났습니다");
+            spdlog::warn("게임 이동 파라미터 범위 오류: {}", e.what());
+        }
+        catch (const std::exception& e) {
+            sendError("게임 이동 중 오류가 발생했습니다");
+            spdlog::error("게임 이동 처리 중 예외: {}", e.what());
+        }
     }
 
     // ========================================
@@ -462,7 +532,7 @@ namespace Blokus::Server {
     }
 
     void MessageHandler::handleChat(const std::vector<std::string>& params) {
-        if (!session_->isAuthenticated()) {
+        if (!session_->isConnected()) {
             sendError("채팅은 로그인 후 이용 가능합니다");
             return;
         }
@@ -481,148 +551,6 @@ namespace Blokus::Server {
 
         std::string username = session_->getUsername();
         spdlog::info("채팅 메시지: [{}] {}", username, message);
-    }
-
-    // ========================================
-    // 기존 콜백 방식 (하위 호환성)
-    // ========================================
-
-    void MessageHandler::handleAuthMessage(const std::string& authData) {
-        // 간단한 파싱: "username:password"
-        size_t colonPos = authData.find(':');
-        if (colonPos == std::string::npos) {
-            sendError("Invalid auth format. Use 'username:password'");
-            return;
-        }
-
-        std::string username = authData.substr(0, colonPos);
-        std::string password = authData.substr(colonPos + 1);
-
-        spdlog::info("인증 시도 (기존방식): {} (세션: {})", username, session_->getSessionId());
-
-        // AuthenticationService 사용
-        if (authService_) {
-            auto result = authService_->loginUser(username, password);
-
-            if (result.success) {
-                session_->setAuthenticated(result.userId, result.username);
-                sendTextMessage("AUTH_SUCCESS:" + result.username);
-            }
-            else {
-                sendTextMessage("AUTH_FAILED:" + result.message);
-            }
-        }
-        else {
-            // Fallback: 간단한 검증
-            bool success = (username.length() >= 3 && password.length() >= 4);
-
-            if (success) {
-                session_->setAuthenticated("user_" + username, username);
-                sendTextMessage("AUTH_SUCCESS:" + username);
-            }
-            else {
-                sendTextMessage("AUTH_FAILED:Invalid credentials");
-            }
-        }
-    }
-
-    void MessageHandler::handleRoomMessage(const std::string& roomData) {
-        if (!session_->isAuthenticated()) {
-            sendError("Authentication required");
-            return;
-        }
-
-        spdlog::info("방 관련 요청 (기존방식): {} (세션: {})", roomData, session_->getSessionId());
-
-        if (!roomManager_) {
-            sendError("방 관리자가 초기화되지 않았습니다");
-            return;
-        }
-
-        // 간단한 방 명령어 처리 - 직접 처리로 변경
-        if (roomData == "list") {
-            // 🔥 방 목록 요청 - 직접 처리
-            auto roomList = roomManager_->getRoomList();
-
-            std::ostringstream response;
-            response << "ROOM_LIST:" << roomList.size();
-
-            for (const auto& room : roomList) {
-                response << ":" << room.roomId
-                    << "," << room.roomName
-                    << "," << room.hostName
-                    << "," << room.currentPlayers
-                    << "," << room.maxPlayers
-                    << "," << (room.isPrivate ? "1" : "0")
-                    << "," << (room.isPlaying ? "1" : "0");
-            }
-
-            sendTextMessage(response.str());
-            spdlog::info("✅ 방 목록 전송 완료 (기존방식)");
-
-            // 🗑️ 제거: if (roomCallback_) { roomCallback_(...); }
-        }
-        else if (roomData.starts_with("create:")) {
-            // 🔥 방 생성 요청 - 직접 처리
-            std::string roomName = roomData.substr(7); // "create:" 제거
-
-            std::string userId = session_->getUserId();
-            std::string username = session_->getUsername();
-
-            int roomId = roomManager_->createRoom(userId, username, roomName, false, "");
-
-            if (roomId > 0) {
-                sendTextMessage("ROOM_CREATED:" + std::to_string(roomId) + ":" + roomName);
-                spdlog::info("✅ 방 생성 성공 (기존방식): {} by {} (ID: {})", roomName, username, roomId);
-            }
-            else {
-                sendError("방 생성에 실패했습니다");
-            }
-
-            // 🗑️ 제거: if (roomCallback_) { roomCallback_(...); }
-        }
-        else if (roomData.starts_with("join:")) {
-            // 🔥 방 참가 요청 - 직접 처리
-            std::string roomIdStr = roomData.substr(5); // "join:" 제거
-
-            try {
-                int roomId = std::stoi(roomIdStr);
-                std::string username = session_->getUsername();
-
-                sendTextMessage("ROOM_JOIN_REQUEST:" + std::to_string(roomId));
-                spdlog::info("✅ 방 입장 요청 처리 (기존방식): {} -> 방 {}", username, roomId);
-
-                // TODO: 실제 방 입장 로직은 RoomManager에서 처리
-            }
-            catch (const std::exception& e) {
-                sendError("잘못된 방 ID입니다");
-            }
-
-            // 🗑️ 제거: if (roomCallback_) { roomCallback_(...); }
-        }
-        else if (roomData == "leave") {
-            // 🔥 방 나가기 요청 - 직접 처리
-            std::string username = session_->getUsername();
-
-            sendTextMessage("ROOM_LEFT:OK");
-            spdlog::info("✅ 방 나가기 요청 처리 (기존방식): {}", username);
-
-            // TODO: 실제 방 나가기 로직은 RoomManager에서 처리
-
-            // 🗑️ 제거: if (roomCallback_) { roomCallback_(...); }
-        }
-        else {
-            sendError("Unknown room command. 사용법: list, create:방이름, join:방ID, leave");
-        }
-    }
-
-    void MessageHandler::handleChatMessage(const std::string& chatData) {
-        if (!session_->isAuthenticated()) {
-            sendError("Authentication required");
-            return;
-        }
-
-        spdlog::info("채팅 메시지 (기존방식): {} -> {}", session_->getUsername(), chatData);
     }
 
     // ========================================

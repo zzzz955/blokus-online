@@ -60,9 +60,6 @@ namespace Blokus::Server {
         void sendProtobufMessage(blokus::MessageType type, const google::protobuf::Message& payload);
 
     private:
-        // 현재 단계: 텍스트 메시지 처리
-        void handleTextMessage(const std::string& rawMessage);
-
         // 메시지 파싱 유틸리티
         std::vector<std::string> splitMessage(const std::string& message, char delimiter = ':');
         void sendResponse(const std::string& response);
@@ -88,11 +85,6 @@ namespace Blokus::Server {
         // 기본 핸들러들
         void handlePing(const std::vector<std::string>& params);
         void handleChat(const std::vector<std::string>& params);
-
-        // 기존 콜백 방식 (하위 호환성)
-        void handleAuthMessage(const std::string& authData);
-        void handleRoomMessage(const std::string& roomData);
-        void handleChatMessage(const std::string& chatData);
 
         // TODO: 2단계에서 구현 예정 (현재는 사용하지 않음)
         /*

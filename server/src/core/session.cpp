@@ -24,7 +24,7 @@ namespace Blokus::Server {
         , messageHandler_(nullptr)
         , writing_(false)
     {
-        spdlog::debug("Session 생성: {}", sessionId_);
+        spdlog::debug("Session 생성: {}, Lobby 상태로 설정", sessionId_);
     }
 
     Session::~Session() {
@@ -77,9 +77,6 @@ namespace Blokus::Server {
         spdlog::info("세션 중지: {}", sessionId_);
 
         try {
-            // 상태 변경
-            state_ = ConnectionState::Disconnecting;
-
             // 소켓 종료
             if (socket_.is_open()) {
                 boost::system::error_code ec;
@@ -90,9 +87,6 @@ namespace Blokus::Server {
 
             // 연결 해제 콜백 호출
             notifyDisconnect();
-
-            // 상태 최종 변경
-            state_ = ConnectionState::Disconnected;
 
         }
         catch (const std::exception& e) {
@@ -144,7 +138,7 @@ namespace Blokus::Server {
     void Session::setAuthenticated(const std::string& userId, const std::string& username) {
         userId_ = userId;
         username_ = username;
-        state_ = ConnectionState::Authenticated;
+        state_ = ConnectionState::InLobby;
         updateLastActivity();
 
         spdlog::info("세션 인증 완료: {} (사용자: {})", sessionId_, username);

@@ -48,15 +48,10 @@ namespace Blokus {
 
         // 클라이언트 연결 상태
         enum class ConnectionState {
-            Connecting,      // 연결 중
             Connected,       // 연결됨
-            Authenticating,  // 인증 중
-            Authenticated,   // 인증됨
             InLobby,        // 로비에 있음
             InRoom,         // 방에 있음
             InGame,         // 게임 중
-            Disconnecting,  // 연결 해제 중
-            Disconnected    // 연결 해제됨
         };
 
         // 세션 상태
@@ -153,7 +148,7 @@ namespace Blokus {
             std::string sessionId;
             std::string username;
             std::string userId;
-            ConnectionState state = ConnectionState::Connecting;
+            ConnectionState state = ConnectionState::Connected;
 
             std::chrono::system_clock::time_point connectedAt;
             std::chrono::system_clock::time_point lastActivity;
