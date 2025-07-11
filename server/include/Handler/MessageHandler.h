@@ -60,11 +60,17 @@ namespace Blokus::Server {
         void sendProtobufMessage(blokus::MessageType type, const google::protobuf::Message& payload);
 
     private:
+        // enum 기반 핸들러 테이블
+        std::unordered_map<MessageType, std::function<void(const std::vector<std::string>&)>> handlers_;
+
+        // 메시지 파싱
+        std::pair<MessageType, std::vector<std::string>> parseMessage(const std::string& rawMessage);
+
         // 메시지 파싱 유틸리티
         std::vector<std::string> splitMessage(const std::string& message, char delimiter = ':');
         void sendResponse(const std::string& response);
 
-        // 인증 관련 핸들러들 (직접 처리)
+        // 핸들러 함수들
         void handleAuth(const std::vector<std::string>& params);
         void handleRegister(const std::vector<std::string>& params);
         void handleLoginGuest(const std::vector<std::string>& params);
@@ -78,6 +84,8 @@ namespace Blokus::Server {
         void handleRoomList(const std::vector<std::string>& params);
         void handlePlayerReady(const std::vector<std::string>& params);
         void handleStartGame(const std::vector<std::string>& params);
+        void handleEndGame(const std::vector<std::string>& params);
+        void handleTransferHost(const std::vector<std::string>& params);
 
         // 게임 관련 핸들러들
         void handleGameMove(const std::vector<std::string>& params);
@@ -110,14 +118,6 @@ namespace Blokus::Server {
 
         // 🔥 채팅 콜백만 유지
         ChatCallback chatCallback_;
-
-        // 🗑️ 제거된 콜백 멤버 변수들:
-        // AuthCallback authCallback_;
-        // RegisterCallback registerCallback_;
-        // RoomCallback roomCallback_;
-
-        // 🔥 메시지 핸들러 테이블 (새로운 방식)
-        std::unordered_map<std::string, std::function<void(const std::vector<std::string>&)>> handlers_;
 
         // 메시지 라우팅 테이블 (Protobuf용)
         std::unordered_map<int, std::function<void(const blokus::MessageWrapper&)>> protobufHandlers_;

@@ -21,6 +21,7 @@ set(SERVER_SOURCES
     src/manager/RoomManager.cpp
     src/service/AuthenticationService.cpp
     # src/util/Logger.cpp
+    src/common/ServerTypes.cpp
 )
 
 # 핵심 헤더 파일들
