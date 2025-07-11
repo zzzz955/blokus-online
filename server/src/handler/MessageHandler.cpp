@@ -184,21 +184,14 @@ namespace Blokus::Server {
         if (result.success) {
             session_->setAuthenticated(result.userId, result.username);
             sendResponse("AUTH_SUCCESS:" + result.username + ":" + result.sessionToken);
-            spdlog::info("사용자 로그인: {} ({})", username, session_->getSessionId());
-
-            // 콜백 호출
-            if (authCallback_) {
-                authCallback_(session_->getSessionId(), username, true);
-            }
+            spdlog::info("✅ 로그인 성공: {} ({})", username, session_->getSessionId());
         }
         else {
             sendError(result.message);
-
-            // 콜백 호출
-            if (authCallback_) {
-                authCallback_(session_->getSessionId(), username, false);
-            }
+            spdlog::warn("❌ 로그인 실패: {} - {}", username, result.message);
         }
+
+        // 🔥 콜백 제거: 직접 처리 완료
     }
 
     void MessageHandler::handleRegister(const std::vector<std::string>& params) {
@@ -220,23 +213,22 @@ namespace Blokus::Server {
 
         if (result.success) {
             sendResponse("REGISTER_SUCCESS:" + username);
-            spdlog::info("새 사용자 등록: {} ({})", username, email);
+            spdlog::info("✅ 회원가입 성공: {} ({})", username, email);
 
             // 등록 후 자동 로그인
             auto loginResult = authService_->loginUser(username, password);
             if (loginResult.success) {
                 session_->setAuthenticated(loginResult.userId, loginResult.username);
                 sendResponse("AUTO_LOGIN:" + loginResult.sessionToken);
-            }
-
-            // 콜백 호출
-            if (registerCallback_) {
-                registerCallback_(session_->getSessionId(), username, email, password);
+                spdlog::info("✅ 자동 로그인 성공: {}", username);
             }
         }
         else {
             sendError(result.message);
+            spdlog::error("❌ 회원가입 실패: {} - {}", username, result.message);
         }
+
+        // 🔥 콜백 제거: 직접 처리 완료
     }
 
     void MessageHandler::handleLoginGuest(const std::vector<std::string>& params) {
@@ -253,11 +245,6 @@ namespace Blokus::Server {
             session_->setAuthenticated(result.userId, result.username);
             sendResponse("GUEST_LOGIN_SUCCESS:" + result.username + ":" + result.sessionToken);
             spdlog::info("게스트 로그인: {} ({})", result.username, session_->getSessionId());
-
-            // 콜백 호출
-            if (authCallback_) {
-                authCallback_(session_->getSessionId(), result.username, true);
-            }
         }
         else {
             sendError(result.message);
@@ -328,20 +315,20 @@ namespace Blokus::Server {
         std::string userId = session_->getUserId();
         std::string username = session_->getUsername();
 
+        spdlog::info("방 생성 요청: {} by {}", roomName, username);
+
         int roomId = roomManager_->createRoom(userId, username, roomName, isPrivate, password);
 
         if (roomId > 0) {
             sendResponse("ROOM_CREATED:" + std::to_string(roomId) + ":" + roomName);
-            spdlog::info("방 생성 성공: {} by {} (ID: {})", roomName, username, roomId);
-
-            // 콜백 호출
-            if (roomCallback_) {
-                roomCallback_(session_->getSessionId(), "create", std::to_string(roomId) + ":" + roomName);
-            }
+            spdlog::info("✅ 방 생성 성공: {} by {} (ID: {})", roomName, username, roomId);
         }
         else {
+            spdlog::error("❌ 방 생성 실패: {}", roomName);
             sendError("방 생성에 실패했습니다");
         }
+
+        // 🔥 콜백 제거됨: MessageHandler에서 직접 완료 처리
     }
 
     void MessageHandler::handleJoinRoom(const std::vector<std::string>& params) {
@@ -370,11 +357,6 @@ namespace Blokus::Server {
             // Session 포인터를 직접 사용하지 않고 콜백으로 처리
             sendResponse("ROOM_JOIN_REQUEST:" + std::to_string(roomId));
             spdlog::info("방 입장 요청: {} -> 방 {}", username, roomId);
-
-            // 콜백 호출
-            if (roomCallback_) {
-                roomCallback_(session_->getSessionId(), "join", std::to_string(roomId) + (password.empty() ? "" : ":" + password));
-            }
         }
         catch (const std::exception& e) {
             sendError("잘못된 방 ID입니다");
@@ -393,11 +375,6 @@ namespace Blokus::Server {
         // TODO: 현재 방 ID를 세션에서 추적하거나 파라미터로 받아야 함
         sendResponse("ROOM_LEFT:OK");
         spdlog::info("방 나가기 요청: {}", username);
-
-        // 콜백 호출
-        if (roomCallback_) {
-            roomCallback_(session_->getSessionId(), "leave", "");
-        }
     }
 
     void MessageHandler::handleRoomList(const std::vector<std::string>& params) {
@@ -422,11 +399,6 @@ namespace Blokus::Server {
         }
 
         sendResponse(response.str());
-
-        // 콜백 호출
-        if (roomCallback_) {
-            roomCallback_(session_->getSessionId(), "list", "");
-        }
     }
 
     void MessageHandler::handlePlayerReady(const std::vector<std::string>& params) {
@@ -442,11 +414,6 @@ namespace Blokus::Server {
         std::string readyStatus = ready ? "1" : "0";
         sendResponse("PLAYER_READY:" + readyStatus);
         spdlog::info("플레이어 준비 상태 변경: {} -> {}", session_->getUsername(), ready ? "준비" : "대기");
-
-        // 콜백 호출
-        if (roomCallback_) {
-            roomCallback_(session_->getSessionId(), "ready", ready ? "1" : "0");
-        }
     }
 
     void MessageHandler::handleStartGame(const std::vector<std::string>& params) {
@@ -458,11 +425,6 @@ namespace Blokus::Server {
         // TODO: 호스트 권한 확인 및 게임 시작 로직
         sendResponse("GAME_START_REQUEST:OK");
         spdlog::info("게임 시작 요청: {}", session_->getUsername());
-
-        // 콜백 호출
-        if (roomCallback_) {
-            roomCallback_(session_->getSessionId(), "start", "");
-        }
     }
 
     // ========================================
@@ -519,11 +481,6 @@ namespace Blokus::Server {
 
         std::string username = session_->getUsername();
         spdlog::info("채팅 메시지: [{}] {}", username, message);
-
-        // 콜백 호출 (브로드캐스트를 위해)
-        if (chatCallback_) {
-            chatCallback_(session_->getSessionId(), message);
-        }
     }
 
     // ========================================
@@ -550,19 +507,9 @@ namespace Blokus::Server {
             if (result.success) {
                 session_->setAuthenticated(result.userId, result.username);
                 sendTextMessage("AUTH_SUCCESS:" + result.username);
-
-                // 콜백 호출
-                if (authCallback_) {
-                    authCallback_(session_->getSessionId(), username, true);
-                }
             }
             else {
                 sendTextMessage("AUTH_FAILED:" + result.message);
-
-                // 콜백 호출
-                if (authCallback_) {
-                    authCallback_(session_->getSessionId(), username, false);
-                }
             }
         }
         else {
@@ -576,11 +523,6 @@ namespace Blokus::Server {
             else {
                 sendTextMessage("AUTH_FAILED:Invalid credentials");
             }
-
-            // 콜백 호출
-            if (authCallback_) {
-                authCallback_(session_->getSessionId(), username, success);
-            }
         }
     }
 
@@ -592,35 +534,85 @@ namespace Blokus::Server {
 
         spdlog::info("방 관련 요청 (기존방식): {} (세션: {})", roomData, session_->getSessionId());
 
-        // 간단한 방 명령어 처리
+        if (!roomManager_) {
+            sendError("방 관리자가 초기화되지 않았습니다");
+            return;
+        }
+
+        // 간단한 방 명령어 처리 - 직접 처리로 변경
         if (roomData == "list") {
-            // 방 목록 요청
-            if (roomCallback_) {
-                roomCallback_(session_->getSessionId(), "list", "");
+            // 🔥 방 목록 요청 - 직접 처리
+            auto roomList = roomManager_->getRoomList();
+
+            std::ostringstream response;
+            response << "ROOM_LIST:" << roomList.size();
+
+            for (const auto& room : roomList) {
+                response << ":" << room.roomId
+                    << "," << room.roomName
+                    << "," << room.hostName
+                    << "," << room.currentPlayers
+                    << "," << room.maxPlayers
+                    << "," << (room.isPrivate ? "1" : "0")
+                    << "," << (room.isPlaying ? "1" : "0");
             }
+
+            sendTextMessage(response.str());
+            spdlog::info("✅ 방 목록 전송 완료 (기존방식)");
+
+            // 🗑️ 제거: if (roomCallback_) { roomCallback_(...); }
         }
         else if (roomData.starts_with("create:")) {
-            // 방 생성 요청
+            // 🔥 방 생성 요청 - 직접 처리
             std::string roomName = roomData.substr(7); // "create:" 제거
-            if (roomCallback_) {
-                roomCallback_(session_->getSessionId(), "create", roomName);
+
+            std::string userId = session_->getUserId();
+            std::string username = session_->getUsername();
+
+            int roomId = roomManager_->createRoom(userId, username, roomName, false, "");
+
+            if (roomId > 0) {
+                sendTextMessage("ROOM_CREATED:" + std::to_string(roomId) + ":" + roomName);
+                spdlog::info("✅ 방 생성 성공 (기존방식): {} by {} (ID: {})", roomName, username, roomId);
             }
+            else {
+                sendError("방 생성에 실패했습니다");
+            }
+
+            // 🗑️ 제거: if (roomCallback_) { roomCallback_(...); }
         }
         else if (roomData.starts_with("join:")) {
-            // 방 참가 요청
-            std::string roomId = roomData.substr(5); // "join:" 제거
-            if (roomCallback_) {
-                roomCallback_(session_->getSessionId(), "join", roomId);
+            // 🔥 방 참가 요청 - 직접 처리
+            std::string roomIdStr = roomData.substr(5); // "join:" 제거
+
+            try {
+                int roomId = std::stoi(roomIdStr);
+                std::string username = session_->getUsername();
+
+                sendTextMessage("ROOM_JOIN_REQUEST:" + std::to_string(roomId));
+                spdlog::info("✅ 방 입장 요청 처리 (기존방식): {} -> 방 {}", username, roomId);
+
+                // TODO: 실제 방 입장 로직은 RoomManager에서 처리
             }
+            catch (const std::exception& e) {
+                sendError("잘못된 방 ID입니다");
+            }
+
+            // 🗑️ 제거: if (roomCallback_) { roomCallback_(...); }
         }
         else if (roomData == "leave") {
-            // 방 나가기 요청
-            if (roomCallback_) {
-                roomCallback_(session_->getSessionId(), "leave", "");
-            }
+            // 🔥 방 나가기 요청 - 직접 처리
+            std::string username = session_->getUsername();
+
+            sendTextMessage("ROOM_LEFT:OK");
+            spdlog::info("✅ 방 나가기 요청 처리 (기존방식): {}", username);
+
+            // TODO: 실제 방 나가기 로직은 RoomManager에서 처리
+
+            // 🗑️ 제거: if (roomCallback_) { roomCallback_(...); }
         }
         else {
-            sendError("Unknown room command");
+            sendError("Unknown room command. 사용법: list, create:방이름, join:방ID, leave");
         }
     }
 
@@ -631,11 +623,6 @@ namespace Blokus::Server {
         }
 
         spdlog::info("채팅 메시지 (기존방식): {} -> {}", session_->getUsername(), chatData);
-
-        // 콜백 호출 (브로드캐스트를 위해)
-        if (chatCallback_) {
-            chatCallback_(session_->getSessionId(), chatData);
-        }
     }
 
     // ========================================

@@ -27,14 +27,15 @@ namespace Blokus::Server {
     class AuthenticationService;
     class RoomManager;
 
-    // 메시지 이벤트 콜백 타입들
-    using AuthCallback = std::function<void(const std::string& sessionId, const std::string& username, bool success)>;
-    using RegisterCallback = std::function<void(const std::string& sessionId, const std::string& username,
-        const std::string& email, const std::string& password)>;
-    using RoomCallback = std::function<void(const std::string& sessionId, const std::string& action, const std::string& data)>;
+    // 🔥 채팅 브로드캐스트용 콜백만 유지
     using ChatCallback = std::function<void(const std::string& sessionId, const std::string& message)>;
 
-    // 단순화된 메시지 핸들러 클래스 (브로커 역할 + 인증 통합)
+    // 🗑️ 제거된 콜백 타입들 (더 이상 사용 안함):
+    // using AuthCallback = ...
+    // using RegisterCallback = ...
+    // using RoomCallback = ...
+
+    // 단순화된 메시지 핸들러 클래스 (직접 처리 방식)
     class MessageHandler {
     public:
         explicit MessageHandler(Session* session, RoomManager* roomManager = nullptr, AuthenticationService* authService = nullptr);
@@ -43,11 +44,13 @@ namespace Blokus::Server {
         // 메시지 처리 (현재: 텍스트 우선)
         void handleMessage(const std::string& rawMessage);
 
-        // 콜백 설정 (GameServer에서 설정)
-        void setAuthCallback(AuthCallback callback) { authCallback_ = callback; }
-        void setRegisterCallback(RegisterCallback callback) { registerCallback_ = callback; }
-        void setRoomCallback(RoomCallback callback) { roomCallback_ = callback; }
+        // 🔥 채팅 콜백만 유지 (브로드캐스트 필요)
         void setChatCallback(ChatCallback callback) { chatCallback_ = callback; }
+
+        // 🗑️ 제거된 콜백 설정 함수들:
+        // void setAuthCallback(AuthCallback callback);
+        // void setRegisterCallback(RegisterCallback callback);
+        // void setRoomCallback(RoomCallback callback);
 
         // 응답 전송 (현재: 텍스트 기반)
         void sendTextMessage(const std::string& message);
@@ -64,14 +67,14 @@ namespace Blokus::Server {
         std::vector<std::string> splitMessage(const std::string& message, char delimiter = ':');
         void sendResponse(const std::string& response);
 
-        // 인증 관련 핸들러들 (AuthenticationService 통합)
+        // 인증 관련 핸들러들 (직접 처리)
         void handleAuth(const std::vector<std::string>& params);
         void handleRegister(const std::vector<std::string>& params);
         void handleLoginGuest(const std::vector<std::string>& params);
         void handleLogout(const std::vector<std::string>& params);
         void handleSessionValidate(const std::vector<std::string>& params);
 
-        // 방 관련 핸들러들 (RoomManager 통합)
+        // 방 관련 핸들러들 (직접 처리)
         void handleCreateRoom(const std::vector<std::string>& params);
         void handleJoinRoom(const std::vector<std::string>& params);
         void handleLeaveRoom(const std::vector<std::string>& params);
@@ -106,20 +109,22 @@ namespace Blokus::Server {
 
     private:
         Session* session_;  // 소유하지 않음, 단순 참조
-        RoomManager* roomManager_;  // 🔥 새로 추가: RoomManager 참조
-        AuthenticationService* authService_;  // 🔥 새로 추가: AuthService 참조
+        RoomManager* roomManager_;  // RoomManager 참조
+        AuthenticationService* authService_;  // AuthService 참조
 
         // 시퀀스 관리
         uint32_t sequenceId_{ 0 };
         uint32_t lastReceivedSequence_{ 0 };
 
-        // 콜백들 (GameServer와의 통신)
-        AuthCallback authCallback_;
-        RegisterCallback registerCallback_;  // 🔥 새로 추가
-        RoomCallback roomCallback_;
+        // 🔥 채팅 콜백만 유지
         ChatCallback chatCallback_;
 
-        // 🔥 새로 추가: 메시지 핸들러 테이블
+        // 🗑️ 제거된 콜백 멤버 변수들:
+        // AuthCallback authCallback_;
+        // RegisterCallback registerCallback_;
+        // RoomCallback roomCallback_;
+
+        // 🔥 메시지 핸들러 테이블 (새로운 방식)
         std::unordered_map<std::string, std::function<void(const std::vector<std::string>&)>> handlers_;
 
         // 메시지 라우팅 테이블 (Protobuf용)

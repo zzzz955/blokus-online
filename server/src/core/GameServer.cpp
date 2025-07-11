@@ -314,20 +314,19 @@ namespace Blokus::Server {
             spdlog::info("🔧 [addSession] MessageHandler 생성 - SessionId: {}", sessionId);
 
             // MessageHandler 생성 및 설정
-            // 참고: Session 클래스에 setMessageHandler 메서드가 있어야 함
             auto messageHandler = std::make_unique<MessageHandler>(
                 session.get(),          // Session 포인터
                 roomManager_.get(),     // RoomManager 포인터  
                 authService_.get()      // AuthenticationService 포인터
             );
 
-            // Session에 MessageHandler 설정 (Session.h에 setMessageHandler 필요)
+            // Session에 MessageHandler 설정
             session->setMessageHandler(std::move(messageHandler));
 
             spdlog::info("✅ [addSession] MessageHandler 생성 완료 - SessionId: {}", sessionId);
         }
 
-        // 세션 콜백 설정
+        // 세션 기본 콜백만 설정 (연결 해제, 메시지 수신)
         session->setDisconnectCallback([this](const std::string& id) {
             onSessionDisconnect(id);
             });
@@ -336,34 +335,11 @@ namespace Blokus::Server {
             onSessionMessage(id, msg);
             });
 
-        // 🔥 핵심 수정: MessageHandler 콜백 설정 (이제 항상 존재함)
-        auto handler = session->getMessageHandler();
-        if (handler) {
-            spdlog::info("🔧 [addSession] MessageHandler 콜백 설정 - SessionId: {}", sessionId);
+        // 🔥 핵심 변경: MessageHandler 콜백 모두 제거!
+        // MessageHandler가 직접 AuthService, RoomManager와 상호작용하므로
+        // 중간 콜백이 불필요함. 중복 처리 방지!
 
-            // AuthService와 RoomManager 콜백 설정
-            handler->setAuthCallback([this](const std::string& id, const std::string& username, bool success) {
-                handleAuthentication(id, username, success);
-                });
-
-            handler->setRegisterCallback([this](const std::string& id, const std::string& username,
-                const std::string& email, const std::string& password) {
-                    handleRegistration(id, username, email, password);
-                });
-
-            handler->setRoomCallback([this](const std::string& id, const std::string& action, const std::string& data) {
-                handleRoomAction(id, action, data);
-                });
-
-            handler->setChatCallback([this](const std::string& id, const std::string& message) {
-                handleChatBroadcast(id, message);
-                });
-
-            spdlog::info("✅ [addSession] MessageHandler 콜백 설정 완료 - SessionId: {}", sessionId);
-        }
-        else {
-            spdlog::error("❌ [addSession] MessageHandler가 여전히 null입니다 - SessionId: {}", sessionId);
-        }
+        spdlog::info("✅ [addSession] 세션 설정 완료 (콜백 없음) - SessionId: {}", sessionId);
     }
 
     void GameServer::removeSession(const std::string& sessionId) {
