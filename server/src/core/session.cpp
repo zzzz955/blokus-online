@@ -49,9 +49,6 @@ namespace Blokus::Server {
             std::string remoteAddr = getRemoteAddress();
             spdlog::info("세션 시작: {} (클라이언트: {})", sessionId_, remoteAddr);
 
-            // 메시지 핸들러 초기화 (GameServer 참조 제거)
-            messageHandler_ = std::make_unique<MessageHandler>(this);
-
             // 상태 업데이트
             state_ = ConnectionState::Connected;
             updateLastActivity();
@@ -64,6 +61,10 @@ namespace Blokus::Server {
             spdlog::error("세션 시작 중 오류 ({}): {}", sessionId_, e.what());
             handleError(boost::system::error_code());
         }
+    }
+
+    void Session::setMessageHandler(std::unique_ptr<MessageHandler> handler) {
+        messageHandler_ = std::move(handler);
     }
 
     void Session::stop() {
