@@ -288,6 +288,7 @@ namespace Blokus::Server {
     // ========================================
 
     void Session::processMessage(const std::string& message) {
+        spdlog::debug("📨 메시지 처리 시작: {}", message);
         if (messageHandler_) {
             try {
                 messageHandler_->handleMessage(message);
@@ -296,6 +297,7 @@ namespace Blokus::Server {
                 spdlog::error("❌ 메시지 핸들러 오류 ({}): {}", sessionId_, e.what());
                 sendMessage("ERROR:Message processing failed");
             }
+            spdlog::debug("📨 메시지 처리 완료: {}", message);
         }
         else {
             notifyMessage(message);

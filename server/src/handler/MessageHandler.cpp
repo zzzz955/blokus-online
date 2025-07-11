@@ -345,7 +345,7 @@ namespace Blokus::Server {
                     // 7. 브로드캐스트 (데드락 방지를 위해 여기서 호출)
                     auto room = roomManager_->getRoom(roomId);
                     if (room) {
-                        room->broadcastPlayerJoined(username, getUserId);
+                        room->broadcastPlayerJoined(username);
                     }
 
                     // 8. 성공 응답

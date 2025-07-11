@@ -522,13 +522,13 @@ namespace Blokus {
 
 		void GameRoom::broadcastPlayerJoined(const std::string& username) {
 			std::ostringstream oss;
-			oss << "PLAYER_JOINED:" << username << ":" << getPlayerCount();
+			oss << username << "님이 입장하셨습니다. 현재 인원 : " << getPlayerCount() << "명";
 			broadcastMessage(oss.str());
 		}
 
 		void GameRoom::broadcastPlayerLeft(const std::string& username) {
 			std::ostringstream oss;
-			oss << "PLAYER_LEFT:" << username << ":" << getPlayerCount();
+			oss << username << "님이 퇴장하셨습니다. 현재 인원 : " << getPlayerCount() << "명";
 			broadcastMessage(oss.str());
 		}
 
@@ -540,13 +540,13 @@ namespace Blokus {
 
 		void GameRoom::broadcastHostChanged(const std::string& newHostName) {
 			std::ostringstream oss;
-			oss << "HOST_CHANGED:" << newHostName;
+			oss << newHostName << "님이 방장이 되셨습니다";
 			broadcastMessage(oss.str());
 		}
 
 		void GameRoom::broadcastGameStart() {
 			std::ostringstream oss;
-			oss << "GAME_STARTED:" << getPlayerCount();
+			oss << "게임이 시작되었습니다. 현재 인원 : " << getPlayerCount() << "명";
 
 			// 플레이어 정보도 함께 전송
 			for (const auto& player : m_players) {
@@ -562,7 +562,7 @@ namespace Blokus {
 
 		void GameRoom::broadcastGameState() {
 			std::ostringstream oss;
-			oss << "GAME_STATE:" << static_cast<int>(m_state) << ":" << getPlayerCount();
+			oss << "게임 종료";
 			broadcastMessage(oss.str());
 		}
 
