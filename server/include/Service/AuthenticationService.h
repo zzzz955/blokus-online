@@ -67,9 +67,7 @@ namespace Blokus {
             // ========================================
 
             // 회원가입
-            RegisterResult registerUser(const std::string& username,
-                const std::string& email,
-                const std::string& password);
+            RegisterResult registerUser(const std::string& username, const std::string& password);
 
             // 로그인 (아이디/패스워드)
             AuthResult loginUser(const std::string& username, const std::string& password);

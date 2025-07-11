@@ -206,7 +206,7 @@ namespace Blokus::Server {
             return RegisterResult(false, "인증 서비스가 초기화되지 않았습니다", "");
         }
 
-        return authService_->registerUser(username, email, password);
+        return authService_->registerUser(username, password);
     }
 
     AuthResult GameServer::loginGuest(const std::string& guestName) {
@@ -309,6 +309,24 @@ namespace Blokus::Server {
         spdlog::info("새 세션 추가: {} (총 연결: {})",
             sessionId, getCurrentConnections());
 
+        // 🔥 핵심 수정: Session에 MessageHandler가 없으면 생성
+        if (!session->getMessageHandler()) {
+            spdlog::info("🔧 [addSession] MessageHandler 생성 - SessionId: {}", sessionId);
+
+            // MessageHandler 생성 및 설정
+            // 참고: Session 클래스에 setMessageHandler 메서드가 있어야 함
+            auto messageHandler = std::make_unique<MessageHandler>(
+                session.get(),          // Session 포인터
+                roomManager_.get(),     // RoomManager 포인터  
+                authService_.get()      // AuthenticationService 포인터
+            );
+
+            // Session에 MessageHandler 설정 (Session.h에 setMessageHandler 필요)
+            session->setMessageHandler(std::move(messageHandler));
+
+            spdlog::info("✅ [addSession] MessageHandler 생성 완료 - SessionId: {}", sessionId);
+        }
+
         // 세션 콜백 설정
         session->setDisconnectCallback([this](const std::string& id) {
             onSessionDisconnect(id);
@@ -318,13 +336,12 @@ namespace Blokus::Server {
             onSessionMessage(id, msg);
             });
 
-        // MessageHandler 콜백 설정
-        if (session->getMessageHandler()) {
-            auto handler = session->getMessageHandler();
+        // 🔥 핵심 수정: MessageHandler 콜백 설정 (이제 항상 존재함)
+        auto handler = session->getMessageHandler();
+        if (handler) {
+            spdlog::info("🔧 [addSession] MessageHandler 콜백 설정 - SessionId: {}", sessionId);
 
-            // AuthService와 RoomManager 설정 (MessageHandler가 이미 생성된 경우)
-            // TODO: MessageHandler 생성자에서 직접 전달하도록 수정 필요
-
+            // AuthService와 RoomManager 콜백 설정
             handler->setAuthCallback([this](const std::string& id, const std::string& username, bool success) {
                 handleAuthentication(id, username, success);
                 });
@@ -341,6 +358,11 @@ namespace Blokus::Server {
             handler->setChatCallback([this](const std::string& id, const std::string& message) {
                 handleChatBroadcast(id, message);
                 });
+
+            spdlog::info("✅ [addSession] MessageHandler 콜백 설정 완료 - SessionId: {}", sessionId);
+        }
+        else {
+            spdlog::error("❌ [addSession] MessageHandler가 여전히 null입니다 - SessionId: {}", sessionId);
         }
     }
 
@@ -598,7 +620,7 @@ namespace Blokus::Server {
             return;
         }
 
-        auto registerResult = authService_->registerUser(username, email, password);
+        auto registerResult = authService_->registerUser(username, password);
 
         if (registerResult.success) {
             spdlog::info("새 사용자 등록 성공: {} ({})", username, email);

@@ -216,7 +216,7 @@ namespace Blokus::Server {
         std::string email = params[1];
         std::string password = params[2];
 
-        auto result = authService_->registerUser(username, email, password);
+        auto result = authService_->registerUser(username, password);
 
         if (result.success) {
             sendResponse("REGISTER_SUCCESS:" + username);

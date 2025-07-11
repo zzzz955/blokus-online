@@ -29,6 +29,7 @@ namespace Blokus::Server {
         ~Session();
 
         // 세션 제어
+        void setMessageHandler(std::unique_ptr<MessageHandler> handler);
         void start();
         void stop();
         bool isActive() const { return active_.load(); }
@@ -63,7 +64,6 @@ namespace Blokus::Server {
 
         // MessageHandler 접근
         MessageHandler* getMessageHandler() const { return messageHandler_.get(); }
-        void setMessageHandler(std::unique_ptr<MessageHandler> handler);
 
     private:
         // 비동기 읽기/쓰기

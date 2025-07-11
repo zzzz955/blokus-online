@@ -79,18 +79,16 @@ namespace Blokus {
         // 회원가입/로그인
         // ========================================
 
-        RegisterResult AuthenticationService::registerUser(const std::string& username,
-            const std::string& email,
-            const std::string& password) {
+        RegisterResult AuthenticationService::registerUser(const std::string& username, const std::string& password) {
             try {
                 // 입력 데이터 검증
                 if (!validateUsername(username)) {
                     return RegisterResult(false, "잘못된 사용자명 형식입니다", "");
                 }
 
-                if (!validateEmail(email)) {
-                    return RegisterResult(false, "잘못된 이메일 형식입니다", "");
-                }
+                //if (!validateEmail(email)) {
+                //    return RegisterResult(false, "잘못된 이메일 형식입니다", "");
+                //}
 
                 if (!validatePassword(password)) {
                     return RegisterResult(false,
@@ -102,9 +100,9 @@ namespace Blokus {
                     return RegisterResult(false, "이미 사용 중인 사용자명입니다", "");
                 }
 
-                if (!isEmailAvailable(email)) {
-                    return RegisterResult(false, "이미 사용 중인 이메일입니다", "");
-                }
+                //if (!isEmailAvailable(email)) {
+                //    return RegisterResult(false, "이미 사용 중인 이메일입니다", "");
+                //}
 
                 // 비밀번호 해시화
                 std::string salt = generateSalt();
@@ -116,11 +114,12 @@ namespace Blokus {
                 // TODO: 데이터베이스에 저장
                 if (m_dbManager) {
                     // 실제 DB 저장 로직
-                    spdlog::info("사용자 등록 시도: {} ({})", username, email);
+                    m_dbManager->createUser(userId, hashedPassword);
+                    spdlog::info("사용자 등록 시도: {}", username);
                 }
                 else {
                     // 임시: 메모리에만 저장 (개발용)
-                    spdlog::info("임시 사용자 등록: {} ({})", username, email);
+                    spdlog::info("임시 사용자 등록: {}", username);
                 }
 
                 spdlog::info("새 사용자 등록 성공: {} (ID: {})", username, userId);

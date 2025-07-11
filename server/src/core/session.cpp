@@ -1,4 +1,4 @@
-#include "core/Session.h"
+ï»¿#include "core/Session.h"
 #include "handler/MessageHandler.h"
 #include <spdlog/spdlog.h>
 #include <openssl/rand.h>
@@ -10,7 +10,7 @@
 namespace Blokus::Server {
 
     // ========================================
-    // »ı¼ºÀÚ ¹× ¼Ò¸êÀÚ
+    // ìƒì„±ì ë° ì†Œë©¸ì
     // ========================================
 
     Session::Session(boost::asio::ip::tcp::socket socket)
@@ -24,98 +24,99 @@ namespace Blokus::Server {
         , messageHandler_(nullptr)
         , writing_(false)
     {
-        spdlog::debug("Session »ı¼º: {}", sessionId_);
+        spdlog::debug("Session ìƒì„±: {}", sessionId_);
     }
 
     Session::~Session() {
-        spdlog::debug("Session ¼Ò¸ê: {}", sessionId_);
+        spdlog::debug("Session ì†Œë©¸: {}", sessionId_);
         if (active_.load()) {
             stop();
         }
     }
 
     // ========================================
-    // ¼¼¼Ç Á¦¾î
+    // ì„¸ì…˜ ì œì–´
     // ========================================
+
+    void Session::setMessageHandler(std::unique_ptr<MessageHandler> handler) {
+        messageHandler_ = std::move(handler);
+        spdlog::info("MessageHandler ì„¤ì • ì™„ë£Œ - SessionId: {}", sessionId_);
+    }
 
     void Session::start() {
         if (!active_.load()) {
-            spdlog::warn("ÀÌ¹Ì ºñÈ°¼ºÈ­µÈ ¼¼¼Ç ½ÃÀÛ ½Ãµµ: {}", sessionId_);
+            spdlog::warn("ì´ë¯¸ ë¹„í™œì„±í™”ëœ ì„¸ì…˜ ì‹œì‘ ì‹œë„: {}", sessionId_);
             return;
         }
 
         try {
-            // ¿ø°İ ÁÖ¼Ò ·Î±ë
+            // ì›ê²© ì£¼ì†Œ ë¡œê¹…
             std::string remoteAddr = getRemoteAddress();
-            spdlog::info("¼¼¼Ç ½ÃÀÛ: {} (Å¬¶óÀÌ¾ğÆ®: {})", sessionId_, remoteAddr);
+            spdlog::info("ì„¸ì…˜ ì‹œì‘: {} (í´ë¼ì´ì–¸íŠ¸: {})", sessionId_, remoteAddr);
 
-            // »óÅÂ ¾÷µ¥ÀÌÆ®
+            // ìƒíƒœ ì—…ë°ì´íŠ¸
             state_ = ConnectionState::Connected;
             updateLastActivity();
 
-            // ºñµ¿±â ÀĞ±â ½ÃÀÛ
+            // ë¹„ë™ê¸° ì½ê¸° ì‹œì‘
             startRead();
 
         }
         catch (const std::exception& e) {
-            spdlog::error("¼¼¼Ç ½ÃÀÛ Áß ¿À·ù ({}): {}", sessionId_, e.what());
+            spdlog::error("ì„¸ì…˜ ì‹œì‘ ì¤‘ ì˜¤ë¥˜ ({}): {}", sessionId_, e.what());
             handleError(boost::system::error_code());
         }
-    }
-
-    void Session::setMessageHandler(std::unique_ptr<MessageHandler> handler) {
-        messageHandler_ = std::move(handler);
     }
 
     void Session::stop() {
         bool expected = true;
         if (!active_.compare_exchange_strong(expected, false)) {
-            return; // ÀÌ¹Ì ÁßÁöµÊ
+            return; // ì´ë¯¸ ì¤‘ì§€ë¨
         }
 
-        spdlog::info("¼¼¼Ç ÁßÁö: {}", sessionId_);
+        spdlog::info("ì„¸ì…˜ ì¤‘ì§€: {}", sessionId_);
 
         try {
-            // »óÅÂ º¯°æ
+            // ìƒíƒœ ë³€ê²½
             state_ = ConnectionState::Disconnecting;
 
-            // ¼ÒÄÏ Á¾·á
+            // ì†Œì¼“ ì¢…ë£Œ
             if (socket_.is_open()) {
                 boost::system::error_code ec;
                 socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
                 socket_.close(ec);
-                // ¿¡·¯´Â ¹«½Ã (ÀÌ¹Ì ´İÇôÀÖÀ» ¼ö ÀÖÀ½)
+                // ì—ëŸ¬ëŠ” ë¬´ì‹œ (ì´ë¯¸ ë‹«í˜€ìˆì„ ìˆ˜ ìˆìŒ)
             }
 
-            // ¿¬°á ÇØÁ¦ Äİ¹é È£Ãâ
+            // ì—°ê²° í•´ì œ ì½œë°± í˜¸ì¶œ
             notifyDisconnect();
 
-            // »óÅÂ ÃÖÁ¾ º¯°æ
+            // ìƒíƒœ ìµœì¢… ë³€ê²½
             state_ = ConnectionState::Disconnected;
 
         }
         catch (const std::exception& e) {
-            spdlog::error("¼¼¼Ç ÁßÁö Áß ¿À·ù ({}): {}", sessionId_, e.what());
+            spdlog::error("ì„¸ì…˜ ì¤‘ì§€ ì¤‘ ì˜¤ë¥˜ ({}): {}", sessionId_, e.what());
         }
     }
 
     // ========================================
-    // ¸Ş½ÃÁö ¼Û¼ö½Å
+    // ë©”ì‹œì§€ ì†¡ìˆ˜ì‹ 
     // ========================================
 
     void Session::sendMessage(const std::string& message) {
         if (!active_.load() || !socket_.is_open()) {
-            spdlog::debug("ºñÈ°¼º ¼¼¼Ç¿¡ ¸Ş½ÃÁö Àü¼Û ½Ãµµ: {}", sessionId_);
+            spdlog::debug("ë¹„í™œì„± ì„¸ì…˜ì— ë©”ì‹œì§€ ì „ì†¡ ì‹œë„: {}", sessionId_);
             return;
         }
 
         try {
             std::lock_guard<std::mutex> lock(sendMutex_);
 
-            // ¸Ş½ÃÁö¸¦ Å¥¿¡ Ãß°¡
-            outgoingMessages_.push(message + "\n"); // ÁÙ¹Ù²ŞÀ¸·Î ±¸ºĞ
+            // ë©”ì‹œì§€ë¥¼ íì— ì¶”ê°€
+            outgoingMessages_.push(message + "\n"); // ì¤„ë°”ê¿ˆìœ¼ë¡œ êµ¬ë¶„
 
-            // ÇöÀç ¾²±â ÁßÀÌ ¾Æ´Ï¸é ¾²±â ½ÃÀÛ
+            // í˜„ì¬ ì“°ê¸° ì¤‘ì´ ì•„ë‹ˆë©´ ì“°ê¸° ì‹œì‘
             if (!writing_) {
                 writing_ = true;
                 doWrite();
@@ -123,21 +124,21 @@ namespace Blokus::Server {
 
         }
         catch (const std::exception& e) {
-            spdlog::error("¸Ş½ÃÁö Àü¼Û ÁØºñ Áß ¿À·ù ({}): {}", sessionId_, e.what());
+            spdlog::error("ë©”ì‹œì§€ ì „ì†¡ ì¤€ë¹„ ì¤‘ ì˜¤ë¥˜ ({}): {}", sessionId_, e.what());
             handleError(boost::system::error_code());
         }
     }
 
     void Session::sendBinary(const std::vector<uint8_t>& data) {
-        // ¹ÙÀÌ³Ê¸® µ¥ÀÌÅÍ¸¦ Base64³ª hex·Î ÀÎÄÚµùÇÏ¿© ÅØ½ºÆ®·Î Àü¼Û
-        // ¶Ç´Â º°µµÀÇ ¹ÙÀÌ³Ê¸® ÇÁ·ÎÅäÄİ ±¸Çö
-        // ÇöÀç´Â °£´ÜÈ÷ Å©±â Á¤º¸¸¸ Àü¼Û
+        // ë°”ì´ë„ˆë¦¬ ë°ì´í„°ë¥¼ Base64ë‚˜ hexë¡œ ì¸ì½”ë”©í•˜ì—¬ í…ìŠ¤íŠ¸ë¡œ ì „ì†¡
+        // ë˜ëŠ” ë³„ë„ì˜ ë°”ì´ë„ˆë¦¬ í”„ë¡œí† ì½œ êµ¬í˜„
+        // í˜„ì¬ëŠ” ê°„ë‹¨íˆ í¬ê¸° ì •ë³´ë§Œ ì „ì†¡
         std::string message = "BINARY_DATA:" + std::to_string(data.size());
         sendMessage(message);
     }
 
     // ========================================
-    // ¼¼¼Ç Á¤º¸ °ü¸®
+    // ì„¸ì…˜ ì •ë³´ ê´€ë¦¬
     // ========================================
 
     void Session::setAuthenticated(const std::string& userId, const std::string& username) {
@@ -146,7 +147,7 @@ namespace Blokus::Server {
         state_ = ConnectionState::Authenticated;
         updateLastActivity();
 
-        spdlog::info("¼¼¼Ç ÀÎÁõ ¿Ï·á: {} (»ç¿ëÀÚ: {})", sessionId_, username);
+        spdlog::info("ì„¸ì…˜ ì¸ì¦ ì™„ë£Œ: {} (ì‚¬ìš©ì: {})", sessionId_, username);
     }
 
     bool Session::isTimedOut(std::chrono::seconds timeout) const {
@@ -163,13 +164,13 @@ namespace Blokus::Server {
             }
         }
         catch (const std::exception&) {
-            // ¼ÒÄÏÀÌ ÀÌ¹Ì ´İÇû°Å³ª ¿À·ù ¹ß»ı
+            // ì†Œì¼“ì´ ì´ë¯¸ ë‹«í˜”ê±°ë‚˜ ì˜¤ë¥˜ ë°œìƒ
         }
         return "unknown";
     }
 
     // ========================================
-    // ºñµ¿±â ÀĞ±â/¾²±â
+    // ë¹„ë™ê¸° ì½ê¸°/ì“°ê¸°
     // ========================================
 
     void Session::startRead() {
@@ -193,32 +194,32 @@ namespace Blokus::Server {
         if (error) {
             if (error != boost::asio::error::eof &&
                 error != boost::asio::error::connection_reset) {
-                spdlog::error("ÀĞ±â ¿À·ù ({}): {}", sessionId_, error.message());
+                spdlog::error("ì½ê¸° ì˜¤ë¥˜ ({}): {}", sessionId_, error.message());
             }
             handleError(error);
             return;
         }
 
         try {
-            // ¼ö½ÅµÈ µ¥ÀÌÅÍ¸¦ ¹öÆÛ¿¡ Ãß°¡
+            // ìˆ˜ì‹ ëœ ë°ì´í„°ë¥¼ ë²„í¼ì— ì¶”ê°€
             messageBuffer_.append(readBuffer_.data(), bytesTransferred);
             updateLastActivity();
 
-            // ¿ÏÀüÇÑ ¸Ş½ÃÁöµé Ã³¸®
+            // ì™„ì „í•œ ë©”ì‹œì§€ë“¤ ì²˜ë¦¬
             processReceivedData();
 
-            // ´ÙÀ½ ÀĞ±â ½ÃÀÛ
+            // ë‹¤ìŒ ì½ê¸° ì‹œì‘
             startRead();
 
         }
         catch (const std::exception& e) {
-            spdlog::error("¸Ş½ÃÁö Ã³¸® Áß ¿À·ù ({}): {}", sessionId_, e.what());
+            spdlog::error("ë©”ì‹œì§€ ì²˜ë¦¬ ì¤‘ ì˜¤ë¥˜ ({}): {}", sessionId_, e.what());
             handleError(boost::system::error_code());
         }
     }
 
     void Session::doWrite() {
-        // ¹ÂÅØ½º´Â ÀÌ¹Ì sendMessage()¿¡¼­ ÀâÇôÀÖÀ½
+        // ë®¤í…ìŠ¤ëŠ” ì´ë¯¸ sendMessage()ì—ì„œ ì¡í˜€ìˆìŒ
         if (!active_.load() || outgoingMessages_.empty()) {
             writing_ = false;
             return;
@@ -239,7 +240,7 @@ namespace Blokus::Server {
         }
 
         if (error) {
-            spdlog::error("¾²±â ¿À·ù ({}): {}", sessionId_, error.message());
+            spdlog::error("ì“°ê¸° ì˜¤ë¥˜ ({}): {}", sessionId_, error.message());
             handleError(error);
             return;
         }
@@ -247,40 +248,40 @@ namespace Blokus::Server {
         try {
             std::lock_guard<std::mutex> lock(sendMutex_);
 
-            // Àü¼Û ¿Ï·áµÈ ¸Ş½ÃÁö Á¦°Å - O(1) ¼º´É!
+            // ì „ì†¡ ì™„ë£Œëœ ë©”ì‹œì§€ ì œê±° - O(1) ì„±ëŠ¥!
             if (!outgoingMessages_.empty()) {
                 outgoingMessages_.pop();
             }
 
-            // ´ë±â ÁßÀÎ ¸Ş½ÃÁö°¡ ÀÖÀ¸¸é °è¼Ó Àü¼Û
+            // ëŒ€ê¸° ì¤‘ì¸ ë©”ì‹œì§€ê°€ ìˆìœ¼ë©´ ê³„ì† ì „ì†¡
             if (!outgoingMessages_.empty()) {
                 doWrite();
             }
             else {
-                writing_ = false;  // ´õ ÀÌ»ó ¾µ ¸Ş½ÃÁö ¾øÀ½
+                writing_ = false;  // ë” ì´ìƒ ì“¸ ë©”ì‹œì§€ ì—†ìŒ
             }
 
         }
         catch (const std::exception& e) {
-            spdlog::error("¾²±â ¿Ï·á Ã³¸® Áß ¿À·ù ({}): {}", sessionId_, e.what());
+            spdlog::error("ì“°ê¸° ì™„ë£Œ ì²˜ë¦¬ ì¤‘ ì˜¤ë¥˜ ({}): {}", sessionId_, e.what());
             handleError(boost::system::error_code());
         }
     }
 
     // ========================================
-    // ¸Ş½ÃÁö Ã³¸®
+    // ë©”ì‹œì§€ ì²˜ë¦¬
     // ========================================
 
     void Session::processReceivedData() {
-        // ÁÙ¹Ù²ŞÀ¸·Î ±¸ºĞµÈ ¸Ş½ÃÁöµé Ã³¸®
+        // ì¤„ë°”ê¿ˆìœ¼ë¡œ êµ¬ë¶„ëœ ë©”ì‹œì§€ë“¤ ì²˜ë¦¬
         size_t pos = 0;
         while ((pos = messageBuffer_.find('\n')) != std::string::npos) {
             std::string message = messageBuffer_.substr(0, pos);
             messageBuffer_.erase(0, pos + 1);
 
-            // ºó ¸Ş½ÃÁö ¹«½Ã
+            // ë¹ˆ ë©”ì‹œì§€ ë¬´ì‹œ
             if (!message.empty()) {
-                // \r Á¦°Å (Windows Å¬¶óÀÌ¾ğÆ® ´ëÀÀ)
+                // \r ì œê±° (Windows í´ë¼ì´ì–¸íŠ¸ ëŒ€ì‘)
                 if (!message.empty() && message.back() == '\r') {
                     message.pop_back();
                 }
@@ -289,10 +290,10 @@ namespace Blokus::Server {
             }
         }
 
-        // ¹öÆÛ Å©±â Á¦ÇÑ (DoS °ø°İ ¹æÁö)
+        // ë²„í¼ í¬ê¸° ì œí•œ (DoS ê³µê²© ë°©ì§€)
         const size_t MAX_BUFFER_SIZE = 64 * 1024; // 64KB
         if (messageBuffer_.size() > MAX_BUFFER_SIZE) {
-            spdlog::warn("¸Ş½ÃÁö ¹öÆÛ Å©±â ÃÊ°ú ({}): {} bytes", sessionId_, messageBuffer_.size());
+            spdlog::warn("ë©”ì‹œì§€ ë²„í¼ í¬ê¸° ì´ˆê³¼ ({}): {} bytes", sessionId_, messageBuffer_.size());
             handleError(boost::system::error_code());
         }
     }
@@ -300,47 +301,47 @@ namespace Blokus::Server {
     void Session::processMessage(const std::string& message) {
         updateLastActivity();
 
-        spdlog::debug("¸Ş½ÃÁö ¼ö½Å ({}): {}", sessionId_,
+        spdlog::debug("ë©”ì‹œì§€ ìˆ˜ì‹  ({}): {}", sessionId_,
             message.length() > 100 ? message.substr(0, 100) + "..." : message);
 
-        // ¸Ş½ÃÁö ÇÚµé·¯¸¦ ÅëÇØ Ã³¸®
+        // ë©”ì‹œì§€ í•¸ë“¤ëŸ¬ë¥¼ í†µí•´ ì²˜ë¦¬
         if (messageHandler_) {
             try {
                 messageHandler_->handleMessage(message);
             }
             catch (const std::exception& e) {
-                spdlog::error("¸Ş½ÃÁö ÇÚµé·¯ ¿À·ù ({}): {}", sessionId_, e.what());
-                // ¿¡·¯ ÀÀ´ä Àü¼Û
+                spdlog::error("ë©”ì‹œì§€ í•¸ë“¤ëŸ¬ ì˜¤ë¥˜ ({}): {}", sessionId_, e.what());
+                // ì—ëŸ¬ ì‘ë‹µ ì „ì†¡
                 sendMessage("ERROR:Message processing failed");
             }
         }
         else {
-            // ¸Ş½ÃÁö Äİ¹é È£Ãâ
+            // ë©”ì‹œì§€ ì½œë°± í˜¸ì¶œ
             notifyMessage(message);
         }
     }
 
     // ========================================
-    // ¿¡·¯ Ã³¸® ¹× Á¤¸®
+    // ì—ëŸ¬ ì²˜ë¦¬ ë° ì •ë¦¬
     // ========================================
 
     void Session::handleError(const boost::system::error_code& error) {
         if (error && error != boost::asio::error::eof &&
             error != boost::asio::error::connection_reset) {
-            spdlog::error("¼¼¼Ç ¿À·ù ({}): {}", sessionId_, error.message());
+            spdlog::error("ì„¸ì…˜ ì˜¤ë¥˜ ({}): {}", sessionId_, error.message());
         }
 
         stop();
     }
 
     void Session::cleanup() {
-        // ¸Ş½ÃÁö ÇÚµé·¯ Á¤¸®
+        // ë©”ì‹œì§€ í•¸ë“¤ëŸ¬ ì •ë¦¬
         messageHandler_.reset();
 
-        // ¹öÆÛ Á¤¸®
+        // ë²„í¼ ì •ë¦¬
         messageBuffer_.clear();
 
-        // Å¥ Á¤¸® - while ·çÇÁ·Î ¸ğµç ¿ä¼Ò Á¦°Å
+        // í ì •ë¦¬ - while ë£¨í”„ë¡œ ëª¨ë“  ìš”ì†Œ ì œê±°
         std::lock_guard<std::mutex> lock(sendMutex_);
         while (!outgoingMessages_.empty()) {
             outgoingMessages_.pop();
@@ -349,7 +350,7 @@ namespace Blokus::Server {
     }
 
     // ========================================
-    // Äİ¹é È£Ãâ
+    // ì½œë°± í˜¸ì¶œ
     // ========================================
 
     void Session::notifyDisconnect() {
@@ -358,7 +359,7 @@ namespace Blokus::Server {
                 disconnectCallback_(sessionId_);
             }
             catch (const std::exception& e) {
-                spdlog::error("¿¬°á ÇØÁ¦ Äİ¹é ¿À·ù ({}): {}", sessionId_, e.what());
+                spdlog::error("ì—°ê²° í•´ì œ ì½œë°± ì˜¤ë¥˜ ({}): {}", sessionId_, e.what());
             }
         }
     }
@@ -369,26 +370,26 @@ namespace Blokus::Server {
                 messageCallback_(sessionId_, message);
             }
             catch (const std::exception& e) {
-                spdlog::error("¸Ş½ÃÁö Äİ¹é ¿À·ù ({}): {}", sessionId_, e.what());
+                spdlog::error("ë©”ì‹œì§€ ì½œë°± ì˜¤ë¥˜ ({}): {}", sessionId_, e.what());
             }
         }
     }
 
     // ========================================
-    // À¯Æ¿¸®Æ¼ ÇÔ¼ö
+    // ìœ í‹¸ë¦¬í‹° í•¨ìˆ˜
     // ========================================
 
     std::string Session::generateSessionId() {
-        // OpenSSLÀ» »ç¿ëÇÑ ¾ÈÀüÇÑ ·£´ı ¼¼¼Ç ID »ı¼º
-        unsigned char randomBytes[16]; // 128ºñÆ®
+        // OpenSSLì„ ì‚¬ìš©í•œ ì•ˆì „í•œ ëœë¤ ì„¸ì…˜ ID ìƒì„±
+        unsigned char randomBytes[16]; // 128ë¹„íŠ¸
         if (RAND_bytes(randomBytes, sizeof(randomBytes)) != 1) {
-            // ·£´ı »ı¼º ½ÇÆĞ ½Ã ½Ã°£ ±â¹İ fallback
+            // ëœë¤ ìƒì„± ì‹¤íŒ¨ ì‹œ ì‹œê°„ ê¸°ë°˜ fallback
             auto now = std::chrono::high_resolution_clock::now();
             auto timestamp = now.time_since_epoch().count();
             return "session_" + std::to_string(timestamp);
         }
 
-        // ¹ÙÀÌÆ®¸¦ 16Áø¼ö ¹®ÀÚ¿­·Î º¯È¯
+        // ë°”ì´íŠ¸ë¥¼ 16ì§„ìˆ˜ ë¬¸ìì—´ë¡œ ë³€í™˜
         std::stringstream ss;
         ss << std::hex << std::setfill('0');
         for (int i = 0; i < sizeof(randomBytes); ++i) {
