@@ -132,12 +132,17 @@ namespace Blokus::Server {
     }
 
     // ========================================
-    // 인증 관련 핸들러들 (새로 추가)
+    // 인증 관련 핸들러들
     // ========================================
 
     void MessageHandler::handleAuth(const std::vector<std::string>& params) {
         if (!authService_) {
             sendError("인증 서비스를 사용할 수 없습니다");
+            return;
+        }
+
+        if (!session_->isConnected()) {
+            sendError("인증을 진행할 수 있는 상태가 아닙니다");
             return;
         }
 
@@ -167,6 +172,11 @@ namespace Blokus::Server {
     void MessageHandler::handleRegister(const std::vector<std::string>& params) {
         if (!authService_) {
             sendError("인증 서비스를 사용할 수 없습니다");
+            return;
+        }
+
+        if (!session_->isConnected()) {
+            sendError("회원 가입을 진행할 수 있는 상태가 아닙니다");
             return;
         }
 
@@ -204,6 +214,11 @@ namespace Blokus::Server {
     void MessageHandler::handleLoginGuest(const std::vector<std::string>& params) {
         if (!authService_) {
             sendError("인증 서비스를 사용할 수 없습니다");
+            return;
+        }
+
+        if (!session_->isConnected()) {
+            sendError("게스트 로그인을 진행할 수 있는 상태가 아닙니다");
             return;
         }
 
