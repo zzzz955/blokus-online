@@ -66,20 +66,52 @@ namespace Blokus {
         enum class RoomState {
             Waiting,    // 대기 중
             Playing,    // 게임 중
-            Finished,   // 게임 종료
             Disbanded   // 방 해체
         };
 
-        // 메시지 타입 (간소화된 버전)
+        // 메시지 타입 (확장된 버전)
         enum class MessageType {
             Unknown = 0,
+
+            // 기본 기능 (1-99)
+            Ping = 1,
+
+            // 인증 관련 (100-199)
             Auth = 100,
+            Register = 101,
+            Guest = 102,
+            Logout = 103,
+            Validate = 104,
+
+            // 로비 관련 (200-299)
             Lobby = 200,
+
+            // 방 관련 (300-399)
             Room = 300,
+            RoomCreate = 301,
+            RoomJoin = 302,
+            RoomLeave = 303,
+            RoomList = 304,
+            RoomReady = 305,
+            RoomStart = 306,
+            RoomEnd = 307,
+            RoomTransferHost = 308,
+
+            // 게임 관련 (400-499)
             Game = 400,
+            GameMove = 401,
+            GameEnd = 402,
+
+            // 채팅 관련 (500-599)
             Chat = 500,
+
+            // 에러 관련 (900-999)
             Error = 900
         };
+
+        // MessageType 문자열 변환 함수
+        MessageType parseMessageType(const std::string& messageStr);
+        std::string messageTypeToString(MessageType type);
 
         // 메시지 처리 결과
         enum class MessageResult {
@@ -172,17 +204,17 @@ namespace Blokus {
         // ========================================
         // 유틸리티 함수들
         // ========================================
-        std::string errorCodeToString(ServerErrorCode code);
-        std::string connectionStateToString(ConnectionState state);
-        std::string sessionStateToString(SessionState state);
-        std::string roomStateToString(RoomState state);
-        std::string messageTypeToString(MessageType type);
+        //std::string errorCodeToString(ServerErrorCode code);
+        //std::string connectionStateToString(ConnectionState state);
+        //std::string sessionStateToString(SessionState state);
+        //std::string roomStateToString(RoomState state);
+        //std::string messageTypeToString(MessageType type);
 
-        bool isValidUsername(const std::string& username);
-        bool isValidRoomName(const std::string& roomName);
-        std::string generateSessionId();
-        std::string hashPassword(const std::string& password);
-        bool verifyPassword(const std::string& password, const std::string& hash);
+        //bool isValidUsername(const std::string& username);
+        //bool isValidRoomName(const std::string& roomName);
+        //std::string generateSessionId();
+        //std::string hashPassword(const std::string& password);
+        //bool verifyPassword(const std::string& password, const std::string& hash);
 
     } // namespace Server
 } // namespace Blokus
