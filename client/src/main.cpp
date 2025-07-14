@@ -3,10 +3,10 @@
 #include <QTimer>
 #include <QFont>
 
-#include "ui/LoginWindow.h"
-#include "ui/LobbyWindow.h"
-#include "ui/GameRoomWindow.h"
-#include "common/Types.h"
+#include "LoginWindow.h"
+#include "LobbyWindow.h"
+#include "GameRoomWindow.h"
+#include "ClientTypes.h"
 
 using namespace Blokus;
 

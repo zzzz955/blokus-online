@@ -1,6 +1,6 @@
-﻿#include "ui/GameBoard.h"
-#include "common/GameLogic.h"
-#include "common/QtAdapter.h"
+﻿#include "GameBoard.h"
+#include "ClientLogic.h"
+#include "QtAdapter.h"
 
 #include <QGraphicsRectItem>
 #include <QGraphicsTextItem>

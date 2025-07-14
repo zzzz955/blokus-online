@@ -1,4 +1,4 @@
-﻿#include "game/Block.h"
+﻿#include "ClientBlock.h"
 #include <QDebug>
 #include <QGraphicsScene>
 #include <algorithm>

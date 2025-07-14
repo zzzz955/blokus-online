@@ -1,8 +1,7 @@
 ﻿#pragma once
 
-#include "common/Types.h"
 #include "ServerTypes.h"
-#include "common/GameLogic.h"
+#include "GameLogic.h"
 #include "Session.h"
 #include "PlayerInfo.h"  // 🔥 새로 추가: 별도 헤더 사용
 #include <vector>

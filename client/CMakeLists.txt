@@ -14,25 +14,25 @@ endif()
 # 클라이언트 소스 파일들
 set(CLIENT_SOURCES
     src/main.cpp
-    src/ui/GameBoard.cpp
-    src/ui/GameRoomWindow.cpp
-    src/ui/ImprovedBlockPalette.cpp
-    src/ui/LoginWindow.cpp
-    src/ui/LobbyWindow.cpp
-    src/game/Block.cpp
-    src/common/QtAdapter.cpp
+    "src/GameBoard.cpp"
+    "src/GameRoomWindow.cpp"
+    "src/ImprovedBlockPalette.cpp"
+    "src/LoginWindow.cpp"
+    "src/LobbyWindow.cpp"
+    "src/Block.cpp"
+    "src/QtAdapter.cpp"
 )
 
 set(CLIENT_HEADERS
-    include/ui/GameBoard.h
-    include/ui/GameRoomWindow.h
-    include/ui/ImprovedBlockPalette.h
-    include/ui/LoginWindow.h
-    include/ui/LobbyWindow.h
-    include/common/Types.h
-    include/common/QtAdapter.h
-    include/game/Block.h
-    include/game/GameLogic.h
+    "include/GameBoard.h"
+    "include/GameRoomWindow.h"
+    "include/ImprovedBlockPalette.h"
+    "include/LoginWindow.h"
+    "include/LobbyWindow.h"
+    "include/ClientTypes.h"
+    "include/QtAdapter.h"
+    "include/ClientBlock.h"
+    "include/ClientLogic.h"
 )
 
 # 실행 파일 생성

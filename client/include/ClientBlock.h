@@ -1,8 +1,7 @@
 ﻿#pragma once
 
-// Common 라이브러리의 Block을 import
-#include "common/Block.h"
-#include "common/Types.h"
+#include "Block.h"
+#include "ClientTypes.h"
 
 // Qt 관련 헤더들 (그래픽 아이템용)
 #include <QGraphicsItemGroup>

@@ -1,5 +1,5 @@
-#include "common/Block.h"
-#include "common/Utils.h"
+#include "Block.h"
+#include "Utils.h"
 #include <algorithm>
 
 namespace Blokus {

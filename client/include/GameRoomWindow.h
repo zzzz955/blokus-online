@@ -23,9 +23,9 @@
 #include <QList>
 #include <QSet>
 
-#include "ui/GameBoard.h"
-#include "game/GameLogic.h"
-#include "common/Types.h"
+#include "GameBoard.h"
+#include "ClientLogic.h"
+#include "ClientTypes.h"
 
 namespace Blokus {
 

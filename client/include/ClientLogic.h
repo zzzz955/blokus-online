@@ -1,7 +1,7 @@
 ﻿#pragma once
 
-#include "common/GameLogic.h"
-#include "common/Types.h"
+#include "GameLogic.h"
+#include "ClientTypes.h"
 
 namespace Blokus {
 

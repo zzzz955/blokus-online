@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 #include "Session.h"
-#include "common/Types.h"
+#include "Types.h"
 #include <memory>
 #include <chrono>
 #include <string>

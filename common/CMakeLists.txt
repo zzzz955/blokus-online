@@ -8,10 +8,10 @@ set(SOURCES
 )
 
 set(HEADERS
-    include/common/Types.h
-    include/common/Block.h
-    include/common/GameLogic.h
-    include/common/Utils.h
+    "include/Types.h"
+    "include/Block.h"
+    "include/GameLogic.h"
+    "include/Utils.h"
 )
 
 # 정적 라이브러리 생성

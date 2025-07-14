@@ -1,6 +1,6 @@
-﻿#include "common/Types.h"
-#include "common/QtAdapter.h"
-#include "common/Utils.h"
+﻿#include "ClientTypes.h"
+#include "QtAdapter.h"
+#include "Utils.h"
 #include <QDebug>
 
 namespace Blokus {

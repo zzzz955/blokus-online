@@ -1,4 +1,4 @@
-﻿#include "ui/LoginWindow.h"
+﻿#include "LoginWindow.h"
 #include <QApplication>
 #include <QDesktopWidget>
 #include <QPropertyAnimation>

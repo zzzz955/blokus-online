@@ -1,4 +1,4 @@
-﻿#include "ui/GameRoomWindow.h"
+﻿#include "GameRoomWindow.h"
 #include <QApplication>
 #include <QMessageBox>
 #include <QInputDialog>

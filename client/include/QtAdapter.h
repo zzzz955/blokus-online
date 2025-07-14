@@ -1,7 +1,7 @@
 ﻿#pragma once
 
-#include "common/Block.h"
-#include "Types.h"
+#include "ClientBlock.h"
+#include "ClientTypes.h"
 #include <QRect>
 
 namespace Blokus {

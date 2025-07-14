@@ -1,6 +1,6 @@
-#include "common/GameLogic.h"
-#include "common/Block.h"  // Block 클래스 사용
-#include "common/Utils.h"
+#include "GameLogic.h"
+#include "Block.h"  // Block 클래스 사용
+#include "Utils.h"
 #include <algorithm>
 
 namespace Blokus {

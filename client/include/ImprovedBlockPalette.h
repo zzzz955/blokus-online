@@ -18,8 +18,8 @@
 #include <map>
 #include <set>
 
-#include "common/Types.h"
-#include "game/Block.h"
+#include "ClientTypes.h"
+#include "ClientBlock.h"
 
 namespace Blokus {
 

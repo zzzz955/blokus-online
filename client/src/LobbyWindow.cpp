@@ -1,5 +1,5 @@
-﻿#include "ui/LobbyWindow.h"
-#include "common/Types.h"  // 🔥 UserInfo 등을 위해 추가
+﻿#include "LobbyWindow.h"
+#include "ClientTypes.h"  // 🔥 UserInfo 등을 위해 추가
 #include <QApplication>
 #include <QDesktopWidget>
 #include <QHeaderView>

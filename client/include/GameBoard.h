@@ -13,9 +13,9 @@
 #include <vector>
 #include <map>
 
-#include "common/Types.h"      // 🔥 이 줄 추가 (BOARD_SIZE 포함)
-#include "game/Block.h"
-#include "game/GameLogic.h"
+#include "ClientTypes.h"      // 🔥 이 줄 추가 (BOARD_SIZE 포함)
+#include "ClientBlock.h"
+#include "ClientLogic.h"
 
 namespace Blokus {
 

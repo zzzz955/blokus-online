@@ -1,10 +1,10 @@
 ﻿#pragma once
 
 // 🔥 Common 라이브러리의 모든 타입들을 가져옴
-#include "common/Types.h"
-#include "common/Block.h"
-#include "common/GameLogic.h"
-#include "common/Utils.h"
+#include "Types.h"
+#include "Block.h"
+#include "GameLogic.h"
+#include "Utils.h"
 
 // Qt 관련 헤더들
 #include <QString>

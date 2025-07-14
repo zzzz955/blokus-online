@@ -26,7 +26,7 @@
 #include <QDateTime>
 #include <QDebug>
 
-#include "common/Types.h"  // 🔥 Types.h에서 UserInfo, RoomInfo 등을 가져옴
+#include "ClientTypes.h"  // 🔥 Types.h에서 UserInfo, RoomInfo 등을 가져옴
 
 namespace Blokus {
     // 방 생성 다이얼로그

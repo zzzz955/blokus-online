@@ -1,5 +1,5 @@
-﻿#include "ui/ImprovedBlockPalette.h"
-#include "common/QtAdapter.h"
+﻿#include "ImprovedBlockPalette.h"
+#include "QtAdapter.h"
 #include <QPainter>
 #include <QMouseEvent>
 #include <QHBoxLayout>

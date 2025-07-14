@@ -12,7 +12,7 @@
 // 기존 정의된 타입들 사용
 #include "ServerTypes.h"
 #include "ConfigManager.h"
-#include "common/Types.h"
+#include "Types.h"
 
 // 전방 선언
 namespace Blokus::Server {

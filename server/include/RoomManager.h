@@ -2,7 +2,7 @@
 
 #include "GameRoom.h"
 #include "ServerTypes.h"
-#include "common/Types.h"
+#include "Types.h"
 #include <unordered_map>
 #include <vector>
 #include <memory>
