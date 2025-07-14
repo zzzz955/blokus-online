@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/ServerTypes.h"
+#include "ServerTypes.h"
 #include <string>
 #include <memory>
 #include <future>

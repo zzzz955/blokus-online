@@ -1,7 +1,7 @@
-﻿#include "handler/MessageHandler.h"
-#include "core/Session.h"
-#include "manager/RoomManager.h"
-#include "service/AuthenticationService.h"
+﻿#include "MessageHandler.h"
+#include "Session.h"
+#include "RoomManager.h"
+#include "AuthenticationService.h"
 #include <spdlog/spdlog.h>
 #include <sstream>
 #include <algorithm>

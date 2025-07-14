@@ -1,10 +1,10 @@
-﻿#include "core/GameServer.h"
-#include "core/Session.h"
-#include "handler/MessageHandler.h"
-#include "manager/RoomManager.h"
-#include "service/AuthenticationService.h"
-#include "manager/DatabaseManager.h"
-#include "manager/ConfigManager.h"
+﻿#include "GameServer.h"
+#include "Session.h"
+#include "MessageHandler.h"
+#include "RoomManager.h"
+#include "AuthenticationService.h"
+#include "DatabaseManager.h"
+#include "ConfigManager.h"
 #include <spdlog/spdlog.h>
 #include <chrono>
 #include <functional>

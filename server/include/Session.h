@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/ServerTypes.h"  // ConnectionState는 여기에 정의됨
+#include "ServerTypes.h"  // ConnectionState는 여기에 정의됨
 #include <boost/asio.hpp>
 #include <spdlog/spdlog.h>
 #include <memory>

@@ -1,6 +1,6 @@
 // ServerTypes.cpp 또는 별도 파일에 구현
 
-#include "common/ServerTypes.h"
+#include "ServerTypes.h"
 #include <unordered_map>
 #include <algorithm>
 #include <cctype>

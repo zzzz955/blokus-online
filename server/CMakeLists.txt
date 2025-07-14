@@ -10,34 +10,29 @@ endif()
 # 서버 소스 파일들
 set(SERVER_SOURCES
     main.cpp
-    src/manager/ConfigManager.cpp
-    src/manager/DatabaseManager.cpp
-    src/core/GameServer.cpp
-    src/core/Session.cpp
-    # src/core/EventSystem.cpp
-    src/manager/GameRoom.cpp
-    src/handler/MessageHandler.cpp
-    # src/manager/NetworkManager.cpp
-    src/manager/RoomManager.cpp
-    src/service/AuthenticationService.cpp
-    # src/util/Logger.cpp
-    src/common/ServerTypes.cpp
+    src/ConfigManager.cpp
+    src/DatabaseManager.cpp
+    src/GameServer.cpp
+    src/Session.cpp
+    src/GameRoom.cpp
+    src/MessageHandler.cpp
+    src/RoomManager.cpp
+    src/AuthenticationService.cpp
+    src/ServerTypes.cpp
 )
 
 # 핵심 헤더 파일들
 set(SERVER_HEADERS
-    include/common/ServerTypes.h
-    include/core/GameServer.h
-    include/core/Session.h
-    include/core/EventSystem.h
-    include/handler/MessageHandler.h
-    include/manager/NetworkManager.h
-    include/manager/GameRoom.h
-    include/manager/RoomManager.h
-    include/manager/DatabaseManager.h
-    include/manager/ConfigManager.h
-    include/service/AuthenticationService.h
-    include/util/Logger.h
+    include/ServerTypes.h
+    include/GameServer.h
+    include/Session.h
+    include/MessageHandler.h
+    include/NetworkManager.h
+    include/GameRoom.h
+    include/RoomManager.h
+    include/DatabaseManager.h
+    include/ConfigManager.h
+    include/AuthenticationService.h
 )
 
 # 실행 파일 생성
