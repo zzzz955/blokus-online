@@ -1,5 +1,5 @@
-﻿#include "manager/DatabaseManager.h"
-#include "manager/ConfigManager.h"
+﻿#include "DatabaseManager.h"
+#include "ConfigManager.h"
 #include <pqxx/pqxx>
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/fmt.h>

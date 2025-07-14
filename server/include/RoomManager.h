@@ -1,7 +1,7 @@
 #pragma once
 
-#include "manager/GameRoom.h"
-#include "common/ServerTypes.h"
+#include "GameRoom.h"
+#include "ServerTypes.h"
 #include "common/Types.h"
 #include <unordered_map>
 #include <vector>

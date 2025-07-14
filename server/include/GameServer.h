@@ -10,8 +10,8 @@
 #include <spdlog/spdlog.h>
 
 // 기존 정의된 타입들 사용
-#include "common/ServerTypes.h"
-#include "manager/ConfigManager.h"
+#include "ServerTypes.h"
+#include "ConfigManager.h"
 #include "common/Types.h"
 
 // 전방 선언

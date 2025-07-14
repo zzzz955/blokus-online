@@ -1,9 +1,9 @@
 #pragma once
 
 #include "common/Types.h"
-#include "common/ServerTypes.h"
+#include "ServerTypes.h"
 #include "common/GameLogic.h"
-#include "core/Session.h"
+#include "Session.h"
 #include <vector>
 #include <unordered_map>
 #include <mutex>

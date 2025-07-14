@@ -1,8 +1,8 @@
 ﻿// main.cpp - 블로커스 온라인 서버 테스트
 
-#include "core/GameServer.h"
-#include "manager/ConfigManager.h"
-#include "manager/DatabaseManager.h"
+#include "GameServer.h"
+#include "ConfigManager.h"
+#include "DatabaseManager.h"
 #include <spdlog/spdlog.h>
 #include <iostream>
 #include <csignal>

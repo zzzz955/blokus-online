@@ -8,7 +8,7 @@
 #include <cstdint>
 
 // 기존 정의 사용
-#include "common/ServerTypes.h"
+#include "ServerTypes.h"
 
 // Protobuf 전방 선언 (blokus 네임스페이스)
 namespace google::protobuf {

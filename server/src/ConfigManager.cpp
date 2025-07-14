@@ -1,4 +1,4 @@
-﻿#include "manager/ConfigManager.h"
+﻿#include "ConfigManager.h"
 
 namespace Blokus {
     namespace Server {

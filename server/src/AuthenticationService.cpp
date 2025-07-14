@@ -1,6 +1,6 @@
-﻿#include "service/AuthenticationService.h"
-#include "manager/DatabaseManager.h"
-#include "manager/ConfigManager.h"
+﻿#include "AuthenticationService.h"
+#include "DatabaseManager.h"
+#include "ConfigManager.h"
 #include <spdlog/spdlog.h>
 #include <openssl/sha.h>
 #include <openssl/rand.h>
