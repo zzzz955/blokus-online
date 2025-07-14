@@ -19,6 +19,7 @@ set(SERVER_SOURCES
     src/RoomManager.cpp
     src/AuthenticationService.cpp
     src/ServerTypes.cpp
+    src/PlayerInfo.cpp
 )
 
 # 핵심 헤더 파일들
@@ -33,6 +34,7 @@ set(SERVER_HEADERS
     include/DatabaseManager.h
     include/ConfigManager.h
     include/AuthenticationService.h
+    include/PlayerInfo.h
 )
 
 # 실행 파일 생성

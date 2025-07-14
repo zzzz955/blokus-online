@@ -171,22 +171,29 @@ namespace Blokus::Server {
     }
 
     void GameServer::run() {
+        spdlog::info("🔧 [DEBUG] run() 메서드 시작");
+
         if (!initialize()) {
             spdlog::error("서버 초기화 실패");
             return;
         }
+        spdlog::info("🔧 [DEBUG] 초기화 완료");
 
         start();
+        spdlog::info("🔧 [DEBUG] start() 완료");
 
         spdlog::info("서버가 실행 중입니다. Ctrl+C로 종료하세요");
+        spdlog::info("🔧 [DEBUG] ioContext_.run() 호출 직전");
 
-        // 메인 스레드에서 대기
         try {
             ioContext_.run();
+            spdlog::info("🔧 [DEBUG] ioContext_.run() 완료됨"); // ⚠️ 이게 바로 찍히면 문제
         }
         catch (const std::exception& e) {
             spdlog::error("메인 루프 예외: {}", e.what());
         }
+
+        spdlog::info("🔧 [DEBUG] run() 메서드 종료");
     }
 
     // ========================================
