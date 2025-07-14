@@ -1,9 +1,10 @@
-#pragma once
+ï»¿#pragma once
 
 #include "common/Types.h"
 #include "ServerTypes.h"
 #include "common/GameLogic.h"
 #include "Session.h"
+#include "PlayerInfo.h"  // ğŸ”¥ ìƒˆë¡œ ì¶”ê°€: ë³„ë„ í—¤ë” ì‚¬ìš©
 #include <vector>
 #include <unordered_map>
 #include <mutex>
@@ -17,93 +18,42 @@ namespace Blokus {
         using SessionPtr = std::shared_ptr<Session>;
 
         // ========================================
-        // ÇÃ·¹ÀÌ¾î Á¤º¸ ±¸Á¶Ã¼ (¼­¹ö¿ë)
-        // ========================================
-        struct PlayerInfo {
-            std::string userId;
-            std::string username;
-            SessionPtr session;
-            Common::PlayerColor color;
-            bool isHost;
-            bool isReady;
-            bool isAI;
-            int aiDifficulty;
-            int score;
-            int remainingBlocks;
-            std::chrono::steady_clock::time_point lastActivity;
-
-            PlayerInfo()
-                : userId("")
-                , username("")
-                , session(nullptr)
-                , color(Common::PlayerColor::None)
-                , isHost(false)
-                , isReady(false)
-                , isAI(false)
-                , aiDifficulty(2)
-                , score(0)
-                , remainingBlocks(Common::BLOCKS_PER_PLAYER)
-                , lastActivity(std::chrono::steady_clock::now())
-            {
-            }
-
-            PlayerInfo(const std::string& uid, const std::string& uname, SessionPtr sess)
-                : userId(uid)
-                , username(uname)
-                , session(sess)
-                , color(Common::PlayerColor::None)
-                , isHost(false)
-                , isReady(false)
-                , isAI(false)
-                , aiDifficulty(2)
-                , score(0)
-                , remainingBlocks(Common::BLOCKS_PER_PLAYER)
-                , lastActivity(std::chrono::steady_clock::now())
-            {
-            }
-
-            bool isValid() const {
-                return !userId.empty() && !username.empty() && session != nullptr;
-            }
-
-            void updateActivity() {
-                lastActivity = std::chrono::steady_clock::now();
-            }
-        };
-
-        // ========================================
-        // GameRoom Å¬·¡½º
+        // GameRoom í´ë˜ìŠ¤ (PlayerInfo ì™¸ë¶€í™”ë¡œ ê°„ì†Œí™”)
         // ========================================
         class GameRoom {
         public:
-            // »ı¼ºÀÚ/¼Ò¸êÀÚ
+            // ìƒì„±ì/ì†Œë©¸ì
             explicit GameRoom(int roomId, const std::string& roomName, const std::string& hostId);
             ~GameRoom();
 
-            // ±âº» Á¤º¸ Á¢±ÙÀÚ
+            // ê¸°ë³¸ ì •ë³´ ì ‘ê·¼ì
             int getRoomId() const { return m_roomId; }
             const std::string& getRoomName() const { return m_roomName; }
             const std::string& getHostId() const { return m_hostId; }
             RoomState getState() const { return m_state; }
 
-            // ÇÃ·¹ÀÌ¾î °ü¸®
+            // ========================================
+            // í”Œë ˆì´ì–´ ê´€ë¦¬ (PlayerInfo í´ë˜ìŠ¤ ì‚¬ìš©)
+            // ========================================
             bool addPlayer(SessionPtr session, const std::string& userId, const std::string& username);
             bool removePlayer(const std::string& userId);
             bool hasPlayer(const std::string& userId) const;
+
+            // ğŸ”¥ ë³€ê²½: PlayerInfo í´ë˜ìŠ¤ ë°˜í™˜
             PlayerInfo* getPlayer(const std::string& userId);
             const PlayerInfo* getPlayer(const std::string& userId) const;
 
-            // ÇÃ·¹ÀÌ¾î »óÅÂ °ü¸®
+            // í”Œë ˆì´ì–´ ìƒíƒœ ê´€ë¦¬
             bool setPlayerReady(const std::string& userId, bool ready);
             bool isPlayerReady(const std::string& userId) const;
             bool setPlayerColor(const std::string& userId, Common::PlayerColor color);
 
-            // È£½ºÆ® °ü¸®
+            // í˜¸ìŠ¤íŠ¸ ê´€ë¦¬
             bool isHost(const std::string& userId) const;
             bool transferHost(const std::string& newHostId);
             void autoSelectNewHost();
 
-            // ¹æ »óÅÂ Á¤º¸
+            // ë°© ìƒíƒœ ì •ë³´
             size_t getPlayerCount() const;
             size_t getMaxPlayers() const { return Common::MAX_PLAYERS; }
             bool isFull() const;
@@ -112,39 +62,41 @@ namespace Blokus {
             bool isPlaying() const { return m_state == RoomState::Playing; }
             bool isWaiting() const { return m_state == RoomState::Waiting; }
 
-            // °ÔÀÓ Á¦¾î
+            // ê²Œì„ ì œì–´
             bool startGame();
             bool endGame();
             bool pauseGame();
             bool resumeGame();
             void resetGame();
 
-            // °ÔÀÓ ·ÎÁ÷ Á¢±Ù
+            // ê²Œì„ ë¡œì§ ì ‘ê·¼
             Common::GameLogic* getGameLogic() const { return m_gameLogic.get(); }
 
-            // ¸Ş½ÃÁö Àü¼Û
+            // ë©”ì‹œì§€ ì „ì†¡
             void broadcastMessage(const std::string& message, const std::string& excludeUserId = "");
             void sendToPlayer(const std::string& userId, const std::string& message);
             void sendToHost(const std::string& message);
 
-            // ¹æ Á¤º¸ »ı¼º
+            // ë°© ì •ë³´ ìƒì„±
             Common::RoomInfo getRoomInfo() const;
+
+            // ğŸ”¥ ë³€ê²½: PlayerInfo ë²¡í„° ë°˜í™˜
             std::vector<PlayerInfo> getPlayerList() const;
 
-            // À¯Æ¿¸®Æ¼
+            // ìœ í‹¸ë¦¬í‹°
             void updateActivity();
             std::chrono::steady_clock::time_point getLastActivity() const { return m_lastActivity; }
             bool isInactive(std::chrono::minutes threshold) const;
 
-            // »ö»ó °ü¸®
+            // ìƒ‰ìƒ ê´€ë¦¬
             Common::PlayerColor getAvailableColor() const;
             bool isColorTaken(Common::PlayerColor color) const;
             void assignColorsAutomatically();
 
-            // Á¤¸® ÇÔ¼ö
+            // ì •ë¦¬ í•¨ìˆ˜
             void cleanupDisconnectedPlayers();
 
-            // ³»ºÎ À¯Æ¿¸®Æ¼ ÇÔ¼öµé
+            // ë¸Œë¡œë“œìºìŠ¤íŠ¸ í•¨ìˆ˜ë“¤ (public - ë°ë“œë½ ë°©ì§€)
             void broadcastPlayerJoined(const std::string& username);
             void broadcastPlayerLeft(const std::string& username);
             void broadcastPlayerReady(const std::string& username, bool ready);
@@ -154,44 +106,44 @@ namespace Blokus {
             void broadcastGameState();
 
         private:
-            // ±âº» Á¤º¸
+            // ê¸°ë³¸ ì •ë³´
             int m_roomId;
             std::string m_roomName;
             std::string m_hostId;
             RoomState m_state;
 
-            // ÇÃ·¹ÀÌ¾î °ü¸®
+            // ğŸ”¥ ë³€ê²½: PlayerInfo í´ë˜ìŠ¤ ì‚¬ìš©
             std::vector<PlayerInfo> m_players;
             mutable std::mutex m_playersMutex;
 
-            // °ÔÀÓ ·ÎÁ÷
+            // ê²Œì„ ë¡œì§
             std::unique_ptr<Common::GameLogic> m_gameLogic;
 
-            // ½Ã°£ °ü¸®
+            // ì‹œê°„ ê´€ë¦¬
             std::chrono::steady_clock::time_point m_createdTime;
             std::chrono::steady_clock::time_point m_gameStartTime;
             std::chrono::steady_clock::time_point m_lastActivity;
 
-            // ¹æ ¼³Á¤
+            // ë°© ì„¤ì •
             bool m_isPrivate;
             std::string m_password;
             int m_maxPlayers;
 
-            // »ö»ó ¹èÁ¤
+            // ìƒ‰ìƒ ë°°ì •
             void assignPlayerColor(PlayerInfo& player);
             Common::PlayerColor getNextAvailableColor() const;
 
-            // °ËÁõ ÇÔ¼öµé
+            // ê²€ì¦ í•¨ìˆ˜ë“¤
             bool validatePlayerCount() const;
             bool validateAllPlayersReady() const;
             bool validateGameCanStart() const;
 
-            // Á¤¸® ÇÔ¼öµé
+            // ì •ë¦¬ í•¨ìˆ˜ë“¤
             void resetPlayerStates();
         };
 
         // ========================================
-        // RoomManager¿ÍÀÇ ¿¬µ¿À» À§ÇÑ Å¸ÀÔ Á¤ÀÇ
+        // RoomManagerì™€ì˜ ì—°ë™ì„ ìœ„í•œ íƒ€ì… ì •ì˜
         // ========================================
         using GameRoomPtr = std::shared_ptr<GameRoom>;
 

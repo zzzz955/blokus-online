@@ -652,8 +652,8 @@ namespace Blokus::Server {
                 // 7. 방의 모든 플레이어 세션 상태를 게임 중으로 변경
                 auto playerList = room->getPlayerList();
                 for (const auto& player : playerList) {
-                    if (player.session) {
-                        player.session->setStateToInGame();
+                    if (player.getSession()) {
+                        player.getSession()->setStateToInGame();
                     }
                 }
 
@@ -714,8 +714,8 @@ namespace Blokus::Server {
                 // 6. 방의 모든 플레이어 세션 상태를 방 대기로 변경
                 auto playerList = room->getPlayerList();
                 for (const auto& player : playerList) {
-                    if (player.session) {
-                        player.session->setStateToInRoom(roomId);
+                    if (player.getSession()) {
+                        player.getSession()->setStateToInRoom(roomId);
                     }
                 }
 
@@ -770,7 +770,7 @@ namespace Blokus::Server {
                     // 새 호스트 이름 찾기
                     const PlayerInfo* newHost = room->getPlayer(newHostId);
                     if (newHost) {
-                        room->broadcastHostChanged(newHost->username);
+                        room->broadcastHostChanged(newHost->getUsername());
                     }
                 }
 

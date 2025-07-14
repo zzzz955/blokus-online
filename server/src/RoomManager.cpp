@@ -81,7 +81,7 @@ namespace Blokus {
             // 방에 있는 모든 플레이어의 매핑 제거
             auto playerList = room->getPlayerList();
             for (const auto& player : playerList) {
-                removePlayerMapping(player.userId);
+                removePlayerMapping(player.getUserId());
             }
 
             m_rooms.erase(it);
@@ -193,7 +193,7 @@ namespace Blokus {
                 return false;
             }
 
-            std::string username = player->username;
+            std::string username = player->getUsername();
 
             // 방에서 플레이어 제거
             if (!room->removePlayer(userId)) {

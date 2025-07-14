@@ -34,7 +34,7 @@ namespace Blokus {
         public:
             static void initialize() {
                 // 서버 설정
-                serverPort = getEnvInt("SERVER_PORT", 7777);
+                serverPort = getEnvInt("SERVER_PORT", 9999);
                 maxClients = getEnvInt("SERVER_MAX_CLIENTS", 1000);
                 threadPoolSize = getEnvInt("SERVER_THREAD_POOL_SIZE", 4);
 
