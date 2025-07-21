@@ -956,6 +956,24 @@ namespace Blokus::Server {
 
         std::string username = session_->getUsername();
         spdlog::info("채팅 메시지: [{}] {}", username, message);
+        
+        // 채팅 메시지 브로드캐스팅
+        try {
+            if (session_->isInLobby()) {
+                // 로비 채팅 - 모든 로비 사용자에게 브로드캐스팅
+                broadcastLobbyChatMessage(username, message);
+            } else if (session_->isInRoom()) {
+                // 방 채팅 - 같은 방의 플레이어들에게 브로드캐스팅
+                broadcastRoomChatMessage(username, message);
+            }
+            
+            // 성공 응답
+            sendResponse("CHAT_SUCCESS");
+        }
+        catch (const std::exception& e) {
+            spdlog::error("채팅 메시지 브로드캐스팅 중 오류: {}", e.what());
+            sendError("채팅 메시지 전송에 실패했습니다");
+        }
     }
 
     // ========================================
@@ -1053,6 +1071,64 @@ namespace Blokus::Server {
         }
         catch (const std::exception& e) {
             spdlog::error("로비 사용자 퇴장 브로드캐스트 중 오류: {}", e.what());
+        }
+    }
+    
+    // 채팅 브로드캐스팅 헬퍼 함수들
+    void MessageHandler::broadcastLobbyChatMessage(const std::string& username, const std::string& message) {
+        try {
+            if (!gameServer_) {
+                spdlog::warn("GameServer가 null이므로 로비 채팅 브로드캐스트 불가");
+                return;
+            }
+
+            std::string chatMessage = "CHAT:" + username + ":" + message;
+            spdlog::info("📢 로비 채팅 브로드캐스트: [{}] {}", username, message);
+            
+            // GameServer를 통해 로비의 모든 사용자에게 브로드캐스트
+            auto lobbyUsers = gameServer_->getLobbyUsers();
+            for (const auto& lobbySession : lobbyUsers) {
+                if (lobbySession && lobbySession->isActive()) {
+                    lobbySession->sendMessage(chatMessage);
+                }
+            }
+            
+            spdlog::debug("로비 사용자 {}명에게 채팅 브로드캐스트 완료", lobbyUsers.size());
+        }
+        catch (const std::exception& e) {
+            spdlog::error("로비 채팅 브로드캐스트 중 오류: {}", e.what());
+        }
+    }
+    
+    void MessageHandler::broadcastRoomChatMessage(const std::string& username, const std::string& message) {
+        try {
+            if (!roomManager_) {
+                spdlog::warn("RoomManager가 null이므로 방 채팅 브로드캐스트 불가");
+                return;
+            }
+            
+            int currentRoomId = session_->getCurrentRoomId();
+            auto room = roomManager_->getRoom(currentRoomId);
+            if (!room) {
+                spdlog::warn("방 {}를 찾을 수 없음", currentRoomId);
+                return;
+            }
+
+            std::string chatMessage = "CHAT:" + username + ":" + message;
+            spdlog::info("📢 방 {} 채팅 브로드캐스트: [{}] {}", currentRoomId, username, message);
+            
+            // 방의 모든 플레이어에게 브로드캐스트
+            auto playerList = room->getPlayerList();
+            for (const auto& player : playerList) {
+                if (player.getSession() && player.getSession()->isActive()) {
+                    player.getSession()->sendMessage(chatMessage);
+                }
+            }
+            
+            spdlog::debug("방 {} 플레이어 {}명에게 채팅 브로드캐스트 완료", currentRoomId, playerList.size());
+        }
+        catch (const std::exception& e) {
+            spdlog::error("방 채팅 브로드캐스트 중 오류: {}", e.what());
         }
     }
 

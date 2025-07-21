@@ -105,6 +105,10 @@ namespace Blokus::Server {
         void sendRoomList();
         void broadcastLobbyUserJoined(const std::string& username);
         void broadcastLobbyUserLeft(const std::string& username);
+        
+        // 채팅 브로드캐스팅 헬퍼 함수들
+        void broadcastLobbyChatMessage(const std::string& username, const std::string& message);
+        void broadcastRoomChatMessage(const std::string& username, const std::string& message);
 
         // TODO: 2단계에서 구현 예정 (현재는 사용하지 않음)
         /*

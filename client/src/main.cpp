@@ -128,72 +128,37 @@ private slots:
     void handleCreateRoomRequest(const RoomInfo& roomInfo)
     {
         qDebug() << QString::fromUtf8("방 생성 요청: %1").arg(roomInfo.roomName);
+        
+        // 실제 서버에 방 생성 요청 전송
+        if (m_networkClient && m_networkClient->isConnected()) {
+            m_networkClient->createRoom(roomInfo.roomName, roomInfo.isPrivate, "");
+        }
 
-        // 더미 방 생성 로직
-        QTimer::singleShot(500, this, [this, roomInfo]() {
-            // RoomInfo를 GameRoomInfo로 변환
-            GameRoomInfo gameRoomInfo;
-            gameRoomInfo.roomId = roomInfo.roomId;
-            gameRoomInfo.roomName = roomInfo.roomName;
-            gameRoomInfo.hostUsername = m_currentUsername;
-            gameRoomInfo.hostColor = PlayerColor::Blue;  // 방장은 항상 파란색
-            gameRoomInfo.maxPlayers = 4;  // 클래식 모드만 지원
-            gameRoomInfo.gameMode = QString::fromUtf8("클래식");
-            gameRoomInfo.isPlaying = false;
-
-            // 첫 번째 슬롯(파란색)에 호스트 배치 - std::array 접근 방식
-            gameRoomInfo.playerSlots[0].username = m_currentUsername;
-            gameRoomInfo.playerSlots[0].isHost = true;
-            gameRoomInfo.playerSlots[0].isReady = true;
-
-            qDebug() << QString::fromUtf8("방 생성 성공! 게임 룸으로 이동");
-            createGameRoomWindow(gameRoomInfo, true); // 호스트로 입장
-            });
+        // 서버 응답을 기다리고 onRoomCreated에서 처리
+        // 더이상 더미 데이터 사용하지 않음
     }
 
     void handleJoinRoomRequest(int roomId, const QString& password)
     {
         qDebug() << QString::fromUtf8("방 입장 요청: 방번호 %1").arg(roomId);
+        
+        // 실제 서버에 방 입장 요청 전송
+        if (m_networkClient && m_networkClient->isConnected()) {
+            m_networkClient->joinRoom(roomId, password);
+        }
 
-        // 더미 방 입장 로직
-        QTimer::singleShot(500, this, [this, roomId]() {
-            // 더미 방 정보 생성
-            GameRoomInfo gameRoomInfo;
-            gameRoomInfo.roomId = roomId;
-            gameRoomInfo.roomName = QString::fromUtf8("테스트 방 #%1").arg(roomId);
-            gameRoomInfo.hostUsername = QString::fromUtf8("방장");
-            gameRoomInfo.hostColor = PlayerColor::Blue;
-            gameRoomInfo.maxPlayers = 4;
-            gameRoomInfo.gameMode = QString::fromUtf8("클래식");
-            gameRoomInfo.isPlaying = false;
-
-            // 기존 플레이어들 배치 (더미) - std::array 접근 방식
-            gameRoomInfo.playerSlots[0].username = QString::fromUtf8("방장");
-            gameRoomInfo.playerSlots[0].isHost = true;
-            gameRoomInfo.playerSlots[0].isReady = true;
-
-            // 내가 들어갈 다음 빈 슬롯 찾기
-            PlayerColor myColor = PlayerColor::Yellow; // 기본적으로 노란색
-            for (int i = 1; i < 4; ++i) {
-                if (gameRoomInfo.playerSlots[i].isEmpty()) {
-                    PlayerColor slotColor = static_cast<PlayerColor>(i + 1);
-                    gameRoomInfo.playerSlots[i].username = m_currentUsername;
-                    gameRoomInfo.playerSlots[i].isHost = false;
-                    gameRoomInfo.playerSlots[i].isReady = false;
-                    myColor = slotColor;
-                    break;
-                }
-            }
-
-            qDebug() << QString::fromUtf8("방 입장 성공! 게임 룸으로 이동 (색상: %1)")
-                .arg(Utils::playerColorToString(myColor));
-            createGameRoomWindow(gameRoomInfo, false); // 일반 참가자로 입장
-            });
+        // 서버 응답을 기다리고 onRoomJoined에서 처리
+        // 더이상 더미 데이터 사용하지 않음
     }
 
     void handleLeaveRoomRequest()
     {
         qDebug() << QString::fromUtf8("방 나가기 요청");
+        
+        // 실제 서버에 방 나가기 요청 전송
+        if (m_networkClient && m_networkClient->isConnected()) {
+            m_networkClient->leaveRoom();
+        }
 
         // 게임 룸 창 닫고 로비로 돌아가기
         if (m_gameRoomWindow) {
@@ -273,10 +238,10 @@ private slots:
     void handleGameRoomChatMessage(const QString& message)
     {
         qDebug() << QString::fromUtf8("게임 룸 채팅: %1").arg(message);
-
-        // 더미 채팅 처리 - 내 메시지를 방에 추가
-        if (m_gameRoomWindow) {
-            m_gameRoomWindow->addChatMessage(m_currentUsername, message, false);
+        
+        // 서버에만 전송, 내 채팅은 브로드캐스트로 받음
+        if (m_networkClient && m_networkClient->isConnected()) {
+            m_networkClient->sendChatMessage(message);
         }
     }
 
@@ -347,6 +312,7 @@ private slots:
         qDebug() << QString::fromUtf8("사용자 로비 입장: %1").arg(username);
         if (m_lobbyWindow) {
             m_lobbyWindow->addSystemMessage(QString::fromUtf8("%1님이 로비에 입장했습니다.").arg(username));
+            // 새로운 사용자 목록 요청
             if (m_networkClient && m_networkClient->isConnected()) {
                 m_networkClient->requestLobbyList();
             }
@@ -358,6 +324,7 @@ private slots:
         qDebug() << QString::fromUtf8("사용자 로비 퇴장: %1").arg(username);
         if (m_lobbyWindow) {
             m_lobbyWindow->addSystemMessage(QString::fromUtf8("%1님이 로비를 나갔습니다.").arg(username));
+            // 업데이트된 사용자 목록 요청
             if (m_networkClient && m_networkClient->isConnected()) {
                 m_networkClient->requestLobbyList();
             }
@@ -369,20 +336,151 @@ private slots:
         qDebug() << QString::fromUtf8("방 목록 업데이트: %1개").arg(rooms.size());
         if (m_lobbyWindow) {
             QList<RoomInfo> roomList;
-            for (int i = 0; i < rooms.size(); ++i) {
-                const QString& roomName = rooms[i];
-                RoomInfo room;
-                room.roomId = i + 1;
-                room.roomName = roomName;
-                room.hostName = QString::fromUtf8("호스트");
-                room.currentPlayers = 1;
-                room.maxPlayers = 4;
-                room.gameMode = QString::fromUtf8("클래식");
-                room.isPlaying = false;
-                room.isPrivate = false;
-                roomList.append(room);
+            
+            // 서버에서 ROOM_LIST:count:room1Data:room2Data... 형식으로 전송됨
+            for (const QString& roomData : rooms) {
+                if (roomData.isEmpty()) continue;
+                
+                // roomData 파싱: "roomId,roomName,hostName,currentPlayers,maxPlayers,isPrivate,isPlaying,gameMode"
+                QStringList parts = roomData.split(',');
+                if (parts.size() >= 8) {
+                    RoomInfo room;
+                    room.roomId = parts[0].toInt();  // 서버의 실제 roomId 사용
+                    room.roomName = parts[1];  // 서버의 실제 방 이름
+                    room.hostName = parts[2];  // 서버의 실제 호스트 이름
+                    room.currentPlayers = parts[3].toInt();
+                    room.maxPlayers = parts[4].toInt();
+                    room.isPrivate = (parts[5] == "1");
+                    room.isPlaying = (parts[6] == "1");
+                    room.gameMode = parts[7];
+                    
+                    roomList.append(room);
+                }
             }
+            
             m_lobbyWindow->updateRoomList(roomList);
+        }
+    }
+    
+    // 방 관련 시그널 핸들러들
+    void onRoomCreated(int roomId, const QString& roomName)
+    {
+        qDebug() << QString::fromUtf8("방 생성 성공: %1 (ID: %2)").arg(roomName).arg(roomId);
+        
+        // 실제 방 생성 성공 시 GameRoomWindow 생성
+        GameRoomInfo gameRoomInfo;
+        gameRoomInfo.roomId = roomId;
+        gameRoomInfo.roomName = roomName;
+        gameRoomInfo.hostUsername = m_currentUsername;
+        gameRoomInfo.hostColor = PlayerColor::Blue;
+        gameRoomInfo.maxPlayers = 4;
+        gameRoomInfo.gameMode = QString::fromUtf8("클래식");
+        gameRoomInfo.isPlaying = false;
+        
+        // 호스트로 설정
+        gameRoomInfo.playerSlots[0].username = m_currentUsername;
+        gameRoomInfo.playerSlots[0].isHost = true;
+        gameRoomInfo.playerSlots[0].isReady = true;
+        
+        createGameRoomWindow(gameRoomInfo, true);
+        
+        // 로비에서 방 목록 업데이트
+        if (m_networkClient && m_networkClient->isConnected()) {
+            m_networkClient->requestRoomList();
+        }
+    }
+    
+    void onRoomJoined(int roomId, const QString& roomName)
+    {
+        qDebug() << QString::fromUtf8("방 입장 성공: %1 (ID: %2)").arg(roomName).arg(roomId);
+        
+        // 실제 방 입장 성공 시 GameRoomWindow 생성
+        GameRoomInfo gameRoomInfo;
+        gameRoomInfo.roomId = roomId;
+        gameRoomInfo.roomName = roomName;
+        gameRoomInfo.hostUsername = QString::fromUtf8("호스트"); // 서버에서 실제 정보 받아야 함
+        gameRoomInfo.hostColor = PlayerColor::Blue;
+        gameRoomInfo.maxPlayers = 4;
+        gameRoomInfo.gameMode = QString::fromUtf8("클래식");
+        gameRoomInfo.isPlaying = false;
+        
+        // 기본 설정 (서버에서 실제 플레이어 정보를 받아야 함)
+        createGameRoomWindow(gameRoomInfo, false);
+    }
+    
+    void onRoomLeft()
+    {
+        qDebug() << QString::fromUtf8("방 나가기 성공");
+        
+        // 게임 룸 창 닫고 로비로 돌아가기
+        if (m_gameRoomWindow) {
+            m_gameRoomWindow->hide();
+            m_gameRoomWindow->deleteLater();
+            m_gameRoomWindow = nullptr;
+        }
+
+        // 로비 창 다시 표시
+        if (m_lobbyWindow) {
+            m_lobbyWindow->show();
+            m_lobbyWindow->raise();
+            m_lobbyWindow->activateWindow();
+        }
+        
+        // 로비에서 방 목록 업데이트
+        if (m_networkClient && m_networkClient->isConnected()) {
+            m_networkClient->requestRoomList();
+        }
+        
+        m_currentRoomInfo = GameRoomInfo();
+    }
+    
+    void onRoomError(const QString& error)
+    {
+        qDebug() << QString::fromUtf8("방 오류: %1").arg(error);
+        if (m_lobbyWindow) {
+            m_lobbyWindow->addSystemMessage(QString::fromUtf8("오류: %1").arg(error));
+        }
+    }
+    
+    // 채팅 관련 시그널 핸들러들
+    void onChatMessageReceived(const QString& username, const QString& message)
+    {
+        qDebug() << QString::fromUtf8("채팅 메시지 수신: [%1] %2").arg(username).arg(message);
+        
+        // 로비 채팅이면 로비에 표시
+        if (m_lobbyWindow && m_lobbyWindow->isVisible()) {
+            ChatMessage chatMsg;
+            chatMsg.username = username;
+            chatMsg.message = message;
+            chatMsg.timestamp = QDateTime::currentDateTime();
+            chatMsg.type = ChatMessage::Normal;
+            m_lobbyWindow->addChatMessage(chatMsg);
+        }
+        
+        // 게임룸 채팅이면 게임룸에 표시
+        if (m_gameRoomWindow && m_gameRoomWindow->isVisible()) {
+            m_gameRoomWindow->addChatMessage(username, message, false);
+        }
+    }
+    
+    // 로비 채팅 핸들러 추가
+    void handleLobbyChatMessage(const QString& message)
+    {
+        qDebug() << QString::fromUtf8("로비 채팅: %1").arg(message);
+        
+        // 서버에만 전송, 내 채팅은 브로드캐스트로 받음
+        if (m_networkClient && m_networkClient->isConnected()) {
+            m_networkClient->sendChatMessage(message);
+        }
+    }
+    
+    // 방 목록 새로고침 핸들러 추가
+    void handleRefreshRoomListRequest()
+    {
+        qDebug() << QString::fromUtf8("방 목록 새로고침 요청");
+        
+        if (m_networkClient && m_networkClient->isConnected()) {
+            m_networkClient->requestRoomList();
         }
     }
 
@@ -419,6 +517,20 @@ private:
                 this, &AppController::onLobbyUserLeft);
         connect(m_networkClient, &NetworkClient::roomListReceived, 
                 this, &AppController::onRoomListReceived);
+        
+        // 방 관련 시그널 추가
+        connect(m_networkClient, &NetworkClient::roomCreated,
+                this, &AppController::onRoomCreated);
+        connect(m_networkClient, &NetworkClient::roomJoined,
+                this, &AppController::onRoomJoined);
+        connect(m_networkClient, &NetworkClient::roomLeft,
+                this, &AppController::onRoomLeft);
+        connect(m_networkClient, &NetworkClient::roomError,
+                this, &AppController::onRoomError);
+        
+        // 채팅 관련 시그널
+        connect(m_networkClient, &NetworkClient::chatMessageReceived,
+                this, &AppController::onChatMessageReceived);
         
         qDebug() << QString::fromUtf8("네트워크 클라이언트 설정 완료");
     }
@@ -460,6 +572,10 @@ private:
                 this, &AppController::handleCreateRoomRequest);
             connect(m_lobbyWindow, &Blokus::LobbyWindow::joinRoomRequested,
                 this, &AppController::handleJoinRoomRequest);
+            connect(m_lobbyWindow, &Blokus::LobbyWindow::sendChatMessageRequested,
+                this, &AppController::handleLobbyChatMessage);
+            connect(m_lobbyWindow, &Blokus::LobbyWindow::refreshRoomListRequested,
+                this, &AppController::handleRefreshRoomListRequest);
 
             m_lobbyWindow->show();
             m_lobbyWindow->raise();
@@ -509,6 +625,10 @@ private:
                 this, &AppController::handleKickPlayerRequest);
             connect(m_gameRoomWindow, &Blokus::GameRoomWindow::chatMessageSent,
                 this, &AppController::handleGameRoomChatMessage);
+            
+            // 게임룸 채팅을 NetworkClient와 연결
+            connect(m_networkClient, &NetworkClient::chatMessageReceived,
+                this, &AppController::onChatMessageReceived);
 
             m_gameRoomWindow->show();
             m_gameRoomWindow->raise();

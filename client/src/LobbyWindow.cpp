@@ -800,26 +800,8 @@ namespace Blokus {
 
         addSystemMessage(QString::fromUtf8("방 목록을 새로고침합니다..."));
         emit refreshRoomListRequested();
-
-        // 더미 데이터로 즉시 갱신 (서버 연동 전까지)
-        QTimer::singleShot(500, this, [this]() {
-            // 임시 더미 방 데이터 생성
-            m_roomList_data.clear();
-            for (int i = 1; i <= 3; ++i) {
-                RoomInfo room;
-                room.roomId = i;
-                room.roomName = QString::fromUtf8("방 %1").arg(i);
-                room.hostName = QString::fromUtf8("호스트%1").arg(i);
-                room.currentPlayers = 1 + (i % 3);
-                room.maxPlayers = 4;
-                room.isPrivate = (i % 2 == 0);
-                room.isPlaying = false;
-                room.gameMode = QString::fromUtf8("클래식");
-                m_roomList_data.append(room);
-            }
-            updateRoomListDisplay();
-            addSystemMessage(QString::fromUtf8("방 목록이 업데이트되었습니다."));
-            });
+        
+        // 더미 데이터 제거 - 서버에서 실제 데이터로 바뀌음
     }
 
     void LobbyWindow::onRoomDoubleClicked()
@@ -832,13 +814,7 @@ namespace Blokus {
         QString message = m_chatInput->text().trimmed();
         if (message.isEmpty()) return;
 
-        ChatMessage chatMsg;
-        chatMsg.username = m_myUsername;
-        chatMsg.message = message;
-        chatMsg.timestamp = QDateTime::currentDateTime();
-        chatMsg.type = ChatMessage::Normal;
-
-        addChatMessage(chatMsg);
+        // 서버에만 전송, 로컬에 추가하지 않음 (브로드캐스트로 받음)
         emit sendChatMessageRequested(message);
 
         m_chatInput->clear();

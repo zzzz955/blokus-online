@@ -216,6 +216,66 @@ namespace Blokus {
         sendMessage("room:list");
         qDebug() << QString::fromUtf8("방 목록 요청 전송");
     }
+    
+    void NetworkClient::createRoom(const QString& roomName, bool isPrivate, const QString& password)
+    {
+        if (!isConnected()) {
+            qWarning() << QString::fromUtf8("방 생성 실패: 서버에 연결되지 않음");
+            return;
+        }
+        
+        QString message = QString("room:create:%1:%2")
+            .arg(roomName)
+            .arg(isPrivate ? "1" : "0");
+            
+        if (isPrivate && !password.isEmpty()) {
+            message += ":" + password;
+        }
+        
+        sendMessage(message);
+        qDebug() << QString::fromUtf8("방 생성 요청 전송: %1").arg(roomName);
+    }
+    
+    void NetworkClient::joinRoom(int roomId, const QString& password)
+    {
+        if (!isConnected()) {
+            qWarning() << QString::fromUtf8("방 참여 실패: 서버에 연결되지 않음");
+            return;
+        }
+        
+        QString message = QString("room:join:%1").arg(roomId);
+        if (!password.isEmpty()) {
+            message += ":" + password;
+        }
+        
+        sendMessage(message);
+        qDebug() << QString::fromUtf8("방 참여 요청 전송: %1").arg(roomId);
+    }
+    
+    void NetworkClient::leaveRoom()
+    {
+        if (!isConnected()) {
+            qWarning() << QString::fromUtf8("방 나가기 실패: 서버에 연결되지 않음");
+            return;
+        }
+        
+        sendMessage("room:leave");
+        qDebug() << QString::fromUtf8("방 나가기 요청 전송");
+    }
+    
+    void NetworkClient::sendChatMessage(const QString& message)
+    {
+        if (!isConnected()) {
+            qWarning() << QString::fromUtf8("채팅 메시지 전송 실패: 서버에 연결되지 않음");
+            return;
+        }
+        
+        QString chatMessage = QString("chat:%1").arg(message);
+        sendMessage(chatMessage);
+        qDebug() << QString::fromUtf8("채팅 메시지 전송: %1").arg(message);
+        
+        emit chatMessageSent();
+    }
 
     void NetworkClient::setState(ConnectionState state)
     {
@@ -344,7 +404,7 @@ namespace Blokus {
                  message.startsWith("LOGOUT_SUCCESS")) {
             processAuthResponse(message);
         }
-        else if (message.startsWith("LOBBY_") || message.startsWith("ROOM_LIST:")) {
+        else if (message.startsWith("LOBBY_") || message.startsWith("ROOM_") || message.startsWith("CHAT:")) {
             processLobbyResponse(message);
         }
         else if (message == "pong") {
@@ -391,14 +451,17 @@ namespace Blokus {
         else if (parts[0] == "LOBBY_USER_LIST" && parts.size() >= 2) {
             int userCount = parts[1].toInt();
             QStringList users;
-            if (parts.size() > 2) {
-                QStringList userEntries = parts[2].split(',');
-                for (const QString& userEntry : userEntries) {
-                    if (!userEntry.isEmpty()) {
-                        users.append(userEntry);
+            
+            // 서버 형식: LOBBY_USER_LIST:count:user1,status1:user2,status2...
+            for (int i = 2; i < parts.size(); ++i) {
+                if (!parts[i].isEmpty()) {
+                    QStringList userInfo = parts[i].split(',');
+                    if (!userInfo.isEmpty()) {
+                        users.append(userInfo[0]); // 사용자명만 추출
                     }
                 }
             }
+            
             emit lobbyUserListReceived(users);
         }
         else if (parts[0] == "LOBBY_USER_JOINED" && parts.size() >= 2) {
@@ -417,6 +480,24 @@ namespace Blokus {
             }
             emit roomListReceived(rooms);
         }
+        else if (parts[0] == "ROOM_CREATED" && parts.size() >= 3) {
+            int roomId = parts[1].toInt();
+            QString roomName = parts[2];
+            emit roomCreated(roomId, roomName);
+        }
+        else if (parts[0] == "ROOM_JOIN_SUCCESS" && parts.size() >= 3) {
+            int roomId = parts[1].toInt();
+            QString roomName = parts[2];
+            emit roomJoined(roomId, roomName);
+        }
+        else if (parts[0] == "ROOM_LEFT") {
+            emit roomLeft();
+        }
+        else if (parts[0] == "CHAT" && parts.size() >= 3) {
+            QString username = parts[1];
+            QString message = parts.mid(2).join(":"); // 메시지에 콜론이 포함될 수 있음
+            emit chatMessageReceived(username, message);
+        }
     }
 
     void NetworkClient::processErrorMessage(const QString& error)
@@ -431,6 +512,9 @@ namespace Blokus {
         else if (error.contains(QString::fromUtf8("회원가입")) || error.contains(QString::fromUtf8("이미 사용 중")) ||
                  error.contains(QString::fromUtf8("사용자명 형식")) || error.contains(QString::fromUtf8("비밀번호는"))) {
             emit registerResult(false, error);
+        }
+        else if (error.contains(QString::fromUtf8("방")) || error.contains(QString::fromUtf8("room"))) {
+            emit roomError(error);
         }
     }
 

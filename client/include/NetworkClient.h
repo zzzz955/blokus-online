@@ -43,6 +43,14 @@ namespace Blokus {
         void leaveLobby();
         void requestLobbyList();
         void requestRoomList();
+        
+        // 방 관련
+        void createRoom(const QString& roomName, bool isPrivate = false, const QString& password = "");
+        void joinRoom(int roomId, const QString& password = "");
+        void leaveRoom();
+        
+        // 채팅 관련
+        void sendChatMessage(const QString& message);
 
     signals:
         // 연결 상태 시그널
@@ -67,6 +75,16 @@ namespace Blokus {
         void lobbyUserJoined(const QString& username);
         void lobbyUserLeft(const QString& username);
         void roomListReceived(const QStringList& rooms);
+        
+        // 방 시그널
+        void roomCreated(int roomId, const QString& roomName);
+        void roomJoined(int roomId, const QString& roomName);
+        void roomLeft();
+        void roomError(const QString& error);
+        
+        // 채팅 시그널
+        void chatMessageReceived(const QString& username, const QString& message);
+        void chatMessageSent();
 
     private slots:
         void onConnected();
