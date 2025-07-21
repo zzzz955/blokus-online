@@ -11,7 +11,7 @@ namespace Blokus {
         , m_reconnectTimer(new QTimer(this))
         , m_state(ConnectionState::Disconnected)
         , m_serverHost("localhost")
-        , m_serverPort(8080)
+        , m_serverPort(9999)
         , m_currentSessionToken("")
         , m_reconnectInterval(5000) // 5초
         , m_maxReconnectAttempts(3)
@@ -88,12 +88,15 @@ namespace Blokus {
         m_serverPort = port;
         
         qDebug() << QString::fromUtf8("서버 연결 시도: %1:%2").arg(host).arg(port);
+        qDebug() << QString::fromUtf8("소켓 상태: %1").arg(m_socket->state());
         
         setState(ConnectionState::Connecting);
         
-        // 연결 시도
-        m_socket->connectToHost(QHostAddress(host), port);
+        // 연결 시도 - QHostAddress 대신 문자열로 직접 연결
+        m_socket->connectToHost(host, port);
         m_connectionTimer->start();
+        
+        qDebug() << QString::fromUtf8("연결 시도 완료, 소켓 상태: %1").arg(m_socket->state());
     }
 
     void NetworkClient::disconnect()
@@ -231,15 +234,17 @@ namespace Blokus {
     void NetworkClient::onSocketError(QAbstractSocket::SocketError error)
     {
         QString errorString;
+        QString detailError = m_socket->errorString();
+        
         switch (error) {
             case QAbstractSocket::ConnectionRefusedError:
-                errorString = QString::fromUtf8("연결이 거부되었습니다.");
+                errorString = QString::fromUtf8("연결이 거부되었습니다 (서버가 실행되지 않았거나 포트가 차단됨)");
                 break;
             case QAbstractSocket::RemoteHostClosedError:
                 errorString = QString::fromUtf8("서버가 연결을 종료했습니다.");
                 break;
             case QAbstractSocket::HostNotFoundError:
-                errorString = QString::fromUtf8("서버를 찾을 수 없습니다.");
+                errorString = QString::fromUtf8("서버를 찾을 수 없습니다 (호스트명 해석 실패)");
                 break;
             case QAbstractSocket::NetworkError:
                 errorString = QString::fromUtf8("네트워크 오류가 발생했습니다.");
@@ -248,11 +253,13 @@ namespace Blokus {
                 errorString = QString::fromUtf8("연결 시간이 초과되었습니다.");
                 break;
             default:
-                errorString = QString::fromUtf8("알 수 없는 네트워크 오류: %1").arg(m_socket->errorString());
+                errorString = QString::fromUtf8("알 수 없는 네트워크 오류");
                 break;
         }
         
-        qWarning() << QString::fromUtf8("소켓 오류: %1").arg(errorString);
+        qWarning() << QString::fromUtf8("소켓 오류 [%1]: %2").arg(error).arg(errorString);
+        qWarning() << QString::fromUtf8("상세 오류: %1").arg(detailError);
+        qWarning() << QString::fromUtf8("연결 대상: %1:%2").arg(m_serverHost).arg(m_serverPort);
         
         m_connectionTimer->stop();
         setState(ConnectionState::Disconnected);

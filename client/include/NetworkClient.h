@@ -25,7 +25,7 @@ namespace Blokus {
         ~NetworkClient();
 
         // 연결 관리
-        void connectToServer(const QString& host = "localhost", quint16 port = 8080);
+        void connectToServer(const QString& host = "localhost", quint16 port = 9999);
         void disconnect();
         bool isConnected() const;
         ConnectionState getState() const { return m_state; }
