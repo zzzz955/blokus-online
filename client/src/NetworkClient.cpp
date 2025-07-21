@@ -452,16 +452,20 @@ namespace Blokus {
             int userCount = parts[1].toInt();
             QStringList users;
             
+            qDebug() << QString::fromUtf8("로비 사용자 목록 수신: 총 %1명, 파트 개수: %2").arg(userCount).arg(parts.size());
+            
             // 서버 형식: LOBBY_USER_LIST:count:user1,status1:user2,status2...
             for (int i = 2; i < parts.size(); ++i) {
                 if (!parts[i].isEmpty()) {
                     QStringList userInfo = parts[i].split(',');
                     if (!userInfo.isEmpty()) {
                         users.append(userInfo[0]); // 사용자명만 추출
+                        qDebug() << QString::fromUtf8("사용자 추가: %1").arg(userInfo[0]);
                     }
                 }
             }
             
+            qDebug() << QString::fromUtf8("최종 사용자 목록: %1").arg(users.join(", "));
             emit lobbyUserListReceived(users);
         }
         else if (parts[0] == "LOBBY_USER_JOINED" && parts.size() >= 2) {
@@ -497,6 +501,38 @@ namespace Blokus {
             QString username = parts[1];
             QString message = parts.mid(2).join(":"); // 메시지에 콜론이 포함될 수 있음
             emit chatMessageReceived(username, message);
+        }
+        else if (parts[0] == "ROOM_INFO" && parts.size() >= 8) {
+            // ROOM_INFO:방ID:방이름:호스트:현재인원:최대인원:비공개:게임중:게임모드:플레이어데이터...
+            emit roomInfoReceived(parts);
+        }
+        else if (parts[0] == "PLAYER_JOINED" && parts.size() >= 2) {
+            QString username = parts[1];
+            emit playerJoined(username);
+        }
+        else if (parts[0] == "PLAYER_LEFT" && parts.size() >= 2) {
+            QString username = parts[1];
+            emit playerLeft(username);
+        }
+        else if (parts[0] == "PLAYER_READY" && parts.size() >= 3) {
+            QString username = parts[1];
+            bool ready = (parts[2] == "1");
+            emit playerReady(username, ready);
+        }
+        else if (parts[0] == "HOST_CHANGED" && parts.size() >= 2) {
+            QString newHost = parts[1];
+            emit hostChanged(newHost);
+        }
+        else if (parts[0] == "GAME_STARTED") {
+            emit gameStarted();
+        }
+        else if (parts[0] == "GAME_ENDED") {
+            emit gameEnded();
+        }
+        else if (parts[0] == "SYSTEM" && parts.size() >= 2) {
+            QString systemMessage = parts.mid(1).join(":");
+            // 시스템 메시지를 채팅으로 처리
+            emit chatMessageReceived(QString::fromUtf8("시스템"), systemMessage);
         }
     }
 

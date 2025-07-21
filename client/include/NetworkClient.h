@@ -81,6 +81,15 @@ namespace Blokus {
         void roomJoined(int roomId, const QString& roomName);
         void roomLeft();
         void roomError(const QString& error);
+        void roomInfoReceived(const QStringList& roomInfo);
+        
+        // 게임룸 상호작용 시그널
+        void playerJoined(const QString& username);
+        void playerLeft(const QString& username);
+        void playerReady(const QString& username, bool ready);
+        void hostChanged(const QString& newHost);
+        void gameStarted();
+        void gameEnded();
         
         // 채팅 시그널
         void chatMessageReceived(const QString& username, const QString& message);

@@ -358,6 +358,9 @@ namespace Blokus::Server {
                     std::ostringstream response;
                     response << "ROOM_CREATED:" << roomId << ":" << roomName;
                     sendResponse(response.str());
+                    
+                    // 9. 방 정보 전체 동기화 전솥
+                    sendRoomInfo(room);
 
                     spdlog::info("✅ 방 생성 성공: '{}' by '{}' (ID: {})", roomName, username, roomId);
                 }
@@ -453,6 +456,9 @@ namespace Blokus::Server {
                 response << "ROOM_JOIN_SUCCESS:" << roomId << ":" << room->getRoomName()
                     << ":" << room->getPlayerCount() << "/" << room->getMaxPlayers();
                 sendResponse(response.str());
+                
+                // 11. 방 정보 전체 동기화 전솥
+                sendRoomInfo(room);
 
                 spdlog::info("✅ 방 참여 성공: '{}' -> 방 {} ({}명)",
                     username, roomId, room->getPlayerCount());
@@ -1129,6 +1135,35 @@ namespace Blokus::Server {
         }
         catch (const std::exception& e) {
             spdlog::error("방 채팅 브로드캐스트 중 오류: {}", e.what());
+        }
+    }
+    
+    void MessageHandler::sendRoomInfo(const std::shared_ptr<GameRoom>& room) {
+        try {
+            if (!room) {
+                spdlog::warn("방이 null이므로 방 정보 전송 불가");
+                return;
+            }
+            
+            // ROOM_INFO:방ID:방이름:호스트:현재인원:최대인원:비공개:게임중:게임모드:플레이어데이터...
+            std::ostringstream response;
+            response << "ROOM_INFO:" << room->getRoomId() << ":" << room->getRoomName()
+                     << ":" << room->getHostName() << ":" << room->getPlayerCount()
+                     << ":" << room->getMaxPlayers() << ":" << (room->isPrivate() ? "1" : "0")
+                     << ":" << (room->isPlaying() ? "1" : "0") << ":클래식";
+            
+            // 플레이어 데이터 추가
+            auto playerList = room->getPlayerList();
+            for (const auto& player : playerList) {
+                response << ":" << player.getUserId() << "," << player.getUsername()
+                         << "," << (player.isHost() ? "1" : "0") << "," << (player.isReady() ? "1" : "0");
+            }
+            
+            sendResponse(response.str());
+            spdlog::debug("방 정보 전송: 방 {} ({})", room->getRoomId(), room->getRoomName());
+        }
+        catch (const std::exception& e) {
+            spdlog::error("방 정보 전송 중 오류: {}", e.what());
         }
     }
 

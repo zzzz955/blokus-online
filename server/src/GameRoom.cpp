@@ -446,15 +446,21 @@ namespace Blokus {
         // ========================================
 
         void GameRoom::broadcastPlayerJoined(const std::string& username) {
+            // 구조화된 메시지와 시스템 메시지 모두 전송
+            broadcastMessage("PLAYER_JOINED:" + username);
+            
             std::ostringstream oss;
             oss << username << "님이 입장하셨습니다. 현재 인원 : " << getPlayerCount() << "명";
-            broadcastMessage(oss.str());
+            broadcastMessage("SYSTEM:" + oss.str());
         }
 
         void GameRoom::broadcastPlayerLeft(const std::string& username) {
+            // 구조화된 메시지와 시스템 메시지 모두 전송
+            broadcastMessage("PLAYER_LEFT:" + username);
+            
             std::ostringstream oss;
             oss << username << "님이 퇴장하셨습니다. 현재 인원 : " << getPlayerCount() << "명";
-            broadcastMessage(oss.str());
+            broadcastMessage("SYSTEM:" + oss.str());
         }
 
         void GameRoom::broadcastPlayerReady(const std::string& username, bool ready) {
@@ -464,14 +470,21 @@ namespace Blokus {
         }
 
         void GameRoom::broadcastHostChanged(const std::string& newHostName) {
+            // 구조화된 메시지와 시스템 메시지 모두 전송
+            broadcastMessage("HOST_CHANGED:" + newHostName);
+            
             std::ostringstream oss;
             oss << newHostName << "님이 방장이 되셨습니다";
-            broadcastMessage(oss.str());
+            broadcastMessage("SYSTEM:" + oss.str());
         }
 
         void GameRoom::broadcastGameStart() {
+            // 구조화된 메시지 전송
+            broadcastMessage("GAME_STARTED");
+            
             std::ostringstream oss;
             oss << "게임이 시작되었습니다. 현재 인원 : " << getPlayerCount() << "명";
+            broadcastMessage("SYSTEM:" + oss.str());
 
             // 플레이어 정보도 함께 전송
             for (const auto& player : m_players) {
@@ -482,7 +495,9 @@ namespace Blokus {
         }
 
         void GameRoom::broadcastGameEnd() {
+            // 구조화된 메시지와 시스템 메시지 모두 전송
             broadcastMessage("GAME_ENDED");
+            broadcastMessage("SYSTEM:게임이 종료되었습니다.");
         }
 
         void GameRoom::broadcastGameState() {

@@ -109,6 +109,9 @@ namespace Blokus::Server {
         // 채팅 브로드캐스팅 헬퍼 함수들
         void broadcastLobbyChatMessage(const std::string& username, const std::string& message);
         void broadcastRoomChatMessage(const std::string& username, const std::string& message);
+        
+        // 방 정보 동기화 헬퍼 함수
+        void sendRoomInfo(const std::shared_ptr<GameRoom>& room);
 
         // TODO: 2단계에서 구현 예정 (현재는 사용하지 않음)
         /*

@@ -447,8 +447,8 @@ private slots:
     {
         qDebug() << QString::fromUtf8("채팅 메시지 수신: [%1] %2").arg(username).arg(message);
         
-        // 로비 채팅이면 로비에 표시
-        if (m_lobbyWindow && m_lobbyWindow->isVisible()) {
+        // 로비 채팅이면 로비에만 표시 (게임룸과 중복 방지)
+        if (m_lobbyWindow && m_lobbyWindow->isVisible() && (!m_gameRoomWindow || !m_gameRoomWindow->isVisible())) {
             ChatMessage chatMsg;
             chatMsg.username = username;
             chatMsg.message = message;
@@ -457,8 +457,8 @@ private slots:
             m_lobbyWindow->addChatMessage(chatMsg);
         }
         
-        // 게임룸 채팅이면 게임룸에 표시
-        if (m_gameRoomWindow && m_gameRoomWindow->isVisible()) {
+        // 게임룸 채팅이면 게임룸에만 표시 (로비와 중복 방지)
+        else if (m_gameRoomWindow && m_gameRoomWindow->isVisible()) {
             m_gameRoomWindow->addChatMessage(username, message, false);
         }
     }
@@ -481,6 +481,114 @@ private slots:
         
         if (m_networkClient && m_networkClient->isConnected()) {
             m_networkClient->requestRoomList();
+        }
+    }
+    
+    // 방 정보 동기화 핸들러
+    void onRoomInfoReceived(const QStringList& roomInfo)
+    {
+        if (roomInfo.size() < 8) return;
+        
+        int roomId = roomInfo[1].toInt();
+        QString roomName = roomInfo[2];
+        QString hostName = roomInfo[3];
+        int currentPlayers = roomInfo[4].toInt();
+        int maxPlayers = roomInfo[5].toInt();
+        bool isPrivate = (roomInfo[6] == "1");
+        bool isPlaying = (roomInfo[7] == "1");
+        QString gameMode = roomInfo[8];
+        
+        // GameRoomInfo 생성
+        GameRoomInfo gameRoomInfo;
+        gameRoomInfo.roomId = roomId;
+        gameRoomInfo.roomName = roomName;
+        gameRoomInfo.hostUsername = hostName;
+        gameRoomInfo.hostColor = PlayerColor::Blue;
+        gameRoomInfo.maxPlayers = maxPlayers;
+        gameRoomInfo.gameMode = gameMode;
+        gameRoomInfo.isPlaying = isPlaying;
+        
+        // 플레이어 정보 파싱 (9번 인덱스부터)
+        for (int i = 9; i < roomInfo.size(); ++i) {
+            QStringList playerData = roomInfo[i].split(',');
+            if (playerData.size() >= 4) {
+                QString userId = playerData[0];
+                QString username = playerData[1];
+                bool isHost = (playerData[2] == "1");
+                bool isReady = (playerData[3] == "1");
+                
+                // 빈 슬롯 찾아서 플레이어 배치
+                for (int slot = 0; slot < 4; ++slot) {
+                    if (gameRoomInfo.playerSlots[slot].isEmpty()) {
+                        gameRoomInfo.playerSlots[slot].username = username;
+                        gameRoomInfo.playerSlots[slot].isHost = isHost;
+                        gameRoomInfo.playerSlots[slot].isReady = isReady;
+                        gameRoomInfo.playerSlots[slot].color = static_cast<PlayerColor>(slot + 1);
+                        break;
+                    }
+                }
+            }
+        }
+        
+        qDebug() << QString::fromUtf8("방 정보 수신: %1 (ID: %2, 플레이어: %3명)")
+            .arg(roomName).arg(roomId).arg(currentPlayers);
+        
+        // 게임룸 창이 있으면 업데이트
+        if (m_gameRoomWindow) {
+            m_gameRoomWindow->updateRoomInfo(gameRoomInfo);
+        }
+    }
+    
+    // 게임룸 상호작용 핸들러들
+    void onPlayerJoined(const QString& username)
+    {
+        qDebug() << QString::fromUtf8("플레이어 방 입장: %1").arg(username);
+        if (m_gameRoomWindow) {
+            m_gameRoomWindow->addSystemMessage(QString::fromUtf8("%1님이 방에 입장했습니다.").arg(username));
+        }
+    }
+    
+    void onPlayerLeft(const QString& username)
+    {
+        qDebug() << QString::fromUtf8("플레이어 방 퇴장: %1").arg(username);
+        if (m_gameRoomWindow) {
+            m_gameRoomWindow->addSystemMessage(QString::fromUtf8("%1님이 방을 나갔습니다.").arg(username));
+        }
+    }
+    
+    void onPlayerReady(const QString& username, bool ready)
+    {
+        QString status = ready ? QString::fromUtf8("준비 완료") : QString::fromUtf8("대기 중");
+        qDebug() << QString::fromUtf8("플레이어 준비 상태 변경: %1 -> %2").arg(username).arg(status);
+        
+        if (m_gameRoomWindow) {
+            m_gameRoomWindow->addSystemMessage(QString::fromUtf8("%1님이 %2했습니다.").arg(username).arg(status));
+        }
+    }
+    
+    void onHostChanged(const QString& newHost)
+    {
+        qDebug() << QString::fromUtf8("방장 변경: %1").arg(newHost);
+        if (m_gameRoomWindow) {
+            m_gameRoomWindow->addSystemMessage(QString::fromUtf8("%1님이 새로운 방장이 되었습니다.").arg(newHost));
+        }
+    }
+    
+    void onGameStarted()
+    {
+        qDebug() << QString::fromUtf8("게임 시작!");
+        if (m_gameRoomWindow) {
+            m_gameRoomWindow->startGame();
+            m_gameRoomWindow->addSystemMessage(QString::fromUtf8("게임이 시작되었습니다!"));
+        }
+    }
+    
+    void onGameEnded()
+    {
+        qDebug() << QString::fromUtf8("게임 종료!");
+        if (m_gameRoomWindow) {
+            // TODO: 게임 종료 처리 구현
+            m_gameRoomWindow->addSystemMessage(QString::fromUtf8("게임이 종료되었습니다."));
         }
     }
 
@@ -531,6 +639,24 @@ private:
         // 채팅 관련 시그널
         connect(m_networkClient, &NetworkClient::chatMessageReceived,
                 this, &AppController::onChatMessageReceived);
+        
+        // 방 정보 동기화 시그널
+        connect(m_networkClient, &NetworkClient::roomInfoReceived,
+                this, &AppController::onRoomInfoReceived);
+        
+        // 게임룸 상호작용 시그널
+        connect(m_networkClient, &NetworkClient::playerJoined,
+                this, &AppController::onPlayerJoined);
+        connect(m_networkClient, &NetworkClient::playerLeft,
+                this, &AppController::onPlayerLeft);
+        connect(m_networkClient, &NetworkClient::playerReady,
+                this, &AppController::onPlayerReady);
+        connect(m_networkClient, &NetworkClient::hostChanged,
+                this, &AppController::onHostChanged);
+        connect(m_networkClient, &NetworkClient::gameStarted,
+                this, &AppController::onGameStarted);
+        connect(m_networkClient, &NetworkClient::gameEnded,
+                this, &AppController::onGameEnded);
         
         qDebug() << QString::fromUtf8("네트워크 클라이언트 설정 완료");
     }
