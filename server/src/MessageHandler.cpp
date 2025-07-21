@@ -2,6 +2,7 @@
 #include "Session.h"
 #include "RoomManager.h"
 #include "AuthenticationService.h"
+#include "GameServer.h"
 #include <spdlog/spdlog.h>
 #include <sstream>
 #include <algorithm>
@@ -12,10 +13,11 @@ namespace Blokus::Server {
     // 생성자 및 소멸자
     // ========================================
 
-    MessageHandler::MessageHandler(Session* session, RoomManager* roomManager, AuthenticationService* authService)
+    MessageHandler::MessageHandler(Session* session, RoomManager* roomManager, AuthenticationService* authService, GameServer* gameServer)
         : session_(session)
         , roomManager_(roomManager)
         , authService_(authService)
+        , gameServer_(gameServer)
     {
         // 🔥 enum 기반 핸들러 등록
         handlers_[MessageType::Ping] = [this](const auto& params) { handlePing(params); };
@@ -35,6 +37,11 @@ namespace Blokus::Server {
         handlers_[MessageType::RoomReady] = [this](const auto& params) { handlePlayerReady(params); };
         handlers_[MessageType::RoomStart] = [this](const auto& params) { handleStartGame(params); };
         handlers_[MessageType::RoomTransferHost] = [this](const auto& params) { handleTransferHost(params); };
+
+        // 로비 관련
+        handlers_[MessageType::LobbyEnter] = [this](const auto& params) { handleLobbyEnter(params); };
+        handlers_[MessageType::LobbyLeave] = [this](const auto& params) { handleLobbyLeave(params); };
+        handlers_[MessageType::LobbyList] = [this](const auto& params) { handleLobbyList(params); };
 
         // 게임 관련
         handlers_[MessageType::GameMove] = [this](const auto& params) { handleGameMove(params); };
@@ -853,6 +860,75 @@ namespace Blokus::Server {
     }
 
     // ========================================
+    // 로비 관련 핸들러들
+    // ========================================
+
+    void MessageHandler::handleLobbyEnter(const std::vector<std::string>& params) {
+        // 1. 상태 검증 - 로그인된 상태여야 함
+        if (!session_->isInLobby()) {
+            if (session_->isConnected()) {
+                sendError("로그인 후 로비에 입장할 수 있습니다");
+            } else if (session_->isInRoom()) {
+                sendError("이미 방에 참여 중입니다. 먼저 방을 나가주세요");
+            } else {
+                sendError("현재 상태에서는 로비에 입장할 수 없습니다");
+            }
+            return;
+        }
+
+        try {
+            std::string username = session_->getUsername();
+            spdlog::info("🏢 로비 입장: '{}'", username);
+
+            // 2. 로비 사용자 목록 전송
+            sendLobbyUserList();
+            
+            // 3. 방 목록 전송  
+            sendRoomList();
+
+            // 4. 로비 입장 성공 응답
+            sendResponse("LOBBY_ENTER_SUCCESS");
+            
+            // 5. 다른 사용자들에게 새 사용자 입장 브로드캐스트
+            broadcastLobbyUserJoined(username);
+
+            spdlog::debug("✅ 로비 입장 완료: '{}'", username);
+        }
+        catch (const std::exception& e) {
+            sendError("로비 입장 중 오류가 발생했습니다");
+            spdlog::error("로비 입장 처리 중 예외: {}", e.what());
+        }
+    }
+
+    void MessageHandler::handleLobbyLeave(const std::vector<std::string>& params) {
+        try {
+            std::string username = session_->getUsername();
+            spdlog::info("🏢 로비 퇴장: '{}'", username);
+
+            // 다른 사용자들에게 사용자 퇴장 브로드캐스트
+            broadcastLobbyUserLeft(username);
+
+            sendResponse("LOBBY_LEAVE_SUCCESS");
+            spdlog::debug("✅ 로비 퇴장 완료: '{}'", username);
+        }
+        catch (const std::exception& e) {
+            sendError("로비 퇴장 중 오류가 발생했습니다");
+            spdlog::error("로비 퇴장 처리 중 예외: {}", e.what());
+        }
+    }
+
+    void MessageHandler::handleLobbyList(const std::vector<std::string>& params) {
+        try {
+            // 현재 로비에 있는 사용자 목록 전송
+            sendLobbyUserList();
+        }
+        catch (const std::exception& e) {
+            sendError("로비 목록 조회 중 오류가 발생했습니다");
+            spdlog::error("로비 목록 처리 중 예외: {}", e.what());
+        }
+    }
+
+    // ========================================
     // 기본 핸들러들
     // ========================================
 
@@ -890,6 +966,94 @@ namespace Blokus::Server {
         // TODO: protobuf 메시지 구현
         spdlog::warn("Protobuf 메시지는 아직 구현되지 않았습니다");
         sendError("Protobuf not implemented yet");
+    }
+
+    // ========================================
+    // 로비 브로드캐스팅 헬퍼 함수들
+    // ========================================
+
+    void MessageHandler::sendLobbyUserList() {
+        try {
+            if (!gameServer_) {
+                spdlog::warn("GameServer가 null이므로 로비 사용자 목록 조회 불가");
+                return;
+            }
+
+            // GameServer에서 실제 로비 사용자 목록을 가져옴
+            auto lobbyUsers = gameServer_->getLobbyUsers();
+            
+            std::ostringstream response;
+            response << "LOBBY_USER_LIST:" << lobbyUsers.size();
+            
+            for (const auto& lobbySession : lobbyUsers) {
+                if (lobbySession && lobbySession->isActive() && !lobbySession->getUsername().empty()) {
+                    response << ":" << lobbySession->getUsername() << "," << "LOBBY";
+                }
+            }
+            
+            sendResponse(response.str());
+            spdlog::debug("📋 로비 사용자 목록 전송: {}명", lobbyUsers.size());
+        }
+        catch (const std::exception& e) {
+            spdlog::error("로비 사용자 목록 전송 중 오류: {}", e.what());
+        }
+    }
+
+    void MessageHandler::sendRoomList() {
+        if (roomManager_) {
+            // RoomManager의 기존 기능 사용
+            handleRoomList({});
+        }
+    }
+
+    void MessageHandler::broadcastLobbyUserJoined(const std::string& username) {
+        try {
+            if (!gameServer_) {
+                spdlog::warn("GameServer가 null이므로 로비 브로드캐스트 불가");
+                return;
+            }
+
+            std::string message = "LOBBY_USER_JOINED:" + username;
+            spdlog::info("📢 로비 사용자 입장 브로드캐스트: {}", username);
+            
+            // GameServer를 통해 로비의 모든 사용자에게 브로드캐스트
+            auto lobbyUsers = gameServer_->getLobbyUsers();
+            for (const auto& lobbySession : lobbyUsers) {
+                if (lobbySession && lobbySession->isActive()) {
+                    lobbySession->sendMessage(message);
+                }
+            }
+            
+            spdlog::debug("로비 사용자 {}명에게 입장 브로드캐스트 완료", lobbyUsers.size());
+        }
+        catch (const std::exception& e) {
+            spdlog::error("로비 사용자 입장 브로드캐스트 중 오류: {}", e.what());
+        }
+    }
+
+    void MessageHandler::broadcastLobbyUserLeft(const std::string& username) {
+        try {
+            if (!gameServer_) {
+                spdlog::warn("GameServer가 null이므로 로비 브로드캐스트 불가");
+                return;
+            }
+
+            std::string message = "LOBBY_USER_LEFT:" + username;
+            spdlog::info("📢 로비 사용자 퇴장 브로드캐스트: {}", username);
+            
+            // GameServer를 통해 로비의 모든 사용자에게 브로드캐스트
+            auto lobbyUsers = gameServer_->getLobbyUsers();
+            for (const auto& lobbySession : lobbyUsers) {
+                if (lobbySession && lobbySession->isActive()) {
+                    lobbySession->sendMessage(message);
+                }
+            }
+            
+            spdlog::debug("로비 사용자 {}명에게 퇴장 브로드캐스트 완료", lobbyUsers.size());
+        }
+        catch (const std::exception& e) {
+            spdlog::error("로비 사용자 퇴장 브로드캐스트 중 오류: {}", e.what());
+        }
     }
 
     // TODO: Protobuf 관련 구현 (향후)

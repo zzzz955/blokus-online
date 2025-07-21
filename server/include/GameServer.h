@@ -78,6 +78,9 @@ namespace Blokus::Server {
         // 안전한 세션 작업 - 람다로 작업 전달
         bool withSession(const std::string& sessionId,
             std::function<void(std::shared_ptr<Session>)> action);
+        
+        // 로비 사용자 목록 조회 - 로비 브로드캐스팅용
+        std::vector<std::shared_ptr<Session>> getLobbyUsers() const;
 
         // 접근자
         boost::asio::io_context& getIOContext() { return ioContext_; }
@@ -150,7 +153,7 @@ namespace Blokus::Server {
 
         // 세션 관리
         std::unordered_map<std::string, std::shared_ptr<Session>> sessions_;
-        std::mutex sessionsMutex_;
+        mutable std::mutex sessionsMutex_;
 
         // 서버 통계 (ServerTypes.h의 ServerStats 사용)
         ServerStats stats_;

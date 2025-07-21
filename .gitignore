@@ -39,6 +39,7 @@ Icon?
 *.sln.docstates
 *.userprefs
 .vscode/
+.claude/
 
 # Qt Creator
 *.pro.user

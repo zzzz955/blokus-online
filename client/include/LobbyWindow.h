@@ -121,17 +121,14 @@ namespace Blokus {
         void updateUserStatsDisplay(); // 사용자 통계 표시
 
         // 유틸리티 함수들
-        void addSystemMessage(const QString& message);
         void scrollChatToBottom();
         QString formatChatMessage(const ChatMessage& message);
         QString formatUserStatus(const UserInfo& user);
         QString formatRoomStatus(const RoomInfo& room);
 
-        // 더미 데이터 생성 (서버 연동 전까지)
-        void loadDummyData();
-        QList<UserInfo> generateDummyUsers();
-        QList<RoomInfo> generateDummyRooms();
-        QList<UserInfo> generateDummyRanking();
+    public:
+        void addSystemMessage(const QString& message);
+
 
         // 버튼 쿨다운 관리
         QTimer* m_buttonCooldownTimer;

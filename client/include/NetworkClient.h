@@ -38,6 +38,12 @@ namespace Blokus {
         void registerUser(const QString& username, const QString& password);
         void logout();
 
+        // 로비 관련
+        void enterLobby();
+        void leaveLobby();
+        void requestLobbyList();
+        void requestRoomList();
+
     signals:
         // 연결 상태 시그널
         void connected();
@@ -54,6 +60,14 @@ namespace Blokus {
         void messageReceived(const QString& message);
         void errorReceived(const QString& error);
 
+        // 로비 시그널
+        void lobbyEntered();
+        void lobbyLeft();
+        void lobbyUserListReceived(const QStringList& users);
+        void lobbyUserJoined(const QString& username);
+        void lobbyUserLeft(const QString& username);
+        void roomListReceived(const QStringList& rooms);
+
     private slots:
         void onConnected();
         void onDisconnected();
@@ -65,6 +79,7 @@ namespace Blokus {
         void setState(ConnectionState state);
         void processMessage(const QString& message);
         void processAuthResponse(const QString& response);
+        void processLobbyResponse(const QString& response);
         void processErrorMessage(const QString& error);
         void setupSocket();
         void cleanupSocket();

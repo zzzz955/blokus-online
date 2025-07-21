@@ -1,4 +1,4 @@
-// ServerTypes.cpp ¶Ç´Â º°µµ ÆÄÀÏ¿¡ ±¸Çö
+// ServerTypes.cpp ï¿½Ç´ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ï¿ï¿½ ï¿½ï¿½ï¿½ï¿½
 
 #include "ServerTypes.h"
 #include <unordered_map>
@@ -8,7 +8,7 @@
 namespace Blokus {
     namespace Server {
 
-        // ¹®ÀÚ¿­ Á¤¸® À¯Æ¿¸®Æ¼
+        // ï¿½ï¿½ï¿½Ú¿ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Æ¿ï¿½ï¿½Æ¼
         std::string trimString(const std::string& str) {
             auto start = str.find_first_not_of(" \t\r\n");
             if (start == std::string::npos) return "";
@@ -17,27 +17,32 @@ namespace Blokus {
             return str.substr(start, end - start + 1);
         }
 
-        // MessageType ÆÄ¼­
+        // MessageType ï¿½Ä¼ï¿½
         MessageType parseMessageType(const std::string& messageStr) {
-            // ¸Þ½ÃÁö Á¤¸®
+            // ï¿½Þ½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             std::string clean = trimString(messageStr);
 
-            // ¼Ò¹®ÀÚ·Î º¯È¯ (´ë¼Ò¹®ÀÚ ¹«°ü)
+            // ï¿½Ò¹ï¿½ï¿½Ú·ï¿½ ï¿½ï¿½È¯ (ï¿½ï¿½Ò¹ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
             std::transform(clean.begin(), clean.end(), clean.begin(), ::tolower);
 
-            // ¸ÅÇÎ Å×ÀÌºí
+            // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ìºï¿½
             static const std::unordered_map<std::string, MessageType> typeMap = {
-                // ±âº»
+                // ï¿½âº»
                 {"ping", MessageType::Ping},
 
-                // ÀÎÁõ
+                // ï¿½ï¿½ï¿½ï¿½
                 {"auth", MessageType::Auth},
                 {"register", MessageType::Register},
                 {"guest", MessageType::Guest},
                 {"logout", MessageType::Logout},
                 {"validate", MessageType::Validate},
 
-                // ¹æ °ü·Ã
+                // ï¿½Îºï¿½
+                {"lobby:enter", MessageType::LobbyEnter},
+                {"lobby:leave", MessageType::LobbyLeave},
+                {"lobby:list", MessageType::LobbyList},
+
+                // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
                 {"room:create", MessageType::RoomCreate},
                 {"room:join", MessageType::RoomJoin},
                 {"room:leave", MessageType::RoomLeave},
@@ -47,11 +52,11 @@ namespace Blokus {
                 {"room:end", MessageType::RoomEnd},
                 {"room:transfer", MessageType::RoomTransferHost},
 
-                // °ÔÀÓ
+                // ï¿½ï¿½ï¿½ï¿½
                 {"game:move", MessageType::GameMove},
                 {"game:end", MessageType::GameEnd},
 
-                // Ã¤ÆÃ
+                // Ã¤ï¿½ï¿½
                 {"chat", MessageType::Chat}
             };
 
@@ -59,7 +64,7 @@ namespace Blokus {
             return (it != typeMap.end()) ? it->second : MessageType::Unknown;
         }
 
-        // MessageTypeÀ» ¹®ÀÚ¿­·Î º¯È¯
+        // MessageTypeï¿½ï¿½ ï¿½ï¿½ï¿½Ú¿ï¿½ï¿½ï¿½ ï¿½ï¿½È¯
         std::string messageTypeToString(MessageType type) {
             switch (type) {
             case MessageType::Ping: return "ping";
@@ -68,6 +73,9 @@ namespace Blokus {
             case MessageType::Guest: return "guest";
             case MessageType::Logout: return "logout";
             case MessageType::Validate: return "validate";
+            case MessageType::LobbyEnter: return "lobby:enter";
+            case MessageType::LobbyLeave: return "lobby:leave";
+            case MessageType::LobbyList: return "lobby:list";
             case MessageType::RoomCreate: return "room:create";
             case MessageType::RoomJoin: return "room:join";
             case MessageType::RoomLeave: return "room:leave";

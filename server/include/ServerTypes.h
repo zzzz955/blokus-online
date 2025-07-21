@@ -10,21 +10,21 @@ namespace Blokus {
     namespace Server {
 
         // ========================================
-        // Àü¹æ ¼±¾ð
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         // ========================================
         class ClientSession;
         class GameRoom;
         class UserInfo;
 
         // ========================================
-        // Å¸ÀÔ º°Äª Á¤ÀÇ
+        // Å¸ï¿½ï¿½ ï¿½ï¿½Äª ï¿½ï¿½ï¿½ï¿½
         // ========================================
         using ClientSessionPtr = std::shared_ptr<ClientSession>;
         using GameRoomPtr = std::shared_ptr<GameRoom>;
         using UserInfoPtr = std::shared_ptr<UserInfo>;
 
         // ========================================
-        // ¼­¹ö »ó¼ö
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
         // ========================================
         constexpr uint16_t DEFAULT_SERVER_PORT = 7777;
         constexpr int MAX_CONCURRENT_USERS = 1000;
@@ -32,29 +32,29 @@ namespace Blokus {
         constexpr int MAX_ROOM_COUNT = 100;
         constexpr int MAX_PLAYERS_PER_ROOM = 4;
 
-        // ³×Æ®¿öÅ© °ü·Ã »ó¼ö
+        // ï¿½ï¿½Æ®ï¿½ï¿½Å© ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
         constexpr int SOCKET_BUFFER_SIZE = 65536;  // 64KB
         constexpr int MAX_MESSAGE_SIZE = 1024 * 1024;  // 1MB
         constexpr std::chrono::seconds CLIENT_TIMEOUT{ 30 };
         constexpr std::chrono::seconds HEARTBEAT_INTERVAL{ 10 };
 
-        // °ÔÀÓ °ü·Ã »ó¼ö
-        constexpr std::chrono::seconds TURN_TIMEOUT{ 120 };  // 2ºÐ
-        constexpr std::chrono::seconds ROOM_IDLE_TIMEOUT{ 600 };  // 10ºÐ
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
+        constexpr std::chrono::seconds TURN_TIMEOUT{ 120 };  // 2ï¿½ï¿½
+        constexpr std::chrono::seconds ROOM_IDLE_TIMEOUT{ 600 };  // 10ï¿½ï¿½
 
         // ========================================
-        // ¿­°ÅÇü Á¤ÀÇ
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         // ========================================
 
-        // Å¬¶óÀÌ¾ðÆ® ¿¬°á »óÅÂ
+        // Å¬ï¿½ï¿½ï¿½Ì¾ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         enum class ConnectionState {
-            Connected,       // ¿¬°áµÊ
-            InLobby,        // ·Îºñ¿¡ ÀÖÀ½
-            InRoom,         // ¹æ¿¡ ÀÖÀ½
-            InGame,         // °ÔÀÓ Áß
+            Connected,       // ï¿½ï¿½ï¿½ï¿½ï¿½
+            InLobby,        // ï¿½Îºï¿½ ï¿½ï¿½ï¿½ï¿½
+            InRoom,         // ï¿½æ¿¡ ï¿½ï¿½ï¿½ï¿½
+            InGame,         // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½
         };
 
-        // ¼¼¼Ç »óÅÂ
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         enum class SessionState {
             Active,
             Idle,
@@ -62,31 +62,34 @@ namespace Blokus {
             Invalid
         };
 
-        // ¹æ »óÅÂ
+        // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         enum class RoomState {
-            Waiting,    // ´ë±â Áß
-            Playing,    // °ÔÀÓ Áß
-            Disbanded   // ¹æ ÇØÃ¼
+            Waiting,    // ï¿½ï¿½ï¿½ ï¿½ï¿½
+            Playing,    // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½
+            Disbanded   // ï¿½ï¿½ ï¿½ï¿½Ã¼
         };
 
-        // ¸Þ½ÃÁö Å¸ÀÔ (È®ÀåµÈ ¹öÀü)
+        // ï¿½Þ½ï¿½ï¿½ï¿½ Å¸ï¿½ï¿½ (È®ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
         enum class MessageType {
             Unknown = 0,
 
-            // ±âº» ±â´É (1-99)
+            // ï¿½âº» ï¿½ï¿½ï¿½ (1-99)
             Ping = 1,
 
-            // ÀÎÁõ °ü·Ã (100-199)
+            // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (100-199)
             Auth = 100,
             Register = 101,
             Guest = 102,
             Logout = 103,
             Validate = 104,
 
-            // ·Îºñ °ü·Ã (200-299)
+            // ï¿½Îºï¿½ ï¿½ï¿½ï¿½ï¿½ (200-299)
             Lobby = 200,
+            LobbyEnter = 201,
+            LobbyLeave = 202,
+            LobbyList = 203,
 
-            // ¹æ °ü·Ã (300-399)
+            // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (300-399)
             Room = 300,
             RoomCreate = 301,
             RoomJoin = 302,
@@ -97,23 +100,23 @@ namespace Blokus {
             RoomEnd = 307,
             RoomTransferHost = 308,
 
-            // °ÔÀÓ °ü·Ã (400-499)
+            // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (400-499)
             Game = 400,
             GameMove = 401,
             GameEnd = 402,
 
-            // Ã¤ÆÃ °ü·Ã (500-599)
+            // Ã¤ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (500-599)
             Chat = 500,
 
-            // ¿¡·¯ °ü·Ã (900-999)
+            // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (900-999)
             Error = 900
         };
 
-        // MessageType ¹®ÀÚ¿­ º¯È¯ ÇÔ¼ö
+        // MessageType ï¿½ï¿½ï¿½Ú¿ï¿½ ï¿½ï¿½È¯ ï¿½Ô¼ï¿½
         MessageType parseMessageType(const std::string& messageStr);
         std::string messageTypeToString(MessageType type);
 
-        // ¸Þ½ÃÁö Ã³¸® °á°ú
+        // ï¿½Þ½ï¿½ï¿½ï¿½ Ã³ï¿½ï¿½ ï¿½ï¿½ï¿½
         enum class MessageResult {
             Success,
             Failed,
@@ -122,7 +125,7 @@ namespace Blokus {
             InternalError
         };
 
-        // ¼­¹ö ¿À·ù ÄÚµå
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Úµï¿½
         enum class ServerErrorCode {
             None = 0,
             ConnectionFailed = 1000,
@@ -145,27 +148,27 @@ namespace Blokus {
         };
 
         // ========================================
-        // ±¸Á¶Ã¼ Á¤ÀÇ (¼³Á¤ °ü·Ã Á¦°ÅµÊ)
+        // ï¿½ï¿½ï¿½ï¿½Ã¼ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Åµï¿½)
         // ========================================
 
-        // ¼­¹ö Åë°è Á¤º¸ (·±Å¸ÀÓ »óÅÂ)
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½Å¸ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
         struct ServerStats {
-            // ¿¬°á Åë°è
+            // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
             int currentConnections = 0;
             int totalConnectionsToday = 0;
             int peakConcurrentConnections = 0;
 
-            // ¹æ Åë°è
+            // ï¿½ï¿½ ï¿½ï¿½ï¿½
             int activeRooms = 0;
             int gamesInProgress = 0;
             int totalGamesToday = 0;
 
-            // ¼º´É Åë°è
+            // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
             double cpuUsage = 0.0;
             double memoryUsage = 0.0;
             double networkLatency = 0.0;
 
-            // ¸Þ½ÃÁö Åë°è
+            // ï¿½Þ½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
             uint64_t messagesReceived = 0;
             uint64_t messagesSent = 0;
             uint64_t bytesReceived = 0;
@@ -175,7 +178,7 @@ namespace Blokus {
             std::chrono::system_clock::time_point lastStatsUpdate;
         };
 
-        // Å¬¶óÀÌ¾ðÆ® ¼¼¼Ç Á¤º¸
+        // Å¬ï¿½ï¿½ï¿½Ì¾ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         struct ClientSession {
             std::string sessionId;
             std::string username;
@@ -189,20 +192,20 @@ namespace Blokus {
             std::string clientVersion;
             std::string ipAddress;
 
-            // Åë°è
+            // ï¿½ï¿½ï¿½
             uint64_t messagesSent = 0;
             uint64_t messagesReceived = 0;
             double averageLatency = 0.0;
         };
 
         // ========================================
-        // ÇÔ¼ö Å¸ÀÔ Á¤ÀÇ
+        // ï¿½Ô¼ï¿½ Å¸ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         // ========================================
         using MessageHandlerFunc = std::function<MessageResult(ClientSessionPtr, const std::string&)>;
         using ErrorCallback = std::function<void(const std::string&, const std::exception&)>;
 
         // ========================================
-        // À¯Æ¿¸®Æ¼ ÇÔ¼öµé
+        // ï¿½ï¿½Æ¿ï¿½ï¿½Æ¼ ï¿½Ô¼ï¿½ï¿½ï¿½
         // ========================================
         //std::string errorCodeToString(ServerErrorCode code);
         //std::string connectionStateToString(ConnectionState state);

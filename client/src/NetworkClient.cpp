@@ -173,6 +173,50 @@ namespace Blokus {
         qDebug() << QString::fromUtf8("로그아웃 요청 전송");
     }
 
+    void NetworkClient::enterLobby()
+    {
+        if (!isConnected()) {
+            qWarning() << QString::fromUtf8("로비 입장 실패: 서버에 연결되지 않음");
+            return;
+        }
+        
+        sendMessage("lobby:enter");
+        qDebug() << QString::fromUtf8("로비 입장 요청 전송");
+    }
+
+    void NetworkClient::leaveLobby()
+    {
+        if (!isConnected()) {
+            qWarning() << QString::fromUtf8("로비 퇴장 실패: 서버에 연결되지 않음");
+            return;
+        }
+        
+        sendMessage("lobby:leave");
+        qDebug() << QString::fromUtf8("로비 퇴장 요청 전송");
+    }
+
+    void NetworkClient::requestLobbyList()
+    {
+        if (!isConnected()) {
+            qWarning() << QString::fromUtf8("로비 목록 요청 실패: 서버에 연결되지 않음");
+            return;
+        }
+        
+        sendMessage("lobby:list");
+        qDebug() << QString::fromUtf8("로비 목록 요청 전송");
+    }
+
+    void NetworkClient::requestRoomList()
+    {
+        if (!isConnected()) {
+            qWarning() << QString::fromUtf8("방 목록 요청 실패: 서버에 연결되지 않음");
+            return;
+        }
+        
+        sendMessage("room:list");
+        qDebug() << QString::fromUtf8("방 목록 요청 전송");
+    }
+
     void NetworkClient::setState(ConnectionState state)
     {
         if (m_state != state) {
@@ -300,6 +344,9 @@ namespace Blokus {
                  message.startsWith("LOGOUT_SUCCESS")) {
             processAuthResponse(message);
         }
+        else if (message.startsWith("LOBBY_") || message.startsWith("ROOM_LIST:")) {
+            processLobbyResponse(message);
+        }
         else if (message == "pong") {
             // Ping-pong은 특별히 처리하지 않음
         }
@@ -328,6 +375,47 @@ namespace Blokus {
             setState(ConnectionState::Connected);
             m_currentSessionToken.clear();
             emit logoutResult(true);
+        }
+    }
+
+    void NetworkClient::processLobbyResponse(const QString& response)
+    {
+        QStringList parts = response.split(':');
+        
+        if (parts[0] == "LOBBY_ENTER_SUCCESS") {
+            emit lobbyEntered();
+        }
+        else if (parts[0] == "LOBBY_LEAVE_SUCCESS") {
+            emit lobbyLeft();
+        }
+        else if (parts[0] == "LOBBY_USER_LIST" && parts.size() >= 2) {
+            int userCount = parts[1].toInt();
+            QStringList users;
+            if (parts.size() > 2) {
+                QStringList userEntries = parts[2].split(',');
+                for (const QString& userEntry : userEntries) {
+                    if (!userEntry.isEmpty()) {
+                        users.append(userEntry);
+                    }
+                }
+            }
+            emit lobbyUserListReceived(users);
+        }
+        else if (parts[0] == "LOBBY_USER_JOINED" && parts.size() >= 2) {
+            QString username = parts[1];
+            emit lobbyUserJoined(username);
+        }
+        else if (parts[0] == "LOBBY_USER_LEFT" && parts.size() >= 2) {
+            QString username = parts[1];
+            emit lobbyUserLeft(username);
+        }
+        else if (parts[0] == "ROOM_LIST" && parts.size() >= 2) {
+            int roomCount = parts[1].toInt();
+            QStringList rooms;
+            for (int i = 2; i < parts.size(); ++i) {
+                rooms.append(parts[i]);
+            }
+            emit roomListReceived(rooms);
         }
     }
 

@@ -85,11 +85,22 @@ private slots:
         }
 
         createLobbyWindow();
+        
+        // 로비 입장 요청
+        if (m_networkClient && m_networkClient->isConnected()) {
+            m_networkClient->enterLobby();
+        }
     }
 
     void handleLogoutRequest()
     {
         qDebug() << QString::fromUtf8("로그아웃 요청");
+        
+        // 로비 나가기 요청
+        if (m_networkClient && m_networkClient->isConnected()) {
+            m_networkClient->leaveLobby();
+            m_networkClient->logout();
+        }
 
         // 모든 창 정리하고 로그인 창으로 돌아가기
         if (m_lobbyWindow) {
@@ -302,6 +313,78 @@ private slots:
             m_loginWindow->setRegisterResult(success, message);
         }
     }
+    
+    void onLobbyEntered()
+    {
+        qDebug() << QString::fromUtf8("로비 입장 성공");
+        if (m_networkClient && m_networkClient->isConnected()) {
+            m_networkClient->requestLobbyList();
+            m_networkClient->requestRoomList();
+        }
+    }
+    
+    void onLobbyUserListReceived(const QStringList& users)
+    {
+        qDebug() << QString::fromUtf8("로비 사용자 목록 업데이트: %1명").arg(users.size());
+        if (m_lobbyWindow) {
+            QList<UserInfo> userList;
+            for (const QString& username : users) {
+                UserInfo user;
+                user.username = username;
+                user.status = QString::fromUtf8("온라인");
+                user.level = 1;
+                user.totalGames = 0;
+                user.wins = 0;
+                user.losses = 0;
+                userList.append(user);
+            }
+            m_lobbyWindow->updateUserList(userList);
+        }
+    }
+    
+    void onLobbyUserJoined(const QString& username)
+    {
+        qDebug() << QString::fromUtf8("사용자 로비 입장: %1").arg(username);
+        if (m_lobbyWindow) {
+            m_lobbyWindow->addSystemMessage(QString::fromUtf8("%1님이 로비에 입장했습니다.").arg(username));
+            if (m_networkClient && m_networkClient->isConnected()) {
+                m_networkClient->requestLobbyList();
+            }
+        }
+    }
+    
+    void onLobbyUserLeft(const QString& username)
+    {
+        qDebug() << QString::fromUtf8("사용자 로비 퇴장: %1").arg(username);
+        if (m_lobbyWindow) {
+            m_lobbyWindow->addSystemMessage(QString::fromUtf8("%1님이 로비를 나갔습니다.").arg(username));
+            if (m_networkClient && m_networkClient->isConnected()) {
+                m_networkClient->requestLobbyList();
+            }
+        }
+    }
+    
+    void onRoomListReceived(const QStringList& rooms)
+    {
+        qDebug() << QString::fromUtf8("방 목록 업데이트: %1개").arg(rooms.size());
+        if (m_lobbyWindow) {
+            QList<RoomInfo> roomList;
+            for (int i = 0; i < rooms.size(); ++i) {
+                const QString& roomName = rooms[i];
+                RoomInfo room;
+                room.roomId = i + 1;
+                room.roomName = roomName;
+                room.hostName = QString::fromUtf8("호스트");
+                room.currentPlayers = 1;
+                room.maxPlayers = 4;
+                room.gameMode = QString::fromUtf8("클래식");
+                room.isPlaying = false;
+                room.isPrivate = false;
+                roomList.append(room);
+            }
+            m_lobbyWindow->updateRoomList(roomList);
+        }
+    }
 
 private:
     void initializeApplication()
@@ -324,6 +407,18 @@ private:
                 this, &AppController::onLoginResult);
         connect(m_networkClient, &NetworkClient::registerResult, 
                 this, &AppController::onRegisterResult);
+        
+        // 로비 관련 시그널
+        connect(m_networkClient, &NetworkClient::lobbyEntered, 
+                this, &AppController::onLobbyEntered);
+        connect(m_networkClient, &NetworkClient::lobbyUserListReceived, 
+                this, &AppController::onLobbyUserListReceived);
+        connect(m_networkClient, &NetworkClient::lobbyUserJoined, 
+                this, &AppController::onLobbyUserJoined);
+        connect(m_networkClient, &NetworkClient::lobbyUserLeft, 
+                this, &AppController::onLobbyUserLeft);
+        connect(m_networkClient, &NetworkClient::roomListReceived, 
+                this, &AppController::onRoomListReceived);
         
         qDebug() << QString::fromUtf8("네트워크 클라이언트 설정 완료");
     }

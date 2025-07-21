@@ -26,6 +26,7 @@ namespace Blokus::Server {
     class Session;
     class AuthenticationService;
     class RoomManager;
+    class GameServer;
 
     // 🔥 채팅 브로드캐스트용 콜백만 유지
     using ChatCallback = std::function<void(const std::string& sessionId, const std::string& message)>;
@@ -38,7 +39,7 @@ namespace Blokus::Server {
     // 단순화된 메시지 핸들러 클래스 (직접 처리 방식)
     class MessageHandler {
     public:
-        explicit MessageHandler(Session* session, RoomManager* roomManager = nullptr, AuthenticationService* authService = nullptr);
+        explicit MessageHandler(Session* session, RoomManager* roomManager = nullptr, AuthenticationService* authService = nullptr, GameServer* gameServer = nullptr);
         ~MessageHandler();
 
         // 메시지 처리 (현재: 텍스트 우선)
@@ -87,12 +88,23 @@ namespace Blokus::Server {
         void handleEndGame(const std::vector<std::string>& params);
         void handleTransferHost(const std::vector<std::string>& params);
 
+        // 로비 관련 핸들러들
+        void handleLobbyEnter(const std::vector<std::string>& params);
+        void handleLobbyLeave(const std::vector<std::string>& params);
+        void handleLobbyList(const std::vector<std::string>& params);
+
         // 게임 관련 핸들러들
         void handleGameMove(const std::vector<std::string>& params);
 
         // 기본 핸들러들
         void handlePing(const std::vector<std::string>& params);
         void handleChat(const std::vector<std::string>& params);
+
+        // 로비 브로드캐스팅 헬퍼 함수들
+        void sendLobbyUserList();
+        void sendRoomList();
+        void broadcastLobbyUserJoined(const std::string& username);
+        void broadcastLobbyUserLeft(const std::string& username);
 
         // TODO: 2단계에서 구현 예정 (현재는 사용하지 않음)
         /*
@@ -111,6 +123,7 @@ namespace Blokus::Server {
         Session* session_;  // 소유하지 않음, 단순 참조
         RoomManager* roomManager_;  // RoomManager 참조
         AuthenticationService* authService_;  // AuthService 참조
+        GameServer* gameServer_;  // GameServer 참조
 
         // 시퀀스 관리
         uint32_t sequenceId_{ 0 };

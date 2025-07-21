@@ -219,9 +219,10 @@ namespace Blokus {
             setupStyles();
             qDebug() << QString::fromUtf8("스타일 설정 완료");
 
-            qDebug() << QString::fromUtf8("더미 데이터 로딩 시작...");
-            loadDummyData();
-            qDebug() << QString::fromUtf8("더미 데이터 로딩 완료");
+            // 서버에서 실제 데이터를 받아올 때까지 빈 상태로 시작
+            updateUserListDisplay();
+            updateRoomListDisplay();
+            updateRankingDisplay();
 
             // 내 정보 설정
             m_myUserInfo.username = username;
@@ -802,7 +803,20 @@ namespace Blokus {
 
         // 더미 데이터로 즉시 갱신 (서버 연동 전까지)
         QTimer::singleShot(500, this, [this]() {
-            m_roomList_data = generateDummyRooms();
+            // 임시 더미 방 데이터 생성
+            m_roomList_data.clear();
+            for (int i = 1; i <= 3; ++i) {
+                RoomInfo room;
+                room.roomId = i;
+                room.roomName = QString::fromUtf8("방 %1").arg(i);
+                room.hostName = QString::fromUtf8("호스트%1").arg(i);
+                room.currentPlayers = 1 + (i % 3);
+                room.maxPlayers = 4;
+                room.isPrivate = (i % 2 == 0);
+                room.isPlaying = false;
+                room.gameMode = QString::fromUtf8("클래식");
+                m_roomList_data.append(room);
+            }
             updateRoomListDisplay();
             addSystemMessage(QString::fromUtf8("방 목록이 업데이트되었습니다."));
             });
@@ -1130,106 +1144,6 @@ namespace Blokus {
         return QString::fromUtf8("%1/%2명").arg(room.currentPlayers).arg(room.maxPlayers);
     }
 
-    // ========================================
-    // 더미 데이터 생성 (서버 연동 전까지)
-    // ========================================
-
-    void LobbyWindow::loadDummyData()
-    {
-        m_userList_data = generateDummyUsers();
-        m_roomList_data = generateDummyRooms();
-        m_ranking_data = generateDummyRanking();
-
-        updateUserListDisplay();
-        updateRoomListDisplay();
-        updateRankingDisplay();
-    }
-
-    QList<UserInfo> LobbyWindow::generateDummyUsers()
-    {
-        QList<UserInfo> users;
-
-        QStringList usernames = {
-            QString::fromUtf8("더미 유저")
-        };
-
-        QStringList statuses = {
-            QString::fromUtf8("로비"), QString::fromUtf8("게임중"), QString::fromUtf8("자리비움")
-        };
-
-        for (int i = 0; i < usernames.size(); ++i) {
-            UserInfo user;
-            user.username = usernames[i];
-            user.totalGames = (i + 1) * 15;  // 15, 30, 45, ... 게임
-            user.wins = user.totalGames * 0.6; // 60% 승률
-            user.losses = user.totalGames - user.wins;
-            user.level = user.calculateLevel();
-            user.averageScore = 40 + (i * 5); // 40~80점 평균
-            user.isOnline = true;
-            user.status = statuses[i % statuses.size()];
-            users.append(user);
-        }
-
-        // 내 정보도 추가
-        UserInfo me;
-        me.username = m_myUsername;
-        me.totalGames = 45;
-        me.wins = 28;
-        me.losses = 17;
-        me.level = me.calculateLevel();
-        me.averageScore = 52;
-        me.isOnline = true;
-        me.status = QString::fromUtf8("로비");
-        users.prepend(me); // 맨 앞에 추가
-
-        return users;
-    }
-
-    QList<RoomInfo> LobbyWindow::generateDummyRooms()
-    {
-        QList<RoomInfo> rooms;
-
-        QStringList roomNames = {
-            QString::fromUtf8("TestRoom")
-        };
-
-        QStringList hosts = {
-            QString::fromUtf8("방장1")
-        };
-
-        for (int i = 0; i < roomNames.size(); ++i) {
-            RoomInfo room;
-            room.roomId = 1001 + i;
-            room.roomName = roomNames[i];
-            room.hostName = hosts[i];
-            room.maxPlayers = 4; // 클래식 모드만
-            room.currentPlayers = (i % 3) + 1; // 1-3명
-            room.isPrivate = (i % 4 == 0);
-            room.isPlaying = (i % 5 == 0);
-            room.gameMode = QString::fromUtf8("클래식");
-
-            rooms.append(room);
-        }
-
-        return rooms;
-    }
-
-    QList<UserInfo> LobbyWindow::generateDummyRanking()
-    {
-        QList<UserInfo> ranking = m_userList_data;
-
-        // 승률 순으로 정렬
-        std::sort(ranking.begin(), ranking.end(), [](const UserInfo& a, const UserInfo& b) {
-            return a.getWinRate() > b.getWinRate();
-            });
-
-        // 상위 10명만 표시
-        if (ranking.size() > 10) {
-            ranking = ranking.mid(0, 10);
-        }
-
-        return ranking;
-    }
 
 } // namespace Blokus
 

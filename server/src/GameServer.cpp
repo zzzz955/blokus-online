@@ -324,7 +324,8 @@ namespace Blokus::Server {
             auto messageHandler = std::make_unique<MessageHandler>(
                 session.get(),          // Session 포인터
                 roomManager_.get(),     // RoomManager 포인터  
-                authService_.get()      // AuthenticationService 포인터
+                authService_.get(),     // AuthenticationService 포인터
+                this                    // GameServer 포인터
             );
 
             // Session에 MessageHandler 설정
@@ -389,6 +390,19 @@ namespace Blokus::Server {
             return true;
         }
         return false;
+    }
+    
+    std::vector<std::shared_ptr<Session>> GameServer::getLobbyUsers() const {
+        std::vector<std::shared_ptr<Session>> lobbyUsers;
+        
+        std::lock_guard<std::mutex> lock(sessionsMutex_);
+        for (const auto& [sessionId, session] : sessions_) {
+            if (session && session->isActive() && session->isInLobby()) {
+                lobbyUsers.push_back(session);
+            }
+        }
+        
+        return lobbyUsers;
     }
 
     // ========================================
