@@ -297,7 +297,6 @@ namespace Blokus {
         }
         else if (message.startsWith("AUTH_SUCCESS:") || 
                  message.startsWith("REGISTER_SUCCESS:") ||
-                 message.startsWith("AUTO_LOGIN:") ||
                  message.startsWith("LOGOUT_SUCCESS")) {
             processAuthResponse(message);
         }
@@ -323,14 +322,7 @@ namespace Blokus {
         }
         else if (parts[0] == "REGISTER_SUCCESS" && parts.size() >= 2) {
             QString username = parts[1];
-            emit registerResult(true, QString::fromUtf8("회원가입이 완료되었습니다."));
-        }
-        else if (parts[0] == "AUTO_LOGIN" && parts.size() >= 2) {
-            QString sessionToken = parts[1];
-            m_currentSessionToken = sessionToken;
-            setState(ConnectionState::Authenticated);
-            // 회원가입 후 자동 로그인 성공은 별도 시그널로 처리하지 않음
-            qDebug() << QString::fromUtf8("회원가입 후 자동 로그인 성공");
+            emit registerResult(true, QString::fromUtf8("회원가입이 완료되었습니다. 로그인해주세요."));
         }
         else if (parts[0] == "LOGOUT_SUCCESS") {
             setState(ConnectionState::Connected);

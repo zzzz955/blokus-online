@@ -212,14 +212,6 @@ namespace Blokus::Server {
         if (result.success) {
             sendResponse("REGISTER_SUCCESS:" + username);
             spdlog::info("✅ 회원가입 성공: {}", username);
-
-            // 등록 후 자동 로그인
-            auto loginResult = authService_->loginUser(username, password);
-            if (loginResult.success) {
-                session_->setAuthenticated(loginResult.userId, loginResult.username);
-                sendResponse("AUTO_LOGIN:" + loginResult.sessionToken);
-                spdlog::info("✅ 자동 로그인 성공: {}", username);
-            }
         }
         else {
             sendError(result.message);
