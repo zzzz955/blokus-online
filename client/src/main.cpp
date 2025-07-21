@@ -7,6 +7,7 @@
 #include "LobbyWindow.h"
 #include "GameRoomWindow.h"
 #include "ClientTypes.h"
+#include "NetworkClient.h"
 
 using namespace Blokus;
 
@@ -19,10 +20,12 @@ public:
         : m_loginWindow(nullptr)
         , m_lobbyWindow(nullptr)
         , m_gameRoomWindow(nullptr)
+        , m_networkClient(new NetworkClient(this))
         , m_currentUsername("")
         , m_currentRoomInfo()
     {
         initializeApplication();
+        setupNetworkClient();
     }
 
     ~AppController()
@@ -32,6 +35,8 @@ public:
 
     void start()
     {
+        // 서버 연결 시도
+        m_networkClient->connectToServer();
         createLoginWindow();
     }
 
@@ -39,36 +44,33 @@ private slots:
     void handleLoginRequest(const QString& username, const QString& password)
     {
         qDebug() << QString::fromUtf8("로그인 시도: %1").arg(username);
-
-        // 더미 인증 로직 (서버 연동 전까지)
-        QTimer::singleShot(1500, this, [this, username]() {
-            if (username.length() >= 4) {
-                m_loginWindow->setLoginResult(true, QString::fromUtf8("환영합니다, %1님!").arg(username));
-            }
-            else {
-                m_loginWindow->setLoginResult(false, QString::fromUtf8("아이디가 너무 짧습니다."));
-            }
-            });
+        
+        if (!m_networkClient->isConnected()) {
+            m_loginWindow->setLoginResult(false, QString::fromUtf8("서버에 연결되지 않았습니다."));
+            return;
+        }
+        
+        m_networkClient->login(username, password);
     }
 
     void handleRegisterRequest(const QString& username, const QString& password, const QString& email)
     {
-        qDebug() << QString::fromUtf8("회원가입 시도: %1, %2").arg(username, email);
-
-        // 더미 회원가입 로직
-        QTimer::singleShot(2000, this, [this]() {
-            m_loginWindow->setRegisterResult(true, QString::fromUtf8("회원가입이 완료되었습니다!"));
-            });
+        qDebug() << QString::fromUtf8("회원가입 시도: %1").arg(username);
+        
+        if (!m_networkClient->isConnected()) {
+            m_loginWindow->setRegisterResult(false, QString::fromUtf8("서버에 연결되지 않았습니다."));
+            return;
+        }
+        
+        m_networkClient->registerUser(username, password);
     }
 
     void handlePasswordResetRequest(const QString& email)
     {
         qDebug() << QString::fromUtf8("비밀번호 재설정 요청: %1").arg(email);
 
-        // 더미 비밀번호 재설정 로직
-        QTimer::singleShot(1000, this, [this]() {
-            m_loginWindow->setPasswordResetResult(true, QString::fromUtf8("이메일을 확인해주세요."));
-            });
+        // 비밀번호 재설정은 아직 미구현
+        m_loginWindow->setPasswordResetResult(false, QString::fromUtf8("비밀번호 재설정 기능은 준비 중입니다."));
     }
 
     void handleLoginSuccess(const QString& username)
@@ -267,10 +269,63 @@ private slots:
         }
     }
 
+    // 네트워크 시그널 핸들러들
+    void onNetworkConnected()
+    {
+        qDebug() << QString::fromUtf8("서버 연결 성공");
+    }
+
+    void onNetworkDisconnected()
+    {
+        qDebug() << QString::fromUtf8("서버 연결 해제");
+    }
+
+    void onNetworkError(const QString& error)
+    {
+        qDebug() << QString::fromUtf8("네트워크 오류: %1").arg(error);
+        
+        if (m_loginWindow) {
+            m_loginWindow->setLoginResult(false, QString::fromUtf8("네트워크 오류: %1").arg(error));
+        }
+    }
+
+    void onLoginResult(bool success, const QString& message, const QString& sessionToken)
+    {
+        if (m_loginWindow) {
+            m_loginWindow->setLoginResult(success, message);
+        }
+    }
+
+    void onRegisterResult(bool success, const QString& message)
+    {
+        if (m_loginWindow) {
+            m_loginWindow->setRegisterResult(success, message);
+        }
+    }
+
 private:
     void initializeApplication()
     {
         qDebug() << QString::fromUtf8("=== 블로커스 온라인 초기화 ===");
+    }
+
+    void setupNetworkClient()
+    {
+        // 네트워크 연결 상태 시그널
+        connect(m_networkClient, &NetworkClient::connected, 
+                this, &AppController::onNetworkConnected);
+        connect(m_networkClient, &NetworkClient::disconnected, 
+                this, &AppController::onNetworkDisconnected);
+        connect(m_networkClient, &NetworkClient::connectionError, 
+                this, &AppController::onNetworkError);
+
+        // 인증 관련 시그널
+        connect(m_networkClient, &NetworkClient::loginResult, 
+                this, &AppController::onLoginResult);
+        connect(m_networkClient, &NetworkClient::registerResult, 
+                this, &AppController::onRegisterResult);
+        
+        qDebug() << QString::fromUtf8("네트워크 클라이언트 설정 완료");
     }
 
     void createLoginWindow()
@@ -397,6 +452,7 @@ private:
     Blokus::LoginWindow* m_loginWindow;
     Blokus::LobbyWindow* m_lobbyWindow;
     Blokus::GameRoomWindow* m_gameRoomWindow;
+    Blokus::NetworkClient* m_networkClient;
     QString m_currentUsername;
     Blokus::GameRoomInfo m_currentRoomInfo;
 };

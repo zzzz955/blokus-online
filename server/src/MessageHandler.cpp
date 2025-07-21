@@ -191,20 +191,27 @@ namespace Blokus::Server {
             return;
         }
 
-        if (params.size() < 3) {
-            sendError("사용법: register:사용자명:이메일:비밀번호");
+        if (params.size() < 2) {
+            sendError("사용법: register:사용자명:비밀번호 (또는 register:사용자명:이메일:비밀번호)");
             return;
         }
 
         std::string username = params[0];
-        std::string email = params[1];
-        std::string password = params[2];
+        std::string password;
+        
+        if (params.size() >= 3) {
+            // register:사용자명:이메일:비밀번호 형식 (이메일이 빈 값일 수도 있음)
+            password = params[2];
+        } else {
+            // register:사용자명:비밀번호 형식 (이메일 생략)
+            password = params[1];
+        }
 
         auto result = authService_->registerUser(username, password);
 
         if (result.success) {
             sendResponse("REGISTER_SUCCESS:" + username);
-            spdlog::info("✅ 회원가입 성공: {} ({})", username, email);
+            spdlog::info("✅ 회원가입 성공: {}", username);
 
             // 등록 후 자동 로그인
             auto loginResult = authService_->loginUser(username, password);

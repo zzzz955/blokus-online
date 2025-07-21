@@ -95,8 +95,15 @@ namespace Blokus {
                         "비밀번호는 " + std::to_string(m_minPasswordLength) + "자 이상이어야 합니다", "");
                 }
 
-                // 중복 확인
-                if (!isUsernameAvailable(username)) {
+                // DB 연결 확인
+                if (!m_dbManager) {
+                    spdlog::error("DatabaseManager가 초기화되지 않았습니다");
+                    return RegisterResult(false, "서버 오류가 발생했습니다", "");
+                }
+
+                // 중복 확인 (DB에서 실제 확인)
+                if (!m_dbManager->isUsernameAvailable(username)) {
+                    spdlog::warn("회원가입 실패: 이미 사용 중인 사용자명 {}", username);
                     return RegisterResult(false, "이미 사용 중인 사용자명입니다", "");
                 }
 
@@ -108,22 +115,17 @@ namespace Blokus {
                 std::string salt = generateSalt();
                 std::string hashedPassword = hashPassword(password, salt);
 
-                // 사용자 ID 생성
-                std::string userId = "user_" + generateSessionToken().substr(0, 12);
+                spdlog::info("새 사용자 등록 시도: {}", username);
 
-                // TODO: 데이터베이스에 저장
-                if (m_dbManager) {
-                    // 실제 DB 저장 로직
-                    m_dbManager->createUser(userId, hashedPassword);
-                    spdlog::info("사용자 등록 시도: {}", username);
+                // 데이터베이스에 저장
+                if (m_dbManager->createUser(username, hashedPassword)) {
+                    spdlog::info("새 사용자 등록 성공: {}", username);
+                    return RegisterResult(true, "회원가입이 완료되었습니다", username);
                 }
                 else {
-                    // 임시: 메모리에만 저장 (개발용)
-                    spdlog::info("임시 사용자 등록: {}", username);
+                    spdlog::error("데이터베이스 사용자 생성 실패: {}", username);
+                    return RegisterResult(false, "사용자 등록에 실패했습니다", "");
                 }
-
-                spdlog::info("새 사용자 등록 성공: {} (ID: {})", username, userId);
-                return RegisterResult(true, "회원가입이 완료되었습니다", userId);
             }
             catch (const std::exception& e) {
                 spdlog::error("사용자 등록 중 오류: {}", e.what());
@@ -138,20 +140,34 @@ namespace Blokus {
                     return AuthResult(false, "사용자명과 비밀번호를 입력해주세요", "", "", "");
                 }
 
-                // TODO: 데이터베이스에서 사용자 정보 조회
-                if (m_dbManager) {
-                    // 실제 DB 조회 로직
-                    spdlog::info("로그인 시도: {}", username);
-                }
-                else {
-                    // 임시: 단순 검증 (개발용)
-                    if (username.length() < 3 || password.length() < 4) {
-                        return AuthResult(false, "잘못된 사용자명 또는 비밀번호입니다", "", "", "");
-                    }
+                // DB 연결 확인
+                if (!m_dbManager) {
+                    spdlog::error("DatabaseManager가 초기화되지 않았습니다");
+                    return AuthResult(false, "서버 오류가 발생했습니다", "", "", "");
                 }
 
-                // 임시 사용자 ID 생성
-                std::string userId = "user_" + username;
+                spdlog::info("로그인 시도: {}", username);
+
+                // 사용자 정보 조회
+                auto userAccount = m_dbManager->getUserByUsername(username);
+                if (!userAccount) {
+                    spdlog::warn("로그인 실패: 사용자 없음 {}", username);
+                    return AuthResult(false, "잘못된 사용자명 또는 비밀번호입니다", "", "", "");
+                }
+
+                // 비밀번호 검증
+                if (!verifyPassword(password, userAccount->passwordHash)) {
+                    spdlog::warn("로그인 실패: 비밀번호 불일치 {}", username);
+                    return AuthResult(false, "잘못된 사용자명 또는 비밀번호입니다", "", "", "");
+                }
+
+                // 사용자 계정 활성화 상태 확인
+                if (!userAccount->isActive) {
+                    spdlog::warn("로그인 실패: 비활성화된 계정 {}", username);
+                    return AuthResult(false, "비활성화된 계정입니다", "", "", "");
+                }
+
+                std::string userId = std::to_string(userAccount->userId);
 
                 // 세션 토큰 생성
                 std::string sessionToken = generateSessionToken();
@@ -160,6 +176,9 @@ namespace Blokus {
                 if (!storeSession(sessionToken, userId, username)) {
                     return AuthResult(false, "세션 생성에 실패했습니다", "", "", "");
                 }
+
+                // 마지막 로그인 시간 업데이트
+                m_dbManager->updateUserLastLogin(userAccount->userId);
 
                 spdlog::info("로그인 성공: {} (ID: {})", username, userId);
                 return AuthResult(true, "로그인되었습니다", userId, sessionToken, username);

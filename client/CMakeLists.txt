@@ -21,6 +21,7 @@ set(CLIENT_SOURCES
     "src/LobbyWindow.cpp"
     "src/Block.cpp"
     "src/QtAdapter.cpp"
+    "src/NetworkClient.cpp"
 )
 
 set(CLIENT_HEADERS
@@ -33,6 +34,7 @@ set(CLIENT_HEADERS
     "include/QtAdapter.h"
     "include/ClientBlock.h"
     "include/ClientLogic.h"
+    "include/NetworkClient.h"
 )
 
 # 실행 파일 생성

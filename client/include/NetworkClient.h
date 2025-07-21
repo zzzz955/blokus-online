@@ -1,0 +1,95 @@
+#pragma once
+
+#include <QObject>
+#include <QTcpSocket>
+#include <QTimer>
+#include <QString>
+#include <QHostAddress>
+#include <functional>
+
+namespace Blokus {
+
+    class NetworkClient : public QObject
+    {
+        Q_OBJECT
+
+    public:
+        enum class ConnectionState {
+            Disconnected,
+            Connecting,
+            Connected,
+            Authenticated
+        };
+
+        explicit NetworkClient(QObject* parent = nullptr);
+        ~NetworkClient();
+
+        // 연결 관리
+        void connectToServer(const QString& host = "localhost", quint16 port = 8080);
+        void disconnect();
+        bool isConnected() const;
+        ConnectionState getState() const { return m_state; }
+
+        // 메시지 전송
+        void sendMessage(const QString& message);
+        
+        // 인증 관련
+        void login(const QString& username, const QString& password);
+        void registerUser(const QString& username, const QString& password);
+        void logout();
+
+    signals:
+        // 연결 상태 시그널
+        void connected();
+        void disconnected();
+        void connectionError(const QString& error);
+        void stateChanged(ConnectionState state);
+
+        // 인증 시그널
+        void loginResult(bool success, const QString& message, const QString& sessionToken = "");
+        void registerResult(bool success, const QString& message);
+        void logoutResult(bool success);
+
+        // 메시지 시그널
+        void messageReceived(const QString& message);
+        void errorReceived(const QString& error);
+
+    private slots:
+        void onConnected();
+        void onDisconnected();
+        void onReadyRead();
+        void onSocketError(QAbstractSocket::SocketError error);
+        void onConnectionTimeout();
+
+    private:
+        void setState(ConnectionState state);
+        void processMessage(const QString& message);
+        void processAuthResponse(const QString& response);
+        void processErrorMessage(const QString& error);
+        void setupSocket();
+        void cleanupSocket();
+        
+        // 재연결 관리
+        void startReconnectTimer();
+        void stopReconnectTimer();
+
+    private:
+        QTcpSocket* m_socket;
+        QTimer* m_connectionTimer;
+        QTimer* m_reconnectTimer;
+        
+        ConnectionState m_state;
+        QString m_serverHost;
+        quint16 m_serverPort;
+        QString m_currentSessionToken;
+        
+        // 재연결 설정
+        int m_reconnectInterval;
+        int m_maxReconnectAttempts;
+        int m_reconnectAttempts;
+        
+        // 연결 시간초과 설정
+        int m_connectionTimeout;
+    };
+
+} // namespace Blokus
