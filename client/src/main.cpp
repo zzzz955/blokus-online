@@ -366,10 +366,13 @@ private slots:
         gameRoomInfo.gameMode = QString::fromUtf8("클래식");
         gameRoomInfo.isPlaying = false;
         
-        // 호스트로 설정
+        // 호스트로 설정 (0번 인덱스 = Blue 색상)
         gameRoomInfo.playerSlots[0].username = m_currentUsername;
         gameRoomInfo.playerSlots[0].isHost = true;
         gameRoomInfo.playerSlots[0].isReady = true;
+        gameRoomInfo.playerSlots[0].color = PlayerColor::Blue;
+        gameRoomInfo.playerSlots[0].isAI = false;
+        gameRoomInfo.playerSlots[0].aiDifficulty = 0;
         
         createGameRoomWindow(gameRoomInfo, true);
         

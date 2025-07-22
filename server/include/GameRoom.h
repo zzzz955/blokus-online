@@ -54,9 +54,11 @@ namespace Blokus {
 
             // 방 상태 정보
             size_t getPlayerCount() const;
+            size_t getHumanPlayerCount() const; // AI가 아닌 실제 사용자 수
             size_t getMaxPlayers() const { return Common::MAX_PLAYERS; }
             bool isFull() const;
             bool isEmpty() const;
+            bool hasOnlyAIPlayers() const; // AI만 남았는지 확인
             bool canStartGame() const;
             bool isPlaying() const { return m_state == RoomState::Playing; }
             bool isWaiting() const { return m_state == RoomState::Waiting; }

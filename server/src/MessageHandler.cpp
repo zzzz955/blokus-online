@@ -528,8 +528,14 @@ namespace Blokus::Server {
                     // 퇴장 알림 브로드캐스트
                     room->broadcastPlayerLeft(username);
                     
-                    // 남은 플레이어들에게 업데이트된 방 정보 전송
-                    broadcastRoomInfoToRoom(room);
+                    // AI만 남은 방인지 확인하고 자동 삭제
+                    if (room->hasOnlyAIPlayers()) {
+                        spdlog::info("🤖 AI만 남은 방 {} 자동 삭제", currentRoomId);
+                        roomManager_->removeRoom(currentRoomId);
+                    } else {
+                        // 남은 플레이어들에게 업데이트된 방 정보 전송
+                        broadcastRoomInfoToRoom(room);
+                    }
                 }
 
                 spdlog::info("✅ 방 나가기 성공: '{}'", username);
@@ -1007,18 +1013,18 @@ namespace Blokus::Server {
                 session_->setStateToLobby();
             }
 
-            // 4. 로비 입장 성공 응답 (먼저 전송)
+            // 2. 로비 입장 성공 응답 (먼저 전송)
             sendResponse("LOBBY_ENTER_SUCCESS");
             
-            // 5. 다른 사용자들에게 새 사용자 입장 브로드캐스트 (새로 입장한 경우만)
+            // 3. 다른 사용자들에게 새 사용자 입장 브로드캐스트 (새로 입장한 경우만)
             if (!wasAlreadyInLobby) {
                 broadcastLobbyUserJoined(username);
             }
 
-            // 2. 로비 사용자 목록 전송 (브로드캐스트 후에 호출하여 본인이 포함된 목록 전송)
+            // 4. 로비 사용자 목록 즉시 전송 (본인이 포함된 최신 목록)
             sendLobbyUserList();
             
-            // 3. 방 목록 전송  
+            // 5. 방 목록 전송  
             sendRoomList();
 
             spdlog::debug("✅ 로비 입장/새로고침 완료: '{}'", username);

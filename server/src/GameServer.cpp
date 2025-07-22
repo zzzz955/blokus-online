@@ -668,8 +668,8 @@ namespace Blokus::Server {
             return;
         }
 
-        // 30초마다 하트비트
-        heartbeatTimer_->expires_after(std::chrono::seconds(30));
+        // 10초마다 하트비트 (로비 동기화 포함)
+        heartbeatTimer_->expires_after(std::chrono::seconds(10));
         heartbeatTimer_->async_wait([this](const boost::system::error_code& error) {
             if (!error && running_.load()) {
                 cleanupSessions();

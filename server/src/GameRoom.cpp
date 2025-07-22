@@ -249,6 +249,18 @@ namespace Blokus {
             std::lock_guard<std::mutex> lock(m_playersMutex);
             return m_players.size();
         }
+        
+        size_t GameRoom::getHumanPlayerCount() const {
+            std::lock_guard<std::mutex> lock(m_playersMutex);
+            return std::count_if(m_players.begin(), m_players.end(),
+                [](const PlayerInfo& player) {
+                    return !player.isAI();
+                });
+        }
+        
+        bool GameRoom::hasOnlyAIPlayers() const {
+            return getHumanPlayerCount() == 0 && getPlayerCount() > 0;
+        }
 
         bool GameRoom::isFull() const {
             std::lock_guard<std::mutex> lock(m_playersMutex);
