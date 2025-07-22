@@ -65,6 +65,12 @@ namespace Blokus {
 
             // 4. 🔥 새 PlayerInfo 객체 생성
             PlayerInfo newPlayer(session);
+            
+            // 🔥 AI 플레이어인 경우 (session이 null) AI 정보 설정
+            if (!session) {
+                newPlayer.setAIInfo(userId, username);
+                spdlog::info("🤖 AI 플레이어 정보 설정: '{}' (ID: {})", username, userId);
+            }
 
             // 호스트 설정 (첫 번째 플레이어가 호스트)
             if (m_players.empty() || userId == m_hostId) {
@@ -228,11 +234,24 @@ namespace Blokus {
                 return;
             }
 
-            // 첫 번째 플레이어를 새 호스트로 선정
-            m_players[0].setHost(true);
-            m_hostId = m_players[0].getUserId();
+            // 실제 사용자(AI가 아닌) 플레이어를 찾아서 호스트로 선정
+            PlayerInfo* newHost = nullptr;
+            for (auto& player : m_players) {
+                if (!player.isAI()) {
+                    newHost = &player;
+                    break;
+                }
+            }
 
-            spdlog::info("👑 방 {} 자동 호스트 선정: '{}'", m_roomId, m_players[0].getUsername());
+            if (newHost) {
+                newHost->setHost(true);
+                m_hostId = newHost->getUserId();
+                spdlog::info("👑 방 {} 자동 호스트 선정 (실제 사용자): '{}'", m_roomId, newHost->getUsername());
+            } else {
+                // 실제 사용자가 없으면 방을 해체해야 함
+                spdlog::warn("⚠️ 방 {} 실제 사용자 없음 - 방 해체 필요", m_roomId);
+                m_state = RoomState::Disbanded;
+            }
         }
 
         // ========================================

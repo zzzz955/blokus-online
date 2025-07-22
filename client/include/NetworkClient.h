@@ -51,6 +51,7 @@ namespace Blokus {
         
         // AI 관련
         void addAI(int colorIndex, int difficulty);
+        void removeAI(int colorIndex);
         
         // 채팅 관련
         void sendChatMessage(const QString& message);

@@ -901,10 +901,16 @@ namespace Blokus {
 
     void GameRoomWindow::updatePlayerSlotsDisplay()
     {
+        qDebug() << QString::fromUtf8("🔄 플레이어 슬롯 디스플레이 업데이트 시작");
         for (int i = 0; i < m_playerSlotWidgets.size() && i < m_roomInfo.playerSlots.size(); ++i) {
+            const auto& slot = m_roomInfo.playerSlots[i];
+            qDebug() << QString::fromUtf8("  슬롯 %1 업데이트: %2 (AI=%3, 빈슬롯=%4)")
+                .arg(i).arg(slot.username).arg(slot.isAI).arg(slot.isEmpty());
+            
             m_playerSlotWidgets[i]->updatePlayerSlot(m_roomInfo.playerSlots[i]);
             m_playerSlotWidgets[i]->setMySlot(m_roomInfo.playerSlots[i].username == m_myUsername);
         }
+        qDebug() << QString::fromUtf8("✅ 플레이어 슬롯 디스플레이 업데이트 완료");
     }
 
     void GameRoomWindow::updateGameControlsState()

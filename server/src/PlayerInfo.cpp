@@ -12,6 +12,8 @@ namespace Blokus::Server {
 
     PlayerInfo::PlayerInfo(SessionPtr session)
         : session_(session)
+        , aiUserId_("")
+        , aiUsername_("")
         , color_(Common::PlayerColor::None)
         , isHost_(false)
         , isReady_(false)
@@ -39,6 +41,8 @@ namespace Blokus::Server {
     // 복사 생성자
     PlayerInfo::PlayerInfo(const PlayerInfo& other)
         : session_(other.session_)
+        , aiUserId_(other.aiUserId_)
+        , aiUsername_(other.aiUsername_)
         , color_(other.color_)
         , isHost_(other.isHost_)
         , isReady_(other.isReady_)
@@ -54,6 +58,8 @@ namespace Blokus::Server {
     PlayerInfo& PlayerInfo::operator=(const PlayerInfo& other) {
         if (this != &other) {
             session_ = other.session_;
+            aiUserId_ = other.aiUserId_;
+            aiUsername_ = other.aiUsername_;
             color_ = other.color_;
             isHost_ = other.isHost_;
             isReady_ = other.isReady_;
@@ -69,6 +75,8 @@ namespace Blokus::Server {
     // 이동 생성자
     PlayerInfo::PlayerInfo(PlayerInfo&& other) noexcept
         : session_(std::move(other.session_))
+        , aiUserId_(std::move(other.aiUserId_))
+        , aiUsername_(std::move(other.aiUsername_))
         , color_(other.color_)
         , isHost_(other.isHost_)
         , isReady_(other.isReady_)
@@ -84,6 +92,8 @@ namespace Blokus::Server {
     PlayerInfo& PlayerInfo::operator=(PlayerInfo&& other) noexcept {
         if (this != &other) {
             session_ = std::move(other.session_);
+            aiUserId_ = std::move(other.aiUserId_);
+            aiUsername_ = std::move(other.aiUsername_);
             color_ = other.color_;
             isHost_ = other.isHost_;
             isReady_ = other.isReady_;
@@ -101,7 +111,7 @@ namespace Blokus::Server {
     // ========================================
 
     bool PlayerInfo::setPlayerColor(Common::PlayerColor color) {
-        if (!isConnected()) {
+        if (!isConnected() && !isAI()) {
             spdlog::warn("Cannot set color for disconnected player: {}", getUserId());
             return false;
         }
@@ -119,7 +129,7 @@ namespace Blokus::Server {
     }
 
     bool PlayerInfo::setReady(bool ready) {
-        if (!isConnected()) {
+        if (!isConnected() && !isAI()) {
             spdlog::warn("Cannot set ready state for disconnected player: {}", getUserId());
             return false;
         }
@@ -150,6 +160,13 @@ namespace Blokus::Server {
             spdlog::debug("Player '{}' is no longer the host", getUsername());
         }
 
+        updateActivity();
+    }
+    
+    void PlayerInfo::setAIInfo(const std::string& userId, const std::string& username) {
+        aiUserId_ = userId;
+        aiUsername_ = username;
+        spdlog::debug("AI 플레이어 정보 설정: ID='{}', 이름='{}'", userId, username);
         updateActivity();
     }
 

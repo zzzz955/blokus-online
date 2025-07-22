@@ -397,7 +397,9 @@ namespace Blokus::Server {
         
         std::lock_guard<std::mutex> lock(sessionsMutex_);
         for (const auto& [sessionId, session] : sessions_) {
-            if (session && session->isActive() && session->isInLobby()) {
+            // Connected 상태가 아닌 모든 사용자 (InLobby + InRoom + InGame)를 포함
+            if (session && session->isActive() && 
+                (session->isInLobby() || session->isInRoom() || session->isInGame())) {
                 lobbyUsers.push_back(session);
             }
         }
@@ -639,9 +641,10 @@ namespace Blokus::Server {
             int validUserCount = 0;
             for (const auto& session : lobbyUsers) {
                 if (session && session->isActive() && !session->getUsername().empty()) {
-                    response << ":" << session->getUsername() << "," << "LOBBY";
+                    std::string userStatus = session->isInLobby() ? "LOBBY" : "ROOM";
+                    response << ":" << session->getUsername() << "," << userStatus;
                     validUserCount++;
-                    spdlog::debug("   - 주기적 브로드캐스트 포함: '{}'", session->getUsername());
+                    spdlog::debug("   - 주기적 브로드캐스트 포함: '{}' (상태: {})", session->getUsername(), userStatus);
                 }
             }
             

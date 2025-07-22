@@ -88,6 +88,7 @@ namespace Blokus::Server {
         void handleEndGame(const std::vector<std::string>& params);
         void handleTransferHost(const std::vector<std::string>& params);
         void handleAddAI(const std::vector<std::string>& params);
+        void handleRemoveAI(const std::vector<std::string>& params);
 
         // 로비 관련 핸들러들
         void handleLobbyEnter(const std::vector<std::string>& params);
