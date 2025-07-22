@@ -512,10 +512,10 @@ private slots:
                 int aiDifficulty = playerData[5].toInt();
                 int colorIndex = playerData[6].toInt();
                 
-                // 색상 인덱스를 기반으로 정확한 슬롯에 배치 (0-3 인덱스를 1-4 PlayerColor로 변환)
-                if (colorIndex >= 0 && colorIndex < 4) {
-                    PlayerColor playerColor = static_cast<PlayerColor>(colorIndex + 1);
-                    int slotIndex = colorIndex;
+                // 색상 인덱스를 기반으로 정확한 슬롯에 배치 (PlayerColor 1-4를 배열 인덱스 0-3으로 변환)
+                if (colorIndex >= 1 && colorIndex <= 4) {
+                    PlayerColor playerColor = static_cast<PlayerColor>(colorIndex);
+                    int slotIndex = colorIndex - 1;  // PlayerColor 1-4를 배열 인덱스 0-3으로 변환
                     
                     gameRoomInfo.playerSlots[slotIndex].username = username;
                     gameRoomInfo.playerSlots[slotIndex].isHost = isHost;

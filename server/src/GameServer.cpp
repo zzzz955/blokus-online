@@ -557,16 +557,30 @@ namespace Blokus::Server {
     void GameServer::onSessionDisconnect(const std::string& sessionId) {
         spdlog::info("세션 연결 해제: {}", sessionId);
         
-        // 세션 제거 전에 사용자 정보 저장 (로비 사용자 제거 브로드캐스트용)
+        // 세션 제거 전에 사용자 정보 저장 (로비 사용자 제거 브로드캐스트 및 방 나가기용)
         std::string username;
+        std::string userId;
         bool wasInLobby = false;
+        bool wasInRoom = false;
+        int roomId = -1;
         {
             std::lock_guard<std::mutex> lock(sessionsMutex_);
             auto it = sessions_.find(sessionId);
             if (it != sessions_.end()) {
                 username = it->second->getUsername();
+                userId = it->second->getUserId();
                 wasInLobby = it->second->isInLobby();
+                wasInRoom = it->second->isInRoom();
+                if (wasInRoom) {
+                    roomId = it->second->getCurrentRoomId();
+                }
             }
+        }
+        
+        // 방에 있던 사용자가 연결 해제된 경우 자동으로 방에서 나가기
+        if (wasInRoom && !userId.empty() && roomManager_) {
+            spdlog::info("세션 연결 해제로 인한 방 {} 나가기: {}", roomId, username);
+            roomManager_->leaveRoom(userId);
         }
         
         removeSession(sessionId);
@@ -614,6 +628,7 @@ namespace Blokus::Server {
         try {
             auto lobbyUsers = getLobbyUsers();
             if (lobbyUsers.empty()) {
+                spdlog::debug("🔄 주기적 브로드캐스트: 로비 사용자 없음");
                 return; // 로비 사용자가 없으면 브로드캐스트하지 않음
             }
             
@@ -621,22 +636,27 @@ namespace Blokus::Server {
             std::ostringstream response;
             response << "LOBBY_USER_LIST:" << lobbyUsers.size();
             
+            int validUserCount = 0;
             for (const auto& session : lobbyUsers) {
                 if (session && session->isActive() && !session->getUsername().empty()) {
                     response << ":" << session->getUsername() << "," << "LOBBY";
+                    validUserCount++;
+                    spdlog::debug("   - 주기적 브로드캐스트 포함: '{}'", session->getUsername());
                 }
             }
             
             std::string message = response.str();
             
             // 모든 로비 사용자에게 브로드캐스트
+            int sentCount = 0;
             for (const auto& session : lobbyUsers) {
                 if (session && session->isActive()) {
                     session->sendMessage(message);
+                    sentCount++;
                 }
             }
             
-            spdlog::debug("🔄 주기적 로비 사용자 목록 브로드캐스트: {}명", lobbyUsers.size());
+            spdlog::info("🔄 주기적 로비 사용자 목록 브로드캐스트: {}명 유효, {}명 전송", validUserCount, sentCount);
         }
         catch (const std::exception& e) {
             spdlog::error("주기적 로비 사용자 목록 브로드캐스트 중 오류: {}", e.what());
