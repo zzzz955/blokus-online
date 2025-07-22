@@ -178,7 +178,11 @@ namespace Blokus::Server {
         if (result.success) {
             session_->setAuthenticated(result.userId, result.username);
             sendResponse("AUTH_SUCCESS:" + result.username + ":" + result.sessionToken);
-            spdlog::info("✅ 로그인 성공: {} ({})", username, session_->getSessionId());
+            
+            // 로그인 성공 시 자동으로 로비에 입장되므로 다른 사용자들에게 브로드캐스트
+            broadcastLobbyUserJoined(result.username);
+            
+            spdlog::info("✅ 로그인 성공: {} ({}) - 로비 진입 브로드캐스트 완료", username, session_->getSessionId());
         }
         else {
             sendError(result.message);
@@ -247,7 +251,11 @@ namespace Blokus::Server {
         if (result.success) {
             session_->setAuthenticated(result.userId, result.username);
             sendResponse("GUEST_LOGIN_SUCCESS:" + result.username + ":" + result.sessionToken);
-            spdlog::info("게스트 로그인: {} ({})", result.username, session_->getSessionId());
+            
+            // 게스트 로그인 성공 시 자동으로 로비에 입장되므로 다른 사용자들에게 브로드캐스트
+            broadcastLobbyUserJoined(result.username);
+            
+            spdlog::info("게스트 로그인: {} ({}) - 로비 진입 브로드캐스트 완료", result.username, session_->getSessionId());
         }
         else {
             sendError(result.message);
@@ -976,44 +984,42 @@ namespace Blokus::Server {
     // ========================================
 
     void MessageHandler::handleLobbyEnter(const std::vector<std::string>& params) {
-        // 1. 상태 검증 - 로그인된 상태여야 함 (이미 로비에 있어도 허용)
-        if (!session_->isInLobby()) {
-            if (session_->isConnected()) {
-                sendError("로그인 후 로비에 입장할 수 있습니다");
-            } else if (session_->isInRoom()) {
-                sendError("이미 방에 참여 중입니다. 먼저 방을 나가주세요");
-            } else {
-                sendError("현재 상태에서는 로비에 입장할 수 없습니다");
-            }
-            return;
-        }
-        
         // 방에 있는 경우 로비 진입 거부
         if (session_->isInRoom()) {
             sendError("이미 방에 참여 중입니다. 먼저 방을 나가주세요");
             return;
         }
 
+        // 연결되지 않은 사용자는 로비 진입 거부
+        if (!session_->isConnected()) {
+            sendError("로그인 후 로비에 입장할 수 있습니다");
+            return;
+        }
+
         try {
             std::string username = session_->getUsername();
-            spdlog::info("🏢 로비 입장/새로고침: '{}'", username);
+            bool wasAlreadyInLobby = session_->isInLobby();
+            
+            spdlog::info("🏢 로비 입장/새로고침: '{}' (기존 로비 상태: {})", username, wasAlreadyInLobby);
 
-            // 로비 상태로 명시적 설정 (이미 로비 상태여도 확실하게)
+            // 로비 상태로 명시적 설정
             if (!session_->isInLobby()) {
                 session_->setStateToLobby();
             }
 
-            // 2. 로비 사용자 목록 전송
+            // 4. 로비 입장 성공 응답 (먼저 전송)
+            sendResponse("LOBBY_ENTER_SUCCESS");
+            
+            // 5. 다른 사용자들에게 새 사용자 입장 브로드캐스트 (새로 입장한 경우만)
+            if (!wasAlreadyInLobby) {
+                broadcastLobbyUserJoined(username);
+            }
+
+            // 2. 로비 사용자 목록 전송 (브로드캐스트 후에 호출하여 본인이 포함된 목록 전송)
             sendLobbyUserList();
             
             // 3. 방 목록 전송  
             sendRoomList();
-
-            // 4. 로비 입장 성공 응답
-            sendResponse("LOBBY_ENTER_SUCCESS");
-            
-            // 5. 다른 사용자들에게 새 사용자 입장 브로드캐스트 (항상 호출)
-            broadcastLobbyUserJoined(username);
 
             spdlog::debug("✅ 로비 입장/새로고침 완료: '{}'", username);
         }
@@ -1279,11 +1285,13 @@ namespace Blokus::Server {
                      << ":" << room->getMaxPlayers() << ":" << (room->isPrivate() ? "1" : "0")
                      << ":" << (room->isPlaying() ? "1" : "0") << ":클래식";
             
-            // 플레이어 데이터 추가
+            // 플레이어 데이터 추가 (userId,username,isHost,isReady,isAI,aiDifficulty,colorIndex)
             auto playerList = room->getPlayerList();
             for (const auto& player : playerList) {
                 response << ":" << player.getUserId() << "," << player.getUsername()
-                         << "," << (player.isHost() ? "1" : "0") << "," << (player.isReady() ? "1" : "0");
+                         << "," << (player.isHost() ? "1" : "0") << "," << (player.isReady() ? "1" : "0")
+                         << "," << (player.isAI() ? "1" : "0") << "," << player.getAIDifficulty()
+                         << "," << static_cast<int>(player.getColor());
             }
             
             sendResponse(response.str());
@@ -1308,11 +1316,13 @@ namespace Blokus::Server {
                      << ":" << room->getMaxPlayers() << ":" << (room->isPrivate() ? "1" : "0")
                      << ":" << (room->isPlaying() ? "1" : "0") << ":클래식";
             
-            // 플레이어 데이터 추가
+            // 플레이어 데이터 추가 (userId,username,isHost,isReady,isAI,aiDifficulty,colorIndex)
             auto playerList = room->getPlayerList();
             for (const auto& player : playerList) {
                 response << ":" << player.getUserId() << "," << player.getUsername()
-                         << "," << (player.isHost() ? "1" : "0") << "," << (player.isReady() ? "1" : "0");
+                         << "," << (player.isHost() ? "1" : "0") << "," << (player.isReady() ? "1" : "0")
+                         << "," << (player.isAI() ? "1" : "0") << "," << player.getAIDifficulty()
+                         << "," << static_cast<int>(player.getColor());
             }
             
             std::string roomInfoMessage = response.str();

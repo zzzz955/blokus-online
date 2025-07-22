@@ -81,6 +81,10 @@ namespace Blokus::Server {
         
         // 로비 사용자 목록 조회 - 로비 브로드캐스팅용
         std::vector<std::shared_ptr<Session>> getLobbyUsers() const;
+        
+        // 로비 브로드캐스트 메서드들
+        void broadcastLobbyUserLeft(const std::string& username);
+        void broadcastLobbyUserListPeriodically();
 
         // 접근자
         boost::asio::io_context& getIOContext() { return ioContext_; }

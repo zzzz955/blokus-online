@@ -556,7 +556,25 @@ namespace Blokus::Server {
 
     void GameServer::onSessionDisconnect(const std::string& sessionId) {
         spdlog::info("세션 연결 해제: {}", sessionId);
+        
+        // 세션 제거 전에 사용자 정보 저장 (로비 사용자 제거 브로드캐스트용)
+        std::string username;
+        bool wasInLobby = false;
+        {
+            std::lock_guard<std::mutex> lock(sessionsMutex_);
+            auto it = sessions_.find(sessionId);
+            if (it != sessions_.end()) {
+                username = it->second->getUsername();
+                wasInLobby = it->second->isInLobby();
+            }
+        }
+        
         removeSession(sessionId);
+        
+        // 로비에 있던 사용자가 연결 해제된 경우 다른 로비 사용자들에게 브로드캐스트
+        if (wasInLobby && !username.empty()) {
+            broadcastLobbyUserLeft(username);
+        }
     }
 
     void GameServer::onSessionMessage(const std::string& sessionId, const std::string& message) {
@@ -568,6 +586,61 @@ namespace Blokus::Server {
 
         spdlog::debug("세션 {}에서 메시지 수신: {}", sessionId,
             message.length() > 50 ? message.substr(0, 50) + "..." : message);
+    }
+
+    // ========================================
+    // 로비 브로드캐스트 메서드들
+    // ========================================
+    
+    void GameServer::broadcastLobbyUserLeft(const std::string& username) {
+        try {
+            std::string message = "LOBBY_USER_LEFT:" + username;
+            auto lobbyUsers = getLobbyUsers();
+            
+            spdlog::info("🔊 로비 사용자 퇴장 브로드캐스트: '{}' -> {}명에게", username, lobbyUsers.size());
+            
+            for (const auto& session : lobbyUsers) {
+                if (session && session->isActive()) {
+                    session->sendMessage(message);
+                }
+            }
+        }
+        catch (const std::exception& e) {
+            spdlog::error("로비 사용자 퇴장 브로드캐스트 중 오류: {}", e.what());
+        }
+    }
+    
+    void GameServer::broadcastLobbyUserListPeriodically() {
+        try {
+            auto lobbyUsers = getLobbyUsers();
+            if (lobbyUsers.empty()) {
+                return; // 로비 사용자가 없으면 브로드캐스트하지 않음
+            }
+            
+            // LOBBY_USER_LIST 메시지 생성
+            std::ostringstream response;
+            response << "LOBBY_USER_LIST:" << lobbyUsers.size();
+            
+            for (const auto& session : lobbyUsers) {
+                if (session && session->isActive() && !session->getUsername().empty()) {
+                    response << ":" << session->getUsername() << "," << "LOBBY";
+                }
+            }
+            
+            std::string message = response.str();
+            
+            // 모든 로비 사용자에게 브로드캐스트
+            for (const auto& session : lobbyUsers) {
+                if (session && session->isActive()) {
+                    session->sendMessage(message);
+                }
+            }
+            
+            spdlog::debug("🔄 주기적 로비 사용자 목록 브로드캐스트: {}명", lobbyUsers.size());
+        }
+        catch (const std::exception& e) {
+            spdlog::error("주기적 로비 사용자 목록 브로드캐스트 중 오류: {}", e.what());
+        }
     }
 
     // ========================================
@@ -600,6 +673,7 @@ namespace Blokus::Server {
         heartbeatTimer_->async_wait([this](const boost::system::error_code& error) {
             if (!error && running_.load()) {
                 cleanupSessions();
+                broadcastLobbyUserListPeriodically(); // 주기적 로비 사용자 목록 브로드캐스트
                 logServerStats(); // 통계 로그
                 handleHeartbeat(); // 다음 하트비트 예약
             }

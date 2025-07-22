@@ -497,10 +497,33 @@ private slots:
         gameRoomInfo.gameMode = gameMode;
         gameRoomInfo.isPlaying = isPlaying;
         
-        // 플레이어 정보 파싱 (9번 인덱스부터)
+        // 플레이어 정보 파싱 (9번 인덱스부터) - 확장된 형식: userId,username,isHost,isReady,isAI,aiDifficulty,colorIndex
         for (int i = 9; i < roomInfo.size(); ++i) {
             QStringList playerData = roomInfo[i].split(',');
-            if (playerData.size() >= 4) {
+            if (playerData.size() >= 7) {
+                QString userId = playerData[0];
+                QString username = playerData[1];
+                bool isHost = (playerData[2] == "1");
+                bool isReady = (playerData[3] == "1");
+                bool isAI = (playerData[4] == "1");
+                int aiDifficulty = playerData[5].toInt();
+                int colorIndex = playerData[6].toInt();
+                
+                // 색상 인덱스를 기반으로 정확한 슬롯에 배치 (0-3 인덱스를 1-4 PlayerColor로 변환)
+                if (colorIndex >= 0 && colorIndex < 4) {
+                    PlayerColor playerColor = static_cast<PlayerColor>(colorIndex + 1);
+                    int slotIndex = colorIndex;
+                    
+                    gameRoomInfo.playerSlots[slotIndex].username = username;
+                    gameRoomInfo.playerSlots[slotIndex].isHost = isHost;
+                    gameRoomInfo.playerSlots[slotIndex].isReady = isReady;
+                    gameRoomInfo.playerSlots[slotIndex].isAI = isAI;
+                    gameRoomInfo.playerSlots[slotIndex].aiDifficulty = aiDifficulty;
+                    gameRoomInfo.playerSlots[slotIndex].color = playerColor;
+                }
+            }
+            else if (playerData.size() >= 4) {
+                // 하위 호환성을 위한 기존 형식 지원
                 QString userId = playerData[0];
                 QString username = playerData[1];
                 bool isHost = (playerData[2] == "1");
@@ -513,6 +536,8 @@ private slots:
                         gameRoomInfo.playerSlots[slot].isHost = isHost;
                         gameRoomInfo.playerSlots[slot].isReady = isReady;
                         gameRoomInfo.playerSlots[slot].color = static_cast<PlayerColor>(slot + 1);
+                        gameRoomInfo.playerSlots[slot].isAI = false;
+                        gameRoomInfo.playerSlots[slot].aiDifficulty = 0;
                         break;
                     }
                 }
