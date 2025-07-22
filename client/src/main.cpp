@@ -194,24 +194,13 @@ private slots:
         qDebug() << QString::fromUtf8("AI 플레이어 추가 요청: %1 색상, 난이도 %2")
             .arg(Utils::playerColorToString(color)).arg(difficulty);
 
-        // 더미 AI 추가 로직
-        QTimer::singleShot(200, this, [this, color, difficulty]() {
-            if (m_gameRoomWindow) {
-                // AI 슬롯 생성
-                PlayerSlot aiSlot;
-                aiSlot.color = color;
-                aiSlot.username = "";
-                aiSlot.isAI = true;
-                aiSlot.aiDifficulty = difficulty;
-                aiSlot.isHost = false;
-                aiSlot.isReady = true;
-
-                m_gameRoomWindow->updatePlayerSlot(color, aiSlot);
-                m_gameRoomWindow->addSystemMessage(
-                    QString::fromUtf8("AI 플레이어가 추가되었습니다. (난이도: %1)")
-                    .arg(difficulty == 1 ? "쉬움" : difficulty == 2 ? "보통" : "어려움"));
-            }
-            });
+        // 서버로 AI 추가 요청 전송
+        if (m_networkClient && m_networkClient->isConnected()) {
+            int colorIndex = static_cast<int>(color) - 1; // PlayerColor는 1-4, 서버는 0-3 기대
+            m_networkClient->addAI(colorIndex, difficulty);
+        } else {
+            qWarning() << QString::fromUtf8("AI 추가 실패: 서버에 연결되지 않음");
+        }
     }
 
     void handleRemovePlayerRequest(PlayerColor color)
@@ -591,6 +580,18 @@ private slots:
             m_gameRoomWindow->addSystemMessage(QString::fromUtf8("게임이 종료되었습니다."));
         }
     }
+    
+    void onAIAdded(int colorIndex, int difficulty)
+    {
+        qDebug() << QString::fromUtf8("AI 추가 성공: 색상 인덱스=%1, 난이도=%2").arg(colorIndex).arg(difficulty);
+        if (m_gameRoomWindow) {
+            QString aiName = QString::fromUtf8("AI Bot %1").arg(difficulty);
+            QString colorName = Utils::playerColorToString(static_cast<PlayerColor>(colorIndex + 1));
+            m_gameRoomWindow->addSystemMessage(
+                QString::fromUtf8("%1 (%2)이 방에 추가되었습니다.").arg(aiName).arg(colorName)
+            );
+        }
+    }
 
 private:
     void initializeApplication()
@@ -657,6 +658,8 @@ private:
                 this, &AppController::onGameStarted);
         connect(m_networkClient, &NetworkClient::gameEnded,
                 this, &AppController::onGameEnded);
+        connect(m_networkClient, &NetworkClient::aiAdded,
+                this, &AppController::onAIAdded);
         
         qDebug() << QString::fromUtf8("네트워크 클라이언트 설정 완료");
     }
@@ -752,9 +755,7 @@ private:
             connect(m_gameRoomWindow, &Blokus::GameRoomWindow::chatMessageSent,
                 this, &AppController::handleGameRoomChatMessage);
             
-            // 게임룸 채팅을 NetworkClient와 연결
-            connect(m_networkClient, &NetworkClient::chatMessageReceived,
-                this, &AppController::onChatMessageReceived);
+            // 게임룸 채팅은 이미 전역적으로 연결되어 있음 (중복 연결 제거)
 
             m_gameRoomWindow->show();
             m_gameRoomWindow->raise();

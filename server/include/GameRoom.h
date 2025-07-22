@@ -60,6 +60,11 @@ namespace Blokus {
             bool canStartGame() const;
             bool isPlaying() const { return m_state == RoomState::Playing; }
             bool isWaiting() const { return m_state == RoomState::Waiting; }
+            
+            // 방 추가 정보 getter (기본 정보는 위에 이미 선언됨)
+            std::string getHostName() const;
+            bool isPrivate() const { return m_isPrivate; }
+            const std::string& getPassword() const { return m_password; }
 
             // 게임 제어
             bool startGame();

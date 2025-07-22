@@ -51,6 +51,7 @@ namespace Blokus {
                 {"room:start", MessageType::RoomStart},
                 {"room:end", MessageType::RoomEnd},
                 {"room:transfer", MessageType::RoomTransferHost},
+                {"room:addai", MessageType::RoomAddAI},
 
                 // ����
                 {"game:move", MessageType::GameMove},
@@ -84,6 +85,7 @@ namespace Blokus {
             case MessageType::RoomStart: return "room:start";
             case MessageType::RoomEnd: return "room:end";
             case MessageType::RoomTransferHost: return "room:transfer";
+            case MessageType::RoomAddAI: return "room:addai";
             case MessageType::GameMove: return "game:move";
             case MessageType::GameEnd: return "game:end";
             case MessageType::Chat: return "chat";

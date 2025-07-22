@@ -87,6 +87,7 @@ namespace Blokus::Server {
         void handleStartGame(const std::vector<std::string>& params);
         void handleEndGame(const std::vector<std::string>& params);
         void handleTransferHost(const std::vector<std::string>& params);
+        void handleAddAI(const std::vector<std::string>& params);
 
         // 로비 관련 핸들러들
         void handleLobbyEnter(const std::vector<std::string>& params);
@@ -112,6 +113,7 @@ namespace Blokus::Server {
         
         // 방 정보 동기화 헬퍼 함수
         void sendRoomInfo(const std::shared_ptr<GameRoom>& room);
+        void broadcastRoomInfoToRoom(const std::shared_ptr<GameRoom>& room);
 
         // TODO: 2단계에서 구현 예정 (현재는 사용하지 않음)
         /*

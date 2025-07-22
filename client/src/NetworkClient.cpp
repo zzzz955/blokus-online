@@ -277,6 +277,18 @@ namespace Blokus {
         emit chatMessageSent();
     }
 
+    void NetworkClient::addAI(int colorIndex, int difficulty)
+    {
+        if (!isConnected()) {
+            qWarning() << QString::fromUtf8("AI 추가 실패: 서버에 연결되지 않음");
+            return;
+        }
+        
+        QString message = QString("room:addai:%1:%2").arg(colorIndex).arg(difficulty);
+        sendMessage(message);
+        qDebug() << QString::fromUtf8("AI 추가 요청 전송: 색상=%1, 난이도=%2").arg(colorIndex).arg(difficulty);
+    }
+
     void NetworkClient::setState(ConnectionState state)
     {
         if (m_state != state) {
@@ -528,6 +540,11 @@ namespace Blokus {
         }
         else if (parts[0] == "GAME_ENDED") {
             emit gameEnded();
+        }
+        else if (parts[0] == "AI_ADD_SUCCESS" && parts.size() >= 3) {
+            int colorIndex = parts[1].toInt();
+            int difficulty = parts[2].toInt();
+            emit aiAdded(colorIndex, difficulty);
         }
         else if (parts[0] == "SYSTEM" && parts.size() >= 2) {
             QString systemMessage = parts.mid(1).join(":");

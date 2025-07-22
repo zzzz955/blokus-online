@@ -238,6 +238,12 @@ namespace Blokus {
         // ========================================
         // 방 상태 정보
         // ========================================
+        
+        std::string GameRoom::getHostName() const {
+            std::lock_guard<std::mutex> lock(m_playersMutex);
+            const auto* host = findPlayerById(m_players, m_hostId);
+            return host ? host->getUsername() : "Unknown";
+        }
 
         size_t GameRoom::getPlayerCount() const {
             std::lock_guard<std::mutex> lock(m_playersMutex);

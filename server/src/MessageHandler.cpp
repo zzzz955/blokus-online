@@ -37,6 +37,7 @@ namespace Blokus::Server {
         handlers_[MessageType::RoomReady] = [this](const auto& params) { handlePlayerReady(params); };
         handlers_[MessageType::RoomStart] = [this](const auto& params) { handleStartGame(params); };
         handlers_[MessageType::RoomTransferHost] = [this](const auto& params) { handleTransferHost(params); };
+        handlers_[MessageType::RoomAddAI] = [this](const auto& params) { handleAddAI(params); };
 
         // 로비 관련
         handlers_[MessageType::LobbyEnter] = [this](const auto& params) { handleLobbyEnter(params); };
@@ -448,17 +449,17 @@ namespace Blokus::Server {
                 // 8. 세션 상태 변경
                 session_->setStateToInRoom(roomId);
 
-                // 9. 브로드캐스트 (데드락 방지를 위해 여기서 호출)
-                room->broadcastPlayerJoined(username);
-
-                // 10. 성공 응답 (방 정보 포함)
+                // 9. 성공 응답 (방 정보 포함) - 브로드캐스트 전에 먼저 응답
                 std::ostringstream response;
                 response << "ROOM_JOIN_SUCCESS:" << roomId << ":" << room->getRoomName()
                     << ":" << room->getPlayerCount() << "/" << room->getMaxPlayers();
                 sendResponse(response.str());
+
+                // 10. 브로드캐스트 (새 플레이어 입장 알림)
+                room->broadcastPlayerJoined(username);
                 
-                // 11. 방 정보 전체 동기화 전솥
-                sendRoomInfo(room);
+                // 11. 방 전체 사용자에게 업데이트된 방 정보 전송 (플레이어 목록 동기화)
+                broadcastRoomInfoToRoom(room);
 
                 spdlog::info("✅ 방 참여 성공: '{}' -> 방 {} ({}명)",
                     username, roomId, room->getPlayerCount());
@@ -507,17 +508,21 @@ namespace Blokus::Server {
 
             // 3. RoomManager를 통한 방 나가기
             if (roomManager_->leaveRoom(userId)) {
-                // 4. 브로드캐스트 (방이 아직 존재할 때만)
-                auto room = roomManager_->getRoom(currentRoomId);
-                if (room) {
-                    room->broadcastPlayerLeft(username);
-                }
-
-                // 5. 세션 상태 변경
+                // 4. 세션 상태 변경
                 session_->setStateToLobby();
 
-                // 6. 성공 응답
+                // 5. 성공 응답
                 sendResponse("ROOM_LEFT:OK");
+
+                // 6. 브로드캐스트 및 방 정보 업데이트 (방이 아직 존재할 때만)
+                auto room = roomManager_->getRoom(currentRoomId);
+                if (room) {
+                    // 퇴장 알림 브로드캐스트
+                    room->broadcastPlayerLeft(username);
+                    
+                    // 남은 플레이어들에게 업데이트된 방 정보 전송
+                    broadcastRoomInfoToRoom(room);
+                }
 
                 spdlog::info("✅ 방 나가기 성공: '{}'", username);
             }
@@ -804,6 +809,107 @@ namespace Blokus::Server {
         }
     }
 
+    void MessageHandler::handleAddAI(const std::vector<std::string>& params) {
+        // 1. 상태 검증
+        if (!session_->isInRoom()) {
+            sendError("방에 있어야 AI를 추가할 수 있습니다");
+            return;
+        }
+
+        // 2. 호스트 권한 확인
+        if (!roomManager_) {
+            sendError("방 관리자가 초기화되지 않았습니다");
+            return;
+        }
+
+        int roomId = session_->getCurrentRoomId();
+        auto room = roomManager_->getRoom(roomId);
+        if (!room) {
+            sendError("방을 찾을 수 없습니다");
+            return;
+        }
+
+        if (!room->isHost(session_->getUserId())) {
+            sendError("방장만 AI를 추가할 수 있습니다");
+            return;
+        }
+
+        // 3. 파라미터 검증 (색상, 난이도)
+        if (params.size() < 2) {
+            sendError("사용법: room:addai:색상번호:난이도");
+            return;
+        }
+
+        try {
+            int colorIndex = std::stoi(params[0]);  // 0-3 (Blue, Yellow, Red, Green)
+            int difficulty = std::stoi(params[1]);  // 1-3 (쉬움, 보통, 어려움)
+
+            // 색상 유효성 검증
+            if (colorIndex < 0 || colorIndex > 3) {
+                sendError("색상번호는 0-3 사이여야 합니다 (0=Blue, 1=Yellow, 2=Red, 3=Green)");
+                return;
+            }
+
+            // 난이도 유효성 검증  
+            if (difficulty < 1 || difficulty > 3) {
+                sendError("난이도는 1-3 사이여야 합니다 (1=쉬움, 2=보통, 3=어려움)");
+                return;
+            }
+
+            // 방이 가득 찬지 확인
+            if (room->isFull()) {
+                sendError("방이 가득 차서 AI를 추가할 수 없습니다");
+                return;
+            }
+
+            Common::PlayerColor aiColor = static_cast<Common::PlayerColor>(colorIndex + 1);
+            
+            // 해당 색상이 이미 사용 중인지 확인
+            if (room->isColorTaken(aiColor)) {
+                sendError("해당 색상은 이미 사용 중입니다");
+                return;
+            }
+
+            // 4. AI 플레이어 생성 및 추가
+            std::string aiUserId = "AI_" + std::to_string(colorIndex) + "_" + std::to_string(roomId);
+            std::string aiUsername = "AI Bot " + std::to_string(difficulty);
+            
+            // AI 세션 생성 (더미 세션)
+            // 실제로는 빈 세션을 만들거나 nullptr로 처리
+            if (room->addPlayer(nullptr, aiUserId, aiUsername)) {
+                // AI 속성 설정
+                PlayerInfo* aiPlayer = room->getPlayer(aiUserId);
+                if (aiPlayer) {
+                    aiPlayer->setAI(true, difficulty);
+                    aiPlayer->setPlayerColor(aiColor);
+                    aiPlayer->setReady(true);  // AI는 항상 준비 상태
+                }
+
+                // 5. 성공 응답
+                sendResponse("AI_ADD_SUCCESS:" + std::to_string(colorIndex) + ":" + std::to_string(difficulty));
+
+                // 6. 브로드캐스트
+                room->broadcastPlayerJoined(aiUsername);
+                broadcastRoomInfoToRoom(room);
+
+                spdlog::info("✅ AI 추가 성공: {} (색상: {}, 난이도: {}, 방: {})",
+                    aiUsername, colorIndex, difficulty, roomId);
+            } else {
+                sendError("AI 플레이어 추가에 실패했습니다");
+            }
+        }
+        catch (const std::invalid_argument& e) {
+            sendError("잘못된 숫자 형식입니다");
+        }
+        catch (const std::out_of_range& e) {
+            sendError("숫자가 범위를 벗어났습니다");
+        }
+        catch (const std::exception& e) {
+            sendError("AI 추가 중 오류가 발생했습니다");
+            spdlog::error("AI 추가 처리 중 예외: {}", e.what());
+        }
+    }
+
     // ========================================
     // 게임 관련 핸들러들
     // ========================================
@@ -870,7 +976,7 @@ namespace Blokus::Server {
     // ========================================
 
     void MessageHandler::handleLobbyEnter(const std::vector<std::string>& params) {
-        // 1. 상태 검증 - 로그인된 상태여야 함
+        // 1. 상태 검증 - 로그인된 상태여야 함 (이미 로비에 있어도 허용)
         if (!session_->isInLobby()) {
             if (session_->isConnected()) {
                 sendError("로그인 후 로비에 입장할 수 있습니다");
@@ -881,10 +987,21 @@ namespace Blokus::Server {
             }
             return;
         }
+        
+        // 방에 있는 경우 로비 진입 거부
+        if (session_->isInRoom()) {
+            sendError("이미 방에 참여 중입니다. 먼저 방을 나가주세요");
+            return;
+        }
 
         try {
             std::string username = session_->getUsername();
-            spdlog::info("🏢 로비 입장: '{}'", username);
+            spdlog::info("🏢 로비 입장/새로고침: '{}'", username);
+
+            // 로비 상태로 명시적 설정 (이미 로비 상태여도 확실하게)
+            if (!session_->isInLobby()) {
+                session_->setStateToLobby();
+            }
 
             // 2. 로비 사용자 목록 전송
             sendLobbyUserList();
@@ -895,10 +1012,10 @@ namespace Blokus::Server {
             // 4. 로비 입장 성공 응답
             sendResponse("LOBBY_ENTER_SUCCESS");
             
-            // 5. 다른 사용자들에게 새 사용자 입장 브로드캐스트
+            // 5. 다른 사용자들에게 새 사용자 입장 브로드캐스트 (항상 호출)
             broadcastLobbyUserJoined(username);
 
-            spdlog::debug("✅ 로비 입장 완료: '{}'", username);
+            spdlog::debug("✅ 로비 입장/새로고침 완료: '{}'", username);
         }
         catch (const std::exception& e) {
             sendError("로비 입장 중 오류가 발생했습니다");
@@ -1005,18 +1122,28 @@ namespace Blokus::Server {
 
             // GameServer에서 실제 로비 사용자 목록을 가져옴
             auto lobbyUsers = gameServer_->getLobbyUsers();
+            spdlog::info("🔍 로비 사용자 목록 조회: 총 {}명", lobbyUsers.size());
             
             std::ostringstream response;
             response << "LOBBY_USER_LIST:" << lobbyUsers.size();
             
+            int validUserCount = 0;
             for (const auto& lobbySession : lobbyUsers) {
                 if (lobbySession && lobbySession->isActive() && !lobbySession->getUsername().empty()) {
                     response << ":" << lobbySession->getUsername() << "," << "LOBBY";
+                    validUserCount++;
+                    spdlog::info("   - 유효한 로비 사용자: '{}'", lobbySession->getUsername());
+                } else {
+                    spdlog::warn("   - 무효한 세션: session={}, active={}, username='{}'", 
+                        (bool)lobbySession, 
+                        lobbySession ? lobbySession->isActive() : false,
+                        lobbySession ? lobbySession->getUsername() : "(null)");
                 }
             }
+            spdlog::info("🔍 유효한 로비 사용자: {}명/{} 명", validUserCount, lobbyUsers.size());
             
             sendResponse(response.str());
-            spdlog::debug("📋 로비 사용자 목록 전송: {}명", lobbyUsers.size());
+            spdlog::info("📋 로비 사용자 목록 전송: {}명 - 메시지: {}", lobbyUsers.size(), response.str());
         }
         catch (const std::exception& e) {
             spdlog::error("로비 사용자 목록 전송 중 오류: {}", e.what());
@@ -1164,6 +1291,44 @@ namespace Blokus::Server {
         }
         catch (const std::exception& e) {
             spdlog::error("방 정보 전송 중 오류: {}", e.what());
+        }
+    }
+
+    void MessageHandler::broadcastRoomInfoToRoom(const std::shared_ptr<GameRoom>& room) {
+        try {
+            if (!room) {
+                spdlog::warn("방이 null이므로 방 정보 브로드캐스트 불가");
+                return;
+            }
+            
+            // ROOM_INFO 메시지 생성 (sendRoomInfo와 동일한 형식)
+            std::ostringstream response;
+            response << "ROOM_INFO:" << room->getRoomId() << ":" << room->getRoomName()
+                     << ":" << room->getHostName() << ":" << room->getPlayerCount()
+                     << ":" << room->getMaxPlayers() << ":" << (room->isPrivate() ? "1" : "0")
+                     << ":" << (room->isPlaying() ? "1" : "0") << ":클래식";
+            
+            // 플레이어 데이터 추가
+            auto playerList = room->getPlayerList();
+            for (const auto& player : playerList) {
+                response << ":" << player.getUserId() << "," << player.getUsername()
+                         << "," << (player.isHost() ? "1" : "0") << "," << (player.isReady() ? "1" : "0");
+            }
+            
+            std::string roomInfoMessage = response.str();
+            
+            // 방의 모든 플레이어에게 브로드캐스트
+            for (const auto& player : playerList) {
+                if (player.getSession() && player.getSession()->isActive()) {
+                    player.getSession()->sendMessage(roomInfoMessage);
+                }
+            }
+            
+            spdlog::debug("방 {} 플레이어 {}명에게 방 정보 브로드캐스트 완료", 
+                room->getRoomId(), playerList.size());
+        }
+        catch (const std::exception& e) {
+            spdlog::error("방 정보 브로드캐스트 중 오류: {}", e.what());
         }
     }
 

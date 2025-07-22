@@ -49,6 +49,9 @@ namespace Blokus {
         void joinRoom(int roomId, const QString& password = "");
         void leaveRoom();
         
+        // AI 관련
+        void addAI(int colorIndex, int difficulty);
+        
         // 채팅 관련
         void sendChatMessage(const QString& message);
 
@@ -88,6 +91,7 @@ namespace Blokus {
         void playerLeft(const QString& username);
         void playerReady(const QString& username, bool ready);
         void hostChanged(const QString& newHost);
+        void aiAdded(int colorIndex, int difficulty);
         void gameStarted();
         void gameEnded();
         
