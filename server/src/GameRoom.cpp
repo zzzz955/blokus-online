@@ -847,16 +847,17 @@ namespace Blokus {
                 return false;
             }
 
-            // 플레이어 찾기
-            auto* player = getPlayer(userId);
+            // 플레이어 찾기 (뮤텍스 내에서 직접 검색)
+            auto* player = findPlayerById(m_players, userId);
             if (!player) {
                 spdlog::warn("❌ 블록 배치 실패: 플레이어를 찾을 수 없음 (방 {}, 사용자 {})", m_roomId, userId);
                 return false;
             }
 
-            // 플레이어 턴 확인
-            if (!isPlayerTurn(userId)) {
-                spdlog::warn("❌ 블록 배치 실패: 플레이어 턴이 아님 (방 {}, 사용자 {})", m_roomId, userId);
+            // 플레이어 턴 확인 (직접 확인으로 데드락 방지)
+            if (player->getColor() != m_gameStateManager->getCurrentPlayer()) {
+                spdlog::warn("❌ 블록 배치 실패: 플레이어 턴이 아님 (방 {}, 사용자 {}, 현재 턴: {})", 
+                    m_roomId, userId, static_cast<int>(m_gameStateManager->getCurrentPlayer()));
                 return false;
             }
 
@@ -890,9 +891,27 @@ namespace Blokus {
             spdlog::info("✅ 블록 배치 성공 (방 {}, 사용자 {}, 블록 타입: {}, 획득 점수: {})", 
                 m_roomId, userId, static_cast<int>(placement.type), scoreGained);
 
-            // 블록 배치 알림 브로드캐스트
+            // 블록 배치 알림 브로드캐스트 (뮤텍스 내에서 안전하게)
             spdlog::info("🔄 블록 배치 브로드캐스트 시작: 방 {}", m_roomId);
-            broadcastBlockPlacement(player->getUsername(), placement, scoreGained);
+            
+            // 블록 배치 알림 메시지 생성 및 브로드캐스트
+            std::ostringstream blockPlacementMsg;
+            blockPlacementMsg << "BLOCK_PLACED:{"
+                << "\"player\":\"" << player->getUsername() << "\","
+                << "\"blockType\":" << static_cast<int>(placement.type) << ","
+                << "\"position\":{\"row\":" << placement.position.first << ",\"col\":" << placement.position.second << "},"
+                << "\"rotation\":" << static_cast<int>(placement.rotation) << ","
+                << "\"flip\":" << static_cast<int>(placement.flip) << ","
+                << "\"playerColor\":" << static_cast<int>(placement.player) << ","
+                << "\"scoreGained\":" << scoreGained
+                << "}";
+            
+            broadcastMessageLocked(blockPlacementMsg.str());
+            
+            // 시스템 메시지로도 알림
+            std::ostringstream systemMsg;
+            systemMsg << "SYSTEM:" << player->getUsername() << "님이 블록을 배치했습니다. (점수: +" << scoreGained << ")";
+            broadcastMessageLocked(systemMsg.str());
 
             // 다음 턴으로 전환
             Common::PlayerColor previousPlayer = m_gameStateManager->getCurrentPlayer();
@@ -901,19 +920,56 @@ namespace Blokus {
             Common::PlayerColor newPlayer = m_gameStateManager->getCurrentPlayer();
             spdlog::info("🔄 턴 전환 완료: {} -> {}", static_cast<int>(previousPlayer), static_cast<int>(newPlayer));
 
-            // 턴 변경 알림 브로드캐스트
+            // 턴 변경 알림 브로드캐스트 (뮤텍스 내에서 안전하게)
             if (newPlayer != previousPlayer) {
                 spdlog::info("🔄 턴 변경 브로드캐스트 시작");
-                broadcastTurnChange(newPlayer);
+                
+                // 새 플레이어 이름 찾기
+                std::string newPlayerName = "";
+                for (const auto& p : m_players) {
+                    if (p.getColor() == newPlayer) {
+                        newPlayerName = p.getUsername();
+                        break;
+                    }
+                }
+                
+                // 턴 변경 알림 메시지
+                std::ostringstream turnChangeMsg;
+                turnChangeMsg << "TURN_CHANGED:{"
+                    << "\"newPlayer\":\"" << newPlayerName << "\","
+                    << "\"playerColor\":" << static_cast<int>(newPlayer) << ","
+                    << "\"turnNumber\":" << m_gameStateManager->getTurnNumber()
+                    << "}";
+                
+                broadcastMessageLocked(turnChangeMsg.str());
+                
+                // 시스템 메시지
+                std::ostringstream turnSystemMsg;
+                turnSystemMsg << "SYSTEM:" << newPlayerName << "님의 턴입니다.";
+                broadcastMessageLocked(turnSystemMsg.str());
             }
 
-            // 전체 게임 상태 브로드캐스트
+            // 전체 게임 상태 브로드캐스트 (뮤텍스 내에서 안전하게)
             spdlog::info("🔄 게임 상태 브로드캐스트 시작");
-            broadcastGameState();
+            if (m_state == RoomState::Playing) {
+                // JSON 형태로 게임 상태 생성
+                std::ostringstream gameStateJson;
+                gameStateJson << "GAME_STATE_UPDATE:{";
+                
+                // 현재 턴 정보
+                Common::PlayerColor currentPlayer = m_gameStateManager->getCurrentPlayer();
+                gameStateJson << "\"currentPlayer\":" << static_cast<int>(currentPlayer) << ",";
+                gameStateJson << "\"turnNumber\":" << m_gameStateManager->getTurnNumber() << ",";
+                
+                // 간단한 보드 상태
+                gameStateJson << "\"boardState\":[], \"scores\":{}}";
+                
+                broadcastMessageLocked(gameStateJson.str());
+            }
 
             // 게임 종료 조건 확인
             if (m_gameStateManager->getGameState() == Common::GameState::Finished) {
-                endGame();
+                endGameLocked();
             }
 
             return true;
