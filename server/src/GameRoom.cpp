@@ -105,9 +105,23 @@ namespace Blokus {
 
             spdlog::info("✅ 방 {} 플레이어 제거: '{}' (남은: {}명)", m_roomId, username, m_players.size());
 
+            // 다른 플레이어들에게 나간 것을 알림
+            broadcastPlayerLeft(username);
+
             // 호스트가 나간 경우 새 호스트 선정
             if (wasHost && !m_players.empty()) {
                 autoSelectNewHost();
+                // 새 호스트 알림
+                std::string newHostName = "";
+                for (const auto& player : m_players) {
+                    if (player.isHost()) {
+                        newHostName = player.getUsername();
+                        break;
+                    }
+                }
+                if (!newHostName.empty()) {
+                    broadcastHostChanged(newHostName);
+                }
             }
 
             // 방이 비었다면 게임 종료
@@ -368,10 +382,19 @@ namespace Blokus {
         void GameRoom::broadcastMessage(const std::string& message, const std::string& excludeUserId) {
             std::lock_guard<std::mutex> lock(m_playersMutex);
 
+            spdlog::info("📢 브로드캐스트 시작: 방 {}, 메시지: '{}', 플레이어 수: {}", 
+                m_roomId, message.substr(0, 50) + (message.length() > 50 ? "..." : ""), m_players.size());
+
+            int sentCount = 0;
             for (const auto& player : m_players) {
+                spdlog::debug("  플레이어 체크: {} (연결됨: {}, 제외여부: {})", 
+                    player.getUsername(), player.isConnected(), player.getUserId() == excludeUserId);
+                
                 if (player.getUserId() != excludeUserId && player.isConnected()) {
                     try {
                         player.sendMessage(message);
+                        sentCount++;
+                        spdlog::debug("  ✅ 전송 성공: {}", player.getUsername());
                     }
                     catch (const std::exception& e) {
                         spdlog::error("❌ 방 {} 메시지 전송 실패 (플레이어: '{}'): {}",
@@ -379,6 +402,8 @@ namespace Blokus {
                     }
                 }
             }
+            
+            spdlog::info("📢 브로드캐스트 완료: {}/{} 플레이어에게 전송", sentCount, m_players.size());
         }
 
         void GameRoom::sendToPlayer(const std::string& userId, const std::string& message) {
@@ -584,6 +609,8 @@ namespace Blokus {
 
         void GameRoom::broadcastBlockPlacement(const std::string& playerName, const Common::BlockPlacement& placement, int scoreGained) {
             std::lock_guard<std::mutex> lock(m_playersMutex);
+            
+            spdlog::info("📦 블록 배치 브로드캐스트 - 방 {}, 플레이어 수: {}", m_roomId, m_players.size());
             
             // 블록 배치 알림 메시지 생성
             std::ostringstream blockPlacementMsg;
@@ -791,19 +818,24 @@ namespace Blokus {
                 m_roomId, userId, static_cast<int>(placement.type), scoreGained);
 
             // 블록 배치 알림 브로드캐스트
+            spdlog::info("🔄 블록 배치 브로드캐스트 시작: 방 {}", m_roomId);
             broadcastBlockPlacement(player->getUsername(), placement, scoreGained);
 
             // 다음 턴으로 전환
             Common::PlayerColor previousPlayer = m_gameStateManager->getCurrentPlayer();
+            spdlog::info("🔄 턴 전환 시작: {} -> ?", static_cast<int>(previousPlayer));
             m_gameStateManager->nextTurn();
             Common::PlayerColor newPlayer = m_gameStateManager->getCurrentPlayer();
+            spdlog::info("🔄 턴 전환 완료: {} -> {}", static_cast<int>(previousPlayer), static_cast<int>(newPlayer));
 
             // 턴 변경 알림 브로드캐스트
             if (newPlayer != previousPlayer) {
+                spdlog::info("🔄 턴 변경 브로드캐스트 시작");
                 broadcastTurnChange(newPlayer);
             }
 
             // 전체 게임 상태 브로드캐스트
+            spdlog::info("🔄 게임 상태 브로드캐스트 시작");
             broadcastGameState();
 
             // 게임 종료 조건 확인

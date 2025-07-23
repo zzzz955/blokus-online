@@ -1185,15 +1185,10 @@ namespace Blokus::Server {
             std::string chatMessage = "CHAT:" + username + ":" + message;
             spdlog::info("📢 방 {} 채팅 브로드캐스트: [{}] {}", currentRoomId, username, message);
             
-            // 방의 모든 플레이어에게 브로드캐스트
-            auto playerList = room->getPlayerList();
-            for (const auto& player : playerList) {
-                if (player.getSession() && player.getSession()->isActive()) {
-                    player.getSession()->sendMessage(chatMessage);
-                }
-            }
+            // GameRoom의 broadcastMessage 사용
+            room->broadcastMessage(chatMessage);
             
-            spdlog::debug("방 {} 플레이어 {}명에게 채팅 브로드캐스트 완료", currentRoomId, playerList.size());
+            spdlog::debug("방 {} 채팅 브로드캐스트 완료", currentRoomId);
         }
         catch (const std::exception& e) {
             spdlog::error("방 채팅 브로드캐스트 중 오류: {}", e.what());
