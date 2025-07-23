@@ -145,17 +145,29 @@ namespace Blokus {
         // ========================================
 
         bool GameRoom::setPlayerReady(const std::string& userId, bool ready) {
-            std::lock_guard<std::mutex> lock(m_playersMutex);
+            std::string username;
+            bool actualReadyState;
+            bool success = false;
+            
+            {
+                std::lock_guard<std::mutex> lock(m_playersMutex);
 
-            auto* player = findPlayerById(m_players, userId);
-            if (!player) {
-                return false;
+                auto* player = findPlayerById(m_players, userId);
+                if (!player) {
+                    return false;
+                }
+
+                success = player->setReady(ready);
+                if (success) {
+                    updateActivity();
+                    username = player->getUsername();
+                    actualReadyState = player->isReady();
+                }
             }
 
-            bool success = player->setReady(ready);
+            // 락 해제 후 브로드캐스트 (데드락 방지)
             if (success) {
-                updateActivity();
-                broadcastPlayerReady(player->getUsername(), player->isReady());
+                broadcastPlayerReady(username, actualReadyState);
             }
 
             return success;

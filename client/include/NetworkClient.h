@@ -48,6 +48,8 @@ namespace Blokus {
         void createRoom(const QString& roomName, bool isPrivate = false, const QString& password = "");
         void joinRoom(int roomId, const QString& password = "");
         void leaveRoom();
+        void setPlayerReady(bool ready);
+        void startGame();
         
         // 채팅 관련
         void sendChatMessage(const QString& message);

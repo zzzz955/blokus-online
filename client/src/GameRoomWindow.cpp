@@ -22,10 +22,10 @@ namespace Blokus {
         , m_colorFrame(nullptr)
         , m_colorLabel(nullptr)
         , m_usernameLabel(nullptr)
-        , m_statusLabel(nullptr)
         , m_scoreLabel(nullptr)
         , m_actionButton(nullptr)
         , m_hostIndicator(nullptr)
+        , m_readyIndicator(nullptr)
     {
         setupUI();
         setupStyles();
@@ -74,9 +74,7 @@ namespace Blokus {
         m_usernameLabel->setAlignment(Qt::AlignCenter);
         m_usernameLabel->setStyleSheet("font-size: 11px; font-weight: bold;");
 
-        m_statusLabel = new QLabel(QString::fromUtf8("대기 중"));
-        m_statusLabel->setAlignment(Qt::AlignCenter);
-        m_statusLabel->setStyleSheet("font-size: 10px; color: #7f8c8d;");
+        // 상태 라벨 제거 (준비 상태 인디케이터로 통합)
 
         m_scoreLabel = new QLabel(QString::fromUtf8("점수: 0"));
         m_scoreLabel->setAlignment(Qt::AlignCenter);
@@ -87,6 +85,12 @@ namespace Blokus {
         m_remainingBlocksLabel->setAlignment(Qt::AlignCenter);
         m_remainingBlocksLabel->setStyleSheet("font-size: 10px; color: #95a5a6;");
 
+        // 준비 상태 인디케이터
+        m_readyIndicator = new QLabel(QString::fromUtf8("대기중"));
+        m_readyIndicator->setAlignment(Qt::AlignCenter);
+        m_readyIndicator->setFixedHeight(20);
+        m_readyIndicator->setStyleSheet("font-size: 10px; font-weight: bold; color: #f39c12;");
+
         // 액션 버튼 (강퇴 전용)
         m_actionButton = new QPushButton(QString::fromUtf8("강퇴"));
         m_actionButton->setFixedHeight(25);
@@ -96,7 +100,7 @@ namespace Blokus {
         m_mainLayout->addWidget(m_colorFrame);
         m_mainLayout->addWidget(m_hostIndicator);
         m_mainLayout->addWidget(m_usernameLabel);
-        m_mainLayout->addWidget(m_statusLabel);
+        m_mainLayout->addWidget(m_readyIndicator);
         m_mainLayout->addWidget(m_scoreLabel);
         m_mainLayout->addWidget(m_remainingBlocksLabel);
         m_mainLayout->addStretch();
@@ -228,6 +232,11 @@ namespace Blokus {
 
     void PlayerSlotWidget::updatePlayerSlot(const PlayerSlot& slot)
     {
+        qDebug() << QString::fromUtf8("PlayerSlotWidget::updatePlayerSlot - 색상 %1: %2 (빈슬롯: %3)")
+            .arg(static_cast<int>(m_color))
+            .arg(slot.username)
+            .arg(slot.isEmpty() ? "예" : "아니오");
+            
         m_currentSlot = slot;
 
         // 사용자명 업데이트
@@ -240,18 +249,8 @@ namespace Blokus {
         // 호스트 표시 업데이트
         m_hostIndicator->setVisible(slot.isHost);
 
-        // 상태 업데이트
-        QString statusText;
-        if (slot.isEmpty()) {
-            statusText = QString::fromUtf8("빈 슬롯");
-            m_statusLabel->setStyleSheet("font-size: 10px; color: #95a5a6;");
-        }
-        else {
-            statusText = slot.isReady ? QString::fromUtf8("준비됨") : QString::fromUtf8("대기 중");
-            m_statusLabel->setStyleSheet(QString("font-size: 10px; color: %1;")
-                .arg(slot.isReady ? "#27ae60" : "#e74c3c"));
-        }
-        m_statusLabel->setText(statusText);
+        // 준비 상태 업데이트 (별도 메서드로 처리)
+        updateReadyState(slot.isReady);
 
         // 점수 및 남은 블록 수 업데이트
         m_scoreLabel->setText(QString::fromUtf8("점수: %1").arg(slot.score));
@@ -270,6 +269,46 @@ namespace Blokus {
 
         if (ret == QMessageBox::Yes) {
             emit kickPlayerRequested(m_color);
+        }
+    }
+
+    void GameRoomWindow::setMyReadyState(bool ready)
+    {
+        m_isReady = ready;
+        updateGameControlsState();
+        
+        // 타임아웃 타이머 정지
+        m_readyButtonTimeout->stop();
+        
+        // 서버 응답 후 버튼 다시 활성화
+        if (!isHost()) {
+            m_gameStartButton->setEnabled(true);
+        }
+        
+        qDebug() << QString::fromUtf8("내 준비 상태 업데이트 완료: %1").arg(ready ? "준비완료" : "대기중");
+    }
+
+    void PlayerSlotWidget::updateReadyState(bool isReady)
+    {
+        if (m_currentSlot.isEmpty()) {
+            m_readyIndicator->setVisible(false);
+            return;
+        }
+
+        // 호스트의 경우 준비 상태 표시하지 않음 (왕관 표시로 충분)
+        if (m_currentSlot.isHost) {
+            m_readyIndicator->setVisible(false);
+            return;
+        }
+
+        m_readyIndicator->setVisible(true);
+        
+        if (isReady) {
+            m_readyIndicator->setText(QString::fromUtf8("준비완료"));
+            m_readyIndicator->setStyleSheet("font-size: 10px; font-weight: bold; color: #27ae60;");
+        } else {
+            m_readyIndicator->setText(QString::fromUtf8("대기중"));
+            m_readyIndicator->setStyleSheet("font-size: 10px; font-weight: bold; color: #f39c12;");
         }
     }
 
@@ -302,10 +341,22 @@ namespace Blokus {
         , m_gameStatusLabel(nullptr)
         , m_coordinateLabel(nullptr)
         , m_isGameStarted(false)
+        , m_isReady(false)
         , m_turnTimer(new QTimer(this))
+        , m_readyButtonTimeout(new QTimer(this))
     {
         // 게임 매니저 생성
         m_gameManager = new GameStateManager();
+
+        // 타이머 설정
+        m_readyButtonTimeout->setSingleShot(true);
+        connect(m_readyButtonTimeout, &QTimer::timeout, this, [this]() {
+            // 서버 응답 타임아웃 시 버튼 다시 활성화
+            if (!isHost()) {
+                m_gameStartButton->setEnabled(true);
+            }
+            qDebug() << QString::fromUtf8("준비 상태 변경 타임아웃 - 버튼 재활성화");
+        });
 
         setupUI();
         setupMenuBar();
@@ -540,9 +591,10 @@ namespace Blokus {
         layout->setContentsMargins(15, 5, 15, 5);
         layout->setSpacing(10);
 
-        // 게임 시작 버튼만 표시 (호스트일 때만)
-        m_gameStartButton = new QPushButton(QString::fromUtf8("🎮 게임 시작"));
+        // 게임 시작/준비 버튼 (호스트 여부에 따라 다름)
+        m_gameStartButton = new QPushButton(QString::fromUtf8("게임 시작"));
         m_gameStartButton->setFixedHeight(30);
+        m_gameStartButton->setMinimumWidth(100); // 최소 너비 설정
 
         // 중앙 게임 상태
         m_gameStatusLabel = new QLabel(QString::fromUtf8("게임 대기 중"));
@@ -558,8 +610,8 @@ namespace Blokus {
         layout->addStretch();
         layout->addWidget(m_coordinateLabel);
 
-        // 시그널 연결
-        connect(m_gameStartButton, &QPushButton::clicked, this, &GameRoomWindow::onGameStartClicked);
+        // 시그널 연결 - 호스트 여부에 따라 다른 슬롯 연결
+        // 실제 연결은 updateGameControlsState()에서 수행
     }
 
     void GameRoomWindow::setupMenuBar()
@@ -704,6 +756,22 @@ namespace Blokus {
         updateGameControlsState();
     }
 
+    void GameRoomWindow::updatePlayerReadyState(const QString& username, bool ready)
+    {
+        // 룸 정보에서 해당 플레이어의 준비 상태 업데이트
+        for (auto& slot : m_roomInfo.playerSlots) {
+            if (slot.username == username) {
+                slot.isReady = ready;
+                qDebug() << QString::fromUtf8("플레이어 %1의 준비 상태 업데이트: %2").arg(username).arg(ready ? "준비완료" : "대기중");
+                break;
+            }
+        }
+        
+        // UI 업데이트 (준비 상태만)
+        updateReadyStates();
+        updateGameControlsState();
+    }
+
     void GameRoomWindow::updatePlayerSlot(PlayerColor color, const PlayerSlot& slot)
     {
         // 해당 색상의 슬롯 찾아서 업데이트
@@ -761,9 +829,34 @@ namespace Blokus {
         bool amHost = isHost();
         bool canStart = canStartGame();
 
-        m_gameStartButton->setEnabled(amHost && canStart && !m_isGameStarted);
-        m_gameStartButton->setVisible(!m_isGameStarted);
+        if (!m_isGameStarted) {
+            // 연결된 시그널 해제
+            disconnect(m_gameStartButton, nullptr, nullptr, nullptr);
+            
+            if (amHost) {
+                // 호스트 - 게임 시작 버튼
+                m_gameStartButton->setText(QString::fromUtf8("게임 시작"));
+                m_gameStartButton->setEnabled(canStart);
+                m_gameStartButton->setMinimumWidth(100);
+                connect(m_gameStartButton, &QPushButton::clicked, this, &GameRoomWindow::onGameStartClicked);
+            } else {
+                // 비호스트 - 준비/준비해제 버튼
+                if (m_isReady) {
+                    m_gameStartButton->setText(QString::fromUtf8("준비 해제"));
+                } else {
+                    m_gameStartButton->setText(QString::fromUtf8("준비 완료"));
+                }
+                m_gameStartButton->setEnabled(true);
+                m_gameStartButton->setMinimumWidth(100);
+                connect(m_gameStartButton, &QPushButton::clicked, this, &GameRoomWindow::onReadyToggleClicked);
+            }
+            m_gameStartButton->setVisible(true);
+        } else {
+            m_gameStartButton->setVisible(false);
+        }
 
+        updateReadyStates();
+        
         // 게임 상태 라벨 업데이트
         if (m_isGameStarted) {
             PlayerColor currentTurn = m_gameManager->getGameLogic().getCurrentPlayer();
@@ -1093,7 +1186,31 @@ namespace Blokus {
             return;
         }
 
+        // 모든 플레이어가 준비되었는지 확인
+        if (!areAllPlayersReady()) {
+            QMessageBox::information(this, QString::fromUtf8("게임 시작 불가"),
+                QString::fromUtf8("모든 플레이어가 준비 상태가 아닙니다."));
+            return;
+        }
+
         emit gameStartRequested();
+    }
+
+    void GameRoomWindow::onReadyToggleClicked()
+    {
+        // 버튼 비활성화 (서버 응답 대기)
+        m_gameStartButton->setEnabled(false);
+        
+        bool newReadyState = !m_isReady;
+        emit playerReadyChanged(newReadyState);
+        
+        // 타임아웃 타이머 시작 (5초)
+        m_readyButtonTimeout->start(5000);
+        
+        qDebug() << QString::fromUtf8("준비 상태 변경 요청: %1 -> %2").arg(m_isReady ? "준비완료" : "대기중").arg(newReadyState ? "준비완료" : "대기중");
+        
+        // 서버 응답을 기다려서 상태 업데이트하므로 여기서는 UI 변경하지 않음
+        // updateGameControlsState()는 서버 응답 후에 호출됨
     }
 
     void GameRoomWindow::onChatSendClicked()
@@ -1221,13 +1338,23 @@ namespace Blokus {
 
     bool GameRoomWindow::isHost() const
     {
-        return m_roomInfo.hostUsername == m_myUsername;
+        try {
+            return m_roomInfo.hostUsername == m_myUsername;
+        } catch (...) {
+            // 초기화 중 오류 발생 시 안전하게 false 반환
+            return false;
+        }
     }
 
     bool GameRoomWindow::canStartGame() const
     {
-        int playerCount = m_roomInfo.getCurrentPlayerCount();
-        return playerCount >= 2 && !m_isGameStarted;
+        try {
+            int playerCount = m_roomInfo.getCurrentPlayerCount();
+            return playerCount >= 2 && !m_isGameStarted;
+        } catch (...) {
+            // 초기화 중 오류 발생 시 안전하게 false 반환
+            return false;
+        }
     }
 
     bool GameRoomWindow::canKickPlayer(PlayerColor color)
@@ -1236,6 +1363,50 @@ namespace Blokus {
 
         PlayerSlot* slot = findPlayerSlot(color);
         return slot && !slot->isEmpty() && slot->username != m_myUsername;
+    }
+
+    bool GameRoomWindow::areAllPlayersReady() const
+    {
+        QStringList debugInfo;
+        bool allReady = true;
+        
+        for (const auto& slot : m_roomInfo.playerSlots) {
+            if (!slot.isEmpty()) {
+                bool playerReady = slot.isHost || slot.isReady;
+                QString readyStatus = playerReady ? "준비됨" : "준비안됨";
+                QString hostStatus = slot.isHost ? "(호스트)" : "";
+                
+                debugInfo << QString("%1: %2 %3").arg(slot.username).arg(readyStatus).arg(hostStatus);
+                
+                if (!playerReady) {
+                    allReady = false;
+                }
+            }
+        }
+        
+        qDebug() << QString::fromUtf8("게임 시작 조건 확인:");
+        qDebug() << QString::fromUtf8("  - %1").arg(debugInfo.join(", "));
+        qDebug() << QString::fromUtf8("  - 모든 플레이어 준비: %1").arg(allReady ? "예" : "아니오");
+        
+        return allReady;
+    }
+
+    void GameRoomWindow::updateReadyStates()
+    {
+        qDebug() << QString::fromUtf8("준비 상태 UI 업데이트 시작:");
+        
+        // 플레이어 슬롯 위젯들의 준비 상태 표시 업데이트
+        for (int i = 0; i < m_playerSlotWidgets.size() && i < m_roomInfo.playerSlots.size(); ++i) {
+            const auto& slot = m_roomInfo.playerSlots[i];
+            qDebug() << QString::fromUtf8("  슬롯 %1: %2 (준비: %3, 호스트: %4, 빈슬롯: %5)")
+                .arg(i)
+                .arg(slot.username)
+                .arg(slot.isReady ? "예" : "아니오")
+                .arg(slot.isHost ? "예" : "아니오")
+                .arg(slot.isEmpty() ? "예" : "아니오");
+            
+            m_playerSlotWidgets[i]->updateReadyState(slot.isReady);
+        }
     }
 
     PlayerSlot* GameRoomWindow::findPlayerSlot(PlayerColor color)

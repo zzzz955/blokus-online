@@ -185,8 +185,17 @@ private slots:
     {
         qDebug() << QString::fromUtf8("게임 시작 요청");
 
-        if (m_gameRoomWindow) {
-            m_gameRoomWindow->startGame();
+        if (m_networkClient && m_networkClient->isConnected()) {
+            m_networkClient->startGame();
+        }
+    }
+
+    void handlePlayerReadyChanged(bool ready)
+    {
+        qDebug() << QString::fromUtf8("플레이어 준비 상태 변경 요청: %1").arg(ready ? "준비완료" : "준비해제");
+
+        if (m_networkClient && m_networkClient->isConnected()) {
+            m_networkClient->setPlayerReady(ready);
         }
     }
 
@@ -581,6 +590,13 @@ private slots:
         qDebug() << QString::fromUtf8("플레이어 준비 상태 변경: %1 -> %2").arg(username).arg(status);
         
         if (m_gameRoomWindow) {
+            // 내 준비 상태 업데이트 (서버 응답 기준)
+            if (username == m_currentUsername) {
+                m_gameRoomWindow->setMyReadyState(ready);
+            }
+            
+            // 개별 플레이어의 준비 상태만 업데이트 (전체 룸 정보는 건드리지 않음)
+            m_gameRoomWindow->updatePlayerReadyState(username, ready);
             m_gameRoomWindow->addSystemMessage(QString::fromUtf8("%1님이 %2했습니다.").arg(username).arg(status));
         }
     }
@@ -767,6 +783,8 @@ private:
                 this, &AppController::handleLeaveRoomRequest);
             connect(m_gameRoomWindow, &Blokus::GameRoomWindow::gameStartRequested,
                 this, &AppController::handleGameStartRequest);
+            connect(m_gameRoomWindow, &Blokus::GameRoomWindow::playerReadyChanged,
+                this, &AppController::handlePlayerReadyChanged);
             connect(m_gameRoomWindow, &Blokus::GameRoomWindow::chatMessageSent,
                 this, &AppController::handleGameRoomChatMessage);
             
