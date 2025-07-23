@@ -589,22 +589,14 @@ private slots:
         QString status = ready ? QString::fromUtf8("준비 완료") : QString::fromUtf8("대기 중");
         qDebug() << QString::fromUtf8("플레이어 준비 상태 변경: %1 -> %2").arg(username).arg(status);
         
-        // 룸 정보에서 해당 플레이어의 준비 상태 업데이트
-        for (auto& slot : m_currentRoomInfo.playerSlots) {
-            if (slot.username == username) {
-                slot.isReady = ready;
-                break;
-            }
-        }
-        
         if (m_gameRoomWindow) {
             // 내 준비 상태 업데이트 (서버 응답 기준)
             if (username == m_currentUsername) {
                 m_gameRoomWindow->setMyReadyState(ready);
             }
             
-            // 룸 정보 업데이트 후 UI 갱신
-            m_gameRoomWindow->updateRoomInfo(m_currentRoomInfo);
+            // 개별 플레이어의 준비 상태만 업데이트 (전체 룸 정보는 건드리지 않음)
+            m_gameRoomWindow->updatePlayerReadyState(username, ready);
             m_gameRoomWindow->addSystemMessage(QString::fromUtf8("%1님이 %2했습니다.").arg(username).arg(status));
         }
     }

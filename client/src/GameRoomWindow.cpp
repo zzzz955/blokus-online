@@ -232,6 +232,11 @@ namespace Blokus {
 
     void PlayerSlotWidget::updatePlayerSlot(const PlayerSlot& slot)
     {
+        qDebug() << QString::fromUtf8("PlayerSlotWidget::updatePlayerSlot - 색상 %1: %2 (빈슬롯: %3)")
+            .arg(static_cast<int>(m_color))
+            .arg(slot.username)
+            .arg(slot.isEmpty() ? "예" : "아니오");
+            
         m_currentSlot = slot;
 
         // 사용자명 업데이트
@@ -748,6 +753,22 @@ namespace Blokus {
         m_roomInfo = roomInfo;
         updateRoomInfoDisplay();
         updatePlayerSlotsDisplay();
+        updateGameControlsState();
+    }
+
+    void GameRoomWindow::updatePlayerReadyState(const QString& username, bool ready)
+    {
+        // 룸 정보에서 해당 플레이어의 준비 상태 업데이트
+        for (auto& slot : m_roomInfo.playerSlots) {
+            if (slot.username == username) {
+                slot.isReady = ready;
+                qDebug() << QString::fromUtf8("플레이어 %1의 준비 상태 업데이트: %2").arg(username).arg(ready ? "준비완료" : "대기중");
+                break;
+            }
+        }
+        
+        // UI 업데이트 (준비 상태만)
+        updateReadyStates();
         updateGameControlsState();
     }
 
@@ -1372,9 +1393,18 @@ namespace Blokus {
 
     void GameRoomWindow::updateReadyStates()
     {
+        qDebug() << QString::fromUtf8("준비 상태 UI 업데이트 시작:");
+        
         // 플레이어 슬롯 위젯들의 준비 상태 표시 업데이트
         for (int i = 0; i < m_playerSlotWidgets.size() && i < m_roomInfo.playerSlots.size(); ++i) {
             const auto& slot = m_roomInfo.playerSlots[i];
+            qDebug() << QString::fromUtf8("  슬롯 %1: %2 (준비: %3, 호스트: %4, 빈슬롯: %5)")
+                .arg(i)
+                .arg(slot.username)
+                .arg(slot.isReady ? "예" : "아니오")
+                .arg(slot.isHost ? "예" : "아니오")
+                .arg(slot.isEmpty() ? "예" : "아니오");
+            
             m_playerSlotWidgets[i]->updateReadyState(slot.isReady);
         }
     }

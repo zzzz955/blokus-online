@@ -126,6 +126,7 @@ namespace Blokus {
         // 룸 정보 업데이트
         void updateRoomInfo(const GameRoomInfo& roomInfo);
         void updatePlayerSlot(PlayerColor color, const PlayerSlot& slot);
+        void updatePlayerReadyState(const QString& username, bool ready);
 
         // 게임 상태 업데이트
         void startGame();
