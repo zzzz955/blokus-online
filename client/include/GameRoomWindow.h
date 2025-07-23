@@ -139,6 +139,9 @@ namespace Blokus {
         void addChatMessage(const QString& username, const QString& message, bool isSystem = false);
         void addSystemMessage(const QString& message);
 
+        // 호스트 권한 확인
+        bool isHost() const;
+
     signals:
         // 룸 관리 시그널
         void leaveRoomRequested();
@@ -206,8 +209,7 @@ namespace Blokus {
         void updatePlayerScore(PlayerColor player, int scoreToAdd);
         void updatePlayerRemainingBlocks(PlayerColor player, int change);
 
-        // 호스트 권한 확인
-        bool isHost() const;
+        // 권한 확인
         bool canStartGame() const;
         bool canAddAI() const;
         bool canKickPlayer(PlayerColor color);

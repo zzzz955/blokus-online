@@ -175,22 +175,29 @@ namespace Blokus {
 
     void PlayerSlotWidget::updateActionButton()
     {
+        // 호스트 권한 확인
+        GameRoomWindow* gameRoom = qobject_cast<GameRoomWindow*>(parent());
+        bool isHost = gameRoom ? gameRoom->isHost() : false;
+
         // 버튼 텍스트와 기능 결정
         if (m_currentSlot.isEmpty()) {
             m_actionButton->setText(QString::fromUtf8("AI 추가"));
             m_actionButton->setVisible(true);
+            m_actionButton->setEnabled(isHost); // 호스트만 AI 추가 가능
             disconnect(m_actionButton, nullptr, nullptr, nullptr);
             connect(m_actionButton, &QPushButton::clicked, this, &PlayerSlotWidget::onAddAIClicked);
         }
         else if (m_currentSlot.isAI) {
             m_actionButton->setText(QString::fromUtf8("AI 제거"));
             m_actionButton->setVisible(true);
+            m_actionButton->setEnabled(isHost); // 호스트만 AI 제거 가능
             disconnect(m_actionButton, nullptr, nullptr, nullptr);
             connect(m_actionButton, &QPushButton::clicked, this, &PlayerSlotWidget::onRemoveClicked);
         }
         else if (m_isMySlot) {
             m_actionButton->setText(QString::fromUtf8("방 나가기"));
             m_actionButton->setVisible(true);
+            m_actionButton->setEnabled(true); // 자신의 슬롯은 항상 나갈 수 있음
             m_actionButton->setStyleSheet(
                 "QPushButton { background-color: #e74c3c; color: white; border: none; "
                 "border-radius: 6px; font-weight: bold; font-size: 12px; padding: 4px; } "
@@ -202,7 +209,8 @@ namespace Blokus {
         else {
             // 다른 플레이어 - 호스트라면 강퇴 가능
             m_actionButton->setText(QString::fromUtf8("강퇴"));
-            m_actionButton->setVisible(false); // 일단 숨김 (호스트 권한 체크 필요)
+            m_actionButton->setVisible(isHost); // 호스트만 표시
+            m_actionButton->setEnabled(isHost); // 호스트만 활성화
             disconnect(m_actionButton, nullptr, nullptr, nullptr);
             connect(m_actionButton, &QPushButton::clicked, this, &PlayerSlotWidget::onKickClicked);
         }
@@ -1287,6 +1295,12 @@ namespace Blokus {
             onLeaveRoomClicked();
         }
         else {
+            // AI 제거는 호스트만 가능
+            if (slot && slot->isAI && !isHost()) {
+                QMessageBox::information(this, QString::fromUtf8("권한 없음"),
+                    QString::fromUtf8("방장만 AI를 제거할 수 있습니다."));
+                return;
+            }
             emit removePlayerRequested(color);
         }
     }
