@@ -115,7 +115,6 @@ namespace Blokus {
             void broadcastPlayerLeft(const std::string& username);
             void broadcastPlayerReady(const std::string& username, bool ready);
             void broadcastHostChanged(const std::string& newHostName);
-            void broadcastGameStart();
             void broadcastGameEnd();
             void broadcastGameState();
             void broadcastBlockPlacement(const std::string& playerName, const Common::BlockPlacement& placement, int scoreGained);

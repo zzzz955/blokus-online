@@ -225,6 +225,8 @@ namespace Blokus {
         // 플레이어 상태 업데이트
         void updatePlayerScore(PlayerColor player, int scoreToAdd);
         void updatePlayerRemainingBlocks(PlayerColor player, int change);
+        void setPlayerScore(PlayerColor player, int score);
+        void setPlayerRemainingBlocks(PlayerColor player, int remainingBlocks);
 
         // 권한 확인
         bool canStartGame() const;

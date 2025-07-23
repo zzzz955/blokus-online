@@ -1002,7 +1002,7 @@ namespace Blokus {
         updateGameControlsState();
         updateRoomInfoDisplay();
 
-        addSystemMessage(QString::fromUtf8("🎮 게임이 시작되었습니다! (클래식 모드)"));
+        // 시스템 메시지는 서버에서 오는 SYSTEM: 메시지로만 표시 (중복 방지)
 
         qDebug() << QString::fromUtf8("🎉 게임 시작 완료!");
     }
@@ -1067,12 +1067,42 @@ namespace Blokus {
         }
     }
 
+    void GameRoomWindow::setPlayerScore(PlayerColor player, int score)
+    {
+        for (int i = 0; i < m_roomInfo.playerSlots.size(); ++i) {
+            if (m_roomInfo.playerSlots[i].color == player) {
+                m_roomInfo.playerSlots[i].score = score;
+
+                // 해당 슬롯 위젯 업데이트
+                if (i < m_playerSlotWidgets.size()) {
+                    m_playerSlotWidgets[i]->updatePlayerSlot(m_roomInfo.playerSlots[i]);
+                }
+                break;
+            }
+        }
+    }
+
     // 플레이어 남은 블록 수 업데이트
     void GameRoomWindow::updatePlayerRemainingBlocks(PlayerColor player, int change)
     {
         for (int i = 0; i < m_roomInfo.playerSlots.size(); ++i) {
             if (m_roomInfo.playerSlots[i].color == player) {
                 m_roomInfo.playerSlots[i].remainingBlocks += change;
+
+                // 해당 슬롯 위젯 업데이트
+                if (i < m_playerSlotWidgets.size()) {
+                    m_playerSlotWidgets[i]->updatePlayerSlot(m_roomInfo.playerSlots[i]);
+                }
+                break;
+            }
+        }
+    }
+
+    void GameRoomWindow::setPlayerRemainingBlocks(PlayerColor player, int remainingBlocks)
+    {
+        for (int i = 0; i < m_roomInfo.playerSlots.size(); ++i) {
+            if (m_roomInfo.playerSlots[i].color == player) {
+                m_roomInfo.playerSlots[i].remainingBlocks = remainingBlocks;
 
                 // 해당 슬롯 위젯 업데이트
                 if (i < m_playerSlotWidgets.size()) {
@@ -2156,8 +2186,43 @@ namespace Blokus {
             updateRoomInfoDisplay();
         }
         
-        // 보드 상태 업데이트는 별도로 처리 (복잡한 JSON 파싱 필요)
-        // 여기서는 기본적인 턴 정보만 업데이트
+        // 플레이어 점수 파싱 및 업데이트
+        QRegExp scoresRegex("\"scores\":\\{([^}]+)\\}");
+        if (scoresRegex.indexIn(gameStateJson) != -1) {
+            QString scoresStr = scoresRegex.cap(1);
+            QStringList scorePairs = scoresStr.split(',');
+            
+            for (const QString& pair : scorePairs) {
+                QRegExp scoreRegex("\"(\\d+)\":(\\d+)");
+                if (scoreRegex.indexIn(pair) != -1) {
+                    int playerColorInt = scoreRegex.cap(1).toInt();
+                    int score = scoreRegex.cap(2).toInt();
+                    PlayerColor playerColor = static_cast<PlayerColor>(playerColorInt);
+                    
+                    // 플레이어 슬롯의 점수 설정 (절대값)
+                    setPlayerScore(playerColor, score);
+                }
+            }
+        }
+        
+        // 남은 블록 개수 파싱 및 업데이트
+        QRegExp remainingRegex("\"remainingBlocks\":\\{([^}]+)\\}");
+        if (remainingRegex.indexIn(gameStateJson) != -1) {
+            QString remainingStr = remainingRegex.cap(1);
+            QStringList remainingPairs = remainingStr.split(',');
+            
+            for (const QString& pair : remainingPairs) {
+                QRegExp blockRegex("\"(\\d+)\":(\\d+)");
+                if (blockRegex.indexIn(pair) != -1) {
+                    int playerColorInt = blockRegex.cap(1).toInt();
+                    int remainingCount = blockRegex.cap(2).toInt();
+                    PlayerColor playerColor = static_cast<PlayerColor>(playerColorInt);
+                    
+                    // 플레이어 슬롯의 남은 블록 개수 설정 (절대값)
+                    setPlayerRemainingBlocks(playerColor, remainingCount);
+                }
+            }
+        }
     }
 
     void GameRoomWindow::onBlockPlaced(const QString& playerName, int blockType, int row, int col, int rotation, int flip, int playerColor, int scoreGained)

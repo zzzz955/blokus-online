@@ -660,18 +660,10 @@ namespace Blokus::Server {
                 return;
             }
 
-            // 5. RoomManager를 통한 게임 시작
+            // 5. RoomManager를 통한 게임 시작 (브로드캐스트는 startGame 내부에서 처리됨)
             if (roomManager_->startGame(userId)) {
-                // 6. 브로드캐스트 (데드락 방지를 위해 여기서 호출)
-                room->broadcastGameStart();
-
-                // 7. 방의 모든 플레이어 세션 상태를 게임 중으로 변경
-                auto playerList = room->getPlayerList();
-                for (const auto& player : playerList) {
-                    if (player.getSession()) {
-                        player.getSession()->setStateToInGame();
-                    }
-                }
+                // 게임 시작 성공 - 세션 상태는 이미 startGame()에서 설정됨
+                spdlog::info("✅ 게임 시작 성공: 사용자 {}", userId);
 
                 // 8. 성공 응답
                 sendResponse("GAME_START_SUCCESS");

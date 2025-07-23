@@ -1,6 +1,7 @@
 ﻿#include "GameRoom.h"
 #include "Session.h"
 #include "PlayerInfo.h"  // 🔥 새로 추가
+#include "Block.h"       // BlockFactory를 위해 추가
 #include <spdlog/spdlog.h>
 #include <algorithm>
 #include <sstream>
@@ -99,6 +100,8 @@ namespace Blokus {
 
             std::string username = it->getUsername();
             bool wasHost = it->isHost();
+            Common::PlayerColor playerColor = it->getColor();
+            bool wasInGame = (m_state == RoomState::Playing);
 
             m_players.erase(it);
             updateActivity();
@@ -137,10 +140,36 @@ namespace Blokus {
                 return true;
             }
 
-            // 게임 중이었다면 게임 종료
-            if (m_state == RoomState::Playing) {
-                spdlog::info("🎮 방 {} 플레이어 이탈로 인한 게임 강제 종료", m_roomId);
-                endGameLocked();
+            // 게임 중이었다면 추가 처리
+            if (wasInGame && m_gameStateManager && m_state == RoomState::Playing) {
+                // 현재 턴이 나간 플레이어였다면 다음 턴으로 넘어감
+                if (m_gameStateManager->getCurrentPlayer() == playerColor) {
+                    spdlog::info("🔄 나간 플레이어의 턴이었음, 다음 턴으로 전환");
+                    
+                    // 남은 플레이어 중에서 다음 턴 찾기
+                    Common::PlayerColor nextPlayer = playerColor;
+                    int attempts = 0;
+                    do {
+                        m_gameStateManager->nextTurn();
+                        nextPlayer = m_gameStateManager->getCurrentPlayer();
+                        attempts++;
+                    } while (nextPlayer == playerColor && attempts < 5); // 무한 루프 방지
+                    
+                    // 턴 변경 브로드캐스트
+                    if (nextPlayer != playerColor) {
+                        broadcastTurnChange(nextPlayer);
+                    }
+                }
+                
+                // 최소 인원 체크 (2명 미만이면 게임 종료)
+                if (m_players.size() < Common::MIN_PLAYERS_TO_START) {
+                    spdlog::info("🏁 방 {} 최소 인원 미달로 게임 종료", m_roomId);
+                    endGameLocked();
+                } else {
+                    // 게임 계속 진행 - 게임 상태 브로드캐스트
+                    spdlog::info("🎮 방 {} 플레이어 이탈했지만 게임 계속 진행 (남은: {}명)", m_roomId, m_players.size());
+                    broadcastGameState();
+                }
             }
 
             return true;
@@ -602,24 +631,6 @@ namespace Blokus {
             broadcastMessageLocked("SYSTEM:" + oss.str());
         }
 
-        void GameRoom::broadcastGameStart() {
-            std::lock_guard<std::mutex> lock(m_playersMutex);
-            
-            // 구조화된 메시지 전송
-            broadcastMessageLocked("GAME_STARTED");
-            
-            std::ostringstream oss;
-            oss << "게임이 시작되었습니다. 현재 인원 : " << m_players.size() << "명";
-            broadcastMessageLocked("SYSTEM:" + oss.str());
-
-            // 플레이어 정보도 함께 전송
-            std::ostringstream playerInfoMsg;
-            playerInfoMsg << "GAME_PLAYER_INFO";
-            for (const auto& player : m_players) {
-                playerInfoMsg << ":" << player.getUsername() << "," << static_cast<int>(player.getColor());
-            }
-            broadcastMessageLocked(playerInfoMsg.str());
-        }
 
         void GameRoom::broadcastGameEnd() {
             std::lock_guard<std::mutex> lock(m_playersMutex);
@@ -718,6 +729,12 @@ namespace Blokus {
                     newPlayerName = player.getUsername();
                     break;
                 }
+            }
+            
+            // 플레이어를 찾지 못한 경우 오류 로깅
+            if (newPlayerName.empty()) {
+                spdlog::warn("⚠️ 턴 변경 실패: 플레이어 색상 {}에 해당하는 플레이어를 찾을 수 없음", static_cast<int>(newPlayer));
+                return; // 빈 슬롯 메시지 방지
             }
             
             // 턴 변경 알림 메시지
@@ -880,13 +897,7 @@ namespace Blokus {
             }
 
             // 성공적으로 배치됨 - 점수 계산
-            auto currentScores = m_gameLogic->calculateScores();
-            int scoreGained = 0;
-            auto scoreIt = currentScores.find(placement.player);
-            if (scoreIt != currentScores.end()) {
-                // 블록 크기만큼 점수 추가 (단순화)
-                scoreGained = 1; // 실제로는 블록 크기에 따라 계산
-            }
+            int scoreGained = Common::BlockFactory::getBlockScore(placement.type);
             
             spdlog::info("✅ 블록 배치 성공 (방 {}, 사용자 {}, 블록 타입: {}, 획득 점수: {})", 
                 m_roomId, userId, static_cast<int>(placement.type), scoreGained);
@@ -910,7 +921,8 @@ namespace Blokus {
             
             // 시스템 메시지로도 알림
             std::ostringstream systemMsg;
-            systemMsg << "SYSTEM:" << player->getUsername() << "님이 블록을 배치했습니다. (점수: +" << scoreGained << ")";
+            std::string blockName = Common::BlockFactory::getBlockName(placement.type);
+            systemMsg << "SYSTEM:" << player->getUsername() << "님이 " << blockName << " 블록을 배치했습니다. (점수: +" << scoreGained << ")";
             broadcastMessageLocked(systemMsg.str());
 
             // 다음 턴으로 전환
@@ -933,20 +945,25 @@ namespace Blokus {
                     }
                 }
                 
-                // 턴 변경 알림 메시지
-                std::ostringstream turnChangeMsg;
-                turnChangeMsg << "TURN_CHANGED:{"
-                    << "\"newPlayer\":\"" << newPlayerName << "\","
-                    << "\"playerColor\":" << static_cast<int>(newPlayer) << ","
-                    << "\"turnNumber\":" << m_gameStateManager->getTurnNumber()
-                    << "}";
-                
-                broadcastMessageLocked(turnChangeMsg.str());
-                
-                // 시스템 메시지
-                std::ostringstream turnSystemMsg;
-                turnSystemMsg << "SYSTEM:" << newPlayerName << "님의 턴입니다.";
-                broadcastMessageLocked(turnSystemMsg.str());
+                // 플레이어를 찾지 못한 경우 오류 로깅 후 스킵
+                if (newPlayerName.empty()) {
+                    spdlog::warn("⚠️ 턴 변경 실패: 플레이어 색상 {}에 해당하는 플레이어를 찾을 수 없음", static_cast<int>(newPlayer));
+                } else {
+                    // 턴 변경 알림 메시지
+                    std::ostringstream turnChangeMsg;
+                    turnChangeMsg << "TURN_CHANGED:{"
+                        << "\"newPlayer\":\"" << newPlayerName << "\","
+                        << "\"playerColor\":" << static_cast<int>(newPlayer) << ","
+                        << "\"turnNumber\":" << m_gameStateManager->getTurnNumber()
+                        << "}";
+                    
+                    broadcastMessageLocked(turnChangeMsg.str());
+                    
+                    // 시스템 메시지
+                    std::ostringstream turnSystemMsg;
+                    turnSystemMsg << "SYSTEM:" << newPlayerName << "님의 턴입니다.";
+                    broadcastMessageLocked(turnSystemMsg.str());
+                }
             }
 
             // 전체 게임 상태 브로드캐스트 (뮤텍스 내에서 안전하게)
@@ -961,8 +978,33 @@ namespace Blokus {
                 gameStateJson << "\"currentPlayer\":" << static_cast<int>(currentPlayer) << ",";
                 gameStateJson << "\"turnNumber\":" << m_gameStateManager->getTurnNumber() << ",";
                 
-                // 간단한 보드 상태
-                gameStateJson << "\"boardState\":[], \"scores\":{}}";
+                // 플레이어 점수 정보
+                gameStateJson << "\"scores\":{";
+                auto currentScores = m_gameLogic->calculateScores();
+                bool firstScore = true;
+                for (const auto& score : currentScores) {
+                    if (!firstScore) gameStateJson << ",";
+                    gameStateJson << "\"" << static_cast<int>(score.first) << "\":" << score.second;
+                    firstScore = false;
+                }
+                gameStateJson << "},";
+                
+                // 플레이어 남은 블록 개수 정보
+                gameStateJson << "\"remainingBlocks\":{";
+                bool firstRemaining = true;
+                for (const auto& player : m_players) {
+                    if (!firstRemaining) gameStateJson << ",";
+                    
+                    // 남은 블록 개수 계산 (전체 블록 수 - 사용된 블록 수)
+                    auto availableBlocks = m_gameLogic->getAvailableBlocks(player.getColor());
+                    int remainingCount = static_cast<int>(availableBlocks.size());
+                    
+                    gameStateJson << "\"" << static_cast<int>(player.getColor()) << "\":" << remainingCount;
+                    firstRemaining = false;
+                }
+                gameStateJson << "}";
+                
+                gameStateJson << "}";
                 
                 broadcastMessageLocked(gameStateJson.str());
             }
