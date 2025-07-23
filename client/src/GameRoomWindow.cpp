@@ -1042,10 +1042,7 @@ namespace Blokus {
             }
         }
 
-        addSystemMessage(QString::fromUtf8("%1이(가) %2 블록을 배치했습니다. (+%3점)")
-            .arg(playerName)
-            .arg(BlockFactory::getBlockName(blockType))
-            .arg(BlockFactory::getBlockScore(blockType)));
+        // 시스템 메시지는 서버에서 오는 SYSTEM: 메시지로만 표시 (중복 방지)
 
         // 게임 종료 조건 체크
         checkGameEndConditions();
@@ -2139,12 +2136,8 @@ namespace Blokus {
 
     void GameRoomWindow::showTurnChangeNotification(const QString& playerName, bool isMyTurn)
     {
-        // 채팅 창에 턴 전환 메시지 추가
-        if (isMyTurn) {
-            addSystemMessage(QString::fromUtf8("내 턴입니다!"));
-        } else {
-            addSystemMessage(QString::fromUtf8("%1님의 턴입니다").arg(playerName));
-        }
+        // 채팅 창에는 메시지 추가하지 않음 (서버에서 오는 SYSTEM 메시지만 사용)
+        // 중복 방지를 위해 주석 처리
 
         // 상태 바에 일시적으로 턴 전환 메시지 표시
         if (statusBar()) {
@@ -2190,6 +2183,7 @@ namespace Blokus {
         QRegExp scoresRegex("\"scores\":\\{([^}]+)\\}");
         if (scoresRegex.indexIn(gameStateJson) != -1) {
             QString scoresStr = scoresRegex.cap(1);
+            qDebug() << QString::fromUtf8("점수 파싱: %1").arg(scoresStr);
             QStringList scorePairs = scoresStr.split(',');
             
             for (const QString& pair : scorePairs) {
@@ -2199,16 +2193,21 @@ namespace Blokus {
                     int score = scoreRegex.cap(2).toInt();
                     PlayerColor playerColor = static_cast<PlayerColor>(playerColorInt);
                     
+                    qDebug() << QString::fromUtf8("플레이어 %1 점수 업데이트: %2").arg(playerColorInt).arg(score);
+                    
                     // 플레이어 슬롯의 점수 설정 (절대값)
                     setPlayerScore(playerColor, score);
                 }
             }
+        } else {
+            qDebug() << QString::fromUtf8("점수 정보를 찾을 수 없음");
         }
         
         // 남은 블록 개수 파싱 및 업데이트
         QRegExp remainingRegex("\"remainingBlocks\":\\{([^}]+)\\}");
         if (remainingRegex.indexIn(gameStateJson) != -1) {
             QString remainingStr = remainingRegex.cap(1);
+            qDebug() << QString::fromUtf8("남은 블록 파싱: %1").arg(remainingStr);
             QStringList remainingPairs = remainingStr.split(',');
             
             for (const QString& pair : remainingPairs) {
@@ -2218,10 +2217,14 @@ namespace Blokus {
                     int remainingCount = blockRegex.cap(2).toInt();
                     PlayerColor playerColor = static_cast<PlayerColor>(playerColorInt);
                     
+                    qDebug() << QString::fromUtf8("플레이어 %1 남은 블록 업데이트: %2").arg(playerColorInt).arg(remainingCount);
+                    
                     // 플레이어 슬롯의 남은 블록 개수 설정 (절대값)
                     setPlayerRemainingBlocks(playerColor, remainingCount);
                 }
             }
+        } else {
+            qDebug() << QString::fromUtf8("남은 블록 정보를 찾을 수 없음");
         }
     }
 
@@ -2248,9 +2251,7 @@ namespace Blokus {
             }
         }
         
-        // 채팅창에 메시지 추가
-        addSystemMessage(QString::fromUtf8("%1님이 블록을 배치했습니다. (점수: +%2)")
-                        .arg(playerName).arg(scoreGained));
+        // 시스템 메시지는 서버에서 오는 SYSTEM: 메시지로만 표시 (중복 방지)
     }
 
     void GameRoomWindow::onTurnChanged(const QString& newPlayerName, int playerColor, int turnNumber)

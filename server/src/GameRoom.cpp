@@ -712,7 +712,8 @@ namespace Blokus {
             
             // 시스템 메시지로도 알림
             std::ostringstream systemMsg;
-            systemMsg << "SYSTEM:" << playerName << "님이 블록을 배치했습니다. (점수: +" << scoreGained << ")";
+            std::string blockName = Common::BlockFactory::getBlockName(placement.type);
+            systemMsg << "SYSTEM:" << playerName << "님이 " << blockName << " 블록을 배치했습니다. (점수: +" << scoreGained << ")";
             broadcastMessageLocked(systemMsg.str());
             
             spdlog::info("📦 블록 배치 브로드캐스트: 방 {}, 플레이어 {}, 블록 타입 {}", 
@@ -896,34 +897,18 @@ namespace Blokus {
                 return false;
             }
 
+            // 블록 사용 상태 업데이트
+            m_gameLogic->setPlayerBlockUsed(placement.player, placement.type);
+
             // 성공적으로 배치됨 - 점수 계산
             int scoreGained = Common::BlockFactory::getBlockScore(placement.type);
             
             spdlog::info("✅ 블록 배치 성공 (방 {}, 사용자 {}, 블록 타입: {}, 획득 점수: {})", 
                 m_roomId, userId, static_cast<int>(placement.type), scoreGained);
 
-            // 블록 배치 알림 브로드캐스트 (뮤텍스 내에서 안전하게)
+            // 블록 배치 알림 브로드캐스트 
             spdlog::info("🔄 블록 배치 브로드캐스트 시작: 방 {}", m_roomId);
-            
-            // 블록 배치 알림 메시지 생성 및 브로드캐스트
-            std::ostringstream blockPlacementMsg;
-            blockPlacementMsg << "BLOCK_PLACED:{"
-                << "\"player\":\"" << player->getUsername() << "\","
-                << "\"blockType\":" << static_cast<int>(placement.type) << ","
-                << "\"position\":{\"row\":" << placement.position.first << ",\"col\":" << placement.position.second << "},"
-                << "\"rotation\":" << static_cast<int>(placement.rotation) << ","
-                << "\"flip\":" << static_cast<int>(placement.flip) << ","
-                << "\"playerColor\":" << static_cast<int>(placement.player) << ","
-                << "\"scoreGained\":" << scoreGained
-                << "}";
-            
-            broadcastMessageLocked(blockPlacementMsg.str());
-            
-            // 시스템 메시지로도 알림
-            std::ostringstream systemMsg;
-            std::string blockName = Common::BlockFactory::getBlockName(placement.type);
-            systemMsg << "SYSTEM:" << player->getUsername() << "님이 " << blockName << " 블록을 배치했습니다. (점수: +" << scoreGained << ")";
-            broadcastMessageLocked(systemMsg.str());
+            broadcastBlockPlacement(player->getUsername(), placement, scoreGained);
 
             // 다음 턴으로 전환
             Common::PlayerColor previousPlayer = m_gameStateManager->getCurrentPlayer();
