@@ -69,6 +69,7 @@ namespace Blokus {
             // 게임 제어
             bool startGame();
             bool endGame();
+            bool endGameLocked(); // 데드락 방지용 내부 메서드
             bool pauseGame();
             bool resumeGame();
             void resetGame();
@@ -86,6 +87,7 @@ namespace Blokus {
 
             // 메시지 전송
             void broadcastMessage(const std::string& message, const std::string& excludeUserId = "");
+            void broadcastMessageLocked(const std::string& message, const std::string& excludeUserId = "");
             void sendToPlayer(const std::string& userId, const std::string& message);
             void sendToHost(const std::string& message);
 

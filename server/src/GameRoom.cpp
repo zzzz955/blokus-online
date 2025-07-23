@@ -105,13 +105,16 @@ namespace Blokus {
 
             spdlog::info("✅ 방 {} 플레이어 제거: '{}' (남은: {}명)", m_roomId, username, m_players.size());
 
-            // 다른 플레이어들에게 나간 것을 알림
-            broadcastPlayerLeft(username);
+            // 다른 플레이어들에게 나간 것을 알림 (뮤텍스 내에서 직접 브로드캐스트)
+            broadcastMessageLocked("PLAYER_LEFT:" + username);
+            std::ostringstream leftMsg;
+            leftMsg << username << "님이 퇴장하셨습니다. 현재 인원 : " << m_players.size() << "명";
+            broadcastMessageLocked("SYSTEM:" + leftMsg.str());
 
             // 호스트가 나간 경우 새 호스트 선정
             if (wasHost && !m_players.empty()) {
                 autoSelectNewHost();
-                // 새 호스트 알림
+                // 새 호스트 알림 (뮤텍스 내에서 직접 브로드캐스트)
                 std::string newHostName = "";
                 for (const auto& player : m_players) {
                     if (player.isHost()) {
@@ -120,7 +123,10 @@ namespace Blokus {
                     }
                 }
                 if (!newHostName.empty()) {
-                    broadcastHostChanged(newHostName);
+                    broadcastMessageLocked("HOST_CHANGED:" + newHostName);
+                    std::ostringstream hostMsg;
+                    hostMsg << newHostName << "님이 방장이 되셨습니다";
+                    broadcastMessageLocked("SYSTEM:" + hostMsg.str());
                 }
             }
 
@@ -134,7 +140,7 @@ namespace Blokus {
             // 게임 중이었다면 게임 종료
             if (m_state == RoomState::Playing) {
                 spdlog::info("🎮 방 {} 플레이어 이탈로 인한 게임 강제 종료", m_roomId);
-                endGame();
+                endGameLocked();
             }
 
             return true;
@@ -342,11 +348,37 @@ namespace Blokus {
                 }
             }
 
-            // 게임 시작 브로드캐스트
-            broadcastGameStart();
+            // 게임 시작 브로드캐스트 (뮤텍스 내에서 안전하게)
+            broadcastMessageLocked("GAME_STARTED");
             
-            // 초기 게임 상태 브로드캐스트
-            broadcastGameState();
+            std::ostringstream startMsg;
+            startMsg << "게임이 시작되었습니다. 현재 인원 : " << m_players.size() << "명";
+            broadcastMessageLocked("SYSTEM:" + startMsg.str());
+
+            // 플레이어 정보도 함께 전송
+            std::ostringstream playerInfoMsg;
+            playerInfoMsg << "GAME_PLAYER_INFO";
+            for (const auto& player : m_players) {
+                playerInfoMsg << ":" << player.getUsername() << "," << static_cast<int>(player.getColor());
+            }
+            broadcastMessageLocked(playerInfoMsg.str());
+            
+            // 초기 게임 상태 브로드캐스트 (뮤텍스 내에서 안전하게)
+            if (m_state == RoomState::Playing) {
+                // JSON 형태로 게임 상태 생성
+                std::ostringstream gameStateJson;
+                gameStateJson << "GAME_STATE_UPDATE:{";
+                
+                // 현재 턴 정보
+                Common::PlayerColor currentPlayer = m_gameStateManager->getCurrentPlayer();
+                gameStateJson << "\"currentPlayer\":" << static_cast<int>(currentPlayer) << ",";
+                gameStateJson << "\"turnNumber\":" << m_gameStateManager->getTurnNumber() << ",";
+                
+                // 간단한 보드 상태 (초기는 빈 보드)
+                gameStateJson << "\"boardState\":[], \"scores\":{}}";
+                
+                broadcastMessageLocked(gameStateJson.str());
+            }
 
             spdlog::info("🎮 방 {} 게임 시작: {} 플레이어, 턴 순서 설정됨", m_roomId, m_players.size());
             return true;
@@ -354,7 +386,11 @@ namespace Blokus {
 
         bool GameRoom::endGame() {
             std::lock_guard<std::mutex> lock(m_playersMutex);
+            return endGameLocked();
+        }
 
+        bool GameRoom::endGameLocked() {
+            // 뮤텍스가 이미 잠겨있다고 가정하고 실행 (데드락 방지용)
             if (m_state != RoomState::Playing) {
                 return false;
             }
@@ -371,8 +407,9 @@ namespace Blokus {
                 }
             }
 
-            // 게임 종료 브로드캐스트
-            broadcastGameEnd();
+            // 게임 종료 브로드캐스트 (뮤텍스 내에서 안전하게)
+            broadcastMessageLocked("GAME_ENDED");
+            broadcastMessageLocked("SYSTEM:게임이 종료되었습니다.");
 
             spdlog::info("🎮 방 {} 게임 종료", m_roomId);
             return true;
@@ -392,7 +429,7 @@ namespace Blokus {
             updateActivity();
 
             spdlog::info("🔄 방 {} 게임 리셋", m_roomId);
-            broadcastMessage("GAME_RESET");
+            broadcastMessageLocked("GAME_RESET");
         }
 
         // ========================================
@@ -401,7 +438,11 @@ namespace Blokus {
 
         void GameRoom::broadcastMessage(const std::string& message, const std::string& excludeUserId) {
             std::lock_guard<std::mutex> lock(m_playersMutex);
+            broadcastMessageLocked(message, excludeUserId);
+        }
 
+        void GameRoom::broadcastMessageLocked(const std::string& message, const std::string& excludeUserId) {
+            // 뮤텍스가 이미 잠겨있다고 가정하고 실행 (데드락 방지용)
             spdlog::info("📢 브로드캐스트 시작: 방 {}, 메시지: '{}', 플레이어 수: {}", 
                 m_roomId, message.substr(0, 50) + (message.length() > 50 ? "..." : ""), m_players.size());
 
@@ -522,58 +563,70 @@ namespace Blokus {
         // ========================================
 
         void GameRoom::broadcastPlayerJoined(const std::string& username) {
+            std::lock_guard<std::mutex> lock(m_playersMutex);
+            
             // 구조화된 메시지와 시스템 메시지 모두 전송
-            broadcastMessage("PLAYER_JOINED:" + username);
+            broadcastMessageLocked("PLAYER_JOINED:" + username);
             
             std::ostringstream oss;
-            oss << username << "님이 입장하셨습니다. 현재 인원 : " << getPlayerCount() << "명";
-            broadcastMessage("SYSTEM:" + oss.str());
+            oss << username << "님이 입장하셨습니다. 현재 인원 : " << m_players.size() << "명";
+            broadcastMessageLocked("SYSTEM:" + oss.str());
         }
 
         void GameRoom::broadcastPlayerLeft(const std::string& username) {
+            std::lock_guard<std::mutex> lock(m_playersMutex);
+            
             // 구조화된 메시지와 시스템 메시지 모두 전송
-            broadcastMessage("PLAYER_LEFT:" + username);
+            broadcastMessageLocked("PLAYER_LEFT:" + username);
             
             std::ostringstream oss;
-            oss << username << "님이 퇴장하셨습니다. 현재 인원 : " << getPlayerCount() << "명";
-            broadcastMessage("SYSTEM:" + oss.str());
+            oss << username << "님이 퇴장하셨습니다. 현재 인원 : " << m_players.size() << "명";
+            broadcastMessageLocked("SYSTEM:" + oss.str());
         }
 
         void GameRoom::broadcastPlayerReady(const std::string& username, bool ready) {
+            std::lock_guard<std::mutex> lock(m_playersMutex);
             std::ostringstream oss;
             oss << "PLAYER_READY:" << username << ":" << (ready ? "1" : "0");
-            broadcastMessage(oss.str());
+            broadcastMessageLocked(oss.str());
         }
 
         void GameRoom::broadcastHostChanged(const std::string& newHostName) {
+            std::lock_guard<std::mutex> lock(m_playersMutex);
+            
             // 구조화된 메시지와 시스템 메시지 모두 전송
-            broadcastMessage("HOST_CHANGED:" + newHostName);
+            broadcastMessageLocked("HOST_CHANGED:" + newHostName);
             
             std::ostringstream oss;
             oss << newHostName << "님이 방장이 되셨습니다";
-            broadcastMessage("SYSTEM:" + oss.str());
+            broadcastMessageLocked("SYSTEM:" + oss.str());
         }
 
         void GameRoom::broadcastGameStart() {
+            std::lock_guard<std::mutex> lock(m_playersMutex);
+            
             // 구조화된 메시지 전송
-            broadcastMessage("GAME_STARTED");
+            broadcastMessageLocked("GAME_STARTED");
             
             std::ostringstream oss;
-            oss << "게임이 시작되었습니다. 현재 인원 : " << getPlayerCount() << "명";
-            broadcastMessage("SYSTEM:" + oss.str());
+            oss << "게임이 시작되었습니다. 현재 인원 : " << m_players.size() << "명";
+            broadcastMessageLocked("SYSTEM:" + oss.str());
 
             // 플레이어 정보도 함께 전송
+            std::ostringstream playerInfoMsg;
+            playerInfoMsg << "GAME_PLAYER_INFO";
             for (const auto& player : m_players) {
-                oss << ":" << player.getUsername() << "," << static_cast<int>(player.getColor());
+                playerInfoMsg << ":" << player.getUsername() << "," << static_cast<int>(player.getColor());
             }
-
-            broadcastMessage(oss.str());
+            broadcastMessageLocked(playerInfoMsg.str());
         }
 
         void GameRoom::broadcastGameEnd() {
+            std::lock_guard<std::mutex> lock(m_playersMutex);
+            
             // 구조화된 메시지와 시스템 메시지 모두 전송
-            broadcastMessage("GAME_ENDED");
-            broadcastMessage("SYSTEM:게임이 종료되었습니다.");
+            broadcastMessageLocked("GAME_ENDED");
+            broadcastMessageLocked("SYSTEM:게임이 종료되었습니다.");
         }
 
         void GameRoom::broadcastGameState() {
@@ -621,7 +674,7 @@ namespace Blokus {
             
             // 모든 플레이어에게 브로드캐스트
             std::string message = gameStateJson.str();
-            broadcastMessage(message);
+            broadcastMessageLocked(message);
             
             spdlog::info("🔄 게임 상태 브로드캐스트: 방 {}, 현재 턴: {}", 
                 m_roomId, static_cast<int>(currentPlayer));
@@ -644,12 +697,12 @@ namespace Blokus {
                 << "\"scoreGained\":" << scoreGained
                 << "}";
             
-            broadcastMessage(blockPlacementMsg.str());
+            broadcastMessageLocked(blockPlacementMsg.str());
             
             // 시스템 메시지로도 알림
             std::ostringstream systemMsg;
             systemMsg << "SYSTEM:" << playerName << "님이 블록을 배치했습니다. (점수: +" << scoreGained << ")";
-            broadcastMessage(systemMsg.str());
+            broadcastMessageLocked(systemMsg.str());
             
             spdlog::info("📦 블록 배치 브로드캐스트: 방 {}, 플레이어 {}, 블록 타입 {}", 
                 m_roomId, playerName, static_cast<int>(placement.type));
@@ -675,12 +728,12 @@ namespace Blokus {
                 << "\"turnNumber\":" << m_gameStateManager->getTurnNumber()
                 << "}";
             
-            broadcastMessage(turnChangeMsg.str());
+            broadcastMessageLocked(turnChangeMsg.str());
             
             // 시스템 메시지
             std::ostringstream systemMsg;
             systemMsg << "SYSTEM:" << newPlayerName << "님의 턴입니다.";
-            broadcastMessage(systemMsg.str());
+            broadcastMessageLocked(systemMsg.str());
             
             spdlog::info("🔄 턴 변경 브로드캐스트: 방 {}, 새 플레이어 {} ({})", 
                 m_roomId, newPlayerName, static_cast<int>(newPlayer));
