@@ -137,6 +137,9 @@ namespace Blokus {
         // 채팅 메시지 추가
         void addChatMessage(const QString& username, const QString& message, bool isSystem = false);
         void addSystemMessage(const QString& message);
+        
+        // 서버 통신
+        void sendBlockPlacementToServer(BlockType blockType, PlayerColor playerColor, int row, int col, int rotation, int flip);
 
         // 호스트 권한 확인
         bool isHost() const;
@@ -155,6 +158,7 @@ namespace Blokus {
 
         // 게임 플레이 시그널
         void blockPlacedRequested(const Block& block, const Position& position);
+        void blockPlacementRequested(const QString& gameMessage);
         void turnSkipRequested();
 
         // 채팅 시그널
@@ -184,7 +188,7 @@ namespace Blokus {
         // 게임보드 이벤트
         void onCellClicked(int row, int col);
         void onCellHovered(int row, int col);
-        void onBlockPlacedSuccessfully(BlockType blockType, PlayerColor player);
+        void onBlockPlacedSuccessfully(BlockType blockType, PlayerColor player, int row, int col, int rotation, int flip);
         void onBlockSelected(const Block& block);
 
     protected:

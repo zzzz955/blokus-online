@@ -383,7 +383,7 @@ namespace Blokus {
         if (m_gameLogic->canPlaceBlock(placement)) {
             if (m_gameLogic->placeBlock(placement)) {
                 addBlockToBoard(blockToPlace, position);
-                emit blockPlacedSuccessfully(blockToPlace.getType(), currentPlayer);
+                emit blockPlacedSuccessfully(blockToPlace.getType(), currentPlayer, position.first, position.second, static_cast<int>(blockToPlace.getRotation()), static_cast<int>(blockToPlace.getFlipState()));
                 clearSelection();
                 return true;
             }

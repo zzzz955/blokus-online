@@ -1008,15 +1008,20 @@ namespace Blokus {
     }
 
     // 블록 배치 성공 시 처리
-    void GameRoomWindow::onBlockPlacedSuccessfully(BlockType blockType, PlayerColor player)
+    void GameRoomWindow::onBlockPlacedSuccessfully(BlockType blockType, PlayerColor player, int row, int col, int rotation, int flip)
     {
-        qDebug() << QString::fromUtf8("블록 배치 성공: %1 플레이어의 %2 블록")
+        qDebug() << QString::fromUtf8("블록 배치 성공: %1 플레이어의 %2 블록 (위치: %3,%4, 회전: %5, 뒤집기: %6)")
             .arg(Utils::playerColorToString(player))
-            .arg(BlockFactory::getBlockName(blockType));
+            .arg(BlockFactory::getBlockName(blockType))
+            .arg(row).arg(col).arg(rotation).arg(flip);
 
-        // 내 블록이 배치되었으면 팔레트에서 제거
+        // 내 플레이어만 서버에 블록 배치 알림 (중복 방지)
         PlayerColor myColor = m_roomInfo.getMyColor(m_myUsername);
         if (player == myColor) {
+            // 서버에 블록 배치 정보 전송 (실제 위치 정보 포함)
+            sendBlockPlacementToServer(blockType, player, row, col, rotation, flip);
+            
+            // 내 블록 팔레트에서 제거
             m_myBlockPalette->removeBlock(blockType);
         }
 
@@ -2201,6 +2206,23 @@ namespace Blokus {
         // UI 업데이트
         updateGameControlsState();
         updateRoomInfoDisplay();
+    }
+
+    void GameRoomWindow::sendBlockPlacementToServer(BlockType blockType, PlayerColor playerColor, int row, int col, int rotation, int flip)
+    {
+        // 서버 메시지 형식: game:move:블록타입:x좌표:y좌표:회전도:뒤집기
+        QString gameMessage = QString("game:move:%1:%2:%3:%4:%5")
+            .arg(static_cast<int>(blockType))  // 블록 타입
+            .arg(col)                          // x 좌표 (열)
+            .arg(row)                          // y 좌표 (행)  
+            .arg(rotation)                     // 회전도
+            .arg(flip);                        // 뒤집기
+
+        qDebug() << QString::fromUtf8("🚀 서버에 블록 배치 메시지 전송: %1 (위치: %2,%3, 회전: %4, 뒤집기: %5)")
+            .arg(gameMessage).arg(row).arg(col).arg(rotation).arg(flip);
+        
+        // 시그널을 통해 AppController로 전달하여 NetworkClient를 통해 서버에 전송
+        emit blockPlacementRequested(gameMessage);
     }
 
 } // namespace Blokus

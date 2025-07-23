@@ -210,6 +210,19 @@ private slots:
         }
     }
 
+    void handleBlockPlacementRequest(const QString& gameMessage)
+    {
+        qDebug() << QString::fromUtf8("🎮 블록 배치 요청: %1").arg(gameMessage);
+        
+        // 서버에 게임 이동 메시지 전송
+        if (m_networkClient && m_networkClient->isConnected()) {
+            m_networkClient->sendMessage(gameMessage);
+            qDebug() << QString::fromUtf8("✅ 서버에 블록 배치 메시지 전송 완료");
+        } else {
+            qWarning() << QString::fromUtf8("❌ 서버 연결이 없어 블록 배치 메시지를 보낼 수 없습니다");
+        }
+    }
+
     // 네트워크 시그널 핸들러들
     void onNetworkConnected()
     {
@@ -787,6 +800,8 @@ private:
                 this, &AppController::handlePlayerReadyChanged);
             connect(m_gameRoomWindow, &Blokus::GameRoomWindow::chatMessageSent,
                 this, &AppController::handleGameRoomChatMessage);
+            connect(m_gameRoomWindow, &Blokus::GameRoomWindow::blockPlacementRequested,
+                this, &AppController::handleBlockPlacementRequest);
             
             // 게임 상태 동기화 시그널 연결 (게임 진행 중 보드 상태 및 턴 동기화)
             connect(m_networkClient, &Blokus::NetworkClient::gameStateUpdated,
