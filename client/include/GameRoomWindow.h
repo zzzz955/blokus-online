@@ -84,6 +84,7 @@ namespace Blokus {
         PlayerColor getColor() const { return m_color; }
         void updateActionButton();
         void updateReadyState(bool isReady);
+        void setCurrentTurn(bool isCurrentTurn);
 
     signals:
         void kickPlayerRequested(PlayerColor color);
@@ -142,6 +143,9 @@ namespace Blokus {
         
         // 내 준비 상태 설정
         void setMyReadyState(bool ready);
+        
+        // 턴 전환 알림
+        void showTurnChangeNotification(const QString& playerName, bool isMyTurn);
 
     signals:
         // 룸 관리 시그널
@@ -267,6 +271,7 @@ namespace Blokus {
         // 상태 관리
         bool m_isGameStarted;
         bool m_isReady;              // 내 준비 상태
+        PlayerColor m_previousTurn;  // 이전 턴 추적용
         QTimer* m_turnTimer;
         QTimer* m_readyButtonTimeout; // 준비 버튼 타임아웃
         QList<QString> m_chatHistory;

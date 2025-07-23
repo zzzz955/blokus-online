@@ -312,6 +312,40 @@ namespace Blokus {
         }
     }
 
+    void PlayerSlotWidget::setCurrentTurn(bool isCurrentTurn)
+    {
+        if (m_currentSlot.isEmpty()) {
+            return;
+        }
+
+        // 현재 턴인 플레이어 슬롯에 시각적 하이라이트 추가
+        if (isCurrentTurn) {
+            // 턴 하이라이트 스타일 적용
+            setStyleSheet("PlayerSlotWidget {"
+                "border: 3px solid #f39c12;"
+                "border-radius: 8px;"
+                "background-color: rgba(243, 156, 18, 0.1);"
+                "}");
+            
+            // 사용자 이름 라벨 강조
+            if (m_usernameLabel) {
+                m_usernameLabel->setStyleSheet("font-size: 12px; font-weight: bold; color: #f39c12;");
+            }
+        } else {
+            // 기본 스타일로 되돌리기
+            setStyleSheet("PlayerSlotWidget {"
+                "border: 1px solid #bdc3c7;"
+                "border-radius: 8px;"
+                "background-color: #ecf0f1;"
+                "}");
+            
+            // 사용자 이름 라벨 기본 스타일
+            if (m_usernameLabel) {
+                m_usernameLabel->setStyleSheet("font-size: 12px; font-weight: bold; color: #2c3e50;");
+            }
+        }
+    }
+
     // ========================================
     // GameRoomWindow 구현
     // ========================================
@@ -342,6 +376,7 @@ namespace Blokus {
         , m_coordinateLabel(nullptr)
         , m_isGameStarted(false)
         , m_isReady(false)
+        , m_previousTurn(PlayerColor::None)
         , m_turnTimer(new QTimer(this))
         , m_readyButtonTimeout(new QTimer(this))
     {
@@ -857,12 +892,40 @@ namespace Blokus {
 
         updateReadyStates();
         
-        // 게임 상태 라벨 업데이트
+        // 게임 상태 라벨 업데이트 및 플레이어 슬롯 하이라이트
         if (m_isGameStarted) {
             PlayerColor currentTurn = m_gameManager->getGameLogic().getCurrentPlayer();
+            
+            // 턴 변경 감지 및 알림
+            if (currentTurn != m_previousTurn && m_previousTurn != PlayerColor::None) {
+                QString currentPlayerName = "";
+                for (const auto& slot : m_roomInfo.playerSlots) {
+                    if (slot.color == currentTurn) {
+                        currentPlayerName = slot.getDisplayName();
+                        break;
+                    }
+                }
+                
+                bool isMyTurn = m_roomInfo.isMyTurn(m_myUsername, currentTurn);
+                showTurnChangeNotification(currentPlayerName, isMyTurn);
+            }
+            m_previousTurn = currentTurn;
+            
+            // 모든 플레이어 슬롯의 턴 하이라이트 업데이트
+            for (int i = 0; i < m_playerSlotWidgets.size(); ++i) {
+                PlayerSlotWidget* slotWidget = m_playerSlotWidgets[i];
+                bool isCurrentTurn = (slotWidget->getColor() == currentTurn);
+                slotWidget->setCurrentTurn(isCurrentTurn);
+            }
+            
             if (m_roomInfo.isMyTurn(m_myUsername, currentTurn)) {
                 m_gameStatusLabel->setText(QString::fromUtf8("내 턴입니다!"));
                 m_gameStatusLabel->setStyleSheet("font-size: 14px; font-weight: bold; color: #27ae60;");
+                
+                // 내 블록 팔레트 활성화
+                if (m_myBlockPalette) {
+                    m_myBlockPalette->setEnabled(true);
+                }
             }
             else {
                 QString turnPlayerName = "";
@@ -874,9 +937,19 @@ namespace Blokus {
                 }
                 m_gameStatusLabel->setText(QString::fromUtf8("%1 턴").arg(turnPlayerName));
                 m_gameStatusLabel->setStyleSheet("font-size: 14px; font-weight: bold; color: #34495e;");
+                
+                // 내 블록 팔레트 비활성화
+                if (m_myBlockPalette) {
+                    m_myBlockPalette->setEnabled(false);
+                }
             }
         }
         else {
+            // 게임이 시작되지 않은 경우 모든 슬롯 하이라이트 제거
+            for (int i = 0; i < m_playerSlotWidgets.size(); ++i) {
+                m_playerSlotWidgets[i]->setCurrentTurn(false);
+            }
+            
             if (canStart) {
                 m_gameStatusLabel->setText(QString::fromUtf8("게임 시작 준비됨"));
                 m_gameStatusLabel->setStyleSheet("font-size: 14px; font-weight: bold; color: #27ae60;");
@@ -2023,6 +2096,33 @@ namespace Blokus {
         m_selectedBlock = Block(BlockType::Single, PlayerColor::None);
 
         qDebug() << QString::fromUtf8("MyBlockPalette 선택 해제됨");
+    }
+
+    // ========================================
+    // GameRoomWindow 턴 전환 메서드
+    // ========================================
+
+    void GameRoomWindow::showTurnChangeNotification(const QString& playerName, bool isMyTurn)
+    {
+        // 채팅 창에 턴 전환 메시지 추가
+        if (isMyTurn) {
+            addSystemMessage(QString::fromUtf8("내 턴입니다!"));
+        } else {
+            addSystemMessage(QString::fromUtf8("%1님의 턴입니다").arg(playerName));
+        }
+
+        // 상태 바에 일시적으로 턴 전환 메시지 표시
+        if (statusBar()) {
+            if (isMyTurn) {
+                statusBar()->showMessage(QString::fromUtf8("🎯 내 턴 - 블록을 배치하세요!"), 3000);
+            } else {
+                statusBar()->showMessage(QString::fromUtf8("⏳ %1님이 블록을 배치하는 중...").arg(playerName), 3000);
+            }
+        }
+
+        // 로그 출력
+        qDebug() << QString::fromUtf8("턴 전환: %1 (내턴=%2)")
+            .arg(playerName).arg(isMyTurn ? "예" : "아니오");
     }
 
 } // namespace Blokus

@@ -866,17 +866,40 @@ namespace Blokus::Server {
                 return;
             }
 
-            // TODO: 실제 게임 로직 구현
-            // - 블록 배치 유효성 검사
-            // - 턴 순서 확인
-            // - 게임 규칙 적용
-            // - 게임 상태 업데이트
-            // - 다른 플레이어들에게 알림
+            // 파라미터 파싱: 블록타입:x좌표:y좌표:회전도[:뒤집기]
+            std::string blockTypeStr = params[0];
+            int x = std::stoi(params[1]);
+            int y = std::stoi(params[2]);
+            int rotation = std::stoi(params[3]);
+            int flip = (params.size() > 4) ? std::stoi(params[4]) : 0;
 
-            spdlog::info("🎮 게임 이동: '{}' (방 {})", userId, roomId);
+            // 블록 배치 정보 생성
+            Common::BlockPlacement placement;
+            placement.type = static_cast<Common::BlockType>(std::stoi(blockTypeStr));
+            placement.position = { y, x }; // row, col 순서
+            placement.rotation = static_cast<Common::Rotation>(rotation);
+            placement.flip = static_cast<Common::FlipState>(flip);
+            
+            // 플레이어 색상 설정
+            auto* player = room->getPlayer(userId);
+            if (!player) {
+                sendError("플레이어 정보를 찾을 수 없습니다");
+                return;
+            }
+            placement.player = player->getColor();
 
-            // 임시 성공 응답
-            sendResponse("GAME_MOVE_SUCCESS");
+            // 블록 배치 시도
+            bool success = room->handleBlockPlacement(userId, placement);
+            if (success) {
+                spdlog::info("🎮 블록 배치 성공: '{}' (방 {}, 위치: {},{}, 타입: {})", 
+                    userId, roomId, y, x, static_cast<int>(placement.type));
+                
+                // 성공 응답과 함께 게임 상태 브로드캐스트
+                sendResponse("GAME_MOVE_SUCCESS");
+                room->broadcastGameState();
+            } else {
+                sendError("블록 배치에 실패했습니다");
+            }
 
         }
         catch (const std::exception& e) {

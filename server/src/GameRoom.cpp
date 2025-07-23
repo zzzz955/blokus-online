@@ -18,6 +18,7 @@ namespace Blokus {
             , m_hostId(hostId)
             , m_state(RoomState::Waiting)
             , m_gameLogic(std::make_unique<Common::GameLogic>())
+            , m_gameStateManager(std::make_unique<Common::GameStateManager>())
             , m_createdTime(std::chrono::steady_clock::now())
             , m_gameStartTime{}
             , m_lastActivity(std::chrono::steady_clock::now())
@@ -309,7 +310,18 @@ namespace Blokus {
             m_gameLogic->clearBoard();
             assignColorsAutomatically();
 
-            spdlog::info("🎮 방 {} 게임 시작: {} 플레이어", m_roomId, m_players.size());
+            // 턴 순서 설정 (플레이어 색상 기준)
+            std::vector<Common::PlayerColor> turnOrder;
+            for (const auto& player : m_players) {
+                if (player.getColor() != Common::PlayerColor::None) {
+                    turnOrder.push_back(player.getColor());
+                }
+            }
+            
+            // 게임 상태 관리자 시작
+            m_gameStateManager->startNewGame(turnOrder);
+
+            spdlog::info("🎮 방 {} 게임 시작: {} 플레이어, 턴 순서 설정됨", m_roomId, m_players.size());
             return true;
         }
 
@@ -336,6 +348,7 @@ namespace Blokus {
             std::lock_guard<std::mutex> lock(m_playersMutex);
 
             m_gameLogic->clearBoard();
+            m_gameStateManager->resetGame();
             m_state = RoomState::Waiting;
 
             for (auto& player : m_players) {
@@ -617,6 +630,111 @@ namespace Blokus {
             for (auto& player : m_players) {
                 player.resetForNewGame();
             }
+        }
+
+        // ========================================
+        // 턴 관리 메서드
+        // ========================================
+
+        bool GameRoom::handleBlockPlacement(const std::string& userId, const Common::BlockPlacement& placement) {
+            std::lock_guard<std::mutex> lock(m_playersMutex);
+
+            // 게임이 진행 중인지 확인
+            if (m_state != RoomState::Playing) {
+                spdlog::warn("❌ 블록 배치 실패: 게임이 진행 중이 아님 (방 {})", m_roomId);
+                return false;
+            }
+
+            // 플레이어 찾기
+            auto* player = getPlayer(userId);
+            if (!player) {
+                spdlog::warn("❌ 블록 배치 실패: 플레이어를 찾을 수 없음 (방 {}, 사용자 {})", m_roomId, userId);
+                return false;
+            }
+
+            // 플레이어 턴 확인
+            if (!isPlayerTurn(userId)) {
+                spdlog::warn("❌ 블록 배치 실패: 플레이어 턴이 아님 (방 {}, 사용자 {})", m_roomId, userId);
+                return false;
+            }
+
+            // 플레이어 색상과 배치 색상 일치 확인
+            if (player->getColor() != placement.player) {
+                spdlog::warn("❌ 블록 배치 실패: 색상 불일치 (방 {}, 사용자 {}, 플레이어 색상: {}, 배치 색상: {})", 
+                    m_roomId, userId, static_cast<int>(player->getColor()), static_cast<int>(placement.player));
+                return false;
+            }
+
+            // 블록 배치 시도
+            if (!m_gameLogic->canPlaceBlock(placement)) {
+                spdlog::warn("❌ 블록 배치 실패: 게임 규칙 위반 (방 {}, 사용자 {})", m_roomId, userId);
+                return false;
+            }
+
+            if (!m_gameLogic->placeBlock(placement)) {
+                spdlog::warn("❌ 블록 배치 실패: 블록 배치 불가 (방 {}, 사용자 {})", m_roomId, userId);
+                return false;
+            }
+
+            // 성공적으로 배치됨
+            spdlog::info("✅ 블록 배치 성공 (방 {}, 사용자 {}, 블록 타입: {})", 
+                m_roomId, userId, static_cast<int>(placement.type));
+
+            // 다음 턴으로 전환
+            m_gameStateManager->nextTurn();
+
+            // 게임 종료 조건 확인
+            if (m_gameStateManager->getGameState() == Common::GameState::Finished) {
+                endGame();
+            }
+
+            return true;
+        }
+
+        bool GameRoom::skipPlayerTurn(const std::string& userId) {
+            std::lock_guard<std::mutex> lock(m_playersMutex);
+
+            // 게임이 진행 중인지 확인
+            if (m_state != RoomState::Playing) {
+                return false;
+            }
+
+            // 플레이어 턴 확인
+            if (!isPlayerTurn(userId)) {
+                return false;
+            }
+
+            // 턴 스킵
+            spdlog::info("⏭️ 턴 스킵 (방 {}, 사용자 {})", m_roomId, userId);
+            m_gameStateManager->skipTurn();
+
+            // 게임 종료 조건 확인
+            if (m_gameStateManager->getGameState() == Common::GameState::Finished) {
+                endGame();
+            }
+
+            return true;
+        }
+
+        bool GameRoom::isPlayerTurn(const std::string& userId) const {
+            if (m_state != RoomState::Playing) {
+                return false;
+            }
+
+            const auto* player = getPlayer(userId);
+            if (!player) {
+                return false;
+            }
+
+            return player->getColor() == m_gameStateManager->getCurrentPlayer();
+        }
+
+        Common::PlayerColor GameRoom::getCurrentPlayer() const {
+            return m_gameStateManager->getCurrentPlayer();
+        }
+
+        std::vector<Common::PlayerColor> GameRoom::getTurnOrder() const {
+            return m_gameStateManager->getTurnOrder();
         }
 
     } // namespace Server
