@@ -267,6 +267,7 @@ namespace Blokus {
         bool m_isGameStarted;
         bool m_isReady;              // 내 준비 상태
         QTimer* m_turnTimer;
+        QTimer* m_readyButtonTimeout; // 준비 버튼 타임아웃
         QList<QString> m_chatHistory;
     };
 

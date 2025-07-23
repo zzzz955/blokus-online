@@ -86,7 +86,7 @@ namespace Blokus {
         m_remainingBlocksLabel->setStyleSheet("font-size: 10px; color: #95a5a6;");
 
         // 준비 상태 인디케이터
-        m_readyIndicator = new QLabel(QString::fromUtf8("⏳ 대기중"));
+        m_readyIndicator = new QLabel(QString::fromUtf8("대기중"));
         m_readyIndicator->setAlignment(Qt::AlignCenter);
         m_readyIndicator->setFixedHeight(20);
         m_readyIndicator->setStyleSheet("font-size: 10px; font-weight: bold; color: #f39c12;");
@@ -271,6 +271,16 @@ namespace Blokus {
     {
         m_isReady = ready;
         updateGameControlsState();
+        
+        // 타임아웃 타이머 정지
+        m_readyButtonTimeout->stop();
+        
+        // 서버 응답 후 버튼 다시 활성화
+        if (!isHost()) {
+            m_gameStartButton->setEnabled(true);
+        }
+        
+        qDebug() << QString::fromUtf8("내 준비 상태 업데이트 완료: %1").arg(ready ? "준비완료" : "대기중");
     }
 
     void PlayerSlotWidget::updateReadyState(bool isReady)
@@ -292,7 +302,7 @@ namespace Blokus {
             m_readyIndicator->setText(QString::fromUtf8("준비완료"));
             m_readyIndicator->setStyleSheet("font-size: 10px; font-weight: bold; color: #27ae60;");
         } else {
-            m_readyIndicator->setText(QString::fromUtf8("준비중"));
+            m_readyIndicator->setText(QString::fromUtf8("대기중"));
             m_readyIndicator->setStyleSheet("font-size: 10px; font-weight: bold; color: #f39c12;");
         }
     }
@@ -328,9 +338,20 @@ namespace Blokus {
         , m_isGameStarted(false)
         , m_isReady(false)
         , m_turnTimer(new QTimer(this))
+        , m_readyButtonTimeout(new QTimer(this))
     {
         // 게임 매니저 생성
         m_gameManager = new GameStateManager();
+
+        // 타이머 설정
+        m_readyButtonTimeout->setSingleShot(true);
+        connect(m_readyButtonTimeout, &QTimer::timeout, this, [this]() {
+            // 서버 응답 타임아웃 시 버튼 다시 활성화
+            if (!isHost()) {
+                m_gameStartButton->setEnabled(true);
+            }
+            qDebug() << QString::fromUtf8("준비 상태 변경 타임아웃 - 버튼 재활성화");
+        });
 
         setupUI();
         setupMenuBar();
@@ -1162,6 +1183,11 @@ namespace Blokus {
         bool newReadyState = !m_isReady;
         emit playerReadyChanged(newReadyState);
         
+        // 타임아웃 타이머 시작 (5초)
+        m_readyButtonTimeout->start(5000);
+        
+        qDebug() << QString::fromUtf8("준비 상태 변경 요청: %1 -> %2").arg(m_isReady ? "준비완료" : "대기중").arg(newReadyState ? "준비완료" : "대기중");
+        
         // 서버 응답을 기다려서 상태 업데이트하므로 여기서는 UI 변경하지 않음
         // updateGameControlsState()는 서버 응답 후에 호출됨
     }
@@ -1320,12 +1346,28 @@ namespace Blokus {
 
     bool GameRoomWindow::areAllPlayersReady() const
     {
+        QStringList debugInfo;
+        bool allReady = true;
+        
         for (const auto& slot : m_roomInfo.playerSlots) {
-            if (!slot.isEmpty() && !slot.isReady) {
-                return false;
+            if (!slot.isEmpty()) {
+                bool playerReady = slot.isHost || slot.isReady;
+                QString readyStatus = playerReady ? "준비됨" : "준비안됨";
+                QString hostStatus = slot.isHost ? "(호스트)" : "";
+                
+                debugInfo << QString("%1: %2 %3").arg(slot.username).arg(readyStatus).arg(hostStatus);
+                
+                if (!playerReady) {
+                    allReady = false;
+                }
             }
         }
-        return true;
+        
+        qDebug() << QString::fromUtf8("게임 시작 조건 확인:");
+        qDebug() << QString::fromUtf8("  - %1").arg(debugInfo.join(", "));
+        qDebug() << QString::fromUtf8("  - 모든 플레이어 준비: %1").arg(allReady ? "예" : "아니오");
+        
+        return allReady;
     }
 
     void GameRoomWindow::updateReadyStates()

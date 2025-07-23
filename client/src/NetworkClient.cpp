@@ -427,7 +427,8 @@ namespace Blokus {
                  message.startsWith("LOGOUT_SUCCESS")) {
             processAuthResponse(message);
         }
-        else if (message.startsWith("LOBBY_") || message.startsWith("ROOM_") || message.startsWith("CHAT:")) {
+        else if (message.startsWith("LOBBY_") || message.startsWith("ROOM_") || message.startsWith("CHAT:") || 
+                 message.startsWith("PLAYER_") || message.startsWith("HOST_") || message.startsWith("GAME_")) {
             processLobbyResponse(message);
         }
         else if (message == "pong") {
@@ -540,6 +541,7 @@ namespace Blokus {
         else if (parts[0] == "PLAYER_READY" && parts.size() >= 3) {
             QString username = parts[1];
             bool ready = (parts[2] == "1");
+            qDebug() << QString::fromUtf8("NetworkClient: PLAYER_READY 수신 - %1: %2").arg(username).arg(ready ? "준비완료" : "대기중");
             emit playerReady(username, ready);
         }
         else if (parts[0] == "HOST_CHANGED" && parts.size() >= 2) {
