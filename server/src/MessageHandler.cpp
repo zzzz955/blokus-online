@@ -521,29 +521,13 @@ namespace Blokus::Server {
 
             spdlog::info("🏠 방 나가기 요청: '{}' <- 방 {}", username, currentRoomId);
 
-            // 3. RoomManager를 통한 방 나가기
+            // 3. RoomManager를 통한 방 나가기 (모든 브로드캐스트 및 정리 작업 포함)
             if (roomManager_->leaveRoom(userId)) {
                 // 4. 세션 상태 변경
                 session_->setStateToLobby();
 
                 // 5. 성공 응답
                 sendResponse("ROOM_LEFT:OK");
-
-                // 6. 브로드캐스트 및 방 정보 업데이트 (방이 아직 존재할 때만)
-                auto room = roomManager_->getRoom(currentRoomId);
-                if (room) {
-                    // 퇴장 알림 브로드캐스트
-                    room->broadcastPlayerLeft(username);
-                    
-                    // 방이 비어있는지 확인하고 자동 삭제
-                    if (room->isEmpty()) {
-                        spdlog::info("빈 방 {} 자동 삭제", currentRoomId);
-                        roomManager_->removeRoom(currentRoomId);
-                    } else {
-                        // 남은 플레이어들에게 업데이트된 방 정보 전송
-                        broadcastRoomInfoToRoom(room);
-                    }
-                }
 
                 spdlog::info("✅ 방 나가기 성공: '{}'", username);
             }
@@ -1019,8 +1003,8 @@ namespace Blokus::Server {
             if (session_->isInLobby()) {
                 // 로비 채팅 - 모든 로비 사용자에게 브로드캐스팅
                 broadcastLobbyChatMessage(username, message);
-            } else if (session_->isInRoom()) {
-                // 방 채팅 - 같은 방의 플레이어들에게 브로드캐스팅
+            } else if (session_->isInRoom() || session_->isInGame()) {
+                // 방 채팅 (게임 중 포함) - 같은 방의 플레이어들에게 브로드캐스팅
                 broadcastRoomChatMessage(username, message);
             }
             

@@ -335,6 +335,19 @@ namespace Blokus {
             // 게임 상태 관리자 시작
             m_gameStateManager->startNewGame(turnOrder);
 
+            // 모든 플레이어의 세션 상태를 게임 중으로 업데이트
+            for (auto& player : m_players) {
+                if (player.getSession()) {
+                    player.getSession()->setStateToInGame();
+                }
+            }
+
+            // 게임 시작 브로드캐스트
+            broadcastGameStart();
+            
+            // 초기 게임 상태 브로드캐스트
+            broadcastGameState();
+
             spdlog::info("🎮 방 {} 게임 시작: {} 플레이어, 턴 순서 설정됨", m_roomId, m_players.size());
             return true;
         }
@@ -352,7 +365,14 @@ namespace Blokus {
             // 모든 플레이어 게임 상태 리셋
             for (auto& player : m_players) {
                 player.resetForNewGame();
+                // 세션 상태를 방에 있는 상태로 복원
+                if (player.getSession()) {
+                    player.getSession()->setStateToInRoom(m_roomId);
+                }
             }
+
+            // 게임 종료 브로드캐스트
+            broadcastGameEnd();
 
             spdlog::info("🎮 방 {} 게임 종료", m_roomId);
             return true;

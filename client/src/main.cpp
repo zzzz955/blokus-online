@@ -788,6 +788,14 @@ private:
             connect(m_gameRoomWindow, &Blokus::GameRoomWindow::chatMessageSent,
                 this, &AppController::handleGameRoomChatMessage);
             
+            // 게임 상태 동기화 시그널 연결 (게임 진행 중 보드 상태 및 턴 동기화)
+            connect(m_networkClient, &Blokus::NetworkClient::gameStateUpdated,
+                m_gameRoomWindow, &Blokus::GameRoomWindow::onGameStateUpdated);
+            connect(m_networkClient, &Blokus::NetworkClient::blockPlaced,
+                m_gameRoomWindow, &Blokus::GameRoomWindow::onBlockPlaced);
+            connect(m_networkClient, &Blokus::NetworkClient::turnChanged,
+                m_gameRoomWindow, &Blokus::GameRoomWindow::onTurnChanged);
+            
             // 게임룸 채팅은 이미 전역적으로 연결되어 있음 (중복 연결 제거)
 
             m_gameRoomWindow->show();
