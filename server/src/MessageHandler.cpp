@@ -526,7 +526,13 @@ namespace Blokus::Server {
                 // 4. 세션 상태 변경
                 session_->setStateToLobby();
 
-                // 5. 성공 응답
+                // 5. 방 정보 동기화 (남은 플레이어들에게 업데이트된 슬롯 정보 전송)
+                auto room = roomManager_->getRoom(currentRoomId);
+                if (room && !room->isEmpty()) {
+                    broadcastRoomInfoToRoom(room);
+                }
+
+                // 6. 성공 응답
                 sendResponse("ROOM_LEFT:OK");
 
                 spdlog::info("✅ 방 나가기 성공: '{}'", username);

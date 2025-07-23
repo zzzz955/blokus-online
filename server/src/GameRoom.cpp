@@ -155,9 +155,9 @@ namespace Blokus {
                         attempts++;
                     } while (nextPlayer == playerColor && attempts < 5); // 무한 루프 방지
                     
-                    // 턴 변경 브로드캐스트
+                    // 턴 변경 브로드캐스트 (뮤텍스 내에서 안전하게)
                     if (nextPlayer != playerColor) {
-                        broadcastTurnChange(nextPlayer);
+                        broadcastTurnChangeLocked(nextPlayer);
                     }
                 }
                 
@@ -166,9 +166,9 @@ namespace Blokus {
                     spdlog::info("🏁 방 {} 최소 인원 미달로 게임 종료", m_roomId);
                     endGameLocked();
                 } else {
-                    // 게임 계속 진행 - 게임 상태 브로드캐스트
+                    // 게임 계속 진행 - 게임 상태 브로드캐스트 (뮤텍스 내에서 안전하게)
                     spdlog::info("🎮 방 {} 플레이어 이탈했지만 게임 계속 진행 (남은: {}명)", m_roomId, m_players.size());
-                    broadcastGameState();
+                    broadcastGameStateLocked();
                 }
             }
 
@@ -642,6 +642,11 @@ namespace Blokus {
 
         void GameRoom::broadcastGameState() {
             std::lock_guard<std::mutex> lock(m_playersMutex);
+            broadcastGameStateLocked();
+        }
+
+        void GameRoom::broadcastGameStateLocked() {
+            // 뮤텍스가 이미 잠겨있다고 가정하고 실행 (데드락 방지용)
             
             if (m_state != RoomState::Playing) {
                 return;
@@ -679,6 +684,21 @@ namespace Blokus {
                 gameStateJson << "\"" << static_cast<int>(score.first) << "\":" << score.second;
                 firstScore = false;
             }
+            gameStateJson << "},";
+            
+            // 플레이어 남은 블록 개수 정보
+            gameStateJson << "\"remainingBlocks\":{";
+            bool firstRemaining = true;
+            for (const auto& player : m_players) {
+                if (!firstRemaining) gameStateJson << ",";
+                
+                // 남은 블록 개수 계산 (전체 블록 수 - 사용된 블록 수)
+                auto availableBlocks = m_gameLogic->getAvailableBlocks(player.getColor());
+                int remainingCount = static_cast<int>(availableBlocks.size());
+                
+                gameStateJson << "\"" << static_cast<int>(player.getColor()) << "\":" << remainingCount;
+                firstRemaining = false;
+            }
             gameStateJson << "}";
             
             gameStateJson << "}";
@@ -693,6 +713,11 @@ namespace Blokus {
 
         void GameRoom::broadcastBlockPlacement(const std::string& playerName, const Common::BlockPlacement& placement, int scoreGained) {
             std::lock_guard<std::mutex> lock(m_playersMutex);
+            broadcastBlockPlacementLocked(playerName, placement, scoreGained);
+        }
+
+        void GameRoom::broadcastBlockPlacementLocked(const std::string& playerName, const Common::BlockPlacement& placement, int scoreGained) {
+            // 뮤텍스가 이미 잠겨있다고 가정하고 실행 (데드락 방지용)
             
             spdlog::info("📦 블록 배치 브로드캐스트 - 방 {}, 플레이어 수: {}", m_roomId, m_players.size());
             
@@ -722,6 +747,11 @@ namespace Blokus {
 
         void GameRoom::broadcastTurnChange(Common::PlayerColor newPlayer) {
             std::lock_guard<std::mutex> lock(m_playersMutex);
+            broadcastTurnChangeLocked(newPlayer);
+        }
+
+        void GameRoom::broadcastTurnChangeLocked(Common::PlayerColor newPlayer) {
+            // 뮤텍스가 이미 잠겨있다고 가정하고 실행 (데드락 방지용)
             
             // 새 플레이어 이름 찾기
             std::string newPlayerName = "";
@@ -906,9 +936,9 @@ namespace Blokus {
             spdlog::info("✅ 블록 배치 성공 (방 {}, 사용자 {}, 블록 타입: {}, 획득 점수: {})", 
                 m_roomId, userId, static_cast<int>(placement.type), scoreGained);
 
-            // 블록 배치 알림 브로드캐스트 
+            // 블록 배치 알림 브로드캐스트 (뮤텍스 내에서 안전하게)
             spdlog::info("🔄 블록 배치 브로드캐스트 시작: 방 {}", m_roomId);
-            broadcastBlockPlacement(player->getUsername(), placement, scoreGained);
+            broadcastBlockPlacementLocked(player->getUsername(), placement, scoreGained);
 
             // 다음 턴으로 전환
             Common::PlayerColor previousPlayer = m_gameStateManager->getCurrentPlayer();

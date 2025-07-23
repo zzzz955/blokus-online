@@ -457,7 +457,8 @@ private slots:
         
         // 게임룸 채팅이면 게임룸에만 표시 (로비와 중복 방지)
         else if (m_gameRoomWindow && m_gameRoomWindow->isVisible()) {
-            m_gameRoomWindow->addChatMessage(username, message, false);
+            bool isSystem = (username == QString::fromUtf8("시스템"));
+            m_gameRoomWindow->addChatMessage(username, message, isSystem);
         }
     }
     

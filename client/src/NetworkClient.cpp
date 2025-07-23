@@ -428,7 +428,8 @@ namespace Blokus {
             processAuthResponse(message);
         }
         else if (message.startsWith("LOBBY_") || message.startsWith("ROOM_") || message.startsWith("CHAT:") || 
-                 message.startsWith("PLAYER_") || message.startsWith("HOST_") || message.startsWith("GAME_")) {
+                 message.startsWith("PLAYER_") || message.startsWith("HOST_") || message.startsWith("GAME_") ||
+                 message.startsWith("SYSTEM:")) {
             processLobbyResponse(message);
         }
         else if (message.startsWith("GAME_STATE_UPDATE:") || 
