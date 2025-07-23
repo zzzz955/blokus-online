@@ -99,8 +99,6 @@ namespace Blokus {
             RoomStart = 306,
             RoomEnd = 307,
             RoomTransferHost = 308,
-            RoomAddAI = 309,
-            RoomRemoveAI = 310,
 
             // ���� ���� (400-499)
             Game = 400,

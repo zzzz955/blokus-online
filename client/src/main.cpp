@@ -190,40 +190,6 @@ private slots:
         }
     }
 
-    void handleAddAIPlayerRequest(PlayerColor color, int difficulty)
-    {
-        qDebug() << QString::fromUtf8("AI 플레이어 추가 요청: %1 색상, 난이도 %2")
-            .arg(Utils::playerColorToString(color)).arg(difficulty);
-
-        // 서버로 AI 추가 요청 전송
-        if (m_networkClient && m_networkClient->isConnected()) {
-            int colorIndex = static_cast<int>(color) - 1; // PlayerColor는 1-4, 서버는 0-3 기대
-            m_networkClient->addAI(colorIndex, difficulty);
-        } else {
-            qWarning() << QString::fromUtf8("AI 추가 실패: 서버에 연결되지 않음");
-        }
-    }
-
-    void handleRemovePlayerRequest(PlayerColor color)
-    {
-        qDebug() << QString::fromUtf8("AI 제거 요청: %1").arg(Utils::playerColorToString(color));
-
-        // 서버에 AI 제거 요청 전송
-        if (m_networkClient && m_networkClient->isConnected()) {
-            int colorIndex = static_cast<int>(color) - 1; // PlayerColor는 1-4, 배열 인덱스는 0-3
-            m_networkClient->removeAI(colorIndex);
-        } else {
-            qWarning() << QString::fromUtf8("AI 제거 실패: 서버에 연결되지 않음");
-        }
-    }
-
-    void handleKickPlayerRequest(PlayerColor color)
-    {
-        qDebug() << QString::fromUtf8("플레이어 강퇴 요청: %1").arg(Utils::playerColorToString(color));
-
-        // 더미 강퇴 로직
-        handleRemovePlayerRequest(color); // 제거와 동일하게 처리
-    }
 
     void handleGameRoomChatMessage(const QString& message)
     {
@@ -828,12 +794,6 @@ private:
                 this, &AppController::handleLeaveRoomRequest);
             connect(m_gameRoomWindow, &Blokus::GameRoomWindow::gameStartRequested,
                 this, &AppController::handleGameStartRequest);
-            connect(m_gameRoomWindow, &Blokus::GameRoomWindow::addAIPlayerRequested,
-                this, &AppController::handleAddAIPlayerRequest);
-            connect(m_gameRoomWindow, &Blokus::GameRoomWindow::removePlayerRequested,
-                this, &AppController::handleRemovePlayerRequest);
-            connect(m_gameRoomWindow, &Blokus::GameRoomWindow::kickPlayerRequested,
-                this, &AppController::handleKickPlayerRequest);
             connect(m_gameRoomWindow, &Blokus::GameRoomWindow::chatMessageSent,
                 this, &AppController::handleGameRoomChatMessage);
             

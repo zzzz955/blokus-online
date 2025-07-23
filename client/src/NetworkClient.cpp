@@ -277,30 +277,6 @@ namespace Blokus {
         emit chatMessageSent();
     }
 
-    void NetworkClient::addAI(int colorIndex, int difficulty)
-    {
-        if (!isConnected()) {
-            qWarning() << QString::fromUtf8("AI 추가 실패: 서버에 연결되지 않음");
-            return;
-        }
-        
-        QString message = QString("room:addai:%1:%2").arg(colorIndex).arg(difficulty);
-        sendMessage(message);
-        qDebug() << QString::fromUtf8("AI 추가 요청 전송: 색상=%1, 난이도=%2").arg(colorIndex).arg(difficulty);
-    }
-
-    void NetworkClient::removeAI(int colorIndex)
-    {
-        if (!isConnected()) {
-            qWarning() << QString::fromUtf8("AI 제거 실패: 서버에 연결되지 않음");
-            return;
-        }
-        
-        QString message = QString("room:removeai:%1").arg(colorIndex);
-        sendMessage(message);
-        qDebug() << QString::fromUtf8("AI 제거 요청 전송: 색상=%1").arg(colorIndex);
-    }
-
     void NetworkClient::setState(ConnectionState state)
     {
         if (m_state != state) {

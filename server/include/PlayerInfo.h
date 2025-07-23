@@ -23,17 +23,11 @@ namespace Blokus::Server {
     private:
         // 핵심 참조점
         SessionPtr session_;
-        
-        // AI 플레이어용 정보 저장소 (session이 null인 경우)
-        std::string aiUserId_;
-        std::string aiUsername_;
 
         // 게임 방 전용 상태 정보
         Common::PlayerColor color_;
         bool isHost_;
         bool isReady_;
-        bool isAI_;
-        int aiDifficulty_;
         int score_;
         int remainingBlocks_;
         std::chrono::steady_clock::time_point lastActivity_;
@@ -56,19 +50,13 @@ namespace Blokus::Server {
         // 세션 기반 정보 접근 (인라인 - 간단한 getter들)
         // ========================================
 
-        /// @brief 사용자 ID 반환 (AI 정보 우선, 없으면 세션에서 가져옴)
+        /// @brief 사용자 ID 반환
         std::string getUserId() const {
-            if (!aiUserId_.empty()) {
-                return aiUserId_;
-            }
             return session_ ? session_->getUserId() : "";
         }
 
-        /// @brief 사용자명 반환 (AI 정보 우선, 없으면 세션에서 가져옴)
+        /// @brief 사용자명 반환
         std::string getUsername() const {
-            if (!aiUsername_.empty()) {
-                return aiUsername_;
-            }
             return session_ ? session_->getUsername() : "";
         }
 
@@ -104,8 +92,6 @@ namespace Blokus::Server {
         Common::PlayerColor getColor() const { return color_; }
         bool isHost() const { return isHost_; }
         bool isReady() const { return isReady_; }
-        bool isAI() const { return isAI_; }
-        int getAIDifficulty() const { return aiDifficulty_; }
         int getScore() const { return score_; }
         int getRemainingBlocks() const { return remainingBlocks_; }
 
@@ -126,11 +112,6 @@ namespace Blokus::Server {
         /// @brief 호스트 상태 설정 (권한 체크 포함)
         void setHost(bool host);
         
-        /// @brief AI 플레이어 정보 설정 (세션이 없을 때 사용)
-        void setAIInfo(const std::string& userId, const std::string& username);
-
-        /// @brief AI 플레이어로 설정
-        void setAI(bool isAI, int difficulty = 2);
 
         /// @brief 점수 업데이트 (게임 로직 포함)
         void updateScore(int newScore);

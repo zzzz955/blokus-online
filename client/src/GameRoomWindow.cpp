@@ -87,9 +87,10 @@ namespace Blokus {
         m_remainingBlocksLabel->setAlignment(Qt::AlignCenter);
         m_remainingBlocksLabel->setStyleSheet("font-size: 10px; color: #95a5a6;");
 
-        // 액션 버튼
-        m_actionButton = new QPushButton(QString::fromUtf8("AI 추가"));
+        // 액션 버튼 (강퇴 전용)
+        m_actionButton = new QPushButton(QString::fromUtf8("강퇴"));
         m_actionButton->setFixedHeight(25);
+        m_actionButton->setVisible(false); // 기본적으로 숨김
 
         // 레이아웃 구성
         m_mainLayout->addWidget(m_colorFrame);
@@ -102,7 +103,7 @@ namespace Blokus {
         m_mainLayout->addWidget(m_actionButton);
 
         // 시그널 연결
-        connect(m_actionButton, &QPushButton::clicked, this, &PlayerSlotWidget::onAddAIClicked);
+        connect(m_actionButton, &QPushButton::clicked, this, &PlayerSlotWidget::onKickClicked);
     }
 
     void PlayerSlotWidget::setupStyles()
@@ -179,38 +180,34 @@ namespace Blokus {
         GameRoomWindow* gameRoom = qobject_cast<GameRoomWindow*>(parent());
         bool isHost = gameRoom ? gameRoom->isHost() : false;
 
-        // 버튼 텍스트와 기능 결정
+        // 버튼 표시 결정 - 멀티플레이어 전용
         if (m_currentSlot.isEmpty()) {
-            m_actionButton->setText(QString::fromUtf8("AI 추가"));
-            m_actionButton->setVisible(true);
-            m_actionButton->setEnabled(isHost); // 호스트만 AI 추가 가능
-            disconnect(m_actionButton, nullptr, nullptr, nullptr);
-            connect(m_actionButton, &QPushButton::clicked, this, &PlayerSlotWidget::onAddAIClicked);
-        }
-        else if (m_currentSlot.isAI) {
-            m_actionButton->setText(QString::fromUtf8("AI 제거"));
-            m_actionButton->setVisible(true);
-            m_actionButton->setEnabled(isHost); // 호스트만 AI 제거 가능
-            disconnect(m_actionButton, nullptr, nullptr, nullptr);
-            connect(m_actionButton, &QPushButton::clicked, this, &PlayerSlotWidget::onRemoveClicked);
+            // 빈 슬롯 - 버튼 숨김 (플레이어가 직접 참여해야 함)
+            m_actionButton->setVisible(false);
         }
         else if (m_isMySlot) {
+            // 내 슬롯 - 방 나가기 버튼
             m_actionButton->setText(QString::fromUtf8("방 나가기"));
             m_actionButton->setVisible(true);
-            m_actionButton->setEnabled(true); // 자신의 슬롯은 항상 나갈 수 있음
+            m_actionButton->setEnabled(true);
             m_actionButton->setStyleSheet(
                 "QPushButton { background-color: #e74c3c; color: white; border: none; "
                 "border-radius: 6px; font-weight: bold; font-size: 12px; padding: 4px; } "
                 "QPushButton:hover { background-color: #c0392b; }"
             );
             disconnect(m_actionButton, nullptr, nullptr, nullptr);
-            connect(m_actionButton, &QPushButton::clicked, this, &PlayerSlotWidget::onRemoveClicked);
+            connect(m_actionButton, &QPushButton::clicked, this, &PlayerSlotWidget::onLeaveClicked);
         }
         else {
             // 다른 플레이어 - 호스트라면 강퇴 가능
             m_actionButton->setText(QString::fromUtf8("강퇴"));
-            m_actionButton->setVisible(isHost); // 호스트만 표시
-            m_actionButton->setEnabled(isHost); // 호스트만 활성화
+            m_actionButton->setVisible(isHost);
+            m_actionButton->setEnabled(isHost);
+            m_actionButton->setStyleSheet(
+                "QPushButton { background-color: #e74c3c; color: white; border: none; "
+                "border-radius: 6px; font-weight: bold; font-size: 12px; padding: 4px; } "
+                "QPushButton:hover { background-color: #c0392b; }"
+            );
             disconnect(m_actionButton, nullptr, nullptr, nullptr);
             connect(m_actionButton, &QPushButton::clicked, this, &PlayerSlotWidget::onKickClicked);
         }
@@ -279,148 +276,13 @@ namespace Blokus {
         updateActionButton();
     }
 
-    void PlayerSlotWidget::onAddAIClicked()
+    void PlayerSlotWidget::onLeaveClicked()
     {
-        // AI 추가 다이얼로그
-        QDialog dialog(this);
-        dialog.setWindowTitle(QString::fromUtf8("AI 플레이어 추가"));
-        dialog.setFixedSize(480, 240);
-        dialog.setModal(true);
-
-        // 베이지색 배경 스타일
-        dialog.setStyleSheet(
-            "QDialog { "
-            "background-color: #f5f5dc; "
-            "border-radius: 12px; "
-            "} "
-        );
-
-        QVBoxLayout* mainLayout = new QVBoxLayout(&dialog);
-        mainLayout->setContentsMargins(10, 10, 10, 10);
-        mainLayout->setSpacing(10);
-
-        // 타이틀 라벨
-        QLabel* titleLabel = new QLabel(QString::fromUtf8("🤖 AI 플레이어 추가"));
-        titleLabel->setAlignment(Qt::AlignCenter);
-        titleLabel->setStyleSheet(
-            "QLabel { "
-            "font-size: 16px; "
-            "font-weight: bold; "
-            "color: #2c3e50; "
-            "background-color: rgba(255, 255, 255, 150); "
-            "padding: 5px; "
-            "border-radius: 4px; "
-            "border: 1px solid #d4c5a0; "
-            "}"
-        );
-
-        // 설명 라벨
-        QLabel* descLabel = new QLabel(QString::fromUtf8("%1 위치에 AI 플레이어를 추가합니다.\nAI 난이도를 선택해주세요:")
-            .arg(getColorName()));
-        descLabel->setAlignment(Qt::AlignCenter);
-        descLabel->setWordWrap(true);
-        descLabel->setStyleSheet(
-            "QLabel { "
-            "font-size: 12px; "
-            "color: #34495e; "
-            "background-color: rgba(255, 255, 255, 100); "
-            "padding: 5px; "
-            "border-radius: 4px; "
-            "line-height: 1.4; "
-            "}"
-        );
-
-        // 난이도 버튼들 컨테이너
-        QWidget* buttonContainer = new QWidget();
-        buttonContainer->setStyleSheet("background-color: transparent;");
-        QHBoxLayout* buttonLayout = new QHBoxLayout(buttonContainer);
-        buttonLayout->setSpacing(10);
-        buttonLayout->setContentsMargins(0, 0, 0, 0);
-
-        // 난이도 버튼 스타일
-        QString buttonBaseStyle =
-            "QPushButton { "
-            "border: none; "
-            "border-radius: 4px; "
-            "color: white; "
-            "font-weight: bold; "
-            "font-size: 12px; "
-            "padding: 4px 8px; "
-            "min-width: 60px; "
-            "min-height: 40px; "
-            "} "
-            "QPushButton:hover { "
-            "transform: scale(1.05); "
-            "} "
-            "QPushButton:pressed { "
-            "transform: scale(0.95); "
-            "}";
-
-        QPushButton* easyButton = new QPushButton(QString::fromUtf8("🟢\n쉬움"));
-        QPushButton* normalButton = new QPushButton(QString::fromUtf8("🟡\n보통"));
-        QPushButton* hardButton = new QPushButton(QString::fromUtf8("🔴\n어려움"));
-
-        easyButton->setStyleSheet(buttonBaseStyle +
-            "QPushButton { background-color: #27ae60; } "
-            "QPushButton:hover { background-color: #2ecc71; }");
-
-        normalButton->setStyleSheet(buttonBaseStyle +
-            "QPushButton { background-color: #f39c12; } "
-            "QPushButton:hover { background-color: #e67e22; }");
-
-        hardButton->setStyleSheet(buttonBaseStyle +
-            "QPushButton { background-color: #e74c3c; } "
-            "QPushButton:hover { background-color: #c0392b; }");
-
-        buttonLayout->addWidget(easyButton);
-        buttonLayout->addWidget(normalButton);
-        buttonLayout->addWidget(hardButton);
-
-        // 취소 버튼
-        QPushButton* cancelButton = new QPushButton(QString::fromUtf8("❌ 취소"));
-        cancelButton->setStyleSheet(
-            "QPushButton { "
-            "background-color: #95a5a6; "
-            "border: none; "
-            "border-radius: 4px; "
-            "color: white; "
-            "font-weight: bold; "
-            "font-size: 12px; "
-            "padding: 4px 8px; "
-            "min-height: 35px; "
-            "} "
-            "QPushButton:hover { "
-            "background-color: #7f8c8d; "
-            "} "
-            "QPushButton:pressed { "
-            "background-color: #6c7b7d; "
-            "}"
-        );
-
-        // 레이아웃 구성
-        mainLayout->addWidget(titleLabel);
-        mainLayout->addWidget(descLabel);
-        mainLayout->addSpacing(10);
-        mainLayout->addWidget(buttonContainer);
-        mainLayout->addStretch();
-        mainLayout->addWidget(cancelButton);
-
-        // 시그널 연결
-        connect(easyButton, &QPushButton::clicked, [&dialog]() { dialog.done(1); });
-        connect(normalButton, &QPushButton::clicked, [&dialog]() { dialog.done(2); });
-        connect(hardButton, &QPushButton::clicked, [&dialog]() { dialog.done(3); });
-        connect(cancelButton, &QPushButton::clicked, [&dialog]() { dialog.reject(); });
-
-        // 다이얼로그 실행
-        int result = dialog.exec();
-        if (result >= 1 && result <= 3) {
-            emit addAIRequested(m_color, result);
+        // 내 슬롯에서 방 나가기 - 부모에게 신호 전달
+        GameRoomWindow* gameRoom = qobject_cast<GameRoomWindow*>(parent());
+        if (gameRoom) {
+            gameRoom->onLeaveRoomClicked();
         }
-    }
-
-    void PlayerSlotWidget::onRemoveClicked()
-    {
-        emit removePlayerRequested(m_color);
     }
 
     void PlayerSlotWidget::onKickClicked()
@@ -611,10 +473,6 @@ namespace Blokus {
             PlayerSlotWidget* slotWidget = new PlayerSlotWidget(color, this);
 
             // 시그널 연결
-            connect(slotWidget, &PlayerSlotWidget::addAIRequested,
-                this, &GameRoomWindow::onAddAIRequested);
-            connect(slotWidget, &PlayerSlotWidget::removePlayerRequested,
-                this, &GameRoomWindow::onRemovePlayerRequested);
             connect(slotWidget, &PlayerSlotWidget::kickPlayerRequested,
                 this, &GameRoomWindow::onKickPlayerRequested);
 
@@ -1276,34 +1134,6 @@ namespace Blokus {
         onChatSendClicked();
     }
 
-    void GameRoomWindow::onAddAIRequested(PlayerColor color, int difficulty)
-    {
-        if (!isHost()) {
-            QMessageBox::information(this, QString::fromUtf8("권한 없음"),
-                QString::fromUtf8("방장만 AI를 추가할 수 있습니다."));
-            return;
-        }
-
-        emit addAIPlayerRequested(color, difficulty);
-    }
-
-    void GameRoomWindow::onRemovePlayerRequested(PlayerColor color)
-    {
-        // 내 슬롯이면 방 나가기, 아니면 제거 요청
-        PlayerSlot* slot = findPlayerSlot(color);
-        if (slot && slot->username == m_myUsername) {
-            onLeaveRoomClicked();
-        }
-        else {
-            // AI 제거는 호스트만 가능
-            if (slot && slot->isAI && !isHost()) {
-                QMessageBox::information(this, QString::fromUtf8("권한 없음"),
-                    QString::fromUtf8("방장만 AI를 제거할 수 있습니다."));
-                return;
-            }
-            emit removePlayerRequested(color);
-        }
-    }
 
     void GameRoomWindow::onKickPlayerRequested(PlayerColor color)
     {

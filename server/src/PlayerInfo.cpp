@@ -12,13 +12,9 @@ namespace Blokus::Server {
 
     PlayerInfo::PlayerInfo(SessionPtr session)
         : session_(session)
-        , aiUserId_("")
-        , aiUsername_("")
         , color_(Common::PlayerColor::None)
         , isHost_(false)
         , isReady_(false)
-        , isAI_(false)
-        , aiDifficulty_(2)
         , score_(0)
         , remainingBlocks_(Common::BLOCKS_PER_PLAYER)
         , lastActivity_(std::chrono::steady_clock::now())
@@ -41,13 +37,9 @@ namespace Blokus::Server {
     // 복사 생성자
     PlayerInfo::PlayerInfo(const PlayerInfo& other)
         : session_(other.session_)
-        , aiUserId_(other.aiUserId_)
-        , aiUsername_(other.aiUsername_)
         , color_(other.color_)
         , isHost_(other.isHost_)
         , isReady_(other.isReady_)
-        , isAI_(other.isAI_)
-        , aiDifficulty_(other.aiDifficulty_)
         , score_(other.score_)
         , remainingBlocks_(other.remainingBlocks_)
         , lastActivity_(other.lastActivity_)
@@ -58,13 +50,9 @@ namespace Blokus::Server {
     PlayerInfo& PlayerInfo::operator=(const PlayerInfo& other) {
         if (this != &other) {
             session_ = other.session_;
-            aiUserId_ = other.aiUserId_;
-            aiUsername_ = other.aiUsername_;
             color_ = other.color_;
             isHost_ = other.isHost_;
             isReady_ = other.isReady_;
-            isAI_ = other.isAI_;
-            aiDifficulty_ = other.aiDifficulty_;
             score_ = other.score_;
             remainingBlocks_ = other.remainingBlocks_;
             lastActivity_ = other.lastActivity_;
@@ -75,13 +63,9 @@ namespace Blokus::Server {
     // 이동 생성자
     PlayerInfo::PlayerInfo(PlayerInfo&& other) noexcept
         : session_(std::move(other.session_))
-        , aiUserId_(std::move(other.aiUserId_))
-        , aiUsername_(std::move(other.aiUsername_))
         , color_(other.color_)
         , isHost_(other.isHost_)
         , isReady_(other.isReady_)
-        , isAI_(other.isAI_)
-        , aiDifficulty_(other.aiDifficulty_)
         , score_(other.score_)
         , remainingBlocks_(other.remainingBlocks_)
         , lastActivity_(other.lastActivity_)
@@ -92,13 +76,9 @@ namespace Blokus::Server {
     PlayerInfo& PlayerInfo::operator=(PlayerInfo&& other) noexcept {
         if (this != &other) {
             session_ = std::move(other.session_);
-            aiUserId_ = std::move(other.aiUserId_);
-            aiUsername_ = std::move(other.aiUsername_);
             color_ = other.color_;
             isHost_ = other.isHost_;
             isReady_ = other.isReady_;
-            isAI_ = other.isAI_;
-            aiDifficulty_ = other.aiDifficulty_;
             score_ = other.score_;
             remainingBlocks_ = other.remainingBlocks_;
             lastActivity_ = other.lastActivity_;
@@ -111,7 +91,7 @@ namespace Blokus::Server {
     // ========================================
 
     bool PlayerInfo::setPlayerColor(Common::PlayerColor color) {
-        if (!isConnected() && !isAI()) {
+        if (!isConnected()) {
             spdlog::warn("Cannot set color for disconnected player: {}", getUserId());
             return false;
         }
@@ -129,7 +109,7 @@ namespace Blokus::Server {
     }
 
     bool PlayerInfo::setReady(bool ready) {
-        if (!isConnected() && !isAI()) {
+        if (!isConnected()) {
             spdlog::warn("Cannot set ready state for disconnected player: {}", getUserId());
             return false;
         }
@@ -163,28 +143,6 @@ namespace Blokus::Server {
         updateActivity();
     }
     
-    void PlayerInfo::setAIInfo(const std::string& userId, const std::string& username) {
-        aiUserId_ = userId;
-        aiUsername_ = username;
-        spdlog::debug("AI 플레이어 정보 설정: ID='{}', 이름='{}'", userId, username);
-        updateActivity();
-    }
-
-    void PlayerInfo::setAI(bool isAI, int difficulty) {
-        isAI_ = isAI;
-
-        if (isAI) {
-            aiDifficulty_ = std::clamp(difficulty, 1, 5); // 1-5 범위로 제한
-            isReady_ = true; // AI는 항상 준비됨
-            spdlog::info("Player '{}' set to AI (difficulty: {})", getUsername(), aiDifficulty_);
-        }
-        else {
-            aiDifficulty_ = 0;
-            spdlog::debug("Player '{}' set to human player", getUsername());
-        }
-
-        updateActivity();
-    }
 
     void PlayerInfo::updateScore(int newScore) {
         int oldScore = score_;
@@ -297,8 +255,6 @@ namespace Blokus::Server {
         j["color"] = static_cast<int>(color_);
         j["isHost"] = isHost_;
         j["isReady"] = isReady_;
-        j["isAI"] = isAI_;
-        j["aiDifficulty"] = aiDifficulty_;
         j["score"] = score_;
         j["remainingBlocks"] = remainingBlocks_;
 
@@ -323,12 +279,6 @@ namespace Blokus::Server {
             }
             if (json.contains("isReady")) {
                 player.isReady_ = json["isReady"].get<bool>();
-            }
-            if (json.contains("isAI")) {
-                player.isAI_ = json["isAI"].get<bool>();
-            }
-            if (json.contains("aiDifficulty")) {
-                player.aiDifficulty_ = json["aiDifficulty"].get<int>();
             }
             if (json.contains("score")) {
                 player.score_ = json["score"].get<int>();
@@ -375,7 +325,6 @@ namespace Blokus::Server {
             << ", color=" << static_cast<int>(color_)
             << ", host=" << (isHost_ ? "true" : "false")
             << ", ready=" << (isReady_ ? "true" : "false")
-            << ", AI=" << (isAI_ ? "true" : "false")
             << ", score=" << score_
             << ", blocks=" << remainingBlocks_
             << "}";

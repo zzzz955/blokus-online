@@ -85,13 +85,10 @@ namespace Blokus {
         void updateActionButton();
 
     signals:
-        void addAIRequested(PlayerColor color, int difficulty);
-        void removePlayerRequested(PlayerColor color);
         void kickPlayerRequested(PlayerColor color);
 
     private slots:
-        void onAddAIClicked();
-        void onRemoveClicked();
+        void onLeaveClicked();
         void onKickClicked();
 
     private:
@@ -146,8 +143,6 @@ namespace Blokus {
         // 룸 관리 시그널
         void leaveRoomRequested();
         void gameStartRequested();
-        void addAIPlayerRequested(PlayerColor color, int difficulty);
-        void removePlayerRequested(PlayerColor color);
         void kickPlayerRequested(PlayerColor color);
 
         // 게임 플레이 시그널
@@ -165,8 +160,6 @@ namespace Blokus {
         void onChatReturnPressed();
 
         // 플레이어 슬롯 이벤트
-        void onAddAIRequested(PlayerColor color, int difficulty);
-        void onRemovePlayerRequested(PlayerColor color);
         void onKickPlayerRequested(PlayerColor color);
 
         // 게임보드 이벤트
