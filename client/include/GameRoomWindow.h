@@ -88,7 +88,6 @@ namespace Blokus {
         void kickPlayerRequested(PlayerColor color);
 
     private slots:
-        void onLeaveClicked();
         void onKickClicked();
 
     private:

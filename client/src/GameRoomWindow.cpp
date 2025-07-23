@@ -38,7 +38,7 @@ namespace Blokus {
 
     void PlayerSlotWidget::setupUI()
     {
-        setFixedSize(130, 150);
+        setFixedSize(130, 130);
 
         m_mainLayout = new QVBoxLayout(this);
         m_mainLayout->setContentsMargins(4, 4, 4, 4);
@@ -186,17 +186,8 @@ namespace Blokus {
             m_actionButton->setVisible(false);
         }
         else if (m_isMySlot) {
-            // 내 슬롯 - 방 나가기 버튼
-            m_actionButton->setText(QString::fromUtf8("방 나가기"));
-            m_actionButton->setVisible(true);
-            m_actionButton->setEnabled(true);
-            m_actionButton->setStyleSheet(
-                "QPushButton { background-color: #e74c3c; color: white; border: none; "
-                "border-radius: 6px; font-weight: bold; font-size: 12px; padding: 4px; } "
-                "QPushButton:hover { background-color: #c0392b; }"
-            );
-            disconnect(m_actionButton, nullptr, nullptr, nullptr);
-            connect(m_actionButton, &QPushButton::clicked, this, &PlayerSlotWidget::onLeaveClicked);
+            // 내 슬롯 - 버튼 숨김 (GameRoomWindow에 방 나가기 버튼이 별도로 있음)
+            m_actionButton->setVisible(false);
         }
         else {
             // 다른 플레이어 - 호스트라면 강퇴 가능
@@ -270,14 +261,6 @@ namespace Blokus {
         updateActionButton();
     }
 
-    void PlayerSlotWidget::onLeaveClicked()
-    {
-        // 내 슬롯에서 방 나가기 - 부모에게 신호 전달
-        GameRoomWindow* gameRoom = qobject_cast<GameRoomWindow*>(parent());
-        if (gameRoom) {
-            gameRoom->onLeaveRoomClicked();
-        }
-    }
 
     void PlayerSlotWidget::onKickClicked()
     {
@@ -455,7 +438,7 @@ namespace Blokus {
     void GameRoomWindow::setupPlayerSlotsPanel()
     {
         m_playerSlotsPanel = new QWidget();
-        m_playerSlotsPanel->setFixedHeight(160);
+        m_playerSlotsPanel->setFixedHeight(130);
 
         m_slotsLayout = new QHBoxLayout(m_playerSlotsPanel);
         m_slotsLayout->setContentsMargins(4, 4, 4, 4);
