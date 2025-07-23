@@ -263,6 +263,29 @@ namespace Blokus {
         qDebug() << QString::fromUtf8("방 나가기 요청 전송");
     }
     
+    void NetworkClient::setPlayerReady(bool ready)
+    {
+        if (!isConnected()) {
+            qWarning() << QString::fromUtf8("준비 상태 변경 실패: 서버에 연결되지 않음");
+            return;
+        }
+        
+        QString message = QString("room:ready:%1").arg(ready ? "1" : "0");
+        sendMessage(message);
+        qDebug() << QString::fromUtf8("준비 상태 변경 요청 전송: %1").arg(ready ? "준비완료" : "준비해제");
+    }
+
+    void NetworkClient::startGame()
+    {
+        if (!isConnected()) {
+            qWarning() << QString::fromUtf8("게임 시작 실패: 서버에 연결되지 않음");
+            return;
+        }
+        
+        sendMessage("room:start");
+        qDebug() << QString::fromUtf8("게임 시작 요청 전송");
+    }
+
     void NetworkClient::sendChatMessage(const QString& message)
     {
         if (!isConnected()) {

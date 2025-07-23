@@ -83,6 +83,7 @@ namespace Blokus {
         void setMySlot(bool isMySlot);
         PlayerColor getColor() const { return m_color; }
         void updateActionButton();
+        void updateReadyState(bool isReady);
 
     signals:
         void kickPlayerRequested(PlayerColor color);
@@ -106,11 +107,11 @@ namespace Blokus {
         QFrame* m_colorFrame;
         QLabel* m_colorLabel;
         QLabel* m_usernameLabel;
-        QLabel* m_statusLabel;
         QLabel* m_scoreLabel;
         QLabel* m_remainingBlocksLabel;
         QPushButton* m_actionButton;
         QWidget* m_hostIndicator;
+        QLabel* m_readyIndicator;
     };
 
     // 메인 게임 룸 윈도우
@@ -137,6 +138,9 @@ namespace Blokus {
 
         // 호스트 권한 확인
         bool isHost() const;
+        
+        // 내 준비 상태 설정
+        void setMyReadyState(bool ready);
 
     signals:
         // 룸 관리 시그널
@@ -150,6 +154,9 @@ namespace Blokus {
 
         // 채팅 시그널
         void chatMessageSent(const QString& message);
+        
+        // 준비 상태 시그널
+        void playerReadyChanged(bool ready);
 
     public slots:
         // UI 이벤트 핸들러
@@ -157,6 +164,7 @@ namespace Blokus {
 
     private slots:
         void onGameStartClicked();
+        void onReadyToggleClicked();
         void onChatSendClicked();
         void onChatReturnPressed();
 
@@ -190,6 +198,7 @@ namespace Blokus {
         void updateRoomInfoDisplay();
         void updatePlayerSlotsDisplay();
         void updateGameControlsState();
+        void updateReadyStates();
 
         // 게임 상태 관리
         void enableGameControls(bool enabled);
@@ -206,6 +215,7 @@ namespace Blokus {
         // 권한 확인
         bool canStartGame() const;
         bool canKickPlayer(PlayerColor color);
+        bool areAllPlayersReady() const;
 
         // 유틸리티 함수들
         void scrollChatToBottom();
@@ -255,6 +265,7 @@ namespace Blokus {
 
         // 상태 관리
         bool m_isGameStarted;
+        bool m_isReady;              // 내 준비 상태
         QTimer* m_turnTimer;
         QList<QString> m_chatHistory;
     };

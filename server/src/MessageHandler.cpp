@@ -611,15 +611,9 @@ namespace Blokus::Server {
             spdlog::info("🎮 플레이어 준비 상태 변경: '{}' -> {}",
                 username, ready ? "준비" : "대기");
 
-            // 3. RoomManager를 통한 준비 상태 설정
+            // 3. RoomManager를 통한 준비 상태 설정 (브로드캐스트는 내부에서 처리)
             if (roomManager_->setPlayerReady(userId, ready)) {
-                // 4. 브로드캐스트 (데드락 방지를 위해 여기서 호출)
-                auto room = roomManager_->findPlayerRoom(userId);
-                if (room) {
-                    room->broadcastPlayerReady(username, ready);
-                }
-
-                // 5. 성공 응답
+                // 4. 성공 응답
                 std::string readyStatus = ready ? "1" : "0";
                 sendResponse("PLAYER_READY:" + readyStatus);
 
