@@ -65,13 +65,6 @@ namespace Blokus {
 
             // 4. 🔥 새 PlayerInfo 객체 생성
             PlayerInfo newPlayer(session);
-            
-            // 🔥 AI 플레이어인 경우 (session이 null) AI 정보 설정
-            if (!session) {
-                newPlayer.setAIInfo(userId, username);
-                spdlog::info("🤖 AI 플레이어 정보 설정: '{}' (ID: {})", username, userId);
-            }
-
             // 호스트 설정 (첫 번째 플레이어가 호스트)
             if (m_players.empty() || userId == m_hostId) {
                 newPlayer.setHost(true);
@@ -234,24 +227,11 @@ namespace Blokus {
                 return;
             }
 
-            // 실제 사용자(AI가 아닌) 플레이어를 찾아서 호스트로 선정
-            PlayerInfo* newHost = nullptr;
-            for (auto& player : m_players) {
-                if (!player.isAI()) {
-                    newHost = &player;
-                    break;
-                }
-            }
-
-            if (newHost) {
-                newHost->setHost(true);
-                m_hostId = newHost->getUserId();
-                spdlog::info("👑 방 {} 자동 호스트 선정 (실제 사용자): '{}'", m_roomId, newHost->getUsername());
-            } else {
-                // 실제 사용자가 없으면 방을 해체해야 함
-                spdlog::warn("⚠️ 방 {} 실제 사용자 없음 - 방 해체 필요", m_roomId);
-                m_state = RoomState::Disbanded;
-            }
+            // 첫 번째 플레이어를 호스트로 선정
+            PlayerInfo& newHost = m_players.front();
+            newHost.setHost(true);
+            m_hostId = newHost.getUserId();
+            spdlog::info("👑 방 {} 자동 호스트 선정: '{}'", m_roomId, newHost.getUsername());
         }
 
         // ========================================
@@ -269,24 +249,7 @@ namespace Blokus {
             return m_players.size();
         }
         
-        size_t GameRoom::getHumanPlayerCount() const {
-            std::lock_guard<std::mutex> lock(m_playersMutex);
-            size_t humanCount = std::count_if(m_players.begin(), m_players.end(),
-                [](const PlayerInfo& player) {
-                    return !player.isAI();
-                });
-            spdlog::debug("방 {} 인간 플레이어 수: {}/{}", m_roomId, humanCount, m_players.size());
-            return humanCount;
-        }
         
-        bool GameRoom::hasOnlyAIPlayers() const {
-            size_t humanCount = getHumanPlayerCount();
-            size_t totalCount = getPlayerCount();
-            bool onlyAI = (humanCount == 0 && totalCount > 0);
-            spdlog::debug("방 {} AI만 남음 체크: 인간={}, 전체={}, AI만={}", m_roomId, humanCount, totalCount, onlyAI);
-            return onlyAI;
-        }
-
         bool GameRoom::isFull() const {
             std::lock_guard<std::mutex> lock(m_playersMutex);
             return m_players.size() >= m_maxPlayers;
@@ -584,7 +547,7 @@ namespace Blokus {
         bool GameRoom::validateAllPlayersReady() const {
             for (const auto& player : m_players) {
                 // 호스트가 아닌 플레이어는 반드시 준비되어야 함
-                if (!player.isHost() && !player.isReady() && !player.isAI()) {
+                if (!player.isHost() && !player.isReady()) {
                     return false;
                 }
             }

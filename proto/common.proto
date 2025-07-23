@@ -5,10 +5,10 @@ package blokus;
 import "google/protobuf/timestamp.proto";
 
 // ========================================
-// ±âº» °ÔÀÓ Å¸ÀÔµé
+// ï¿½âº» ï¿½ï¿½ï¿½ï¿½ Å¸ï¿½Ôµï¿½
 // ========================================
 
-// ÇÃ·¹ÀÌ¾î »ö»ó
+// ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½ï¿½ï¿½
 enum PlayerColor {
   PLAYER_COLOR_NONE = 0;
   PLAYER_COLOR_BLUE = 1;
@@ -17,25 +17,25 @@ enum PlayerColor {
   PLAYER_COLOR_GREEN = 4;
 }
 
-// ºí·Ï Å¸ÀÔ (21°³ Æú¸®¿À¹Ì³ë)
+// ï¿½ï¿½ï¿½ï¿½ Å¸ï¿½ï¿½ (21ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ì³ï¿½)
 enum BlockType {
   BLOCK_TYPE_SINGLE = 0;
   
-  // 2Ä­ ºí·Ï
+  // 2Ä­ ï¿½ï¿½ï¿½ï¿½
   BLOCK_TYPE_DOMINO = 1;
   
-  // 3Ä­ ºí·Ï
+  // 3Ä­ ï¿½ï¿½ï¿½ï¿½
   BLOCK_TYPE_TRIO_LINE = 2;
   BLOCK_TYPE_TRIO_ANGLE = 3;
   
-  // 4Ä­ ºí·Ï (Å×Æ®·Î¹Ì³ë)
+  // 4Ä­ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½Æ®ï¿½Î¹Ì³ï¿½)
   BLOCK_TYPE_TETRO_I = 4;
   BLOCK_TYPE_TETRO_O = 5;
   BLOCK_TYPE_TETRO_T = 6;
   BLOCK_TYPE_TETRO_L = 7;
   BLOCK_TYPE_TETRO_S = 8;
   
-  // 5Ä­ ºí·Ï (ÆæÅä¹Ì³ë)
+  // 5Ä­ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½Ì³ï¿½)
   BLOCK_TYPE_PENTO_F = 9;
   BLOCK_TYPE_PENTO_I = 10;
   BLOCK_TYPE_PENTO_L = 11;
@@ -50,31 +50,31 @@ enum BlockType {
   BLOCK_TYPE_PENTO_Z = 20;
 }
 
-// ºí·Ï È¸Àü »óÅÂ
+// ï¿½ï¿½ï¿½ï¿½ È¸ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 enum Rotation {
-  ROTATION_0 = 0;    // 0µµ
-  ROTATION_90 = 1;   // 90µµ ½Ã°è¹æÇâ
-  ROTATION_180 = 2;  // 180µµ
-  ROTATION_270 = 3;  // 270µµ ½Ã°è¹æÇâ
+  ROTATION_0 = 0;    // 0ï¿½ï¿½
+  ROTATION_90 = 1;   // 90ï¿½ï¿½ ï¿½Ã°ï¿½ï¿½ï¿½ï¿½
+  ROTATION_180 = 2;  // 180ï¿½ï¿½
+  ROTATION_270 = 3;  // 270ï¿½ï¿½ ï¿½Ã°ï¿½ï¿½ï¿½ï¿½
 }
 
-// ºí·Ï µÚÁý±â »óÅÂ
+// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 enum FlipState {
-  FLIP_NORMAL = 0;      // Á¤»ó
-  FLIP_HORIZONTAL = 1;  // ¼öÆò µÚÁý±â
-  FLIP_VERTICAL = 2;    // ¼öÁ÷ µÚÁý±â
-  FLIP_BOTH = 3;        // ¾çÂÊ µÚÁý±â
+  FLIP_NORMAL = 0;      // ï¿½ï¿½ï¿½ï¿½
+  FLIP_HORIZONTAL = 1;  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+  FLIP_VERTICAL = 2;    // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+  FLIP_BOTH = 3;        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 }
 
-// °ÔÀÓ »óÅÂ
+// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 enum GameState {
-  GAME_STATE_WAITING = 0;   // ÇÃ·¹ÀÌ¾î ´ë±â Áß
-  GAME_STATE_PLAYING = 1;   // °ÔÀÓ ÁøÇà Áß
-  GAME_STATE_FINISHED = 2;  // °ÔÀÓ Á¾·á
-  GAME_STATE_PAUSED = 3;    // ÀÏ½ÃÁ¤Áö
+  GAME_STATE_WAITING = 0;   // ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½
+  GAME_STATE_PLAYING = 1;   // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½
+  GAME_STATE_FINISHED = 2;  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  GAME_STATE_PAUSED = 3;    // ï¿½Ï½ï¿½ï¿½ï¿½ï¿½ï¿½
 }
 
-// »ç¿ëÀÚ »óÅÂ
+// ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 enum UserStatus {
   USER_STATUS_OFFLINE = 0;
   USER_STATUS_ONLINE = 1;
@@ -84,16 +84,16 @@ enum UserStatus {
 }
 
 // ========================================
-// ±âº» µ¥ÀÌÅÍ ±¸Á¶
+// ï¿½âº» ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 // ========================================
 
-// 2D À§Ä¡
+// 2D ï¿½ï¿½Ä¡
 message Position {
   int32 row = 1;
   int32 col = 2;
 }
 
-// ºí·Ï ¹èÄ¡ Á¤º¸
+// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ä¡ ï¿½ï¿½ï¿½ï¿½
 message BlockPlacement {
   BlockType type = 1;
   Position position = 2;
@@ -102,7 +102,7 @@ message BlockPlacement {
   PlayerColor player = 5;
 }
 
-// »ç¿ëÀÚ ±âº» Á¤º¸
+// ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½âº» ï¿½ï¿½ï¿½ï¿½
 message UserInfo {
   string username = 1;
   int32 level = 2;
@@ -114,20 +114,18 @@ message UserInfo {
   google.protobuf.Timestamp last_seen = 8;
 }
 
-// ÇÃ·¹ÀÌ¾î ½½·Ô Á¤º¸
+// ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 message PlayerSlot {
   PlayerColor color = 1;
   string username = 2;
-  bool is_ai = 3;
-  int32 ai_difficulty = 4;  // 1-3 (½¬¿ò-¾î·Á¿ò)
-  bool is_host = 5;
-  bool is_ready = 6;
-  int32 score = 7;
-  int32 remaining_blocks = 8;
-  repeated BlockType used_blocks = 9;
+  bool is_host = 3;
+  bool is_ready = 4;
+  int32 score = 5;
+  int32 remaining_blocks = 6;
+  repeated BlockType used_blocks = 7;
 }
 
-// ¹æ ±âº» Á¤º¸
+// ï¿½ï¿½ ï¿½âº» ï¿½ï¿½ï¿½ï¿½
 message RoomInfo {
   int32 room_id = 1;
   string room_name = 2;
@@ -136,20 +134,20 @@ message RoomInfo {
   int32 max_players = 5;
   bool is_private = 6;
   bool is_playing = 7;
-  string game_mode = 8;  // "Å¬·¡½Ä", "µà¿À" µî
+  string game_mode = 8;  // "Å¬ï¿½ï¿½ï¿½ï¿½", "ï¿½ï¿½ï¿½" ï¿½ï¿½
   google.protobuf.Timestamp created_at = 9;
 }
 
-// °ÔÀÓ º¸µå »óÅÂ (¾ÐÃàµÈ ÇüÅÂ)
+// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
 message BoardState {
-  // 20x20 º¸µå¸¦ È¿À²ÀûÀ¸·Î ÀÎÄÚµù
-  // °¢ ¼¿Àº 4ºñÆ® (0-4: PlayerColor)
-  // 400¼¿ ¡æ 200¹ÙÀÌÆ®·Î ¾ÐÃà
+  // 20x20 ï¿½ï¿½ï¿½å¸¦ È¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Úµï¿½
+  // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ 4ï¿½ï¿½Æ® (0-4: PlayerColor)
+  // 400ï¿½ï¿½ ï¿½ï¿½ 200ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
   bytes compressed_board = 1;
-  int32 board_version = 2;  // »óÅÂ ¹öÀü (Ãæµ¹ °¨Áö¿ë)
+  int32 board_version = 2;  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½æµ¹ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½)
 }
 
-// °ÔÀÓ Åë°è
+// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
 message GameStats {
   int32 total_moves = 1;
   int32 game_duration_seconds = 2;
@@ -158,7 +156,7 @@ message GameStats {
   string winner = 5;
 }
 
-// ¼­¹ö »óÅÂ Á¤º¸
+// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 message ServerInfo {
   int32 online_users = 1;
   int32 active_rooms = 2;
@@ -169,10 +167,10 @@ message ServerInfo {
 }
 
 // ========================================
-// °øÅë °á°ú Å¸ÀÔ
+// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ Å¸ï¿½ï¿½
 // ========================================
 
-// ¼º°ø/½ÇÆÐ °á°ú
+// ï¿½ï¿½ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
 enum ResultCode {
   RESULT_SUCCESS = 0;
   RESULT_UNKNOWN_ERROR = 1;
@@ -185,9 +183,9 @@ enum ResultCode {
   RESULT_SERVER_BUSY = 8;
 }
 
-// °øÅë ÀÀ´ä °á°ú
+// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
 message Result {
   ResultCode code = 1;
   string message = 2;
-  map<string, string> details = 3;  // Ãß°¡ Á¤º¸
+  map<string, string> details = 3;  // ï¿½ß°ï¿½ ï¿½ï¿½ï¿½ï¿½
 }

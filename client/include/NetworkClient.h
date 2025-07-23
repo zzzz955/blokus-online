@@ -88,7 +88,6 @@ namespace Blokus {
         void playerLeft(const QString& username);
         void playerReady(const QString& username, bool ready);
         void hostChanged(const QString& newHost);
-        void aiAdded(int colorIndex, int difficulty);
         void gameStarted();
         void gameEnded();
         

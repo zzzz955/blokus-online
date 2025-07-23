@@ -228,8 +228,7 @@ private slots:
         // 특정 에러만 메시지 박스로 표시 (중요한 사용자 액션 관련 에러만)
         if (!error.isEmpty()) {
             // 사용자가 직접 수행한 액션 관련 에러만 표시
-            if (error.contains(QString::fromUtf8("AI")) || 
-                error.contains(QString::fromUtf8("방")) ||
+            if (error.contains(QString::fromUtf8("방")) ||
                 error.contains(QString::fromUtf8("게임")) ||
                 error.contains(QString::fromUtf8("플레이어")) ||
                 error.contains(QString::fromUtf8("호스트")) ||
@@ -358,8 +357,6 @@ private slots:
         gameRoomInfo.playerSlots[0].isHost = true;
         gameRoomInfo.playerSlots[0].isReady = true;
         gameRoomInfo.playerSlots[0].color = PlayerColor::Blue;
-        gameRoomInfo.playerSlots[0].isAI = false;
-        gameRoomInfo.playerSlots[0].aiDifficulty = 0;
         
         createGameRoomWindow(gameRoomInfo, true);
         
@@ -496,42 +493,33 @@ private slots:
         gameRoomInfo.gameMode = gameMode;
         gameRoomInfo.isPlaying = isPlaying;
         
-        // 플레이어 정보 파싱 (9번 인덱스부터) - 확장된 형식: userId,username,isHost,isReady,isAI,aiDifficulty,colorIndex
+        // 플레이어 정보 파싱 (9번 인덱스부터) - 형식: userId,username,isHost,isReady,colorIndex
         qDebug() << QString::fromUtf8("플레이어 데이터 파싱 시작: %1개 항목").arg(roomInfo.size() - 9);
         for (int i = 9; i < roomInfo.size(); ++i) {
             QStringList playerData = roomInfo[i].split(',');
             qDebug() << QString::fromUtf8("플레이어 %1: %2 (필드 수: %3)").arg(i-8).arg(roomInfo[i]).arg(playerData.size());
             
-            if (playerData.size() >= 7) {
+            if (playerData.size() >= 5) {
                 QString userId = playerData[0];
                 QString username = playerData[1];
                 bool isHost = (playerData[2] == "1");
                 bool isReady = (playerData[3] == "1");
-                bool isAI = (playerData[4] == "1");
-                int aiDifficulty = playerData[5].toInt();
-                int colorIndex = playerData[6].toInt();
+                int colorIndex = playerData[4].toInt();
                 
-                qDebug() << QString::fromUtf8("  - 사용자: %1, AI: %2, 색상: %3").arg(username).arg(isAI).arg(colorIndex);
+                qDebug() << QString::fromUtf8("  - 사용자: %1, 색상: %2").arg(username).arg(colorIndex);
                 
                 // 색상 인덱스를 기반으로 정확한 슬롯에 배치 (PlayerColor 1-4를 배열 인덱스 0-3으로 변환)
                 if (colorIndex >= 1 && colorIndex <= 4) {
                     PlayerColor playerColor = static_cast<PlayerColor>(colorIndex);
                     int slotIndex = colorIndex - 1;  // PlayerColor 1-4를 배열 인덱스 0-3으로 변환
                     
-                    qDebug() << QString::fromUtf8("🔧 슬롯 %1에 플레이어 배치: %2 (AI=%3, 색상=%4)")
-                        .arg(slotIndex).arg(username).arg(isAI).arg(colorIndex);
+                    qDebug() << QString::fromUtf8("🔧 슬롯 %1에 플레이어 배치: %2 (색상=%3)")
+                        .arg(slotIndex).arg(username).arg(colorIndex);
                     
                     gameRoomInfo.playerSlots[slotIndex].username = username;
                     gameRoomInfo.playerSlots[slotIndex].isHost = isHost;
                     gameRoomInfo.playerSlots[slotIndex].isReady = isReady;
-                    gameRoomInfo.playerSlots[slotIndex].isAI = isAI;
-                    gameRoomInfo.playerSlots[slotIndex].aiDifficulty = aiDifficulty;
                     gameRoomInfo.playerSlots[slotIndex].color = playerColor;
-                    
-                    if (isAI) {
-                        qDebug() << QString::fromUtf8("✅ AI 플레이어 슬롯 설정 완료: 슬롯=%1, 이름=%2, 난이도=%3")
-                            .arg(slotIndex).arg(username).arg(aiDifficulty);
-                    }
                 }
             }
             else if (playerData.size() >= 4) {
@@ -548,8 +536,6 @@ private slots:
                         gameRoomInfo.playerSlots[slot].isHost = isHost;
                         gameRoomInfo.playerSlots[slot].isReady = isReady;
                         gameRoomInfo.playerSlots[slot].color = static_cast<PlayerColor>(slot + 1);
-                        gameRoomInfo.playerSlots[slot].isAI = false;
-                        gameRoomInfo.playerSlots[slot].aiDifficulty = 0;
                         break;
                     }
                 }
@@ -564,8 +550,8 @@ private slots:
             qDebug() << QString::fromUtf8("GameRoomInfo 업데이트 - 슬롯 상태:");
             for (int i = 0; i < 4; ++i) {
                 const auto& slot = gameRoomInfo.playerSlots[i];
-                qDebug() << QString::fromUtf8("  슬롯 %1: %2, AI=%3, 준비=%4, 호스트=%5")
-                    .arg(i).arg(slot.username).arg(slot.isAI).arg(slot.isReady).arg(slot.isHost);
+                qDebug() << QString::fromUtf8("  슬롯 %1: %2, 준비=%3, 호스트=%4")
+                    .arg(i).arg(slot.username).arg(slot.isReady).arg(slot.isHost);
             }
             
             m_gameRoomWindow->updateRoomInfo(gameRoomInfo);
@@ -625,17 +611,6 @@ private slots:
         }
     }
     
-    void onAIAdded(int colorIndex, int difficulty)
-    {
-        qDebug() << QString::fromUtf8("AI 추가 성공: 색상 인덱스=%1, 난이도=%2").arg(colorIndex).arg(difficulty);
-        if (m_gameRoomWindow) {
-            QString aiName = QString::fromUtf8("AI Bot %1").arg(difficulty);
-            QString colorName = Utils::playerColorToString(static_cast<PlayerColor>(colorIndex + 1));
-            m_gameRoomWindow->addSystemMessage(
-                QString::fromUtf8("%1 (%2)이 방에 추가되었습니다.").arg(aiName).arg(colorName)
-            );
-        }
-    }
 
 private:
     void initializeApplication()
@@ -706,8 +681,6 @@ private:
                 this, &AppController::onGameStarted);
         connect(m_networkClient, &NetworkClient::gameEnded,
                 this, &AppController::onGameEnded);
-        connect(m_networkClient, &NetworkClient::aiAdded,
-                this, &AppController::onAIAdded);
         
         qDebug() << QString::fromUtf8("네트워크 클라이언트 설정 완료");
     }

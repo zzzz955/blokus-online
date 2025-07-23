@@ -158,8 +158,6 @@ namespace Blokus {
     struct PlayerSlot {
         PlayerColor color;
         QString username;    // Qt 문자열 사용
-        bool isAI;
-        int aiDifficulty;
         bool isHost;
         bool isReady;
         int score;
@@ -167,8 +165,7 @@ namespace Blokus {
 
         PlayerSlot()
             : color(PlayerColor::None), username("")
-            , isAI(false), aiDifficulty(2), isHost(false)
-            , isReady(false), score(0)
+            , isHost(false), isReady(false), score(0)
             , remainingBlocks(Common::BLOCKS_PER_PLAYER) {
         }  // Common 상수 사용
 
@@ -176,17 +173,15 @@ namespace Blokus {
         PlayerSlot(const Common::PlayerSlot& common)
             : color(common.color)
             , username(QString::fromUtf8(common.username.c_str()))
-            , isAI(common.isAI), aiDifficulty(common.aiDifficulty)
             , isHost(common.isHost), isReady(common.isReady)
             , score(common.score), remainingBlocks(common.remainingBlocks) {
         }
 
         // 기존 함수들 유지
-        bool isEmpty() const { return username.isEmpty() && !isAI; }
+        bool isEmpty() const { return username.isEmpty(); }
 
         QString getDisplayName() const {
             if (isEmpty()) return QString::fromUtf8("빈 슬롯");
-            if (isAI) return QString::fromUtf8("AI (레벨 %1)").arg(aiDifficulty);
             return username;
         }
 

@@ -209,12 +209,12 @@ namespace Blokus {
 
             triggerRoomEvent(roomId, "PLAYER_LEFT", username);
 
-            // 방이 비었거나 AI만 남았거나 해체 상태라면 제거
-            if (room->isEmpty() || room->hasOnlyAIPlayers() || room->getState() == RoomState::Disbanded) {
-                if (room->hasOnlyAIPlayers()) {
-                    spdlog::info("🤖 AI만 남은 방 {} 자동 삭제 (RoomManager)", roomId);
-                } else if (room->getState() == RoomState::Disbanded) {
+            // 방이 비었거나 해체 상태라면 제거
+            if (room->isEmpty() || room->getState() == RoomState::Disbanded) {
+                if (room->getState() == RoomState::Disbanded) {
                     spdlog::info("💥 해체된 방 {} 자동 삭제 (RoomManager)", roomId);
+                } else {
+                    spdlog::info("빈 방 {} 자동 삭제 (RoomManager)", roomId);
                 }
                 removeRoom(roomId);
             }

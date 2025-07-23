@@ -240,8 +240,6 @@ namespace Blokus {
         struct PlayerSlot {
             PlayerColor color;          // 플레이어 색상
             std::string username;       // 플레이어 이름
-            bool isAI;                  // AI 플레이어 여부
-            int aiDifficulty;           // AI 난이도 (1-3)
             bool isHost;                // 호스트 여부
             bool isReady;               // 준비 상태
             int score;                  // 현재 점수
@@ -250,8 +248,6 @@ namespace Blokus {
             PlayerSlot()
                 : color(PlayerColor::None)
                 , username("")
-                , isAI(false)
-                , aiDifficulty(2)
                 , isHost(false)
                 , isReady(false)
                 , score(0)

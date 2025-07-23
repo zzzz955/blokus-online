@@ -6,7 +6,7 @@ import "google/protobuf/timestamp.proto";
 import "common.proto";
 
 // ========================================
-// °ÔÀÓ °ü·Ã ¿­°ÅÇü
+// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 // ========================================
 
 enum TurnAction {
@@ -17,16 +17,16 @@ enum TurnAction {
 }
 
 enum GameEndReason {
-  GAME_END_NORMAL = 0;         // Á¤»ó Á¾·á (¸ðµç ÇÃ·¹ÀÌ¾î ºí·Ï ¼ÒÁø ¶Ç´Â ¹èÄ¡ ºÒ°¡)
-  GAME_END_FORFEIT = 1;        // Ç×º¹
-  GAME_END_DISCONNECT = 2;     // ÇÃ·¹ÀÌ¾î Á¢¼Ó ²÷±è
-  GAME_END_TIMEOUT = 3;        // ½Ã°£ ÃÊ°ú
-  GAME_END_SERVER_ERROR = 4;   // ¼­¹ö ¿À·ù
-  GAME_END_ADMIN_STOP = 5;     // °ü¸®ÀÚ Áß´Ü
+  GAME_END_NORMAL = 0;         // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ç´ï¿½ ï¿½ï¿½Ä¡ ï¿½Ò°ï¿½)
+  GAME_END_FORFEIT = 1;        // ï¿½×ºï¿½
+  GAME_END_DISCONNECT = 2;     // ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  GAME_END_TIMEOUT = 3;        // ï¿½Ã°ï¿½ ï¿½Ê°ï¿½
+  GAME_END_SERVER_ERROR = 4;   // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  GAME_END_ADMIN_STOP = 5;     // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ß´ï¿½
 }
 
 // ========================================
-// ¹æ »óÅÂ °ü¸®
+// ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 // ========================================
 
 message RoomStateUpdate {
@@ -34,60 +34,43 @@ message RoomStateUpdate {
   repeated PlayerSlot player_slots = 2;
   GameState game_state = 3;
   
-  // °ÔÀÓ ¼³Á¤
+  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
   string game_mode = 4;
   int32 turn_time_seconds = 5;
   bool allow_undo = 6;
   bool spectators_allowed = 7;
   
-  // ÇöÀç °ÔÀÓ Á¤º¸ (°ÔÀÓ ÁßÀÏ ¶§)
+  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½)
   PlayerColor current_player = 8;
   int32 turn_number = 9;
   int32 remaining_time_seconds = 10;
   
-  // ¹æ ¸ÞÅ¸µ¥ÀÌÅÍ
+  // ï¿½ï¿½ ï¿½ï¿½Å¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
   google.protobuf.Timestamp last_updated = 11;
-  int32 version = 12;          // »óÅÂ ¹öÀü (Ãæµ¹ ¹æÁö)
+  int32 version = 12;          // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½æµ¹ ï¿½ï¿½ï¿½ï¿½)
 }
 
-// ========================================
-// AI ÇÃ·¹ÀÌ¾î °ü¸®
-// ========================================
-
-message AddAIPlayerRequest {
-  int32 room_id = 1;
-  PlayerColor color = 2;
-  int32 difficulty = 3;        // 1: ½¬¿ò, 2: º¸Åë, 3: ¾î·Á¿ò
-  string ai_name = 4;          // AI ÇÃ·¹ÀÌ¾î ÀÌ¸§
-  string ai_personality = 5;   // AI ¼º°Ý ("°ø°ÝÀû", "¼öºñÀû", "±ÕÇüÀû")
-}
-
-message AddAIPlayerResponse {
-  Result result = 1;
-  PlayerSlot ai_player_slot = 2;
-  string message = 3;
-}
 
 message RemovePlayerRequest {
   int32 room_id = 1;
   PlayerColor color = 2;
   string reason = 3;
-  bool is_kick = 4;            // °­Åð ¿©ºÎ
+  bool is_kick = 4;            // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 }
 
 message RemovePlayerResponse {
   Result result = 1;
   string message = 2;
-  bool room_disbanded = 3;     // ¹æ ÇØÃ¼ ¿©ºÎ
+  bool room_disbanded = 3;     // ï¿½ï¿½ ï¿½ï¿½Ã¼ ï¿½ï¿½ï¿½ï¿½
 }
 
 // ========================================
-// °ÔÀÓ ½ÃÀÛ/Á¾·á
+// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½
 // ========================================
 
 message StartGameRequest {
   int32 room_id = 1;
-  bool force_start = 2;        // °­Á¦ ½ÃÀÛ (ÁØºñµÇÁö ¾ÊÀº ÇÃ·¹ÀÌ¾î ÀÖ¾îµµ)
+  bool force_start = 2;        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½Øºï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½Ö¾îµµ)
 }
 
 message StartGameResponse {
@@ -102,16 +85,16 @@ message GameStartedNotification {
   repeated PlayerSlot players = 2;
   PlayerColor first_player = 3;
   
-  // °ÔÀÓ ¼³Á¤
+  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
   string game_mode = 4;
   int32 turn_time_seconds = 5;
   bool allow_undo = 6;
   int32 max_undo_count = 7;
   
-  // ÃÊ±â °ÔÀÓ »óÅÂ
+  // ï¿½Ê±ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
   BoardState initial_board = 8;
   google.protobuf.Timestamp started_at = 9;
-  string game_id = 10;         // °ÔÀÓ °íÀ¯ ID (¸®ÇÃ·¹ÀÌ¿ë)
+  string game_id = 10;         // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ID (ï¿½ï¿½ï¿½Ã·ï¿½ï¿½Ì¿ï¿½)
 }
 
 message GameEndedNotification {
@@ -119,21 +102,21 @@ message GameEndedNotification {
   string game_id = 2;
   GameEndReason end_reason = 3;
   
-  // ÃÖÁ¾ °á°ú
+  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
   repeated PlayerResult final_results = 4;
-  string winner = 5;           // ½ÂÀÚ (µ¿Á¡ÀÎ °æ¿ì ºó ¹®ÀÚ¿­)
+  string winner = 5;           // ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½Ú¿ï¿½)
   
-  // °ÔÀÓ Åë°è
+  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
   GameStats game_stats = 6;
   google.protobuf.Timestamp ended_at = 7;
   int32 game_duration_seconds = 8;
   
-  // ·¹ÀÌÆÃ º¯È­
-  map<string, int32> rating_changes = 9; // ÇÃ·¹ÀÌ¾îº° ·¹ÀÌÆÃ º¯È­
+  // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½È­
+  map<string, int32> rating_changes = 9; // ï¿½Ã·ï¿½ï¿½Ì¾îº° ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½È­
   
-  // ¾÷Àû ¹× º¸»ó
-  map<string, string> achievements = 10; // ÇÃ·¹ÀÌ¾îº° »õ·Î È¹µæÇÑ ¾÷Àû (¹®ÀÚ¿­·Î ¼öÁ¤)
-  map<string, int32> experience_gained = 11;     // ÇÃ·¹ÀÌ¾îº° °æÇèÄ¡ È¹µæ
+  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  map<string, string> achievements = 10; // ï¿½Ã·ï¿½ï¿½Ì¾îº° ï¿½ï¿½ï¿½ï¿½ È¹ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½Ú¿ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
+  map<string, int32> experience_gained = 11;     // ï¿½Ã·ï¿½ï¿½Ì¾îº° ï¿½ï¿½ï¿½ï¿½Ä¡ È¹ï¿½ï¿½
 }
 
 message PlayerResult {
@@ -142,9 +125,9 @@ message PlayerResult {
   int32 final_score = 3;
   int32 blocks_placed = 4;
   int32 remaining_blocks = 5;
-  bool finished_all_blocks = 6; // ¸ðµç ºí·Ï ¹èÄ¡ ¿Ï·á
+  bool finished_all_blocks = 6; // ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ä¡ ï¿½Ï·ï¿½
   
-  // »ó¼¼ Åë°è
+  // ï¿½ï¿½ ï¿½ï¿½ï¿½
   int32 total_moves = 7;
   int32 undo_count = 8;
   float average_think_time = 9;
@@ -153,7 +136,7 @@ message PlayerResult {
 }
 
 // ========================================
-// ÅÏ °ü¸®
+// ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 // ========================================
 
 message TurnChangedNotification {
@@ -162,57 +145,57 @@ message TurnChangedNotification {
   PlayerColor previous_player = 3;
   int32 turn_number = 4;
   
-  // ÅÏ ½Ã°£ Á¤º¸
+  // ï¿½ï¿½ ï¿½Ã°ï¿½ ï¿½ï¿½ï¿½ï¿½
   int32 turn_time_seconds = 5;
   google.protobuf.Timestamp turn_started_at = 6;
   
-  // °ÔÀÓ »óÅÂ
+  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
   int32 moves_made = 7;
-  bool game_nearly_finished = 8; // °ÔÀÓÀÌ °ÅÀÇ ³¡³ª°¡´ÂÁö
+  bool game_nearly_finished = 8; // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
   
-  // ÀÌÀü ÅÏ Á¤º¸
+  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
   TurnAction previous_action = 9;
   string previous_action_details = 10;
 }
 
 // ========================================
-// ºí·Ï ¹èÄ¡
+// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ä¡
 // ========================================
 
 message PlaceBlockRequest {
   int32 room_id = 1;
   BlockPlacement block_placement = 2;
   
-  // ¹èÄ¡ ¿É¼Ç
-  bool confirm_placement = 3;  // È®Á¤ ¹èÄ¡ (false¸é À¯È¿¼º¸¸ °Ë»ç)
-  bool use_hint = 4;          // ÈùÆ® »ç¿ë ¿©ºÎ
+  // ï¿½ï¿½Ä¡ ï¿½É¼ï¿½
+  bool confirm_placement = 3;  // È®ï¿½ï¿½ ï¿½ï¿½Ä¡ (falseï¿½ï¿½ ï¿½ï¿½È¿ï¿½ï¿½ï¿½ï¿½ ï¿½Ë»ï¿½)
+  bool use_hint = 4;          // ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
   
-  // Å¬¶óÀÌ¾ðÆ® °ËÁõ Á¤º¸
-  int32 client_board_version = 5; // Å¬¶óÀÌ¾ðÆ®ÀÇ º¸µå ¹öÀü
-  string move_id = 6;         // Å¬¶óÀÌ¾ðÆ®¿¡¼­ »ý¼ºÇÑ °íÀ¯ ID
+  // Å¬ï¿½ï¿½ï¿½Ì¾ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  int32 client_board_version = 5; // Å¬ï¿½ï¿½ï¿½Ì¾ï¿½Æ®ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  string move_id = 6;         // Å¬ï¿½ï¿½ï¿½Ì¾ï¿½Æ®ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ID
 }
 
 message PlaceBlockResponse {
   Result result = 1;
   
-  // ¼º°ø ½Ã Á¤º¸
+  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
   BlockPlacement confirmed_placement = 2;
   int32 score_gained = 3;
   BoardState new_board_state = 4;
   bool move_accepted = 5;
   
-  // °ËÁõ °á°ú
+  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
   bool valid_placement = 6;
   repeated string validation_errors = 7;
-  repeated Position suggested_positions = 8; // À¯È¿ÇÑ ¹èÄ¡ À§Ä¡ Á¦¾È
+  repeated Position suggested_positions = 8; // ï¿½ï¿½È¿ï¿½ï¿½ ï¿½ï¿½Ä¡ ï¿½ï¿½Ä¡ ï¿½ï¿½ï¿½ï¿½
   
-  // °ÔÀÓ »óÅÂ º¯È­
+  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½È­
   bool turn_ended = 9;
   PlayerColor next_player = 10;
   bool game_ended = 11;
   
-  // Å¬¶óÀÌ¾ðÆ® µ¿±âÈ­
-  string move_id = 12;        // ¿äÃ»¿¡¼­ ¹ÞÀº move_id ±×´ë·Î ¹ÝÈ¯
+  // Å¬ï¿½ï¿½ï¿½Ì¾ï¿½Æ® ï¿½ï¿½ï¿½ï¿½È­
+  string move_id = 12;        // ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ move_id ï¿½×´ï¿½ï¿½ ï¿½ï¿½È¯
   int32 server_board_version = 13;
 }
 
@@ -222,45 +205,45 @@ message BlockPlacedNotification {
   PlayerColor player_color = 3;
   BlockPlacement block_placement = 4;
   
-  // Á¡¼ö Á¤º¸
+  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
   int32 score_gained = 5;
   int32 new_total_score = 6;
   int32 remaining_blocks = 7;
   
-  // º¸µå »óÅÂ
+  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
   BoardState updated_board = 8;
   
-  // °ÔÀÓ »óÅÂ
+  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
   bool turn_ended = 9;
   PlayerColor next_player = 10;
   google.protobuf.Timestamp placed_at = 11;
   
-  // Æ¯º°ÇÑ »óÈ²
-  bool perfect_game = 12;     // ¿Ïº®ÇÑ °ÔÀÓ (¸ðµç ºí·Ï »ç¿ë)
-  bool game_winning_move = 13; // °ÔÀÓ ½Â¸® °áÁ¤ ¼ö
-  repeated string triggered_achievements = 14; // ÀÌ ¼ö·Î ´Þ¼ºÇÑ ¾÷Àûµé
+  // Æ¯ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½È²
+  bool perfect_game = 12;     // ï¿½Ïºï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½)
+  bool game_winning_move = 13; // ï¿½ï¿½ï¿½ï¿½ ï¿½Â¸ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½
+  repeated string triggered_achievements = 14; // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Þ¼ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 }
 
 // ========================================
-// ÅÏ ½ºÅµ ¹× Æ¯¼ö Çàµ¿
+// ï¿½ï¿½ ï¿½ï¿½Åµ ï¿½ï¿½ Æ¯ï¿½ï¿½ ï¿½àµ¿
 // ========================================
 
 message SkipTurnRequest {
   int32 room_id = 1;
-  string reason = 2;          // ½ºÅµ ÀÌÀ¯
-  bool forced = 3;            // °­Á¦ ½ºÅµ (½Ã°£ ÃÊ°ú µî)
+  string reason = 2;          // ï¿½ï¿½Åµ ï¿½ï¿½ï¿½ï¿½
+  bool forced = 3;            // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Åµ (ï¿½Ã°ï¿½ ï¿½Ê°ï¿½ ï¿½ï¿½)
 }
 
 message SkipTurnResponse {
   Result result = 1;
   string message = 2;
   PlayerColor next_player = 3;
-  bool game_ended = 4;        // ¸ðµç ÇÃ·¹ÀÌ¾î°¡ ½ºÅµÇÏ¿© °ÔÀÓ Á¾·á
+  bool game_ended = 4;        // ï¿½ï¿½ï¿½ ï¿½Ã·ï¿½ï¿½Ì¾î°¡ ï¿½ï¿½Åµï¿½Ï¿ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 }
 
 message UndoMoveRequest {
   int32 room_id = 1;
-  int32 moves_to_undo = 2;    // µÇµ¹¸± ¼öÀÇ °³¼ö
+  int32 moves_to_undo = 2;    // ï¿½Çµï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
   string reason = 3;
 }
 
@@ -268,40 +251,40 @@ message UndoMoveResponse {
   Result result = 1;
   BoardState reverted_board = 2;
   PlayerColor current_player = 3;
-  int32 undo_count_remaining = 4; // ³²Àº ½ÇÇàÃë¼Ò È½¼ö
+  int32 undo_count_remaining = 4; // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ È½ï¿½ï¿½
   string message = 5;
 }
 
 // ========================================
-// °ÔÀÓ »óÅÂ Á¶È¸
+// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½È¸
 // ========================================
 
 message GetGameStateRequest {
   int32 room_id = 1;
-  bool include_board = 2;     // º¸µå »óÅÂ Æ÷ÇÔ
-  bool include_player_details = 3; // ÇÃ·¹ÀÌ¾î »ó¼¼ Á¤º¸ Æ÷ÇÔ
-  bool include_move_history = 4;   // ¼ö ±â·Ï Æ÷ÇÔ
+  bool include_board = 2;     // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  bool include_player_details = 3; // ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  bool include_move_history = 4;   // ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 }
 
 message GameStateResponse {
   Result result = 1;
   
-  // ±âº» °ÔÀÓ »óÅÂ
+  // ï¿½âº» ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
   GameState game_state = 2;
   PlayerColor current_player = 3;
   int32 turn_number = 4;
   int32 remaining_time_seconds = 5;
   
-  // ÇÃ·¹ÀÌ¾î Á¤º¸
+  // ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½ï¿½ï¿½
   repeated PlayerSlot players = 6;
   
-  // º¸µå »óÅÂ (¿äÃ» ½Ã¿¡¸¸)
+  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½Ã» ï¿½Ã¿ï¿½ï¿½ï¿½)
   BoardState board_state = 7;
   
-  // °ÔÀÓ ±â·Ï (¿äÃ» ½Ã¿¡¸¸)
+  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ (ï¿½ï¿½Ã» ï¿½Ã¿ï¿½ï¿½ï¿½)
   repeated GameMove move_history = 8;
   
-  // °ÔÀÓ ¸ÞÅ¸µ¥ÀÌÅÍ
+  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Å¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
   google.protobuf.Timestamp game_started_at = 9;
   string game_id = 10;
   string game_mode = 11;
@@ -312,7 +295,7 @@ message GameMove {
   string player_username = 2;
   PlayerColor player_color = 3;
   TurnAction action = 4;
-  BlockPlacement block_placement = 5; // actionÀÌ PLACE_BLOCKÀÎ °æ¿ì
+  BlockPlacement block_placement = 5; // actionï¿½ï¿½ PLACE_BLOCKï¿½ï¿½ ï¿½ï¿½ï¿½
   google.protobuf.Timestamp timestamp = 6;
   int32 think_time_seconds = 7;
   int32 score_before = 8;
@@ -320,60 +303,60 @@ message GameMove {
 }
 
 // ========================================
-// ½Ç½Ã°£ °ÔÀÓ »óÅÂ ¾÷µ¥ÀÌÆ®
+// ï¿½Ç½Ã°ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®
 // ========================================
 
 message GameStateUpdate {
   int32 room_id = 1;
-  int32 update_version = 2;   // ¾÷µ¥ÀÌÆ® ¹öÀü (¼ø¼­ º¸Àå)
+  int32 update_version = 2;   // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
   
-  // º¯°æµÈ Á¤º¸¸¸ Æ÷ÇÔ (µ¨Å¸ ¾÷µ¥ÀÌÆ®)
+  // ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½Å¸ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®)
   optional PlayerColor current_player = 3;
   optional int32 remaining_time = 4;
   optional BoardState board_changes = 5;
   repeated PlayerSlot updated_players = 6;
   
-  // ¸ÞÅ¸µ¥ÀÌÅÍ
+  // ï¿½ï¿½Å¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
   google.protobuf.Timestamp updated_at = 7;
-  string update_reason = 8;   // "block_placed", "turn_changed", "player_joined" µî
+  string update_reason = 8;   // "block_placed", "turn_changed", "player_joined" ï¿½ï¿½
 }
 
 // ========================================
-// °ÔÀÓ ºÐ¼® ¹× ÈùÆ®
+// ï¿½ï¿½ï¿½ï¿½ ï¿½Ð¼ï¿½ ï¿½ï¿½ ï¿½ï¿½Æ®
 // ========================================
 
 message GetHintRequest {
   int32 room_id = 1;
   PlayerColor player = 2;
-  int32 hint_level = 3;       // 1: °£´ÜÇÑ ÈùÆ®, 2: »ó¼¼ÇÑ ÈùÆ®, 3: ÃÖÀû ¼ö
+  int32 hint_level = 3;       // 1: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Æ®, 2: ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Æ®, 3: ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½
 }
 
 message GetHintResponse {
   Result result = 1;
   
-  // ÈùÆ® Á¤º¸
+  // ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½
   repeated BlockPlacement suggested_moves = 2;
-  repeated string explanations = 3; // °¢ ¼ö¿¡ ´ëÇÑ ¼³¸í
-  int32 hint_quality = 4;     // ÈùÆ® Ç°Áú Á¡¼ö (1-100)
+  repeated string explanations = 3; // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  int32 hint_quality = 4;     // ï¿½ï¿½Æ® Ç°ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (1-100)
   
-  // ºÐ¼® Á¤º¸
+  // ï¿½Ð¼ï¿½ ï¿½ï¿½ï¿½ï¿½
   int32 possible_moves_count = 5;
-  float win_probability = 6;   // ½Â·ü ¿¹Ãø
-  string strategy_advice = 7;  // Àü·« Á¶¾ð
+  float win_probability = 6;   // ï¿½Â·ï¿½ ï¿½ï¿½ï¿½ï¿½
+  string strategy_advice = 7;  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 }
 
 // ========================================
-// °üÀü ½Ã½ºÅÛ
+// ï¿½ï¿½ï¿½ï¿½ ï¿½Ã½ï¿½ï¿½ï¿½
 // ========================================
 
 message SpectatorJoinRequest {
   int32 room_id = 1;
-  bool silent_join = 2;       // Á¶¿ëÈ÷ ÀÔÀå (¾Ë¸² ¾øÀ½)
+  bool silent_join = 2;       // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½Ë¸ï¿½ ï¿½ï¿½ï¿½ï¿½)
 }
 
 message SpectatorJoinResponse {
   Result result = 1;
-  GameStateResponse current_state = 2; // ÇöÀç °ÔÀÓ »óÅÂ
+  GameStateResponse current_state = 2; // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
   int32 spectator_count = 3;
   string welcome_message = 4;
 }
@@ -381,6 +364,6 @@ message SpectatorJoinResponse {
 message SpectatorNotification {
   int32 room_id = 1;
   string spectator_username = 2;
-  bool joined = 3;            // true: ÀÔÀå, false: ÅðÀå
+  bool joined = 3;            // true: ï¿½ï¿½ï¿½ï¿½, false: ï¿½ï¿½ï¿½ï¿½
   int32 total_spectators = 4;
 }

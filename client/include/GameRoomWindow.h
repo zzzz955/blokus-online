@@ -152,9 +152,11 @@ namespace Blokus {
         // 채팅 시그널
         void chatMessageSent(const QString& message);
 
-    private slots:
+    public slots:
         // UI 이벤트 핸들러
         void onLeaveRoomClicked();
+
+    private slots:
         void onGameStartClicked();
         void onChatSendClicked();
         void onChatReturnPressed();
@@ -204,7 +206,6 @@ namespace Blokus {
 
         // 권한 확인
         bool canStartGame() const;
-        bool canAddAI() const;
         bool canKickPlayer(PlayerColor color);
 
         // 유틸리티 함수들

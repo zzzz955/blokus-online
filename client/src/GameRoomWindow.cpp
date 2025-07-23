@@ -255,12 +255,6 @@ namespace Blokus {
             statusText = QString::fromUtf8("빈 슬롯");
             m_statusLabel->setStyleSheet("font-size: 10px; color: #95a5a6;");
         }
-        else if (slot.isAI) {
-            QString difficultyText = (slot.aiDifficulty == 1) ? "쉬움" :
-                (slot.aiDifficulty == 2) ? "보통" : "어려움";
-            statusText = QString::fromUtf8("AI %1").arg(difficultyText);
-            m_statusLabel->setStyleSheet("font-size: 10px; color: #9b59b6;");
-        }
         else {
             statusText = slot.isReady ? QString::fromUtf8("준비됨") : QString::fromUtf8("대기 중");
             m_statusLabel->setStyleSheet(QString("font-size: 10px; color: %1;")
@@ -770,8 +764,8 @@ namespace Blokus {
         qDebug() << QString::fromUtf8("🔄 플레이어 슬롯 디스플레이 업데이트 시작");
         for (int i = 0; i < m_playerSlotWidgets.size() && i < m_roomInfo.playerSlots.size(); ++i) {
             const auto& slot = m_roomInfo.playerSlots[i];
-            qDebug() << QString::fromUtf8("  슬롯 %1 업데이트: %2 (AI=%3, 빈슬롯=%4)")
-                .arg(i).arg(slot.username).arg(slot.isAI).arg(slot.isEmpty());
+            qDebug() << QString::fromUtf8("  슬롯 %1 업데이트: %2 (빈슬롯=%3)")
+                .arg(i).arg(slot.username).arg(slot.isEmpty());
             
             m_playerSlotWidgets[i]->updatePlayerSlot(m_roomInfo.playerSlots[i]);
             m_playerSlotWidgets[i]->setMySlot(m_roomInfo.playerSlots[i].username == m_myUsername);
@@ -1251,11 +1245,6 @@ namespace Blokus {
     {
         int playerCount = m_roomInfo.getCurrentPlayerCount();
         return playerCount >= 2 && !m_isGameStarted;
-    }
-
-    bool GameRoomWindow::canAddAI() const
-    {
-        return isHost() && m_roomInfo.getCurrentPlayerCount() < m_roomInfo.maxPlayers;
     }
 
     bool GameRoomWindow::canKickPlayer(PlayerColor color)

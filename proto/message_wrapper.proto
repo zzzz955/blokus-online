@@ -6,14 +6,14 @@ import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
 
 // ========================================
-// ¸Þ½ÃÁö Å¸ÀÔ ¿­°ÅÇü (¶ó¿ìÆÃ¿ë)
+// ï¿½Þ½ï¿½ï¿½ï¿½ Å¸ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½Ã¿ï¿½)
 // ========================================
 
 enum MessageType {
-  // ±âº» ¸Þ½ÃÁö
+  // ï¿½âº» ï¿½Þ½ï¿½ï¿½ï¿½
   MESSAGE_TYPE_UNKNOWN = 0;
   
-  // ¿¬°á ¹× ÀÎÁõ (100-199)
+  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (100-199)
   MESSAGE_TYPE_AUTH_REQUEST = 100;
   MESSAGE_TYPE_AUTH_RESPONSE = 101;
   MESSAGE_TYPE_REGISTER_REQUEST = 102;
@@ -23,7 +23,7 @@ enum MessageType {
   MESSAGE_TYPE_HEARTBEAT = 106;
   MESSAGE_TYPE_WELCOME = 107;
   
-  // ·Îºñ ½Ã½ºÅÛ (200-299)
+  // ï¿½Îºï¿½ ï¿½Ã½ï¿½ï¿½ï¿½ (200-299)
   MESSAGE_TYPE_GET_ROOM_LIST_REQUEST = 200;
   MESSAGE_TYPE_ROOM_LIST_RESPONSE = 201;
   MESSAGE_TYPE_ROOM_LIST_UPDATE = 202;
@@ -39,20 +39,18 @@ enum MessageType {
   MESSAGE_TYPE_GET_USER_STATS_REQUEST = 212;
   MESSAGE_TYPE_USER_STATS_RESPONSE = 213;
   
-  // °ÔÀÓ ·ë °ü¸® (300-349)
+  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (300-349)
   MESSAGE_TYPE_ROOM_STATE_UPDATE = 300;
-  MESSAGE_TYPE_ADD_AI_PLAYER_REQUEST = 301;
-  MESSAGE_TYPE_ADD_AI_PLAYER_RESPONSE = 302;
-  MESSAGE_TYPE_REMOVE_PLAYER_REQUEST = 303;
-  MESSAGE_TYPE_REMOVE_PLAYER_RESPONSE = 304;
-  MESSAGE_TYPE_KICK_PLAYER_REQUEST = 305;
-  MESSAGE_TYPE_KICK_PLAYER_RESPONSE = 306;
-  MESSAGE_TYPE_PLAYER_READY_REQUEST = 307;
-  MESSAGE_TYPE_PLAYER_READY_RESPONSE = 308;
-  MESSAGE_TYPE_START_GAME_REQUEST = 309;
-  MESSAGE_TYPE_START_GAME_RESPONSE = 310;
+  MESSAGE_TYPE_REMOVE_PLAYER_REQUEST = 301;
+  MESSAGE_TYPE_REMOVE_PLAYER_RESPONSE = 302;
+  MESSAGE_TYPE_KICK_PLAYER_REQUEST = 303;
+  MESSAGE_TYPE_KICK_PLAYER_RESPONSE = 304;
+  MESSAGE_TYPE_PLAYER_READY_REQUEST = 305;
+  MESSAGE_TYPE_PLAYER_READY_RESPONSE = 306;
+  MESSAGE_TYPE_START_GAME_REQUEST = 307;
+  MESSAGE_TYPE_START_GAME_RESPONSE = 308;
   
-  // °ÔÀÓÇÃ·¹ÀÌ (350-399)
+  // ï¿½ï¿½ï¿½ï¿½ï¿½Ã·ï¿½ï¿½ï¿½ (350-399)
   MESSAGE_TYPE_GAME_STARTED_NOTIFICATION = 350;
   MESSAGE_TYPE_TURN_CHANGED_NOTIFICATION = 351;
   MESSAGE_TYPE_PLACE_BLOCK_REQUEST = 352;
@@ -67,7 +65,7 @@ enum MessageType {
   MESSAGE_TYPE_UNDO_MOVE_REQUEST = 361;
   MESSAGE_TYPE_UNDO_MOVE_RESPONSE = 362;
   
-  // Ã¤ÆÃ ½Ã½ºÅÛ (400-449)
+  // Ã¤ï¿½ï¿½ ï¿½Ã½ï¿½ï¿½ï¿½ (400-449)
   MESSAGE_TYPE_CHAT_MESSAGE = 400;
   MESSAGE_TYPE_CHAT_NOTIFICATION = 401;
   MESSAGE_TYPE_WHISPER_MESSAGE = 402;
@@ -75,13 +73,13 @@ enum MessageType {
   MESSAGE_TYPE_CHAT_HISTORY_REQUEST = 404;
   MESSAGE_TYPE_CHAT_HISTORY_RESPONSE = 405;
   
-  // °ü¸®ÀÚ ±â´É (450-499)
+  // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ (450-499)
   MESSAGE_TYPE_ADMIN_COMMAND = 450;
   MESSAGE_TYPE_ADMIN_RESPONSE = 451;
   MESSAGE_TYPE_SERVER_ANNOUNCEMENT = 452;
   MESSAGE_TYPE_MAINTENANCE_NOTIFICATION = 453;
   
-  // Åë°è ¹× ·©Å· (500-549)
+  // ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½Å· (500-549)
   MESSAGE_TYPE_GET_RANKING_REQUEST = 500;
   MESSAGE_TYPE_RANKING_RESPONSE = 501;
   MESSAGE_TYPE_RANKING_UPDATE = 502;
@@ -89,7 +87,7 @@ enum MessageType {
   MESSAGE_TYPE_GAME_REPLAY_RESPONSE = 504;
   MESSAGE_TYPE_ACHIEVEMENT_UNLOCKED = 505;
   
-  // ¿¡·¯ ¹× Æ¯¼ö (900-999)
+  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ Æ¯ï¿½ï¿½ (900-999)
   MESSAGE_TYPE_ERROR_RESPONSE = 900;
   MESSAGE_TYPE_RATE_LIMIT_EXCEEDED = 901;
   MESSAGE_TYPE_SERVER_SHUTDOWN = 902;
@@ -100,52 +98,52 @@ enum MessageType {
 }
 
 // ========================================
-// ¸Þ½ÃÁö ¿ì¼±¼øÀ§ (QoS)
+// ï¿½Þ½ï¿½ï¿½ï¿½ ï¿½ì¼±ï¿½ï¿½ï¿½ï¿½ (QoS)
 // ========================================
 
 enum MessagePriority {
-  PRIORITY_LOW = 0;      // Åë°è, Ã¤ÆÃ µî
-  PRIORITY_NORMAL = 1;   // ·Îºñ ¾÷µ¥ÀÌÆ®, ÀÏ¹Ý ¾Ë¸²
-  PRIORITY_HIGH = 2;     // °ÔÀÓ »óÅÂ º¯°æ
-  PRIORITY_CRITICAL = 3; // ºí·Ï ¹èÄ¡, ÅÏ º¯°æ
+  PRIORITY_LOW = 0;      // ï¿½ï¿½ï¿½, Ã¤ï¿½ï¿½ ï¿½ï¿½
+  PRIORITY_NORMAL = 1;   // ï¿½Îºï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®, ï¿½Ï¹ï¿½ ï¿½Ë¸ï¿½
+  PRIORITY_HIGH = 2;     // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  PRIORITY_CRITICAL = 3; // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ä¡, ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 }
 
 // ========================================
-// ¸Þ½ÃÁö ·¡ÆÛ
+// ï¿½Þ½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 // ========================================
 
 message MessageWrapper {
-  // ±âº» ¶ó¿ìÆÃ Á¤º¸
+  // ï¿½âº» ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
   MessageType type = 1;
-  uint32 sequence_id = 2;          // ¿äÃ»-ÀÀ´ä ¸ÅÄª¿ë
-  google.protobuf.Any payload = 3;  // ½ÇÁ¦ ¸Þ½ÃÁö µ¥ÀÌÅÍ
+  uint32 sequence_id = 2;          // ï¿½ï¿½Ã»-ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Äªï¿½ï¿½
+  google.protobuf.Any payload = 3;  // ï¿½ï¿½ï¿½ï¿½ ï¿½Þ½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
   
-  // ¸ÞÅ¸µ¥ÀÌÅÍ
+  // ï¿½ï¿½Å¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
   google.protobuf.Timestamp timestamp = 10;
   string client_version = 11;
   MessagePriority priority = 12;
   
-  // ¶ó¿ìÆÃ Á¤º¸
-  string target_room = 15;         // Æ¯Á¤ ¹æÀ¸·Î Àü¼Û
-  string target_user = 16;         // Æ¯Á¤ »ç¿ëÀÚ¿¡°Ô Àü¼Û
-  bool broadcast = 17;             // ÀüÃ¼ ºê·ÎµåÄ³½ºÆ®
+  // ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  string target_room = 15;         // Æ¯ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  string target_user = 16;         // Æ¯ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Ú¿ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  bool broadcast = 17;             // ï¿½ï¿½Ã¼ ï¿½ï¿½Îµï¿½Ä³ï¿½ï¿½Æ®
   
-  // Àü¼Û ¿É¼Ç
-  bool requires_ack = 20;          // ¼ö½Å È®ÀÎ ÇÊ¿ä
-  uint32 retry_count = 21;         // Àç½Ãµµ È½¼ö
-  uint32 timeout_ms = 22;          // Å¸ÀÓ¾Æ¿ô (¹Ð¸®ÃÊ)
+  // ï¿½ï¿½ï¿½ï¿½ ï¿½É¼ï¿½
+  bool requires_ack = 20;          // ï¿½ï¿½ï¿½ï¿½ È®ï¿½ï¿½ ï¿½Ê¿ï¿½
+  uint32 retry_count = 21;         // ï¿½ï¿½Ãµï¿½ È½ï¿½ï¿½
+  uint32 timeout_ms = 22;          // Å¸ï¿½Ó¾Æ¿ï¿½ (ï¿½Ð¸ï¿½ï¿½ï¿½)
   
-  // ¾ÐÃà ¹× ÃÖÀûÈ­
-  bool compressed = 25;            // ÆäÀÌ·Îµå ¾ÐÃà ¿©ºÎ
-  string compression_type = 26;    // "gzip", "lz4" µî
+  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½È­
+  bool compressed = 25;            // ï¿½ï¿½ï¿½Ì·Îµï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  string compression_type = 26;    // "gzip", "lz4" ï¿½ï¿½
   
-  // µð¹ö±ë ¹× ÃßÀû
-  string trace_id = 30;           // ºÐ»ê ÃßÀû¿ë ID
-  map<string, string> headers = 31; // Ä¿½ºÅÒ Çì´õ
+  // ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  string trace_id = 30;           // ï¿½Ð»ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ID
+  map<string, string> headers = 31; // Ä¿ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
 }
 
 // ========================================
-// ¸Þ½ÃÁö È®ÀÎ ÀÀ´ä
+// ï¿½Þ½ï¿½ï¿½ï¿½ È®ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 // ========================================
 
 message MessageAck {
@@ -156,25 +154,25 @@ message MessageAck {
 }
 
 // ========================================
-// ¹èÄ¡ ¸Þ½ÃÁö (¿©·¯ ¸Þ½ÃÁö¸¦ ¹­¾î¼­ Àü¼Û)
+// ï¿½ï¿½Ä¡ ï¿½Þ½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ ï¿½Þ½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½î¼­ ï¿½ï¿½ï¿½ï¿½)
 // ========================================
 
 message BatchMessage {
   repeated MessageWrapper messages = 1;
   uint32 batch_id = 2;
   google.protobuf.Timestamp created_at = 3;
-  bool ordered = 4;  // ¼ø¼­ º¸Àå ÇÊ¿ä ¿©ºÎ
+  bool ordered = 4;  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ê¿ï¿½ ï¿½ï¿½ï¿½ï¿½
 }
 
 // ========================================
-// ¿¬°á »óÅÂ °ü¸®
+// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 // ========================================
 
 message KeepAlive {
   google.protobuf.Timestamp timestamp = 1;
-  uint32 client_fps = 2;           // Å¬¶óÀÌ¾ðÆ® ¼º´É ¸ð´ÏÅÍ¸µ
-  float network_latency_ms = 3;    // ³×Æ®¿öÅ© Áö¿¬½Ã°£
-  uint32 memory_usage_mb = 4;      // ¸Þ¸ð¸® »ç¿ë·®
+  uint32 client_fps = 2;           // Å¬ï¿½ï¿½ï¿½Ì¾ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Í¸ï¿½
+  float network_latency_ms = 3;    // ï¿½ï¿½Æ®ï¿½ï¿½Å© ï¿½ï¿½ï¿½ï¿½ï¿½Ã°ï¿½
+  uint32 memory_usage_mb = 4;      // ï¿½Þ¸ï¿½ ï¿½ï¿½ë·®
 }
 
 message ConnectionStatus {
@@ -192,7 +190,7 @@ message ConnectionStatus {
 }
 
 // ========================================
-// ¼¼¼Ç º¹±¸
+// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 // ========================================
 
 message SessionInfo {
@@ -208,11 +206,11 @@ message ReconnectInfo {
   SessionInfo session = 1;
   uint32 missed_message_count = 2;
   repeated MessageWrapper missed_messages = 3;
-  bool full_state_required = 4;  // ÀüÃ¼ »óÅÂ ÀçÀü¼Û ÇÊ¿ä
+  bool full_state_required = 4;  // ï¿½ï¿½Ã¼ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ê¿ï¿½
 }
 
 // ========================================
-// ¸Þ½ÃÁö Åë°è ¹× ¸ð´ÏÅÍ¸µ
+// ï¿½Þ½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Í¸ï¿½
 // ========================================
 
 message MessageStats {

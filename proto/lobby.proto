@@ -6,63 +6,63 @@ import "google/protobuf/timestamp.proto";
 import "common.proto";
 
 // ========================================
-// ·Îºñ °ü·Ã ¿­°ÅÇü
+// ï¿½Îºï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 // ========================================
 
 enum RoomFilter {
   ROOM_FILTER_ALL = 0;
-  ROOM_FILTER_AVAILABLE = 1;    // ÀÔÀå °¡´ÉÇÑ ¹æ
-  ROOM_FILTER_IN_PROGRESS = 2;  // °ÔÀÓ ÁøÇà Áß
-  ROOM_FILTER_FRIENDS = 3;      // Ä£±¸°¡ ÀÖ´Â ¹æ
-  ROOM_FILTER_BEGINNER = 4;     // ÃÊº¸ÀÚ ¹æ
-  ROOM_FILTER_EXPERT = 5;       // °í¼ö¹æ
+  ROOM_FILTER_AVAILABLE = 1;    // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½
+  ROOM_FILTER_IN_PROGRESS = 2;  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½
+  ROOM_FILTER_FRIENDS = 3;      // Ä£ï¿½ï¿½ï¿½ï¿½ ï¿½Ö´ï¿½ ï¿½ï¿½
+  ROOM_FILTER_BEGINNER = 4;     // ï¿½Êºï¿½ï¿½ï¿½ ï¿½ï¿½
+  ROOM_FILTER_EXPERT = 5;       // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 }
 
 enum RoomSortOrder {
-  ROOM_SORT_CREATED_TIME = 0;   // »ý¼º ½Ã°£¼ø
-  ROOM_SORT_PLAYER_COUNT = 1;   // ÇÃ·¹ÀÌ¾î ¼ö¼ø
-  ROOM_SORT_ROOM_NAME = 2;      // ¹æ ÀÌ¸§¼ø
-  ROOM_SORT_HOST_RATING = 3;    // ¹æÀå ·¹ÀÌÆÃ¼ø
+  ROOM_SORT_CREATED_TIME = 0;   // ï¿½ï¿½ï¿½ï¿½ ï¿½Ã°ï¿½ï¿½ï¿½
+  ROOM_SORT_PLAYER_COUNT = 1;   // ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½ï¿½ï¿½
+  ROOM_SORT_ROOM_NAME = 2;      // ï¿½ï¿½ ï¿½Ì¸ï¿½ï¿½ï¿½
+  ROOM_SORT_HOST_RATING = 3;    // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ã¼ï¿½
 }
 
 // ========================================
-// ¹æ ¸ñ·Ï ¿äÃ»/ÀÀ´ä
+// ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½Ã»/ï¿½ï¿½ï¿½ï¿½
 // ========================================
 
 message GetRoomListRequest {
   RoomFilter filter = 1;
   RoomSortOrder sort_order = 2;
-  bool ascending = 3;          // ¿À¸§Â÷¼ø/³»¸²Â÷¼ø
+  bool ascending = 3;          // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
   
-  // ÆäÀÌÂ¡
+  // ï¿½ï¿½ï¿½ï¿½Â¡
   int32 page = 4;
   int32 page_size = 5;
   
-  // °Ë»ö Á¶°Ç
-  string search_query = 6;     // ¹æ ÀÌ¸§ °Ë»ö
-  string host_name = 7;        // Æ¯Á¤ È£½ºÆ® °Ë»ö
-  int32 min_players = 8;       // ÃÖ¼Ò ÇÃ·¹ÀÌ¾î ¼ö
-  int32 max_players = 9;       // ÃÖ´ë ÇÃ·¹ÀÌ¾î ¼ö
-  bool include_private = 10;   // ºñ°ø°³ ¹æ Æ÷ÇÔ ¿©ºÎ
+  // ï¿½Ë»ï¿½ ï¿½ï¿½ï¿½ï¿½
+  string search_query = 6;     // ï¿½ï¿½ ï¿½Ì¸ï¿½ ï¿½Ë»ï¿½
+  string host_name = 7;        // Æ¯ï¿½ï¿½ È£ï¿½ï¿½Æ® ï¿½Ë»ï¿½
+  int32 min_players = 8;       // ï¿½Ö¼ï¿½ ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½
+  int32 max_players = 9;       // ï¿½Ö´ï¿½ ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½
+  bool include_private = 10;   // ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 }
 
 message RoomListResponse {
   Result result = 1;
   repeated RoomInfo rooms = 2;
   
-  // ÆäÀÌÂ¡ Á¤º¸
+  // ï¿½ï¿½ï¿½ï¿½Â¡ ï¿½ï¿½ï¿½ï¿½
   int32 total_rooms = 3;
   int32 current_page = 4;
   int32 total_pages = 5;
   
-  // Åë°è Á¤º¸
-  int32 available_rooms = 6;   // ÀÔÀå °¡´ÉÇÑ ¹æ ¼ö
-  int32 playing_rooms = 7;     // °ÔÀÓ ÁøÇà ÁßÀÎ ¹æ ¼ö
-  int32 total_players_in_lobby = 8; // ·Îºñ ³» ÃÑ ÇÃ·¹ÀÌ¾î ¼ö
+  // ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  int32 available_rooms = 6;   // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½
+  int32 playing_rooms = 7;     // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½
+  int32 total_players_in_lobby = 8; // ï¿½Îºï¿½ ï¿½ï¿½ ï¿½ï¿½ ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½
 }
 
 // ========================================
-// ½Ç½Ã°£ ¹æ ¸ñ·Ï ¾÷µ¥ÀÌÆ®
+// ï¿½Ç½Ã°ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®
 // ========================================
 
 message RoomListUpdate {
@@ -78,133 +78,132 @@ message RoomListUpdate {
   
   UpdateType update_type = 1;
   RoomInfo room_info = 2;
-  string updated_field = 3;    // ¾î¶² ÇÊµå°¡ º¯°æµÇ¾ú´ÂÁö
+  string updated_field = 3;    // ï¿½î¶² ï¿½Êµå°¡ ï¿½ï¿½ï¿½ï¿½Ç¾ï¿½ï¿½ï¿½ï¿½ï¿½
   google.protobuf.Timestamp updated_at = 4;
   
-  // Ãß°¡ Á¤º¸
-  string player_username = 5;  // ÀÔÀå/ÅðÀåÇÑ ÇÃ·¹ÀÌ¾î
-  PlayerColor player_color = 6; // ÇÃ·¹ÀÌ¾î »ö»ó
+  // ï¿½ß°ï¿½ ï¿½ï¿½ï¿½ï¿½
+  string player_username = 5;  // ï¿½ï¿½ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ã·ï¿½ï¿½Ì¾ï¿½
+  PlayerColor player_color = 6; // ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½ï¿½ï¿½
 }
 
 // ========================================
-// ¹æ »ý¼º ¿äÃ»/ÀÀ´ä
+// ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ã»/ï¿½ï¿½ï¿½ï¿½
 // ========================================
 
 message CreateRoomRequest {
   string room_name = 1;
   bool is_private = 2;
-  string password = 3;         // ºñ°ø°³ ¹æ ºñ¹Ð¹øÈ£
+  string password = 3;         // ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½Ð¹ï¿½È£
   
-  // °ÔÀÓ ¼³Á¤
-  string game_mode = 4;        // "Å¬·¡½Ä", "µà¿À", "ÆÀÀü" µî
-  int32 max_players = 5;       // ÃÖ´ë ÇÃ·¹ÀÌ¾î ¼ö (2-4)
-  int32 turn_time_seconds = 6; // ÅÏ Á¦ÇÑ½Ã°£
-  bool allow_ai = 7;           // AI ÇÃ·¹ÀÌ¾î Çã¿ë
+  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  string game_mode = 4;        // "Å¬ï¿½ï¿½ï¿½ï¿½", "ï¿½ï¿½ï¿½", "ï¿½ï¿½ï¿½ï¿½" ï¿½ï¿½
+  int32 max_players = 5;       // ï¿½Ö´ï¿½ ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½ (2-4)
+  int32 turn_time_seconds = 6; // ï¿½ï¿½ ï¿½ï¿½ï¿½Ñ½Ã°ï¿½
   
-  // ¹æ ¼³Á¤
-  string description = 8;      // ¹æ ¼³¸í
-  repeated string tags = 9;    // ¹æ ÅÂ±× (ÃÊº¸ÀÚ, °í¼ö, ºü¸¥°ÔÀÓ µî)
-  int32 min_rating = 10;       // ÃÖ¼Ò ·¹ÀÌÆÃ Á¦ÇÑ
-  int32 max_rating = 11;       // ÃÖ´ë ·¹ÀÌÆÃ Á¦ÇÑ
+  // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  string description = 8;      // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  repeated string tags = 9;    // ï¿½ï¿½ ï¿½Â±ï¿½ (ï¿½Êºï¿½ï¿½ï¿½, ï¿½ï¿½ï¿½ï¿½, ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½)
+  int32 min_rating = 10;       // ï¿½Ö¼ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  int32 max_rating = 11;       // ï¿½Ö´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
   
-  // °í±Þ ¼³Á¤
-  bool spectators_allowed = 15; // °üÀüÀÚ Çã¿ë
-  int32 max_spectators = 16;   // ÃÖ´ë °üÀüÀÚ ¼ö
-  bool auto_start = 17;        // ÀÎ¿ø ÃæÁ· ½Ã ÀÚµ¿ ½ÃÀÛ
-  bool ranked_game = 18;       // ·©Å© °ÔÀÓ ¿©ºÎ
+  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  bool spectators_allowed = 15; // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
+  int32 max_spectators = 16;   // ï¿½Ö´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½
+  bool auto_start = 17;        // ï¿½Î¿ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½Úµï¿½ ï¿½ï¿½ï¿½ï¿½
+  bool ranked_game = 18;       // ï¿½ï¿½Å© ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 }
 
 message CreateRoomResponse {
   Result result = 1;
-  RoomInfo room_info = 2;      // »ý¼ºµÈ ¹æ Á¤º¸
-  string join_token = 3;       // ¹æ ÀÔÀå ÅäÅ« (ÀÓ½Ã)
+  RoomInfo room_info = 2;      // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  string join_token = 3;       // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Å« (ï¿½Ó½ï¿½)
   
-  // ½ÇÆÐ ½Ã »ó¼¼ Á¤º¸
+  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
   repeated string validation_errors = 10;
-  string suggested_name = 11;  // Áßº¹µÈ ÀÌ¸§ÀÏ ¶§ Á¦¾È¸í
+  string suggested_name = 11;  // ï¿½ßºï¿½ï¿½ï¿½ ï¿½Ì¸ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½È¸ï¿½
 }
 
 // ========================================
-// ¹æ ÀÔÀå ¿äÃ»/ÀÀ´ä
+// ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ã»/ï¿½ï¿½ï¿½ï¿½
 // ========================================
 
 message JoinRoomRequest {
   int32 room_id = 1;
-  string password = 2;         // ºñ°ø°³ ¹æ ºñ¹Ð¹øÈ£
-  string join_token = 3;       // ÃÊ´ë ÅäÅ«
-  PlayerColor preferred_color = 4; // ¼±È£ÇÏ´Â »ö»ó
-  bool as_spectator = 5;       // °üÀüÀÚ·Î ÀÔÀå
+  string password = 2;         // ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½Ð¹ï¿½È£
+  string join_token = 3;       // ï¿½Ê´ï¿½ ï¿½ï¿½Å«
+  PlayerColor preferred_color = 4; // ï¿½ï¿½È£ï¿½Ï´ï¿½ ï¿½ï¿½ï¿½ï¿½
+  bool as_spectator = 5;       // ï¿½ï¿½ï¿½ï¿½ï¿½Ú·ï¿½ ï¿½ï¿½ï¿½ï¿½
 }
 
 message JoinRoomResponse {
   Result result = 1;
   RoomInfo room_info = 2;
-  PlayerColor assigned_color = 3; // ÇÒ´çµÈ »ö»ó
-  repeated PlayerSlot player_slots = 4; // ¸ðµç ÇÃ·¹ÀÌ¾î ½½·Ô Á¤º¸
+  PlayerColor assigned_color = 3; // ï¿½Ò´ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  repeated PlayerSlot player_slots = 4; // ï¿½ï¿½ï¿½ ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
   
-  // ¹æ »ó¼¼ Á¤º¸
-  string welcome_message = 5;  // ¹æÀåÀÌ ¼³Á¤ÇÑ È¯¿µ ¸Þ½ÃÁö
-  repeated string room_rules = 6; // ¹æ ±ÔÄ¢
-  bool is_rejoining = 7;       // ÀçÀÔÀå ¿©ºÎ (°ÔÀÓ ÁøÇà Áß ÀçÁ¢¼Ó)
+  // ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  string welcome_message = 5;  // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ È¯ï¿½ï¿½ ï¿½Þ½ï¿½ï¿½ï¿½
+  repeated string room_rules = 6; // ï¿½ï¿½ ï¿½ï¿½Ä¢
+  bool is_rejoining = 7;       // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½)
   
-  // ½ÇÆÐ ½Ã Á¤º¸
+  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
   string failure_reason = 10;
-  int32 queue_position = 11;   // ´ë±â¿­ À§Ä¡ (¹æÀÌ °¡µæÂù °æ¿ì)
+  int32 queue_position = 11;   // ï¿½ï¿½â¿­ ï¿½ï¿½Ä¡ (ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½)
 }
 
 // ========================================
-// ¹æ ³ª°¡±â ¿äÃ»/ÀÀ´ä
+// ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ã»/ï¿½ï¿½ï¿½ï¿½
 // ========================================
 
 message LeaveRoomRequest {
   int32 room_id = 1;
-  string reason = 2;           // ³ª°¡´Â ÀÌÀ¯ (¼±ÅÃ)
-  bool transfer_host = 3;      // ¹æÀå ±ÇÇÑ ÀÌ¾ç (¹æÀåÀÎ °æ¿ì)
-  string new_host_username = 4; // »õ ¹æÀå ÁöÁ¤
+  string reason = 2;           // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½)
+  bool transfer_host = 3;      // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ì¾ï¿½ (ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½)
+  string new_host_username = 4; // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 }
 
 message LeaveRoomResponse {
   Result result = 1;
   string message = 2;
-  bool room_disbanded = 3;     // ¹æÀÌ ÇØÃ¼µÇ¾ú´ÂÁö
-  string new_host = 4;         // »õ·Î¿î ¹æÀå
+  bool room_disbanded = 3;     // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ã¼ï¿½Ç¾ï¿½ï¿½ï¿½ï¿½ï¿½
+  string new_host = 4;         // ï¿½ï¿½ï¿½Î¿ï¿½ ï¿½ï¿½ï¿½ï¿½
 }
 
 // ========================================
-// ÇÃ·¹ÀÌ¾î ÀÔÀå/ÅðÀå ¾Ë¸²
+// ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½ ï¿½Ë¸ï¿½
 // ========================================
 
 message PlayerJoinedNotification {
   string username = 1;
   PlayerColor color = 2;
   PlayerSlot player_info = 3;
-  bool is_rejoining = 4;       // ÀçÀÔÀå ¿©ºÎ
+  bool is_rejoining = 4;       // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
   google.protobuf.Timestamp joined_at = 5;
   
-  // ÀÔÀåÇÑ ÇÃ·¹ÀÌ¾î Á¤º¸
+  // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½ï¿½ï¿½
   UserInfo user_info = 6;
-  string join_message = 7;     // ÀÔÀå ¸Þ½ÃÁö
+  string join_message = 7;     // ï¿½ï¿½ï¿½ï¿½ ï¿½Þ½ï¿½ï¿½ï¿½
 }
 
 message PlayerLeftNotification {
   string username = 1;
   PlayerColor color = 2;
-  string reason = 3;           // ÅðÀå ÀÌÀ¯
-  bool was_kicked = 4;         // °­Åð ¿©ºÎ
+  string reason = 3;           // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  bool was_kicked = 4;         // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
   google.protobuf.Timestamp left_at = 5;
   
-  // ¹æ »óÅÂ º¯°æ
-  string new_host = 6;         // »õ·Î¿î ¹æÀå (±âÁ¸ ¹æÀåÀÌ ³ª°£ °æ¿ì)
-  bool room_disbanded = 7;     // ¹æ ÇØÃ¼ ¿©ºÎ
+  // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  string new_host = 6;         // ï¿½ï¿½ï¿½Î¿ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½)
+  bool room_disbanded = 7;     // ï¿½ï¿½ ï¿½ï¿½Ã¼ ï¿½ï¿½ï¿½ï¿½
 }
 
 // ========================================
-// »ç¿ëÀÚ ¸ñ·Ï °ü·Ã
+// ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 // ========================================
 
 message GetUserListRequest {
-  UserStatus status_filter = 1; // »óÅÂº° ÇÊÅÍ¸µ
-  string search_query = 2;     // »ç¿ëÀÚ¸í °Ë»ö
+  UserStatus status_filter = 1; // ï¿½ï¿½ï¿½Âºï¿½ ï¿½ï¿½ï¿½Í¸ï¿½
+  string search_query = 2;     // ï¿½ï¿½ï¿½ï¿½Ú¸ï¿½ ï¿½Ë»ï¿½
   int32 page = 3;
   int32 page_size = 4;
 }
@@ -220,78 +219,78 @@ message UserListUpdate {
   
   UpdateType update_type = 1;
   UserInfo user_info = 2;
-  UserStatus old_status = 3;   // ÀÌÀü »óÅÂ
-  UserStatus new_status = 4;   // »õ·Î¿î »óÅÂ
-  int32 room_id = 5;          // °ü·Ã ¹æ ID
+  UserStatus old_status = 3;   // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  UserStatus new_status = 4;   // ï¿½ï¿½ï¿½Î¿ï¿½ ï¿½ï¿½ï¿½ï¿½
+  int32 room_id = 5;          // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ID
   google.protobuf.Timestamp updated_at = 6;
 }
 
 // ========================================
-// »ç¿ëÀÚ Åë°è ¿äÃ»/ÀÀ´ä
+// ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½Ã»/ï¿½ï¿½ï¿½ï¿½
 // ========================================
 
 message GetUserStatsRequest {
-  string username = 1;         // Á¶È¸ÇÒ »ç¿ëÀÚ (ºó °ªÀÌ¸é ÀÚ½Å)
-  bool include_game_history = 2; // °ÔÀÓ ±â·Ï Æ÷ÇÔ
-  bool include_achievements = 3;  // ¾÷Àû Æ÷ÇÔ
-  int32 recent_games_count = 4;   // ÃÖ±Ù °ÔÀÓ ¼ö
+  string username = 1;         // ï¿½ï¿½È¸ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ ï¿½ï¿½ï¿½Ì¸ï¿½ ï¿½Ú½ï¿½)
+  bool include_game_history = 2; // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  bool include_achievements = 3;  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  int32 recent_games_count = 4;   // ï¿½Ö±ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½
 }
 
 message UserStatsResponse {
   Result result = 1;
   UserInfo user_info = 2;
   
-  // »ó¼¼ Åë°è
+  // ï¿½ï¿½ ï¿½ï¿½ï¿½
   int32 games_today = 3;
   int32 games_this_week = 4;
   int32 games_this_month = 5;
   int32 consecutive_wins = 6;
   int32 longest_win_streak = 7;
   float average_game_duration = 8;
-  int32 favorite_color = 9;    // °¡Àå ¸¹ÀÌ »ç¿ëÇÑ »ö»ó
+  int32 favorite_color = 9;    // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
   
-  // ÃÖ±Ù °ÔÀÓ ±â·Ï
+  // ï¿½Ö±ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
   repeated GameStats recent_games = 10;
   
-  // ¾÷Àû Á¤º¸
+  // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
   repeated string achievements = 11;
   int32 achievement_points = 12;
   
-  // ·©Å· Á¤º¸
+  // ï¿½ï¿½Å· ï¿½ï¿½ï¿½ï¿½
   int32 current_rank = 13;
-  int32 rank_change = 14;      // ·©Å© º¯µ¿ (+/-¼ýÀÚ)
+  int32 rank_change = 14;      // ï¿½ï¿½Å© ï¿½ï¿½ï¿½ï¿½ (+/-ï¿½ï¿½ï¿½ï¿½)
   int32 rating_points = 15;
-  string tier = 16;            // "ºê·ÐÁî", "½Ç¹ö", "°ñµå" µî
+  string tier = 16;            // "ï¿½ï¿½ï¿½ï¿½ï¿½", "ï¿½Ç¹ï¿½", "ï¿½ï¿½ï¿½" ï¿½ï¿½
 }
 
 // ========================================
-// Ä£±¸ ½Ã½ºÅÛ (±âº»)
+// Ä£ï¿½ï¿½ ï¿½Ã½ï¿½ï¿½ï¿½ (ï¿½âº»)
 // ========================================
 
 message FriendListRequest {
-  bool include_offline = 1;    // ¿ÀÇÁ¶óÀÎ Ä£±¸ Æ÷ÇÔ
+  bool include_offline = 1;    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Ä£ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 }
 
 message FriendListResponse {
   Result result = 1;
   repeated UserInfo friends = 2;
-  repeated UserInfo pending_requests = 3; // ´ë±â ÁßÀÎ Ä£±¸ ¿äÃ»
-  repeated UserInfo sent_requests = 4;    // º¸³½ Ä£±¸ ¿äÃ»
+  repeated UserInfo pending_requests = 3; // ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Ä£ï¿½ï¿½ ï¿½ï¿½Ã»
+  repeated UserInfo sent_requests = 4;    // ï¿½ï¿½ï¿½ï¿½ Ä£ï¿½ï¿½ ï¿½ï¿½Ã»
 }
 
 message AddFriendRequest {
   string username = 1;
-  string message = 2;          // Ä£±¸ ¿äÃ» ¸Þ½ÃÁö
+  string message = 2;          // Ä£ï¿½ï¿½ ï¿½ï¿½Ã» ï¿½Þ½ï¿½ï¿½ï¿½
 }
 
 message AddFriendResponse {
   Result result = 1;
   string message = 2;
-  bool auto_accepted = 3;      // ÀÚµ¿ ¼ö¶ô ¿©ºÎ
+  bool auto_accepted = 3;      // ï¿½Úµï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 }
 
 // ========================================
-// ¼­¹ö »óÅÂ ¹× °øÁö
+// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 // ========================================
 
 message ServerAnnouncementNotification {
@@ -306,14 +305,14 @@ message ServerAnnouncementNotification {
   AnnouncementType type = 1;
   string title = 2;
   string message = 3;
-  string url = 4;              // »ó¼¼ Á¤º¸ URL
+  string url = 4;              // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ URL
   google.protobuf.Timestamp valid_until = 5;
-  bool requires_acknowledgment = 6; // »ç¿ëÀÚ È®ÀÎ ÇÊ¿ä
+  bool requires_acknowledgment = 6; // ï¿½ï¿½ï¿½ï¿½ï¿½ È®ï¿½ï¿½ ï¿½Ê¿ï¿½
   
-  // Ç¥½Ã ¼³Á¤
-  bool show_popup = 7;         // ÆË¾÷À¸·Î Ç¥½Ã
-  bool show_banner = 8;        // ¹è³Ê·Î Ç¥½Ã
-  int32 priority = 9;          // ¿ì¼±¼øÀ§ (³ôÀ»¼ö·Ï ¸ÕÀú Ç¥½Ã)
+  // Ç¥ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  bool show_popup = 7;         // ï¿½Ë¾ï¿½ï¿½ï¿½ï¿½ï¿½ Ç¥ï¿½ï¿½
+  bool show_banner = 8;        // ï¿½ï¿½Ê·ï¿½ Ç¥ï¿½ï¿½
+  int32 priority = 9;          // ï¿½ì¼±ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Ç¥ï¿½ï¿½)
 }
 
 message MaintenanceNotification {
@@ -321,6 +320,6 @@ message MaintenanceNotification {
   google.protobuf.Timestamp end_time = 2;
   string reason = 3;
   string details = 4;
-  bool force_disconnect = 5;   // °­Á¦ Á¢¼Ó Á¾·á ¿©ºÎ
-  int32 warning_minutes = 6;   // »çÀü °æ°í ½Ã°£
+  bool force_disconnect = 5;   // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+  int32 warning_minutes = 6;   // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½Ã°ï¿½
 }

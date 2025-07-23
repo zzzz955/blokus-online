@@ -535,9 +535,9 @@ namespace Blokus::Server {
                     // 퇴장 알림 브로드캐스트
                     room->broadcastPlayerLeft(username);
                     
-                    // AI만 남은 방인지 확인하고 자동 삭제
-                    if (room->hasOnlyAIPlayers()) {
-                        spdlog::info("🤖 AI만 남은 방 {} 자동 삭제", currentRoomId);
+                    // 방이 비어있는지 확인하고 자동 삭제
+                    if (room->isEmpty()) {
+                        spdlog::info("빈 방 {} 자동 삭제", currentRoomId);
                         roomManager_->removeRoom(currentRoomId);
                     } else {
                         // 남은 플레이어들에게 업데이트된 방 정보 전송
@@ -1198,12 +1198,11 @@ namespace Blokus::Server {
                      << ":" << room->getMaxPlayers() << ":" << (room->isPrivate() ? "1" : "0")
                      << ":" << (room->isPlaying() ? "1" : "0") << ":클래식";
             
-            // 플레이어 데이터 추가 (userId,username,isHost,isReady,isAI,aiDifficulty,colorIndex)
+            // 플레이어 데이터 추가 (userId,username,isHost,isReady,colorIndex)
             auto playerList = room->getPlayerList();
             for (const auto& player : playerList) {
                 response << ":" << player.getUserId() << "," << player.getUsername()
                          << "," << (player.isHost() ? "1" : "0") << "," << (player.isReady() ? "1" : "0")
-                         << "," << (player.isAI() ? "1" : "0") << "," << player.getAIDifficulty()
                          << "," << static_cast<int>(player.getColor());
             }
             
@@ -1229,13 +1228,12 @@ namespace Blokus::Server {
                      << ":" << room->getMaxPlayers() << ":" << (room->isPrivate() ? "1" : "0")
                      << ":" << (room->isPlaying() ? "1" : "0") << ":클래식";
             
-            // 플레이어 데이터 추가 (userId,username,isHost,isReady,isAI,aiDifficulty,colorIndex)
+            // 플레이어 데이터 추가 (userId,username,isHost,isReady,colorIndex)
             auto playerList = room->getPlayerList();
             spdlog::debug("🔍 방 {} 플레이어 목록 생성 중: {}명", room->getRoomId(), playerList.size());
             for (const auto& player : playerList) {
                 std::string playerData = player.getUserId() + "," + player.getUsername()
                          + "," + (player.isHost() ? "1" : "0") + "," + (player.isReady() ? "1" : "0")
-                         + "," + (player.isAI() ? "1" : "0") + "," + std::to_string(player.getAIDifficulty())
                          + "," + std::to_string(static_cast<int>(player.getColor()));
                 
                 spdlog::debug("  - 플레이어 데이터: {}", playerData);
@@ -1246,16 +1244,16 @@ namespace Blokus::Server {
             
             spdlog::info("📤 방 {} ROOM_INFO 메시지 생성: {}", room->getRoomId(), roomInfoMessage);
             
-            // 방의 모든 실제 플레이어에게 브로드캐스트 (AI 제외)
+            // 방의 모든 플레이어에게 브로드캐스트
             int sentCount = 0;
             for (const auto& player : playerList) {
-                if (!player.isAI() && player.getSession() && player.getSession()->isActive()) {
+                if (player.getSession() && player.getSession()->isActive()) {
                     player.getSession()->sendMessage(roomInfoMessage);
                     sentCount++;
                 }
             }
             
-            spdlog::debug("방 {} 실제 플레이어 {}명 (전체 {}명)에게 방 정보 브로드캐스트 완료", 
+            spdlog::debug("방 {} 플레이어 {}명 (전체 {}명)에게 방 정보 브로드캐스트 완료", 
                 room->getRoomId(), sentCount, playerList.size());
         }
         catch (const std::exception& e) {

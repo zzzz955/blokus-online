@@ -529,11 +529,6 @@ namespace Blokus {
         else if (parts[0] == "GAME_ENDED") {
             emit gameEnded();
         }
-        else if (parts[0] == "AI_ADD_SUCCESS" && parts.size() >= 3) {
-            int colorIndex = parts[1].toInt();
-            int difficulty = parts[2].toInt();
-            emit aiAdded(colorIndex, difficulty);
-        }
         else if (parts[0] == "SYSTEM" && parts.size() >= 2) {
             QString systemMessage = parts.mid(1).join(":");
             // 시스템 메시지를 채팅으로 처리
