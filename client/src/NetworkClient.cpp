@@ -428,8 +428,14 @@ namespace Blokus {
             processAuthResponse(message);
         }
         else if (message.startsWith("LOBBY_") || message.startsWith("ROOM_") || message.startsWith("CHAT:") || 
-                 message.startsWith("PLAYER_") || message.startsWith("HOST_") || message.startsWith("GAME_")) {
+                 message.startsWith("PLAYER_") || message.startsWith("HOST_") || message.startsWith("GAME_") ||
+                 message.startsWith("SYSTEM:")) {
             processLobbyResponse(message);
+        }
+        else if (message.startsWith("GAME_STATE_UPDATE:") || 
+                 message.startsWith("BLOCK_PLACED:") || 
+                 message.startsWith("TURN_CHANGED:")) {
+            processGameStateMessage(message);
         }
         else if (message == "pong") {
             // Ping-pong은 특별히 처리하지 않음
@@ -592,6 +598,67 @@ namespace Blokus {
     {
         m_reconnectTimer->stop();
         m_reconnectAttempts = 0;
+    }
+
+    void NetworkClient::processGameStateMessage(const QString& message)
+    {
+        if (message.startsWith("GAME_STATE_UPDATE:")) {
+            QString jsonData = message.mid(18); // "GAME_STATE_UPDATE:" 제거
+            emit gameStateUpdated(jsonData);
+            qDebug() << QString::fromUtf8("게임 상태 업데이트 수신: %1").arg(jsonData);
+        }
+        else if (message.startsWith("BLOCK_PLACED:")) {
+            QString jsonData = message.mid(13); // "BLOCK_PLACED:" 제거
+            
+            // JSON 파싱 (간단한 방식)
+            QString playerName, blockType, row, col, rotation, flip, playerColor, scoreGained;
+            
+            // 간단한 JSON 파싱 (실제로는 QJsonDocument를 사용해야 함)
+            QRegExp playerRegex("\"player\":\"([^\"]+)\"");
+            QRegExp blockTypeRegex("\"blockType\":(\\d+)");
+            QRegExp positionRegex("\"position\":\\{\"row\":(\\d+),\"col\":(\\d+)\\}");
+            QRegExp rotationRegex("\"rotation\":(\\d+)");
+            QRegExp flipRegex("\"flip\":(\\d+)");
+            QRegExp playerColorRegex("\"playerColor\":(\\d+)");
+            QRegExp scoreRegex("\"scoreGained\":(\\d+)");
+            
+            if (playerRegex.indexIn(jsonData) != -1) playerName = playerRegex.cap(1);
+            if (blockTypeRegex.indexIn(jsonData) != -1) blockType = blockTypeRegex.cap(1);
+            if (positionRegex.indexIn(jsonData) != -1) {
+                row = positionRegex.cap(1);
+                col = positionRegex.cap(2);
+            }
+            if (rotationRegex.indexIn(jsonData) != -1) rotation = rotationRegex.cap(1);
+            if (flipRegex.indexIn(jsonData) != -1) flip = flipRegex.cap(1);
+            if (playerColorRegex.indexIn(jsonData) != -1) playerColor = playerColorRegex.cap(1);
+            if (scoreRegex.indexIn(jsonData) != -1) scoreGained = scoreRegex.cap(1);
+            
+            emit blockPlaced(playerName, blockType.toInt(), row.toInt(), col.toInt(), 
+                           rotation.toInt(), flip.toInt(), playerColor.toInt(), scoreGained.toInt());
+            
+            qDebug() << QString::fromUtf8("블록 배치 알림: %1이 블록을 배치함 (점수: +%2)")
+                        .arg(playerName).arg(scoreGained);
+        }
+        else if (message.startsWith("TURN_CHANGED:")) {
+            QString jsonData = message.mid(13); // "TURN_CHANGED:" 제거
+            
+            // JSON 파싱
+            QRegExp playerRegex("\"newPlayer\":\"([^\"]+)\"");
+            QRegExp colorRegex("\"playerColor\":(\\d+)");
+            QRegExp turnRegex("\"turnNumber\":(\\d+)");
+            
+            QString newPlayerName;
+            int playerColor = 0, turnNumber = 0;
+            
+            if (playerRegex.indexIn(jsonData) != -1) newPlayerName = playerRegex.cap(1);
+            if (colorRegex.indexIn(jsonData) != -1) playerColor = colorRegex.cap(1).toInt();
+            if (turnRegex.indexIn(jsonData) != -1) turnNumber = turnRegex.cap(1).toInt();
+            
+            emit turnChanged(newPlayerName, playerColor, turnNumber);
+            
+            qDebug() << QString::fromUtf8("턴 변경 알림: %1님의 턴 (턴 %2)")
+                        .arg(newPlayerName).arg(turnNumber);
+        }
     }
 
 } // namespace Blokus

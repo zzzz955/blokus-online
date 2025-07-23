@@ -1,5 +1,5 @@
 #include "GameLogic.h"
-#include "Block.h"  // Block Å¬·¡½º »ç¿ë
+#include "Block.h"  // Block Å¬ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
 #include "Utils.h"
 #include <algorithm>
 
@@ -7,7 +7,7 @@ namespace Blokus {
     namespace Common {
 
         // ========================================
-        // GameLogic ±¸Çö
+        // GameLogic ï¿½ï¿½ï¿½ï¿½
         // ========================================
 
         GameLogic::GameLogic()
@@ -15,7 +15,7 @@ namespace Blokus {
         {
             initializeBoard();
 
-            // ¸ðµç ÇÃ·¹ÀÌ¾îÀÇ Ã¹ ºí·Ï ¹èÄ¡ »óÅÂ ÃÊ±âÈ­
+            // ï¿½ï¿½ï¿½ ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ï¿½ï¿½ Ã¹ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ä¡ ï¿½ï¿½ï¿½ï¿½ ï¿½Ê±ï¿½È­
             m_hasPlacedFirstBlock[PlayerColor::Blue] = false;
             m_hasPlacedFirstBlock[PlayerColor::Yellow] = false;
             m_hasPlacedFirstBlock[PlayerColor::Red] = false;
@@ -35,7 +35,7 @@ namespace Blokus {
                 }
             }
 
-            // »ç¿ëµÈ ºí·Ï°ú ¹èÄ¡ »óÅÂ ÃÊ±âÈ­
+            // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ï°ï¿½ ï¿½ï¿½Ä¡ ï¿½ï¿½ï¿½ï¿½ ï¿½Ê±ï¿½È­
             m_usedBlocks.clear();
             m_playerOccupiedCells.clear();
 
@@ -57,22 +57,22 @@ namespace Blokus {
 
         bool GameLogic::canPlaceBlock(const BlockPlacement& placement) const
         {
-            // 1. ±âº» À¯È¿¼º °Ë»ç (º¸µå °æ°è, Ãæµ¹)
+            // 1. ï¿½âº» ï¿½ï¿½È¿ï¿½ï¿½ ï¿½Ë»ï¿½ (ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½, ï¿½æµ¹)
             if (hasCollision(placement)) {
                 return false;
             }
 
-            // 2. ºí·ÏÀÌ ÀÌ¹Ì »ç¿ëµÇ¾ú´ÂÁö È®ÀÎ
+            // 2. ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ì¹ï¿½ ï¿½ï¿½ï¿½Ç¾ï¿½ï¿½ï¿½ï¿½ï¿½ È®ï¿½ï¿½
             if (isBlockUsed(placement.player, placement.type)) {
                 return false;
             }
 
-            // 3. Ã¹ ¹øÂ° ºí·ÏÀÎÁö È®ÀÎ
+            // 3. Ã¹ ï¿½ï¿½Â° ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ È®ï¿½ï¿½
             if (!hasPlayerPlacedFirstBlock(placement.player)) {
                 return isFirstBlockValid(placement);
             }
 
-            // 4. Ã¹ ¹øÂ° ºí·ÏÀÌ ¾Æ´Ñ °æ¿ì, ºí·ÎÄ¿½º ±ÔÄ¢ Àû¿ë
+            // 4. Ã¹ ï¿½ï¿½Â° ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Æ´ï¿½ ï¿½ï¿½ï¿½, ï¿½ï¿½ï¿½ï¿½Ä¿ï¿½ï¿½ ï¿½ï¿½Ä¢ ï¿½ï¿½ï¿½ï¿½
             return isCornerAdjacencyValid(placement) && hasNoEdgeAdjacency(placement);
         }
 
@@ -82,7 +82,7 @@ namespace Blokus {
                 return false;
             }
 
-            // º¸µå¿¡ ºí·Ï ¹èÄ¡ (Block Å¬·¡½º »ç¿ë)
+            // ï¿½ï¿½ï¿½å¿¡ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ä¡ (Block Å¬ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½)
             Block block(placement.type, placement.player);
             block.setRotation(placement.rotation);
             block.setFlipState(placement.flip);
@@ -94,10 +94,10 @@ namespace Blokus {
                 m_playerOccupiedCells[placement.player].push_back(pos);
             }
 
-            // ºí·Ï »ç¿ë Ç¥½Ã
+            // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ Ç¥ï¿½ï¿½
             setPlayerBlockUsed(placement.player, placement.type);
 
-            // Ã¹ ºí·Ï ¹èÄ¡ Ç¥½Ã
+            // Ã¹ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ä¡ Ç¥ï¿½ï¿½
             if (!hasPlayerPlacedFirstBlock(placement.player)) {
                 m_hasPlacedFirstBlock[placement.player] = true;
             }
@@ -112,7 +112,7 @@ namespace Blokus {
             PlayerColor owner = getCellOwner(position);
             if (owner == PlayerColor::None) return false;
 
-            // ´Ü¼øÈ÷ ÇØ´ç ¼¿¸¸ Á¦°Å (½ÇÁ¦·Î´Â ÀüÃ¼ ºí·ÏÀ» Ã£¾Æ¼­ Á¦°ÅÇØ¾ß ÇÔ)
+            // ï¿½Ü¼ï¿½ï¿½ï¿½ ï¿½Ø´ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ï¿½Î´ï¿½ ï¿½ï¿½Ã¼ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Ã£ï¿½Æ¼ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ø¾ï¿½ ï¿½ï¿½)
             m_board[position.first][position.second] = PlayerColor::None;
             return true;
         }
@@ -150,7 +150,7 @@ namespace Blokus {
         {
             std::vector<BlockType> available;
 
-            // ±âÁ¸ Types.hÀÇ ¸ðµç ºí·Ï Å¸ÀÔ »ç¿ë (Block.cpp¿Í µ¿ÀÏ)
+            // ï¿½ï¿½ï¿½ï¿½ Types.hï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Å¸ï¿½ï¿½ ï¿½ï¿½ï¿½ (Block.cppï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
             std::vector<BlockType> allTypes = {
                 BlockType::Single,
                 BlockType::Domino,
@@ -183,12 +183,12 @@ namespace Blokus {
             auto availableBlocks = getAvailableBlocks(player);
 
             for (BlockType blockType : availableBlocks) {
-                // ¸ðµç °¡´ÉÇÑ À§Ä¡¿Í È¸Àü/µÚÁý±â »óÅÂ¸¦ Å×½ºÆ®
+                // ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ä¡ï¿½ï¿½ È¸ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Â¸ï¿½ ï¿½×½ï¿½Æ®
                 for (int row = 0; row < BOARD_SIZE; ++row) {
                     for (int col = 0; col < BOARD_SIZE; ++col) {
                         Position testPos = { row, col };
 
-                        // 4°¡Áö È¸Àü x 4°¡Áö µÚÁý±â = 16°¡Áö »óÅÂ Å×½ºÆ®
+                        // 4ï¿½ï¿½ï¿½ï¿½ È¸ï¿½ï¿½ x 4ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ = 16ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½×½ï¿½Æ®
                         for (int rot = 0; rot < 4; ++rot) {
                             for (int flip = 0; flip < 4; ++flip) {
                                 BlockPlacement testPlacement;
@@ -212,7 +212,7 @@ namespace Blokus {
 
         bool GameLogic::isGameFinished() const
         {
-            // ¸ðµç ÇÃ·¹ÀÌ¾î°¡ ´õ ÀÌ»ó ºí·ÏÀ» ³õÀ» ¼ö ¾øÀ¸¸é °ÔÀÓ Á¾·á
+            // ï¿½ï¿½ï¿½ ï¿½Ã·ï¿½ï¿½Ì¾î°¡ ï¿½ï¿½ ï¿½Ì»ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             std::vector<PlayerColor> players = {
                 PlayerColor::Blue, PlayerColor::Yellow,
                 PlayerColor::Red, PlayerColor::Green
@@ -240,16 +240,16 @@ namespace Blokus {
                 int score = 0;
                 auto availableBlocks = getAvailableBlocks(player);
 
-                // »ç¿ëÇÏÁö ¸øÇÑ ºí·ÏÀÇ Á¡¼ö¸¦ Â÷°¨
+                // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
                 for (BlockType blockType : availableBlocks) {
                     score -= Utils::getBlockScore(blockType);
                 }
 
-                // º¸³Ê½º Á¡¼ö °è»ê
+                // ï¿½ï¿½ï¿½Ê½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
                 if (availableBlocks.empty()) {
-                    score += 15; // ¸ðµç ºí·Ï »ç¿ë º¸³Ê½º
+                    score += 15; // ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ê½ï¿½
 
-                    // ¸¶Áö¸· ºí·ÏÀÌ ´ÜÀÏ ºí·ÏÀÌ¾úÀ¸¸é Ãß°¡ º¸³Ê½º
+                    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ì¾ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ß°ï¿½ ï¿½ï¿½ï¿½Ê½ï¿½
                     if (isBlockUsed(player, BlockType::Single)) {
                         score += 5;
                     }
@@ -276,7 +276,7 @@ namespace Blokus {
         }
 
         // ========================================
-        // ³»ºÎ ÇïÆÛ ÇÔ¼öµé
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ô¼ï¿½ï¿½ï¿½
         // ========================================
 
         bool GameLogic::isPositionValid(const Position& pos) const
@@ -286,7 +286,7 @@ namespace Blokus {
 
         bool GameLogic::hasCollision(const BlockPlacement& placement) const
         {
-            // Block Å¬·¡½º¸¦ »ç¿ëÇÏ¿© Ãæµ¹ °Ë»ç
+            // Block Å¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Ï¿ï¿½ ï¿½æµ¹ ï¿½Ë»ï¿½
             Block block(placement.type, placement.player);
             block.setRotation(placement.rotation);
             block.setFlipState(placement.flip);
@@ -304,22 +304,22 @@ namespace Blokus {
 
         bool GameLogic::isFirstBlockValid(const BlockPlacement& placement) const
         {
-            // Block Å¬·¡½º¸¦ »ç¿ëÇÏ¿© Ã¹ ºí·Ï °ËÁõ
+            // Block Å¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Ï¿ï¿½ Ã¹ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             Block block(placement.type, placement.player);
             block.setRotation(placement.rotation);
             block.setFlipState(placement.flip);
 
             PositionList absolutePositions = block.getAbsolutePositions(placement.position);
 
-            // Å¬·¡½Ä ¸ðµå: 4°³ ¸ð¼­¸® Áß ÇÏ³ª¿¡ ´ê¾Æ¾ß ÇÔ
+            // Å¬ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½: 4ï¿½ï¿½ ï¿½ð¼­¸ï¿½ ï¿½ï¿½ ï¿½Ï³ï¿½ï¿½ï¿½ ï¿½ï¿½Æ¾ï¿½ ï¿½ï¿½
             std::vector<Position> corners = {
-                {0, 0},                    // ¿ÞÂÊ À§ ¸ð¼­¸®
-                {0, BOARD_SIZE - 1},       // ¿À¸¥ÂÊ À§ ¸ð¼­¸®  
-                {BOARD_SIZE - 1, 0},       // ¿ÞÂÊ ¾Æ·¡ ¸ð¼­¸®
-                {BOARD_SIZE - 1, BOARD_SIZE - 1}  // ¿À¸¥ÂÊ ¾Æ·¡ ¸ð¼­¸®
+                {0, 0},                    // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ð¼­¸ï¿½
+                {0, BOARD_SIZE - 1},       // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ð¼­¸ï¿½  
+                {BOARD_SIZE - 1, 0},       // ï¿½ï¿½ï¿½ï¿½ ï¿½Æ·ï¿½ ï¿½ð¼­¸ï¿½
+                {BOARD_SIZE - 1, BOARD_SIZE - 1}  // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Æ·ï¿½ ï¿½ð¼­¸ï¿½
             };
 
-            // ºí·ÏÀÇ ¼¿ Áß ÇÏ³ª°¡ 4°³ ¸ð¼­¸® Áß ÇÏ³ª¿¡ Á¤È®È÷ À§Ä¡ÇØ¾ß ÇÔ
+            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ ï¿½Ï³ï¿½ï¿½ï¿½ 4ï¿½ï¿½ ï¿½ð¼­¸ï¿½ ï¿½ï¿½ ï¿½Ï³ï¿½ï¿½ï¿½ ï¿½ï¿½È®ï¿½ï¿½ ï¿½ï¿½Ä¡ï¿½Ø¾ï¿½ ï¿½ï¿½
             for (const auto& blockPos : absolutePositions) {
                 for (const auto& corner : corners) {
                     if (blockPos == corner) {
@@ -333,7 +333,7 @@ namespace Blokus {
 
         bool GameLogic::isCornerAdjacencyValid(const BlockPlacement& placement) const
         {
-            // °°Àº »ö ºí·Ï°ú ¸ð¼­¸®·Î Á¢ÃËÇØ¾ß ÇÔ
+            // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½Ï°ï¿½ ï¿½ð¼­¸ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ø¾ï¿½ ï¿½ï¿½
             Block block(placement.type, placement.player);
             block.setRotation(placement.rotation);
             block.setFlipState(placement.flip);
@@ -345,7 +345,7 @@ namespace Blokus {
 
                 for (const auto& diagonal : diagonals) {
                     if (isPositionValid(diagonal) && getCellOwner(diagonal) == placement.player) {
-                        return true; // °°Àº »ö ºí·Ï°ú ¸ð¼­¸® Á¢ÃË ¹ß°ß
+                        return true; // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½Ï°ï¿½ ï¿½ð¼­¸ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ß°ï¿½
                     }
                 }
             }
@@ -355,7 +355,7 @@ namespace Blokus {
 
         bool GameLogic::hasNoEdgeAdjacency(const BlockPlacement& placement) const
         {
-            // °°Àº »ö ºí·Ï°ú º¯À¸·Î Á¢ÃËÇÏ¸é ¾ÈµÊ
+            // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½Ï°ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï¸ï¿½ ï¿½Èµï¿½
             Block block(placement.type, placement.player);
             block.setRotation(placement.rotation);
             block.setFlipState(placement.flip);
@@ -367,7 +367,7 @@ namespace Blokus {
 
                 for (const auto& adjacent : adjacents) {
                     if (isPositionValid(adjacent) && getCellOwner(adjacent) == placement.player) {
-                        return false; // °°Àº »ö ºí·Ï°ú º¯ Á¢ÃË ¹ß°ß
+                        return false; // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½Ï°ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ß°ï¿½
                     }
                 }
             }
@@ -379,7 +379,7 @@ namespace Blokus {
         {
             std::vector<Position> adjacents;
 
-            // »óÇÏÁÂ¿ì 4¹æÇâ
+            // ï¿½ï¿½ï¿½ï¿½ï¿½Â¿ï¿½ 4ï¿½ï¿½ï¿½ï¿½
             std::vector<Position> directions = { {-1, 0}, {1, 0}, {0, -1}, {0, 1} };
 
             for (const auto& dir : directions) {
@@ -396,7 +396,7 @@ namespace Blokus {
         {
             std::vector<Position> diagonals;
 
-            // ´ë°¢¼± 4¹æÇâ
+            // ï¿½ë°¢ï¿½ï¿½ 4ï¿½ï¿½ï¿½ï¿½
             std::vector<Position> directions = { {-1, -1}, {-1, 1}, {1, -1}, {1, 1} };
 
             for (const auto& dir : directions) {
@@ -412,29 +412,29 @@ namespace Blokus {
         Position GameLogic::getPlayerStartCorner(PlayerColor player) const
         {
             switch (player) {
-            case PlayerColor::Blue: return { 0, 0 };                          // ¿ÞÂÊ À§
-            case PlayerColor::Yellow: return { 0, BOARD_SIZE - 1 };          // ¿À¸¥ÂÊ À§
-            case PlayerColor::Red: return { BOARD_SIZE - 1, 0 };             // ¿ÞÂÊ ¾Æ·¡
-            case PlayerColor::Green: return { BOARD_SIZE - 1, BOARD_SIZE - 1 }; // ¿À¸¥ÂÊ ¾Æ·¡
+            case PlayerColor::Blue: return { 0, 0 };                          // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½
+            case PlayerColor::Yellow: return { 0, BOARD_SIZE - 1 };          // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½
+            case PlayerColor::Red: return { BOARD_SIZE - 1, 0 };             // ï¿½ï¿½ï¿½ï¿½ ï¿½Æ·ï¿½
+            case PlayerColor::Green: return { BOARD_SIZE - 1, BOARD_SIZE - 1 }; // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Æ·ï¿½
             default: return { 0, 0 };
             }
         }
 
-        // getBlockShape´Â Á¦°Å - Block Å¬·¡½º¸¦ Á÷Á¢ »ç¿ë
-        // applyTransformationÀº Á¦°Å - Block Å¬·¡½º¸¦ Á÷Á¢ »ç¿ë
-        // normalizeShape´Â Á¦°Å - Block Å¬·¡½º¸¦ Á÷Á¢ »ç¿ë
+        // getBlockShapeï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ - Block Å¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
+        // applyTransformationï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ - Block Å¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
+        // normalizeShapeï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ - Block Å¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
 
         // ========================================
-        // GameStateManager ±¸Çö
+        // GameStateManager ï¿½ï¿½ï¿½ï¿½
         // ========================================
 
         GameStateManager::GameStateManager()
             : m_gameState(GameState::Waiting)
-            , m_turnState(TurnState::WaitingForMove)  // Types.hÀÇ TurnState »ç¿ë
+            , m_turnState(TurnState::WaitingForMove)  // Types.hï¿½ï¿½ TurnState ï¿½ï¿½ï¿½
             , m_turnNumber(1)
             , m_currentPlayerIndex(0)
         {
-            // ÇÃ·¹ÀÌ¾î ¼ø¼­ ¼³Á¤
+            // ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             m_playerOrder = {
                 PlayerColor::Blue, PlayerColor::Yellow,
                 PlayerColor::Red, PlayerColor::Green
@@ -447,6 +447,12 @@ namespace Blokus {
             m_gameState = GameState::Playing;
             m_turnState = TurnState::WaitingForMove;
             m_gameLogic.setCurrentPlayer(m_playerOrder[0]);
+        }
+
+        void GameStateManager::startNewGame(const std::vector<PlayerColor>& turnOrder)
+        {
+            setTurnOrder(turnOrder);
+            startNewGame();
         }
 
         void GameStateManager::resetGame()
@@ -470,7 +476,7 @@ namespace Blokus {
 
             m_currentPlayerIndex = (m_currentPlayerIndex + 1) % m_playerOrder.size();
 
-            // ÇÑ ¹ÙÄû µ¹¸é ÅÏ ¹øÈ£ Áõ°¡
+            // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½È£ ï¿½ï¿½ï¿½ï¿½
             if (m_currentPlayerIndex == 0) {
                 m_turnNumber++;
             }
@@ -478,7 +484,7 @@ namespace Blokus {
             PlayerColor newPlayer = m_playerOrder[m_currentPlayerIndex];
             m_gameLogic.setCurrentPlayer(newPlayer);
 
-            // °ÔÀÓ Á¾·á Á¶°Ç È®ÀÎ
+            // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ È®ï¿½ï¿½
             if (m_gameLogic.isGameFinished()) {
                 endGame();
             }
@@ -501,6 +507,26 @@ namespace Blokus {
         std::map<PlayerColor, int> GameStateManager::getFinalScores() const
         {
             return m_gameLogic.calculateScores();
+        }
+
+        void GameStateManager::setTurnOrder(const std::vector<PlayerColor>& turnOrder)
+        {
+            if (!turnOrder.empty()) {
+                m_playerOrder = turnOrder;
+                m_currentPlayerIndex = 0;
+                if (m_gameState == GameState::Playing) {
+                    m_gameLogic.setCurrentPlayer(m_playerOrder[0]);
+                }
+            }
+        }
+
+        PlayerColor GameStateManager::getNextPlayer() const
+        {
+            if (m_playerOrder.empty()) {
+                return PlayerColor::None;
+            }
+            int nextIndex = (m_currentPlayerIndex + 1) % m_playerOrder.size();
+            return m_playerOrder[nextIndex];
         }
 
     } // namespace Common

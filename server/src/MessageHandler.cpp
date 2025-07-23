@@ -521,29 +521,19 @@ namespace Blokus::Server {
 
             spdlog::info("🏠 방 나가기 요청: '{}' <- 방 {}", username, currentRoomId);
 
-            // 3. RoomManager를 통한 방 나가기
+            // 3. RoomManager를 통한 방 나가기 (모든 브로드캐스트 및 정리 작업 포함)
             if (roomManager_->leaveRoom(userId)) {
                 // 4. 세션 상태 변경
                 session_->setStateToLobby();
 
-                // 5. 성공 응답
-                sendResponse("ROOM_LEFT:OK");
-
-                // 6. 브로드캐스트 및 방 정보 업데이트 (방이 아직 존재할 때만)
+                // 5. 방 정보 동기화 (남은 플레이어들에게 업데이트된 슬롯 정보 전송)
                 auto room = roomManager_->getRoom(currentRoomId);
-                if (room) {
-                    // 퇴장 알림 브로드캐스트
-                    room->broadcastPlayerLeft(username);
-                    
-                    // 방이 비어있는지 확인하고 자동 삭제
-                    if (room->isEmpty()) {
-                        spdlog::info("빈 방 {} 자동 삭제", currentRoomId);
-                        roomManager_->removeRoom(currentRoomId);
-                    } else {
-                        // 남은 플레이어들에게 업데이트된 방 정보 전송
-                        broadcastRoomInfoToRoom(room);
-                    }
+                if (room && !room->isEmpty()) {
+                    broadcastRoomInfoToRoom(room);
                 }
+
+                // 6. 성공 응답
+                sendResponse("ROOM_LEFT:OK");
 
                 spdlog::info("✅ 방 나가기 성공: '{}'", username);
             }
@@ -676,18 +666,10 @@ namespace Blokus::Server {
                 return;
             }
 
-            // 5. RoomManager를 통한 게임 시작
+            // 5. RoomManager를 통한 게임 시작 (브로드캐스트는 startGame 내부에서 처리됨)
             if (roomManager_->startGame(userId)) {
-                // 6. 브로드캐스트 (데드락 방지를 위해 여기서 호출)
-                room->broadcastGameStart();
-
-                // 7. 방의 모든 플레이어 세션 상태를 게임 중으로 변경
-                auto playerList = room->getPlayerList();
-                for (const auto& player : playerList) {
-                    if (player.getSession()) {
-                        player.getSession()->setStateToInGame();
-                    }
-                }
+                // 게임 시작 성공 - 세션 상태는 이미 startGame()에서 설정됨
+                spdlog::info("✅ 게임 시작 성공: 사용자 {}", userId);
 
                 // 8. 성공 응답
                 sendResponse("GAME_START_SUCCESS");
@@ -866,17 +848,39 @@ namespace Blokus::Server {
                 return;
             }
 
-            // TODO: 실제 게임 로직 구현
-            // - 블록 배치 유효성 검사
-            // - 턴 순서 확인
-            // - 게임 규칙 적용
-            // - 게임 상태 업데이트
-            // - 다른 플레이어들에게 알림
+            // 파라미터 파싱: 블록타입:x좌표:y좌표:회전도[:뒤집기]
+            std::string blockTypeStr = params[0];
+            int x = std::stoi(params[1]);
+            int y = std::stoi(params[2]);
+            int rotation = std::stoi(params[3]);
+            int flip = (params.size() > 4) ? std::stoi(params[4]) : 0;
 
-            spdlog::info("🎮 게임 이동: '{}' (방 {})", userId, roomId);
+            // 블록 배치 정보 생성
+            Common::BlockPlacement placement;
+            placement.type = static_cast<Common::BlockType>(std::stoi(blockTypeStr));
+            placement.position = { y, x }; // row, col 순서
+            placement.rotation = static_cast<Common::Rotation>(rotation);
+            placement.flip = static_cast<Common::FlipState>(flip);
+            
+            // 플레이어 색상 설정
+            auto* player = room->getPlayer(userId);
+            if (!player) {
+                sendError("플레이어 정보를 찾을 수 없습니다");
+                return;
+            }
+            placement.player = player->getColor();
 
-            // 임시 성공 응답
-            sendResponse("GAME_MOVE_SUCCESS");
+            // 블록 배치 시도
+            bool success = room->handleBlockPlacement(userId, placement);
+            if (success) {
+                spdlog::info("🎮 블록 배치 성공: '{}' (방 {}, 위치: {},{}, 타입: {})", 
+                    userId, roomId, y, x, static_cast<int>(placement.type));
+                
+                // 성공 응답 (브로드캐스트는 handleBlockPlacement에서 처리됨)
+                sendResponse("GAME_MOVE_SUCCESS");
+            } else {
+                sendError("블록 배치에 실패했습니다");
+            }
 
         }
         catch (const std::exception& e) {
@@ -997,8 +1001,8 @@ namespace Blokus::Server {
             if (session_->isInLobby()) {
                 // 로비 채팅 - 모든 로비 사용자에게 브로드캐스팅
                 broadcastLobbyChatMessage(username, message);
-            } else if (session_->isInRoom()) {
-                // 방 채팅 - 같은 방의 플레이어들에게 브로드캐스팅
+            } else if (session_->isInRoom() || session_->isInGame()) {
+                // 방 채팅 (게임 중 포함) - 같은 방의 플레이어들에게 브로드캐스팅
                 broadcastRoomChatMessage(username, message);
             }
             
@@ -1163,15 +1167,10 @@ namespace Blokus::Server {
             std::string chatMessage = "CHAT:" + username + ":" + message;
             spdlog::info("📢 방 {} 채팅 브로드캐스트: [{}] {}", currentRoomId, username, message);
             
-            // 방의 모든 플레이어에게 브로드캐스트
-            auto playerList = room->getPlayerList();
-            for (const auto& player : playerList) {
-                if (player.getSession() && player.getSession()->isActive()) {
-                    player.getSession()->sendMessage(chatMessage);
-                }
-            }
+            // GameRoom의 broadcastMessage 사용
+            room->broadcastMessage(chatMessage);
             
-            spdlog::debug("방 {} 플레이어 {}명에게 채팅 브로드캐스트 완료", currentRoomId, playerList.size());
+            spdlog::debug("방 {} 채팅 브로드캐스트 완료", currentRoomId);
         }
         catch (const std::exception& e) {
             spdlog::error("방 채팅 브로드캐스트 중 오류: {}", e.what());

@@ -653,7 +653,7 @@ namespace Blokus::Server {
             // 모든 로비 사용자에게 브로드캐스트
             int sentCount = 0;
             for (const auto& session : lobbyUsers) {
-                if (session && session->isActive()) {
+                if (session && session->isActive() && session->isInLobby()) {
                     session->sendMessage(message);
                     sentCount++;
                 }

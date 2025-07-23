@@ -69,15 +69,25 @@ namespace Blokus {
             // 게임 제어
             bool startGame();
             bool endGame();
+            bool endGameLocked(); // 데드락 방지용 내부 메서드
             bool pauseGame();
             bool resumeGame();
             void resetGame();
 
+            // 턴 관리
+            bool handleBlockPlacement(const std::string& userId, const Common::BlockPlacement& placement);
+            bool skipPlayerTurn(const std::string& userId);
+            bool isPlayerTurn(const std::string& userId) const;
+            Common::PlayerColor getCurrentPlayer() const;
+            std::vector<Common::PlayerColor> getTurnOrder() const;
+
             // 게임 로직 접근
             Common::GameLogic* getGameLogic() const { return m_gameLogic.get(); }
+            Common::GameStateManager* getGameStateManager() const { return m_gameStateManager.get(); }
 
             // 메시지 전송
             void broadcastMessage(const std::string& message, const std::string& excludeUserId = "");
+            void broadcastMessageLocked(const std::string& message, const std::string& excludeUserId = "");
             void sendToPlayer(const std::string& userId, const std::string& message);
             void sendToHost(const std::string& message);
 
@@ -105,9 +115,13 @@ namespace Blokus {
             void broadcastPlayerLeft(const std::string& username);
             void broadcastPlayerReady(const std::string& username, bool ready);
             void broadcastHostChanged(const std::string& newHostName);
-            void broadcastGameStart();
             void broadcastGameEnd();
             void broadcastGameState();
+            void broadcastGameStateLocked(); // 데드락 방지용 내부 메서드
+            void broadcastBlockPlacement(const std::string& playerName, const Common::BlockPlacement& placement, int scoreGained);
+            void broadcastBlockPlacementLocked(const std::string& playerName, const Common::BlockPlacement& placement, int scoreGained); // 데드락 방지용 내부 메서드
+            void broadcastTurnChange(Common::PlayerColor newPlayer);
+            void broadcastTurnChangeLocked(Common::PlayerColor newPlayer); // 데드락 방지용 내부 메서드
 
         private:
             // 기본 정보
@@ -122,6 +136,7 @@ namespace Blokus {
 
             // 게임 로직
             std::unique_ptr<Common::GameLogic> m_gameLogic;
+            std::unique_ptr<Common::GameStateManager> m_gameStateManager;
 
             // 시간 관리
             std::chrono::steady_clock::time_point m_createdTime;

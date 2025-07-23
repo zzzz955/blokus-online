@@ -367,3 +367,31 @@ message SpectatorNotification {
   bool joined = 3;            // true: ����, false: ����
   int32 total_spectators = 4;
 }
+
+// ========================================
+// 게임 보드 상태 동기화
+// ========================================
+
+message BoardSyncRequest {
+  int32 room_id = 1;
+  int32 client_board_version = 2;  // 클라이언트 보드 버전
+  bool force_full_sync = 3;        // 전체 동기화 강제 요청
+}
+
+message BoardSyncResponse {
+  Result result = 1;
+  BoardState board_state = 2;      // 전체 보드 상태
+  int32 server_board_version = 3;  // 서버 보드 버전
+  bool is_full_sync = 4;           // 전체 동기화 여부
+  repeated BlockPlacement recent_moves = 5; // 최근 움직임 (부분 동기화용)
+}
+
+message BoardUpdateNotification {
+  int32 room_id = 1;
+  BlockPlacement new_placement = 2;     // 새로 배치된 블록
+  BoardState updated_board = 3;         // 업데이트된 보드 상태
+  int32 board_version = 4;              // 새 보드 버전
+  PlayerColor player = 5;               // 블록을 배치한 플레이어
+  int32 turn_number = 6;                // 턴 번호
+  google.protobuf.Timestamp updated_at = 7;
+}

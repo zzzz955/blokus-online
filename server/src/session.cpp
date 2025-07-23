@@ -131,6 +131,10 @@ namespace Blokus::Server {
 
             spdlog::debug("🎮 세션 상태 변경: {} -> 게임 중 (방 {})", sessionId_, currentRoomId_);
         }
+        else if (state_ == ConnectionState::InGame) {
+            // 이미 게임 중 상태라면 경고 없이 무시
+            spdlog::debug("🎮 세션 이미 게임 중 상태: {} (방 {})", sessionId_, currentRoomId_);
+        }
         else {
             spdlog::warn("❌ 잘못된 상태에서 게임 상태로 변경 시도: {} (현재: {})",
                 sessionId_, static_cast<int>(state_));
@@ -154,11 +158,11 @@ namespace Blokus::Server {
 
             if (!writing_) {
                 writing_ = true;
-                spdlog::debug("📤 쓰기 시작");
+                // spdlog::debug("📤 쓰기 시작");
                 doWrite();
             }
             else {
-                spdlog::debug("📤 쓰기 대기 중");
+                // spdlog::debug("📤 쓰기 대기 중");
             }
 
         }

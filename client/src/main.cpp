@@ -210,6 +210,19 @@ private slots:
         }
     }
 
+    void handleBlockPlacementRequest(const QString& gameMessage)
+    {
+        qDebug() << QString::fromUtf8("🎮 블록 배치 요청: %1").arg(gameMessage);
+        
+        // 서버에 게임 이동 메시지 전송
+        if (m_networkClient && m_networkClient->isConnected()) {
+            m_networkClient->sendMessage(gameMessage);
+            qDebug() << QString::fromUtf8("✅ 서버에 블록 배치 메시지 전송 완료");
+        } else {
+            qWarning() << QString::fromUtf8("❌ 서버 연결이 없어 블록 배치 메시지를 보낼 수 없습니다");
+        }
+    }
+
     // 네트워크 시그널 핸들러들
     void onNetworkConnected()
     {
@@ -444,7 +457,8 @@ private slots:
         
         // 게임룸 채팅이면 게임룸에만 표시 (로비와 중복 방지)
         else if (m_gameRoomWindow && m_gameRoomWindow->isVisible()) {
-            m_gameRoomWindow->addChatMessage(username, message, false);
+            bool isSystem = (username == QString::fromUtf8("시스템"));
+            m_gameRoomWindow->addChatMessage(username, message, isSystem);
         }
     }
     
@@ -787,6 +801,16 @@ private:
                 this, &AppController::handlePlayerReadyChanged);
             connect(m_gameRoomWindow, &Blokus::GameRoomWindow::chatMessageSent,
                 this, &AppController::handleGameRoomChatMessage);
+            connect(m_gameRoomWindow, &Blokus::GameRoomWindow::blockPlacementRequested,
+                this, &AppController::handleBlockPlacementRequest);
+            
+            // 게임 상태 동기화 시그널 연결 (게임 진행 중 보드 상태 및 턴 동기화)
+            connect(m_networkClient, &Blokus::NetworkClient::gameStateUpdated,
+                m_gameRoomWindow, &Blokus::GameRoomWindow::onGameStateUpdated);
+            connect(m_networkClient, &Blokus::NetworkClient::blockPlaced,
+                m_gameRoomWindow, &Blokus::GameRoomWindow::onBlockPlaced);
+            connect(m_networkClient, &Blokus::NetworkClient::turnChanged,
+                m_gameRoomWindow, &Blokus::GameRoomWindow::onTurnChanged);
             
             // 게임룸 채팅은 이미 전역적으로 연결되어 있음 (중복 연결 제거)
 

@@ -91,12 +91,14 @@ namespace Blokus {
 
             // 게임 상태 관리
             void startNewGame();
+            void startNewGame(const std::vector<PlayerColor>& turnOrder);
             void resetGame();
             void endGame();
 
             // 턴 관리
             void nextTurn();
             void skipTurn();
+            void setTurnOrder(const std::vector<PlayerColor>& turnOrder);
 
             // 상태 확인
             GameState getGameState() const { return m_gameState; }
@@ -113,6 +115,9 @@ namespace Blokus {
             // 턴 정보
             int getTurnNumber() const { return m_turnNumber; }
             PlayerColor getCurrentPlayer() const { return m_gameLogic.getCurrentPlayer(); }
+            std::vector<PlayerColor> getTurnOrder() const { return m_playerOrder; }
+            int getCurrentPlayerIndex() const { return m_currentPlayerIndex; }
+            PlayerColor getNextPlayer() const;
 
         private:
             GameLogic m_gameLogic;

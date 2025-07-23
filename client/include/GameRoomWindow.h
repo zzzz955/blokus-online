@@ -84,6 +84,7 @@ namespace Blokus {
         PlayerColor getColor() const { return m_color; }
         void updateActionButton();
         void updateReadyState(bool isReady);
+        void setCurrentTurn(bool isCurrentTurn);
 
     signals:
         void kickPlayerRequested(PlayerColor color);
@@ -136,12 +137,18 @@ namespace Blokus {
         // 채팅 메시지 추가
         void addChatMessage(const QString& username, const QString& message, bool isSystem = false);
         void addSystemMessage(const QString& message);
+        
+        // 서버 통신
+        void sendBlockPlacementToServer(BlockType blockType, PlayerColor playerColor, int row, int col, int rotation, int flip);
 
         // 호스트 권한 확인
         bool isHost() const;
         
         // 내 준비 상태 설정
         void setMyReadyState(bool ready);
+        
+        // 턴 전환 알림
+        void showTurnChangeNotification(const QString& playerName, bool isMyTurn);
 
     signals:
         // 룸 관리 시그널
@@ -151,6 +158,7 @@ namespace Blokus {
 
         // 게임 플레이 시그널
         void blockPlacedRequested(const Block& block, const Position& position);
+        void blockPlacementRequested(const QString& gameMessage);
         void turnSkipRequested();
 
         // 채팅 시그널
@@ -162,6 +170,11 @@ namespace Blokus {
     public slots:
         // UI 이벤트 핸들러
         void onLeaveRoomClicked();
+        
+        // 게임 상태 동기화 슬롯
+        void onGameStateUpdated(const QString& gameStateJson);
+        void onBlockPlaced(const QString& playerName, int blockType, int row, int col, int rotation, int flip, int playerColor, int scoreGained);
+        void onTurnChanged(const QString& newPlayerName, int playerColor, int turnNumber);
 
     private slots:
         void onGameStartClicked();
@@ -175,7 +188,7 @@ namespace Blokus {
         // 게임보드 이벤트
         void onCellClicked(int row, int col);
         void onCellHovered(int row, int col);
-        void onBlockPlacedSuccessfully(BlockType blockType, PlayerColor player);
+        void onBlockPlacedSuccessfully(BlockType blockType, PlayerColor player, int row, int col, int rotation, int flip);
         void onBlockSelected(const Block& block);
 
     protected:
@@ -212,6 +225,8 @@ namespace Blokus {
         // 플레이어 상태 업데이트
         void updatePlayerScore(PlayerColor player, int scoreToAdd);
         void updatePlayerRemainingBlocks(PlayerColor player, int change);
+        void setPlayerScore(PlayerColor player, int score);
+        void setPlayerRemainingBlocks(PlayerColor player, int remainingBlocks);
 
         // 권한 확인
         bool canStartGame() const;
@@ -267,6 +282,7 @@ namespace Blokus {
         // 상태 관리
         bool m_isGameStarted;
         bool m_isReady;              // 내 준비 상태
+        PlayerColor m_previousTurn;  // 이전 턴 추적용
         QTimer* m_turnTimer;
         QTimer* m_readyButtonTimeout; // 준비 버튼 타임아웃
         QList<QString> m_chatHistory;

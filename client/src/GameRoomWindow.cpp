@@ -312,6 +312,40 @@ namespace Blokus {
         }
     }
 
+    void PlayerSlotWidget::setCurrentTurn(bool isCurrentTurn)
+    {
+        if (m_currentSlot.isEmpty()) {
+            return;
+        }
+
+        // 현재 턴인 플레이어 슬롯에 시각적 하이라이트 추가
+        if (isCurrentTurn) {
+            // 턴 하이라이트 스타일 적용
+            setStyleSheet("PlayerSlotWidget {"
+                "border: 3px solid #f39c12;"
+                "border-radius: 8px;"
+                "background-color: rgba(243, 156, 18, 0.1);"
+                "}");
+            
+            // 사용자 이름 라벨 강조
+            if (m_usernameLabel) {
+                m_usernameLabel->setStyleSheet("font-size: 12px; font-weight: bold; color: #f39c12;");
+            }
+        } else {
+            // 기본 스타일로 되돌리기
+            setStyleSheet("PlayerSlotWidget {"
+                "border: 1px solid #bdc3c7;"
+                "border-radius: 8px;"
+                "background-color: #ecf0f1;"
+                "}");
+            
+            // 사용자 이름 라벨 기본 스타일
+            if (m_usernameLabel) {
+                m_usernameLabel->setStyleSheet("font-size: 12px; font-weight: bold; color: #2c3e50;");
+            }
+        }
+    }
+
     // ========================================
     // GameRoomWindow 구현
     // ========================================
@@ -342,6 +376,7 @@ namespace Blokus {
         , m_coordinateLabel(nullptr)
         , m_isGameStarted(false)
         , m_isReady(false)
+        , m_previousTurn(PlayerColor::None)
         , m_turnTimer(new QTimer(this))
         , m_readyButtonTimeout(new QTimer(this))
     {
@@ -857,12 +892,40 @@ namespace Blokus {
 
         updateReadyStates();
         
-        // 게임 상태 라벨 업데이트
+        // 게임 상태 라벨 업데이트 및 플레이어 슬롯 하이라이트
         if (m_isGameStarted) {
             PlayerColor currentTurn = m_gameManager->getGameLogic().getCurrentPlayer();
+            
+            // 턴 변경 감지 및 알림
+            if (currentTurn != m_previousTurn && m_previousTurn != PlayerColor::None) {
+                QString currentPlayerName = "";
+                for (const auto& slot : m_roomInfo.playerSlots) {
+                    if (slot.color == currentTurn) {
+                        currentPlayerName = slot.getDisplayName();
+                        break;
+                    }
+                }
+                
+                bool isMyTurn = m_roomInfo.isMyTurn(m_myUsername, currentTurn);
+                showTurnChangeNotification(currentPlayerName, isMyTurn);
+            }
+            m_previousTurn = currentTurn;
+            
+            // 모든 플레이어 슬롯의 턴 하이라이트 업데이트
+            for (int i = 0; i < m_playerSlotWidgets.size(); ++i) {
+                PlayerSlotWidget* slotWidget = m_playerSlotWidgets[i];
+                bool isCurrentTurn = (slotWidget->getColor() == currentTurn);
+                slotWidget->setCurrentTurn(isCurrentTurn);
+            }
+            
             if (m_roomInfo.isMyTurn(m_myUsername, currentTurn)) {
                 m_gameStatusLabel->setText(QString::fromUtf8("내 턴입니다!"));
                 m_gameStatusLabel->setStyleSheet("font-size: 14px; font-weight: bold; color: #27ae60;");
+                
+                // 내 블록 팔레트 활성화
+                if (m_myBlockPalette) {
+                    m_myBlockPalette->setEnabled(true);
+                }
             }
             else {
                 QString turnPlayerName = "";
@@ -874,9 +937,19 @@ namespace Blokus {
                 }
                 m_gameStatusLabel->setText(QString::fromUtf8("%1 턴").arg(turnPlayerName));
                 m_gameStatusLabel->setStyleSheet("font-size: 14px; font-weight: bold; color: #34495e;");
+                
+                // 내 블록 팔레트 비활성화
+                if (m_myBlockPalette) {
+                    m_myBlockPalette->setEnabled(false);
+                }
             }
         }
         else {
+            // 게임이 시작되지 않은 경우 모든 슬롯 하이라이트 제거
+            for (int i = 0; i < m_playerSlotWidgets.size(); ++i) {
+                m_playerSlotWidgets[i]->setCurrentTurn(false);
+            }
+            
             if (canStart) {
                 m_gameStatusLabel->setText(QString::fromUtf8("게임 시작 준비됨"));
                 m_gameStatusLabel->setStyleSheet("font-size: 14px; font-weight: bold; color: #27ae60;");
@@ -929,21 +1002,26 @@ namespace Blokus {
         updateGameControlsState();
         updateRoomInfoDisplay();
 
-        addSystemMessage(QString::fromUtf8("🎮 게임이 시작되었습니다! (클래식 모드)"));
+        // 시스템 메시지는 서버에서 오는 SYSTEM: 메시지로만 표시 (중복 방지)
 
         qDebug() << QString::fromUtf8("🎉 게임 시작 완료!");
     }
 
     // 블록 배치 성공 시 처리
-    void GameRoomWindow::onBlockPlacedSuccessfully(BlockType blockType, PlayerColor player)
+    void GameRoomWindow::onBlockPlacedSuccessfully(BlockType blockType, PlayerColor player, int row, int col, int rotation, int flip)
     {
-        qDebug() << QString::fromUtf8("블록 배치 성공: %1 플레이어의 %2 블록")
+        qDebug() << QString::fromUtf8("블록 배치 성공: %1 플레이어의 %2 블록 (위치: %3,%4, 회전: %5, 뒤집기: %6)")
             .arg(Utils::playerColorToString(player))
-            .arg(BlockFactory::getBlockName(blockType));
+            .arg(BlockFactory::getBlockName(blockType))
+            .arg(row).arg(col).arg(rotation).arg(flip);
 
-        // 내 블록이 배치되었으면 팔레트에서 제거
+        // 내 플레이어만 서버에 블록 배치 알림 (중복 방지)
         PlayerColor myColor = m_roomInfo.getMyColor(m_myUsername);
         if (player == myColor) {
+            // 서버에 블록 배치 정보 전송 (실제 위치 정보 포함)
+            sendBlockPlacementToServer(blockType, player, row, col, rotation, flip);
+            
+            // 내 블록 팔레트에서 제거
             m_myBlockPalette->removeBlock(blockType);
         }
 
@@ -964,10 +1042,7 @@ namespace Blokus {
             }
         }
 
-        addSystemMessage(QString::fromUtf8("%1이(가) %2 블록을 배치했습니다. (+%3점)")
-            .arg(playerName)
-            .arg(BlockFactory::getBlockName(blockType))
-            .arg(BlockFactory::getBlockScore(blockType)));
+        // 시스템 메시지는 서버에서 오는 SYSTEM: 메시지로만 표시 (중복 방지)
 
         // 게임 종료 조건 체크
         checkGameEndConditions();
@@ -989,12 +1064,42 @@ namespace Blokus {
         }
     }
 
+    void GameRoomWindow::setPlayerScore(PlayerColor player, int score)
+    {
+        for (int i = 0; i < m_roomInfo.playerSlots.size(); ++i) {
+            if (m_roomInfo.playerSlots[i].color == player) {
+                m_roomInfo.playerSlots[i].score = score;
+
+                // 해당 슬롯 위젯 업데이트
+                if (i < m_playerSlotWidgets.size()) {
+                    m_playerSlotWidgets[i]->updatePlayerSlot(m_roomInfo.playerSlots[i]);
+                }
+                break;
+            }
+        }
+    }
+
     // 플레이어 남은 블록 수 업데이트
     void GameRoomWindow::updatePlayerRemainingBlocks(PlayerColor player, int change)
     {
         for (int i = 0; i < m_roomInfo.playerSlots.size(); ++i) {
             if (m_roomInfo.playerSlots[i].color == player) {
                 m_roomInfo.playerSlots[i].remainingBlocks += change;
+
+                // 해당 슬롯 위젯 업데이트
+                if (i < m_playerSlotWidgets.size()) {
+                    m_playerSlotWidgets[i]->updatePlayerSlot(m_roomInfo.playerSlots[i]);
+                }
+                break;
+            }
+        }
+    }
+
+    void GameRoomWindow::setPlayerRemainingBlocks(PlayerColor player, int remainingBlocks)
+    {
+        for (int i = 0; i < m_roomInfo.playerSlots.size(); ++i) {
+            if (m_roomInfo.playerSlots[i].color == player) {
+                m_roomInfo.playerSlots[i].remainingBlocks = remainingBlocks;
 
                 // 해당 슬롯 위젯 업데이트
                 if (i < m_playerSlotWidgets.size()) {
@@ -2023,6 +2128,167 @@ namespace Blokus {
         m_selectedBlock = Block(BlockType::Single, PlayerColor::None);
 
         qDebug() << QString::fromUtf8("MyBlockPalette 선택 해제됨");
+    }
+
+    // ========================================
+    // GameRoomWindow 턴 전환 메서드
+    // ========================================
+
+    void GameRoomWindow::showTurnChangeNotification(const QString& playerName, bool isMyTurn)
+    {
+        // 채팅 창에는 메시지 추가하지 않음 (서버에서 오는 SYSTEM 메시지만 사용)
+        // 중복 방지를 위해 주석 처리
+
+        // 상태 바에 일시적으로 턴 전환 메시지 표시
+        if (statusBar()) {
+            if (isMyTurn) {
+                statusBar()->showMessage(QString::fromUtf8("🎯 내 턴 - 블록을 배치하세요!"), 3000);
+            } else {
+                statusBar()->showMessage(QString::fromUtf8("⏳ %1님이 블록을 배치하는 중...").arg(playerName), 3000);
+            }
+        }
+
+        // 로그 출력
+        qDebug() << QString::fromUtf8("턴 전환: %1 (내턴=%2)")
+            .arg(playerName).arg(isMyTurn ? "예" : "아니오");
+    }
+
+    // ========================================
+    // 게임 상태 동기화 슬롯들
+    // ========================================
+
+    void GameRoomWindow::onGameStateUpdated(const QString& gameStateJson)
+    {
+        qDebug() << QString::fromUtf8("게임 상태 업데이트 수신: %1").arg(gameStateJson);
+        
+        // JSON 파싱 (간단한 방식)
+        QRegExp currentPlayerRegex("\"currentPlayer\":(\\d+)");
+        QRegExp turnNumberRegex("\"turnNumber\":(\\d+)");
+        
+        if (currentPlayerRegex.indexIn(gameStateJson) != -1) {
+            int currentPlayerInt = currentPlayerRegex.cap(1).toInt();
+            PlayerColor currentPlayer = static_cast<PlayerColor>(currentPlayerInt);
+            
+            // 현재 턴 플레이어 업데이트
+            if (m_gameManager) {
+                m_gameManager->getGameLogic().setCurrentPlayer(currentPlayer);
+            }
+            
+            // UI 업데이트
+            updateGameControlsState();
+            updateRoomInfoDisplay();
+        }
+        
+        // 플레이어 점수 파싱 및 업데이트
+        QRegExp scoresRegex("\"scores\":\\{([^}]+)\\}");
+        if (scoresRegex.indexIn(gameStateJson) != -1) {
+            QString scoresStr = scoresRegex.cap(1);
+            qDebug() << QString::fromUtf8("점수 파싱: %1").arg(scoresStr);
+            QStringList scorePairs = scoresStr.split(',');
+            
+            for (const QString& pair : scorePairs) {
+                QRegExp scoreRegex("\"(\\d+)\":(\\d+)");
+                if (scoreRegex.indexIn(pair) != -1) {
+                    int playerColorInt = scoreRegex.cap(1).toInt();
+                    int score = scoreRegex.cap(2).toInt();
+                    PlayerColor playerColor = static_cast<PlayerColor>(playerColorInt);
+                    
+                    qDebug() << QString::fromUtf8("플레이어 %1 점수 업데이트: %2").arg(playerColorInt).arg(score);
+                    
+                    // 플레이어 슬롯의 점수 설정 (절대값)
+                    setPlayerScore(playerColor, score);
+                }
+            }
+        } else {
+            qDebug() << QString::fromUtf8("점수 정보를 찾을 수 없음");
+        }
+        
+        // 남은 블록 개수 파싱 및 업데이트
+        QRegExp remainingRegex("\"remainingBlocks\":\\{([^}]+)\\}");
+        if (remainingRegex.indexIn(gameStateJson) != -1) {
+            QString remainingStr = remainingRegex.cap(1);
+            qDebug() << QString::fromUtf8("남은 블록 파싱: %1").arg(remainingStr);
+            QStringList remainingPairs = remainingStr.split(',');
+            
+            for (const QString& pair : remainingPairs) {
+                QRegExp blockRegex("\"(\\d+)\":(\\d+)");
+                if (blockRegex.indexIn(pair) != -1) {
+                    int playerColorInt = blockRegex.cap(1).toInt();
+                    int remainingCount = blockRegex.cap(2).toInt();
+                    PlayerColor playerColor = static_cast<PlayerColor>(playerColorInt);
+                    
+                    qDebug() << QString::fromUtf8("플레이어 %1 남은 블록 업데이트: %2").arg(playerColorInt).arg(remainingCount);
+                    
+                    // 플레이어 슬롯의 남은 블록 개수 설정 (절대값)
+                    setPlayerRemainingBlocks(playerColor, remainingCount);
+                }
+            }
+        } else {
+            qDebug() << QString::fromUtf8("남은 블록 정보를 찾을 수 없음");
+        }
+    }
+
+    void GameRoomWindow::onBlockPlaced(const QString& playerName, int blockType, int row, int col, int rotation, int flip, int playerColor, int scoreGained)
+    {
+        qDebug() << QString::fromUtf8("블록 배치 알림: %1이 블록 배치 (타입: %2, 위치: %3,%4, 점수: +%5)")
+                    .arg(playerName).arg(blockType).arg(row).arg(col).arg(scoreGained);
+        
+        // 게임 보드에 블록 배치 반영
+        if (m_gameBoard && m_gameManager) {
+            Common::BlockPlacement placement;
+            placement.type = static_cast<Common::BlockType>(blockType);
+            placement.position = { row, col };
+            placement.rotation = static_cast<Common::Rotation>(rotation);
+            placement.flip = static_cast<Common::FlipState>(flip);
+            placement.player = static_cast<PlayerColor>(playerColor);
+            
+            // 게임 보드에 블록 배치
+            if (m_gameBoard->canPlaceBlock(placement)) {
+                m_gameBoard->placeBlock(placement);
+                
+                // 게임 로직에도 반영
+                m_gameManager->getGameLogic().placeBlock(placement);
+            }
+        }
+        
+        // 시스템 메시지는 서버에서 오는 SYSTEM: 메시지로만 표시 (중복 방지)
+    }
+
+    void GameRoomWindow::onTurnChanged(const QString& newPlayerName, int playerColor, int turnNumber)
+    {
+        qDebug() << QString::fromUtf8("턴 변경 알림: %1님의 턴 (색상: %2, 턴: %3)")
+                    .arg(newPlayerName).arg(playerColor).arg(turnNumber);
+        
+        // 게임 매니저의 현재 플레이어 업데이트
+        if (m_gameManager) {
+            PlayerColor newPlayer = static_cast<PlayerColor>(playerColor);
+            m_gameManager->getGameLogic().setCurrentPlayer(newPlayer);
+        }
+        
+        // 턴 변경 알림 표시
+        bool isMyTurn = (newPlayerName == m_myUsername);
+        showTurnChangeNotification(newPlayerName, isMyTurn);
+        
+        // UI 업데이트
+        updateGameControlsState();
+        updateRoomInfoDisplay();
+    }
+
+    void GameRoomWindow::sendBlockPlacementToServer(BlockType blockType, PlayerColor playerColor, int row, int col, int rotation, int flip)
+    {
+        // 서버 메시지 형식: game:move:블록타입:x좌표:y좌표:회전도:뒤집기
+        QString gameMessage = QString("game:move:%1:%2:%3:%4:%5")
+            .arg(static_cast<int>(blockType))  // 블록 타입
+            .arg(col)                          // x 좌표 (열)
+            .arg(row)                          // y 좌표 (행)  
+            .arg(rotation)                     // 회전도
+            .arg(flip);                        // 뒤집기
+
+        qDebug() << QString::fromUtf8("🚀 서버에 블록 배치 메시지 전송: %1 (위치: %2,%3, 회전: %4, 뒤집기: %5)")
+            .arg(gameMessage).arg(row).arg(col).arg(rotation).arg(flip);
+        
+        // 시그널을 통해 AppController로 전달하여 NetworkClient를 통해 서버에 전송
+        emit blockPlacementRequested(gameMessage);
     }
 
 } // namespace Blokus
