@@ -166,6 +166,11 @@ namespace Blokus {
     public slots:
         // UI 이벤트 핸들러
         void onLeaveRoomClicked();
+        
+        // 게임 상태 동기화 슬롯
+        void onGameStateUpdated(const QString& gameStateJson);
+        void onBlockPlaced(const QString& playerName, int blockType, int row, int col, int rotation, int flip, int playerColor, int scoreGained);
+        void onTurnChanged(const QString& newPlayerName, int playerColor, int turnNumber);
 
     private slots:
         void onGameStartClicked();

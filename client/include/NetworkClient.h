@@ -93,6 +93,11 @@ namespace Blokus {
         void gameStarted();
         void gameEnded();
         
+        // 게임 상태 동기화 시그널
+        void gameStateUpdated(const QString& gameStateJson);
+        void blockPlaced(const QString& playerName, int blockType, int row, int col, int rotation, int flip, int playerColor, int scoreGained);
+        void turnChanged(const QString& newPlayerName, int playerColor, int turnNumber);
+        
         // 채팅 시그널
         void chatMessageReceived(const QString& username, const QString& message);
         void chatMessageSent();
@@ -109,6 +114,7 @@ namespace Blokus {
         void processMessage(const QString& message);
         void processAuthResponse(const QString& response);
         void processLobbyResponse(const QString& response);
+        void processGameStateMessage(const QString& message);
         void processErrorMessage(const QString& error);
         void setupSocket();
         void cleanupSocket();

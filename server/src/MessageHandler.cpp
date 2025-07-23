@@ -894,9 +894,8 @@ namespace Blokus::Server {
                 spdlog::info("🎮 블록 배치 성공: '{}' (방 {}, 위치: {},{}, 타입: {})", 
                     userId, roomId, y, x, static_cast<int>(placement.type));
                 
-                // 성공 응답과 함께 게임 상태 브로드캐스트
+                // 성공 응답 (브로드캐스트는 handleBlockPlacement에서 처리됨)
                 sendResponse("GAME_MOVE_SUCCESS");
-                room->broadcastGameState();
             } else {
                 sendError("블록 배치에 실패했습니다");
             }

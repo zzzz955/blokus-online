@@ -116,6 +116,8 @@ namespace Blokus {
             void broadcastGameStart();
             void broadcastGameEnd();
             void broadcastGameState();
+            void broadcastBlockPlacement(const std::string& playerName, const Common::BlockPlacement& placement, int scoreGained);
+            void broadcastTurnChange(Common::PlayerColor newPlayer);
 
         private:
             // 기본 정보

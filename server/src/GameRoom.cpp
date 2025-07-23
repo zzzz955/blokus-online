@@ -532,9 +532,111 @@ namespace Blokus {
         }
 
         void GameRoom::broadcastGameState() {
-            std::ostringstream oss;
-            oss << "게임 종료";
-            broadcastMessage(oss.str());
+            std::lock_guard<std::mutex> lock(m_playersMutex);
+            
+            if (m_state != RoomState::Playing) {
+                return;
+            }
+
+            // JSON 형태로 게임 상태 생성
+            std::ostringstream gameStateJson;
+            gameStateJson << "GAME_STATE_UPDATE:{";
+            
+            // 현재 턴 정보
+            Common::PlayerColor currentPlayer = m_gameStateManager->getCurrentPlayer();
+            gameStateJson << "\"currentPlayer\":" << static_cast<int>(currentPlayer) << ",";
+            gameStateJson << "\"turnNumber\":" << m_gameStateManager->getTurnNumber() << ",";
+            
+            // 보드 상태 (간단한 형태로)
+            gameStateJson << "\"boardState\":[";
+            for (int row = 0; row < Common::BOARD_SIZE; ++row) {
+                if (row > 0) gameStateJson << ",";
+                gameStateJson << "[";
+                for (int col = 0; col < Common::BOARD_SIZE; ++col) {
+                    if (col > 0) gameStateJson << ",";
+                    Common::PlayerColor cellOwner = m_gameLogic->getBoardCell(row, col);
+                    gameStateJson << static_cast<int>(cellOwner);
+                }
+                gameStateJson << "]";
+            }
+            gameStateJson << "],";
+            
+            // 플레이어 점수 정보
+            auto scores = m_gameLogic->calculateScores();
+            gameStateJson << "\"scores\":{";
+            bool firstScore = true;
+            for (const auto& score : scores) {
+                if (!firstScore) gameStateJson << ",";
+                gameStateJson << "\"" << static_cast<int>(score.first) << "\":" << score.second;
+                firstScore = false;
+            }
+            gameStateJson << "}";
+            
+            gameStateJson << "}";
+            
+            // 모든 플레이어에게 브로드캐스트
+            std::string message = gameStateJson.str();
+            broadcastMessage(message);
+            
+            spdlog::info("🔄 게임 상태 브로드캐스트: 방 {}, 현재 턴: {}", 
+                m_roomId, static_cast<int>(currentPlayer));
+        }
+
+        void GameRoom::broadcastBlockPlacement(const std::string& playerName, const Common::BlockPlacement& placement, int scoreGained) {
+            std::lock_guard<std::mutex> lock(m_playersMutex);
+            
+            // 블록 배치 알림 메시지 생성
+            std::ostringstream blockPlacementMsg;
+            blockPlacementMsg << "BLOCK_PLACED:{"
+                << "\"player\":\"" << playerName << "\","
+                << "\"blockType\":" << static_cast<int>(placement.type) << ","
+                << "\"position\":{\"row\":" << placement.position.first << ",\"col\":" << placement.position.second << "},"
+                << "\"rotation\":" << static_cast<int>(placement.rotation) << ","
+                << "\"flip\":" << static_cast<int>(placement.flip) << ","
+                << "\"playerColor\":" << static_cast<int>(placement.player) << ","
+                << "\"scoreGained\":" << scoreGained
+                << "}";
+            
+            broadcastMessage(blockPlacementMsg.str());
+            
+            // 시스템 메시지로도 알림
+            std::ostringstream systemMsg;
+            systemMsg << "SYSTEM:" << playerName << "님이 블록을 배치했습니다. (점수: +" << scoreGained << ")";
+            broadcastMessage(systemMsg.str());
+            
+            spdlog::info("📦 블록 배치 브로드캐스트: 방 {}, 플레이어 {}, 블록 타입 {}", 
+                m_roomId, playerName, static_cast<int>(placement.type));
+        }
+
+        void GameRoom::broadcastTurnChange(Common::PlayerColor newPlayer) {
+            std::lock_guard<std::mutex> lock(m_playersMutex);
+            
+            // 새 플레이어 이름 찾기
+            std::string newPlayerName = "";
+            for (const auto& player : m_players) {
+                if (player.getColor() == newPlayer) {
+                    newPlayerName = player.getUsername();
+                    break;
+                }
+            }
+            
+            // 턴 변경 알림 메시지
+            std::ostringstream turnChangeMsg;
+            turnChangeMsg << "TURN_CHANGED:{"
+                << "\"newPlayer\":\"" << newPlayerName << "\","
+                << "\"playerColor\":" << static_cast<int>(newPlayer) << ","
+                << "\"turnNumber\":" << m_gameStateManager->getTurnNumber()
+                << "}";
+            
+            broadcastMessage(turnChangeMsg.str());
+            
+            // 시스템 메시지
+            std::ostringstream systemMsg;
+            systemMsg << "SYSTEM:" << newPlayerName << "님의 턴입니다.";
+            broadcastMessage(systemMsg.str());
+            
+            spdlog::info("🔄 턴 변경 브로드캐스트: 방 {}, 새 플레이어 {} ({})", 
+                m_roomId, newPlayerName, static_cast<int>(newPlayer));
         }
 
         // ========================================
@@ -676,12 +778,33 @@ namespace Blokus {
                 return false;
             }
 
-            // 성공적으로 배치됨
-            spdlog::info("✅ 블록 배치 성공 (방 {}, 사용자 {}, 블록 타입: {})", 
-                m_roomId, userId, static_cast<int>(placement.type));
+            // 성공적으로 배치됨 - 점수 계산
+            auto currentScores = m_gameLogic->calculateScores();
+            int scoreGained = 0;
+            auto scoreIt = currentScores.find(placement.player);
+            if (scoreIt != currentScores.end()) {
+                // 블록 크기만큼 점수 추가 (단순화)
+                scoreGained = 1; // 실제로는 블록 크기에 따라 계산
+            }
+            
+            spdlog::info("✅ 블록 배치 성공 (방 {}, 사용자 {}, 블록 타입: {}, 획득 점수: {})", 
+                m_roomId, userId, static_cast<int>(placement.type), scoreGained);
+
+            // 블록 배치 알림 브로드캐스트
+            broadcastBlockPlacement(player->getUsername(), placement, scoreGained);
 
             // 다음 턴으로 전환
+            Common::PlayerColor previousPlayer = m_gameStateManager->getCurrentPlayer();
             m_gameStateManager->nextTurn();
+            Common::PlayerColor newPlayer = m_gameStateManager->getCurrentPlayer();
+
+            // 턴 변경 알림 브로드캐스트
+            if (newPlayer != previousPlayer) {
+                broadcastTurnChange(newPlayer);
+            }
+
+            // 전체 게임 상태 브로드캐스트
+            broadcastGameState();
 
             // 게임 종료 조건 확인
             if (m_gameStateManager->getGameState() == Common::GameState::Finished) {

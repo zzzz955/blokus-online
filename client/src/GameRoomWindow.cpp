@@ -2125,6 +2125,84 @@ namespace Blokus {
             .arg(playerName).arg(isMyTurn ? "예" : "아니오");
     }
 
+    // ========================================
+    // 게임 상태 동기화 슬롯들
+    // ========================================
+
+    void GameRoomWindow::onGameStateUpdated(const QString& gameStateJson)
+    {
+        qDebug() << QString::fromUtf8("게임 상태 업데이트 수신: %1").arg(gameStateJson);
+        
+        // JSON 파싱 (간단한 방식)
+        QRegExp currentPlayerRegex("\"currentPlayer\":(\\d+)");
+        QRegExp turnNumberRegex("\"turnNumber\":(\\d+)");
+        
+        if (currentPlayerRegex.indexIn(gameStateJson) != -1) {
+            int currentPlayerInt = currentPlayerRegex.cap(1).toInt();
+            PlayerColor currentPlayer = static_cast<PlayerColor>(currentPlayerInt);
+            
+            // 현재 턴 플레이어 업데이트
+            if (m_gameManager) {
+                m_gameManager->getGameLogic().setCurrentPlayer(currentPlayer);
+            }
+            
+            // UI 업데이트
+            updateGameControlsState();
+            updateRoomInfoDisplay();
+        }
+        
+        // 보드 상태 업데이트는 별도로 처리 (복잡한 JSON 파싱 필요)
+        // 여기서는 기본적인 턴 정보만 업데이트
+    }
+
+    void GameRoomWindow::onBlockPlaced(const QString& playerName, int blockType, int row, int col, int rotation, int flip, int playerColor, int scoreGained)
+    {
+        qDebug() << QString::fromUtf8("블록 배치 알림: %1이 블록 배치 (타입: %2, 위치: %3,%4, 점수: +%5)")
+                    .arg(playerName).arg(blockType).arg(row).arg(col).arg(scoreGained);
+        
+        // 게임 보드에 블록 배치 반영
+        if (m_gameBoard && m_gameManager) {
+            Common::BlockPlacement placement;
+            placement.type = static_cast<Common::BlockType>(blockType);
+            placement.position = { row, col };
+            placement.rotation = static_cast<Common::Rotation>(rotation);
+            placement.flip = static_cast<Common::FlipState>(flip);
+            placement.player = static_cast<PlayerColor>(playerColor);
+            
+            // 게임 보드에 블록 배치
+            if (m_gameBoard->canPlaceBlock(placement)) {
+                m_gameBoard->placeBlock(placement);
+                
+                // 게임 로직에도 반영
+                m_gameManager->getGameLogic().placeBlock(placement);
+            }
+        }
+        
+        // 채팅창에 메시지 추가
+        addSystemMessage(QString::fromUtf8("%1님이 블록을 배치했습니다. (점수: +%2)")
+                        .arg(playerName).arg(scoreGained));
+    }
+
+    void GameRoomWindow::onTurnChanged(const QString& newPlayerName, int playerColor, int turnNumber)
+    {
+        qDebug() << QString::fromUtf8("턴 변경 알림: %1님의 턴 (색상: %2, 턴: %3)")
+                    .arg(newPlayerName).arg(playerColor).arg(turnNumber);
+        
+        // 게임 매니저의 현재 플레이어 업데이트
+        if (m_gameManager) {
+            PlayerColor newPlayer = static_cast<PlayerColor>(playerColor);
+            m_gameManager->getGameLogic().setCurrentPlayer(newPlayer);
+        }
+        
+        // 턴 변경 알림 표시
+        bool isMyTurn = (newPlayerName == m_myUsername);
+        showTurnChangeNotification(newPlayerName, isMyTurn);
+        
+        // UI 업데이트
+        updateGameControlsState();
+        updateRoomInfoDisplay();
+    }
+
 } // namespace Blokus
 
 #include "ui/GameRoomWindow.moc"
