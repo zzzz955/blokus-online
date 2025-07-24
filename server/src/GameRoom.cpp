@@ -1618,6 +1618,9 @@ namespace Blokus {
                 if (player) {
                     std::string username = player->getUsername();
                     
+                    // 플레이어의 세션 상태를 InLobby로 변경
+                    player->getSession()->setStateToLobby();
+                    
                     // 플레이어에게 방 나가기 확인 메시지 전송
                     player->sendMessage("LEAVE_ROOM_CONFIRMED");
                     
