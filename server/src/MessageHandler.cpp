@@ -901,8 +901,11 @@ namespace Blokus::Server {
                 return;
             }
 
-            // 2. 세션 상태 검증
-            if (!session_->isInRoom()) {
+            // 2. 세션 상태 검증 (방에 있거나 게임 중이어야 함)
+            spdlog::debug("📋 게임 결과 응답 세션 상태 확인: 상태={}, InRoom={}, InGame={}", 
+                static_cast<int>(session_->getState()), session_->isInRoom(), session_->isInGame());
+                
+            if (!session_->isInRoom() && !session_->isInGame()) {
                 sendError("방에 있지 않습니다");
                 return;
             }
