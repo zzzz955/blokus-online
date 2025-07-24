@@ -45,6 +45,9 @@ namespace Blokus {
             
             // 캐시 무효화
             invalidateCache();
+            
+            // 보드 초기화 시에만 영구 차단 캐시 초기화
+            m_playerBlockedPermanently.clear();
         }
 
         PlayerColor GameLogic::getCellOwner(const Position& pos) const
@@ -318,16 +321,38 @@ namespace Blokus {
                 int score = 0;
                 auto availableBlocks = getAvailableBlocks(player);
 
-                // ������� ���� ������ ������ ����
-                for (BlockType blockType : availableBlocks) {
-                    score -= Utils::getBlockScore(blockType);
+                // 0점 기준으로 계산: 설치한 블록당 +점수
+                // 전체 블록 점수에서 남은 블록 점수를 빼면 설치한 블록 점수
+                int totalBlockScore = 0;
+                
+                // 전체 블록 점수 계산 (모든 블록 타입의 점수 합)
+                std::vector<BlockType> allBlocks = {
+                    BlockType::Single, BlockType::Domino,
+                    BlockType::TrioLine, BlockType::TrioAngle,
+                    BlockType::Tetro_I, BlockType::Tetro_O, BlockType::Tetro_T, BlockType::Tetro_L, BlockType::Tetro_S,
+                    BlockType::Pento_F, BlockType::Pento_I, BlockType::Pento_L, BlockType::Pento_N,
+                    BlockType::Pento_P, BlockType::Pento_T, BlockType::Pento_U, BlockType::Pento_V,
+                    BlockType::Pento_W, BlockType::Pento_X, BlockType::Pento_Y, BlockType::Pento_Z
+                };
+                
+                for (BlockType blockType : allBlocks) {
+                    totalBlockScore += Utils::getBlockScore(blockType);
                 }
+                
+                // 남은 블록 점수 계산
+                int remainingBlockScore = 0;
+                for (BlockType blockType : availableBlocks) {
+                    remainingBlockScore += Utils::getBlockScore(blockType);
+                }
+                
+                // 설치한 블록 점수 = 전체 - 남은 블록
+                score = totalBlockScore - remainingBlockScore;
 
-                // ���ʽ� ���� ���
+                // 보너스 점수 계산
                 if (availableBlocks.empty()) {
-                    score += 15; // ��� ���� ��� ���ʽ�
+                    score += 15; // 모든 블록 사용 보너스
 
-                    // ������ ������ ���� �����̾����� �߰� ���ʽ�
+                    // 마지막 블록이 1칸 블록이었다면 추가 보너스
                     if (isBlockUsed(player, BlockType::Single)) {
                         score += 5;
                     }
@@ -506,9 +531,9 @@ namespace Blokus {
         {
             m_cacheValid = false;
             m_canPlaceAnyBlockCache.clear();
-            // 게임 상태가 변경되었으므로 영구 차단 캐시도 초기화
-            // (새로운 블록 배치로 인해 다른 플레이어가 배치 가능해질 수 있음)
-            m_playerBlockedPermanently.clear();
+            // 영구 차단 상태는 유지 - 다른 플레이어의 블록 배치로 인해 
+            // 이미 차단된 플레이어가 다시 배치 가능해지는 경우는 없음
+            // m_playerBlockedPermanently는 보드 초기화 시에만 clear
         }
         
         // getBlockShape�� ���� - Block Ŭ������ ���� ���

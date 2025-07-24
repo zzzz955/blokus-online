@@ -45,7 +45,7 @@ namespace Blokus::Server {
 
         // 게임 관련
         handlers_[MessageType::GameMove] = [this](const auto& params) { handleGameMove(params); };
-        handlers_[MessageType::GameResultResponse] = [this](const auto& params) { handleGameResultResponse(params); };
+        // handlers_[MessageType::GameResultResponse] 제거됨 - 즉시 초기화 방식으로 변경
 
         // 기본 기능
         handlers_[MessageType::Chat] = [this](const auto& params) { handleChat(params); };
@@ -895,61 +895,7 @@ namespace Blokus::Server {
         }
     }
 
-    void MessageHandler::handleGameResultResponse(const std::vector<std::string>& params) {
-        try {
-            // 1. 기본 검증
-            if (params.empty()) {
-                sendError("응답이 필요합니다 (CONTINUE 또는 LEAVE)");
-                return;
-            }
-
-            std::string response = params[0];
-            if (response != "CONTINUE" && response != "LEAVE") {
-                sendError("잘못된 응답입니다 (CONTINUE 또는 LEAVE만 가능)");
-                return;
-            }
-
-            // 2. 세션 상태 검증 (방에 있거나 게임 중이어야 함)
-            spdlog::debug("📋 게임 결과 응답 세션 상태 확인: 상태={}, InRoom={}, InGame={}", 
-                static_cast<int>(session_->getState()), session_->isInRoom(), session_->isInGame());
-                
-            if (!session_->isInRoom() && !session_->isInGame()) {
-                sendError("방에 있지 않습니다");
-                return;
-            }
-
-            int roomId = session_->getCurrentRoomId();
-            std::string userId = session_->getUserId();
-            std::string username = session_->getUsername();
-
-            spdlog::info("📝 게임 결과 응답 수신: 사용자 {} ({}), 응답 {}, 방 {}", 
-                username, userId, response, roomId);
-
-            // 3. 방 정보 가져오기
-            auto room = roomManager_->getRoom(roomId);
-            if (!room) {
-                sendError("방을 찾을 수 없습니다");
-                return;
-            }
-
-            // 4. 게임 결과 응답 처리
-            if (!room->handleGameResultResponse(userId, response)) {
-                sendError("게임 결과 응답 처리에 실패했습니다");
-                return;
-            }
-
-            // 5. 성공 응답
-            sendResponse("GAME_RESULT_RESPONSE_SUCCESS");
-
-            spdlog::info("✅ 게임 결과 응답 처리 성공: 사용자 {} ({}), 응답 {}", 
-                username, userId, response);
-
-        }
-        catch (const std::exception& e) {
-            sendError("게임 결과 응답 처리 중 오류가 발생했습니다");
-            spdlog::error("게임 결과 응답 처리 중 예외: {}", e.what());
-        }
-    }
+    // handleGameResultResponse 메서드 제거됨 - 즉시 초기화 방식으로 변경
 
     // ========================================
     // 로비 관련 핸들러들

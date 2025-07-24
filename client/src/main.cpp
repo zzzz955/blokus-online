@@ -733,41 +733,31 @@ private:
             resultMessage += QString::fromUtf8("없음");
         }
         
-        // 다이얼로그 생성
-        QMessageBox msgBox;
-        msgBox.setWindowTitle(QString::fromUtf8("게임 결과"));
-        msgBox.setText(resultMessage);
-        msgBox.setIcon(QMessageBox::Information);
+        // 비모달 다이얼로그 생성
+        QMessageBox* msgBox = new QMessageBox(m_gameRoomWindow);
+        msgBox->setWindowTitle(QString::fromUtf8("게임 결과"));
+        msgBox->setText(resultMessage);
+        msgBox->setIcon(QMessageBox::Information);
+        msgBox->setWindowModality(Qt::NonModal);  // 비모달로 설정
+        msgBox->setAttribute(Qt::WA_DeleteOnClose); // 닫힐 때 자동 삭제
         
-        // 버튼 추가
-        QPushButton* continueBtn = msgBox.addButton(QString::fromUtf8("계속하기"), QMessageBox::AcceptRole);
-        QPushButton* leaveBtn = msgBox.addButton(QString::fromUtf8("방 나가기"), QMessageBox::RejectRole);
+        // 닫기 버튼만 추가 (기존의 계속하기/방나가기 버튼 제거)
+        msgBox->setStandardButtons(QMessageBox::Close);
+        msgBox->setButtonText(QMessageBox::Close, QString::fromUtf8("닫기"));
         
-        msgBox.setDefaultButton(continueBtn);
+        // 10초 후 자동 닫기 타이머 설정
+        QTimer* autoCloseTimer = new QTimer(msgBox);
+        autoCloseTimer->setSingleShot(true);
+        autoCloseTimer->setInterval(10000); // 10초
         
-        // 다이얼로그 표시 및 결과 처리
-        msgBox.exec();
+        connect(autoCloseTimer, &QTimer::timeout, msgBox, &QMessageBox::close);
+        connect(msgBox, &QMessageBox::finished, autoCloseTimer, &QTimer::deleteLater);
         
-        if (msgBox.clickedButton() == continueBtn) {
-            // 계속하기 선택 - 방에 머물기
-            qDebug() << QString::fromUtf8("플레이어가 계속하기를 선택");
-            // 서버에 게임 결과 응답 전송
-            if (m_networkClient) {
-                m_networkClient->sendMessage("game:result:CONTINUE");
-                // 서버 처리 완료를 위한 약간의 대기 시간
-                QThread::msleep(100);
-            }
-        } else if (msgBox.clickedButton() == leaveBtn) {
-            // 방 나가기 선택
-            qDebug() << QString::fromUtf8("플레이어가 방 나가기를 선택");
-            // 서버에 게임 결과 응답 전송 (방 나가기는 서버에서 처리됨)
-            if (m_networkClient) {
-                m_networkClient->sendMessage("game:result:LEAVE");
-                // 서버 처리 완료를 위한 약간의 대기 시간
-                QThread::msleep(100);
-            }
-            // 로비로 이동은 서버에서 LEAVE_ROOM_CONFIRMED 메시지를 받으면 처리됨
-        }
+        // 다이얼로그 표시
+        msgBox->show();
+        autoCloseTimer->start();
+        
+        qDebug() << QString::fromUtf8("✅ 비모달 게임 결과 다이얼로그 표시됨 (10초 후 자동 닫기)");
         } catch (const std::exception& e) {
             qDebug() << QString::fromUtf8("❌ 게임 결과 처리 중 예외 발생: %1").arg(e.what());
             showFallbackGameResult();
@@ -857,6 +847,8 @@ private:
         connect(m_networkClient, &NetworkClient::roomJoined,
                 this, &AppController::onRoomJoined);
         connect(m_networkClient, &NetworkClient::roomLeft,
+                this, &AppController::onRoomLeft);
+        connect(m_networkClient, &NetworkClient::lobbyLeft,
                 this, &AppController::onRoomLeft);
         connect(m_networkClient, &NetworkClient::roomError,
                 this, &AppController::onRoomError);

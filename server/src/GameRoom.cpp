@@ -2,10 +2,12 @@
 #include "Session.h"
 #include "PlayerInfo.h"  // 🔥 새로 추가
 #include "Block.h"       // BlockFactory를 위해 추가
+#include "RoomManager.h" // RoomManager 헤더 추가
 #include <spdlog/spdlog.h>
 #include <algorithm>
 #include <sstream>
 #include <ctime>
+#include <thread>
 
 namespace Blokus {
     namespace Server {
@@ -14,7 +16,7 @@ namespace Blokus {
         // 생성자/소멸자
         // ========================================
 
-        GameRoom::GameRoom(int roomId, const std::string& roomName, const std::string& hostId)
+        GameRoom::GameRoom(int roomId, const std::string& roomName, const std::string& hostId, RoomManager* roomManager)
             : m_roomId(roomId)
             , m_roomName(roomName)
             , m_hostId(hostId)
@@ -27,8 +29,8 @@ namespace Blokus {
             , m_isPrivate(false)
             , m_password("")
             , m_maxPlayers(Common::MAX_PLAYERS)
-            , m_waitingForGameResultResponses(false)
             , m_hasCompletedGame(false)
+            , m_roomManager(roomManager)
         {
             m_players.reserve(Common::MAX_PLAYERS);
             spdlog::info("🏠 방 생성: ID={}, Name='{}', Host={}", m_roomId, m_roomName, m_hostId);
@@ -150,11 +152,26 @@ namespace Blokus {
                 int oldPlayerIndex = m_gameStateManager->getCurrentPlayerIndex();
                 bool wasCurrentPlayerTurn = (m_gameStateManager->getCurrentPlayer() == playerColor);
                 
-                // 남은 플레이어들로 턴 순서 재설정
+                // 남은 플레이어들로 턴 순서 재설정 (색깔 고정 순서 유지)
                 std::vector<Common::PlayerColor> remainingTurnOrder;
-                for (const auto& player : m_players) {
-                    if (player.getColor() != Common::PlayerColor::None) {
-                        remainingTurnOrder.push_back(player.getColor());
+                std::vector<Common::PlayerColor> fixedColorOrder = {
+                    Common::PlayerColor::Blue,
+                    Common::PlayerColor::Yellow, 
+                    Common::PlayerColor::Red,
+                    Common::PlayerColor::Green
+                };
+                
+                // 고정 순서에 따라 실제 플레이어가 있는 색깔만 추가
+                for (Common::PlayerColor color : fixedColorOrder) {
+                    bool hasPlayer = false;
+                    for (const auto& player : m_players) {
+                        if (player.getColor() == color) {
+                            hasPlayer = true;
+                            break;
+                        }
+                    }
+                    if (hasPlayer) {
+                        remainingTurnOrder.push_back(color);
                     }
                 }
                 
@@ -166,18 +183,31 @@ namespace Blokus {
                     // 나간 플레이어가 현재 턴이었다면 다음 플레이어 찾기
                     Common::PlayerColor nextPlayer = Common::PlayerColor::None;
                     if (wasCurrentPlayerTurn) {
-                        // 기존 턴 순서에서 나간 플레이어 다음의 플레이어 찾기
-                        for (int i = oldPlayerIndex + 1; i < oldTurnOrder.size() + oldPlayerIndex + 1; ++i) {
-                            Common::PlayerColor candidatePlayer = oldTurnOrder[i % oldTurnOrder.size()];
-                            // 남은 플레이어 목록에 있는지 확인
-                            if (std::find(remainingTurnOrder.begin(), remainingTurnOrder.end(), candidatePlayer) != remainingTurnOrder.end()) {
-                                nextPlayer = candidatePlayer;
+                        // 고정 색깔 순서에서 나간 플레이어 다음의 플레이어 찾기
+                        int playerColorIndex = -1;
+                        for (int i = 0; i < fixedColorOrder.size(); ++i) {
+                            if (fixedColorOrder[i] == playerColor) {
+                                playerColorIndex = i;
                                 break;
+                            }
+                        }
+                        
+                        if (playerColorIndex != -1) {
+                            // 나간 플레이어 다음부터 순회하며 남은 플레이어 찾기
+                            for (int i = 1; i < fixedColorOrder.size(); ++i) {
+                                Common::PlayerColor candidateColor = fixedColorOrder[(playerColorIndex + i) % fixedColorOrder.size()];
+                                if (std::find(remainingTurnOrder.begin(), remainingTurnOrder.end(), candidateColor) != remainingTurnOrder.end()) {
+                                    nextPlayer = candidateColor;
+                                    break;
+                                }
                             }
                         }
                     } else {
                         // 나간 플레이어가 현재 턴이 아니었다면 현재 턴 유지
-                        nextPlayer = m_gameStateManager->getCurrentPlayer();
+                        Common::PlayerColor currentPlayer = m_gameStateManager->getCurrentPlayer();
+                        if (std::find(remainingTurnOrder.begin(), remainingTurnOrder.end(), currentPlayer) != remainingTurnOrder.end()) {
+                            nextPlayer = currentPlayer;
+                        }
                     }
                     
                     m_gameStateManager->setTurnOrder(remainingTurnOrder);
@@ -400,14 +430,43 @@ namespace Blokus {
 
             // 게임 로직 초기화
             m_gameLogic->clearBoard();
-            assignColorsAutomatically();
+            // 게임 시작 시에는 색깔 재배정하지 않음 (기존 색깔 유지)
 
-            // 턴 순서 설정 (플레이어 색상 기준)
+            // 턴 순서 설정 (색깔 고정 순서: 파란색 → 노란색 → 빨간색 → 초록색)
             std::vector<Common::PlayerColor> turnOrder;
-            for (const auto& player : m_players) {
-                if (player.getColor() != Common::PlayerColor::None) {
-                    turnOrder.push_back(player.getColor());
+            std::vector<Common::PlayerColor> fixedColorOrder = {
+                Common::PlayerColor::Blue,
+                Common::PlayerColor::Yellow, 
+                Common::PlayerColor::Red,
+                Common::PlayerColor::Green
+            };
+            
+            // 실제 플레이어가 있는 색깔만 턴 순서에 추가
+            for (Common::PlayerColor color : fixedColorOrder) {
+                bool hasPlayer = false;
+                for (const auto& player : m_players) {
+                    if (player.getColor() == color) {
+                        hasPlayer = true;
+                        break;
+                    }
                 }
+                if (hasPlayer) {
+                    turnOrder.push_back(color);
+                }
+            }
+            
+            // 디버그: 턴 순서 로그 출력
+            spdlog::info("🎯 게임 시작 턴 순서 (색깔 고정): ");
+            for (int i = 0; i < turnOrder.size(); ++i) {
+                std::string colorName = "";
+                switch (turnOrder[i]) {
+                    case Common::PlayerColor::Blue: colorName = "파란색"; break;
+                    case Common::PlayerColor::Yellow: colorName = "노란색"; break;
+                    case Common::PlayerColor::Red: colorName = "빨간색"; break;
+                    case Common::PlayerColor::Green: colorName = "초록색"; break;
+                    default: colorName = "없음"; break;
+                }
+                spdlog::info("  {}순: {} ({})", i+1, colorName, static_cast<int>(turnOrder[i]));
             }
             
             // 게임 상태 관리자 시작
@@ -533,6 +592,7 @@ namespace Blokus {
                         }
                         
                         // 게임 결과 브로드캐스트
+                        spdlog::info("🎯 게임 종료 조건 충족: 블록 배치 후 승패 결정 (방 {})", m_roomId);
                         broadcastGameResultLocked(finalScores, winners);
                         shouldCheckAutoSkip = false;
                         break;
@@ -567,8 +627,7 @@ namespace Blokus {
                 }
             }
 
-            // 게임 종료 후 플레이어 색상 재할당
-            assignColorsAutomatically();
+            // 게임 종료 후에는 기존 색깔 유지 (재배정하지 않음)
 
             // 게임 종료 브로드캐스트 (뮤텍스 내에서 안전하게)
             broadcastMessageLocked("GAME_ENDED");
@@ -1055,12 +1114,42 @@ namespace Blokus {
             }
             broadcastMessageLocked(systemMsg.str());
             
-            // 게임 결과 응답 대기 상태로 설정
-            m_waitingForGameResultResponses = true;
-            m_gameResultResponses.clear();
-            m_playersToLeave.clear();
+            // 즉시 게임 초기화 및 대기 상태로 전환
+            spdlog::info("🏆 게임 결과 브로드캐스트: 방 {}, 승자 수: {}명, 즉시 초기화 시작", m_roomId, winners.size());
             
-            spdlog::info("🏆 게임 결과 브로드캐스트: 방 {}, 승자 수: {}명, 응답 대기 시작", m_roomId, winners.size());
+            // 게임 상태 초기화
+            m_gameLogic->clearBoard();
+            m_gameStateManager->resetGame();
+            m_state = RoomState::Waiting;
+            
+            // 모든 플레이어 상태 초기화 (호스트 제외하고 준비 해제)
+            for (auto& player : m_players) {
+                player.resetForNewGame();
+                if (!player.isHost()) {
+                    player.setReady(false);  // 호스트가 아닌 플레이어는 준비 해제
+                }
+                // 세션 상태를 InRoom(2)으로 변경
+                if (player.getSession()) {
+                    player.getSession()->setStateToInRoom(m_roomId);
+                }
+                spdlog::debug("🏠 세션 상태 변경: {} -> 방 {}", player.getUsername(), m_roomId);
+            }
+            
+            // 게임 종료 후에는 기존 색깔 유지 (재배정하지 않음)
+            
+            // 방 정보 업데이트 브로드캐스트
+            broadcastRoomInfoLocked();
+            
+            // 클라이언트에게 게임 리셋 알림
+            broadcastMessageLocked("GAME_RESET");
+            
+            // 게임 완료 상태 설정
+            m_hasCompletedGame = true;
+            
+            // 게임 초기화 완료 메시지
+            broadcastMessageLocked("SYSTEM:새로운 게임을 시작할 수 있습니다!");
+            
+            spdlog::info("✅ 게임 종료 후 즉시 초기화 완료: 방 {}, 플레이어 {}명", m_roomId, m_players.size());
         }
 
         // ========================================
@@ -1180,8 +1269,8 @@ namespace Blokus {
 
             // 플레이어 턴 확인 (직접 확인으로 데드락 방지)
             if (player->getColor() != m_gameStateManager->getCurrentPlayer()) {
-                spdlog::warn("❌ 블록 배치 실패: 플레이어 턴이 아님 (방 {}, 사용자 {}, 현재 턴: {})", 
-                    m_roomId, userId, static_cast<int>(m_gameStateManager->getCurrentPlayer()));
+                spdlog::warn("❌ 블록 배치 실패: 플레이어 턴이 아님 (방 {}, 사용자 {}, 플레이어 색깔: {}, 현재 턴: {})", 
+                    m_roomId, userId, static_cast<int>(player->getColor()), static_cast<int>(m_gameStateManager->getCurrentPlayer()));
                 return false;
             }
 
@@ -1555,157 +1644,13 @@ namespace Blokus {
         // 게임 결과 응답 처리 메서드들
         // ========================================
 
-        bool GameRoom::handleGameResultResponse(const std::string& userId, const std::string& response) {
-            std::lock_guard<std::mutex> lock(m_playersMutex);
-            
-            // 게임 결과 응답 대기 중이 아니면 무시
-            if (!m_waitingForGameResultResponses) {
-                spdlog::warn("⚠️ 게임 결과 응답 처리 실패: 응답 대기 중이 아님 (방 {}, 사용자 {})", m_roomId, userId);
-                return false;
-            }
-            
-            // 플레이어 존재 확인
-            auto* player = findPlayerById(m_players, userId);
-            if (!player) {
-                spdlog::warn("⚠️ 게임 결과 응답 처리 실패: 플레이어를 찾을 수 없음 (방 {}, 사용자 {})", m_roomId, userId);
-                return false;
-            }
-            
-            // 이미 응답한 플레이어인지 확인
-            if (m_gameResultResponses.find(userId) != m_gameResultResponses.end()) {
-                spdlog::warn("⚠️ 게임 결과 응답 처리 실패: 이미 응답한 플레이어 (방 {}, 사용자 {})", m_roomId, userId);
-                return false;
-            }
-            
-            // 응답 저장
-            m_gameResultResponses[userId] = response;
-            
-            // LEAVE 응답인 경우 나가기 목록에 추가
-            if (response == "LEAVE") {
-                m_playersToLeave.insert(userId);
-            }
-            
-            spdlog::info("📝 게임 결과 응답 처리: 방 {}, 사용자 {}, 응답 {}, 응답 수: {}/{}", 
-                m_roomId, userId, response, m_gameResultResponses.size(), m_players.size());
-            
-            // 모든 플레이어가 응답했는지 확인
-            if (allPlayersResponded()) {
-                spdlog::info("✅ 모든 플레이어 응답 완료, 게임 결과 처리 시작 (방 {})", m_roomId);
-                processGameResultResponses();
-            }
-            
-            return true;
-        }
+        // 기존 게임 결과 응답 처리 로직 제거됨 - 즉시 초기화 방식으로 변경
 
-        bool GameRoom::allPlayersResponded() const {
-            // 뮤텍스가 이미 잠겨있다고 가정
-            return m_gameResultResponses.size() == m_players.size();
-        }
+        // allPlayersResponded 메서드 제거됨 - 즉시 초기화 방식으로 변경
 
-        void GameRoom::processGameResultResponses() {
-            // 뮤텍스가 이미 잠겨있다고 가정하고 실행 (데드락 방지용)
-            
-            spdlog::info("🔄 게임 결과 응답 처리 시작: 방 {}, 나가기 선택: {}명, 남기 선택: {}명", 
-                m_roomId, m_playersToLeave.size(), m_players.size() - m_playersToLeave.size());
-            
-            // 응답 대기 상태 해제
-            m_waitingForGameResultResponses = false;
-            
-            // 방을 나가기로 선택한 플레이어들 제거
-            std::vector<std::string> playersToRemove(m_playersToLeave.begin(), m_playersToLeave.end());
-            for (const auto& userId : playersToRemove) {
-                auto* player = findPlayerById(m_players, userId);
-                if (player) {
-                    std::string username = player->getUsername();
-                    
-                    // 플레이어에게 방 나가기 확인 메시지 전송 (세션 상태 변경 전)
-                    spdlog::info("📤 방 나가기 확인 메시지 전송: 사용자 {} ({})", userId, username);
-                    player->sendMessage("LOBBY_LEAVE_SUCCESS");
-                    
-                    // 플레이어의 세션 상태를 InLobby로 변경
-                    player->getSession()->setStateToLobby();
-                    
-                    // 플레이어 제거 (removePlayer는 이미 뮤텍스를 사용하므로 직접 제거)
-                    auto it = std::find_if(m_players.begin(), m_players.end(),
-                        [&userId](const PlayerInfo& p) { return p.getUserId() == userId; });
-                    if (it != m_players.end()) {
-                        m_players.erase(it);
-                        
-                        // 다른 플레이어들에게 알림
-                        std::ostringstream leftMsg;
-                        leftMsg << username << "님이 퇴장하셨습니다. 현재 인원 : " << m_players.size() << "명";
-                        broadcastMessageLocked("PLAYER_LEFT:" + username);
-                        broadcastMessageLocked("SYSTEM:" + leftMsg.str());
-                        
-                        spdlog::info("👋 게임 결과로 인한 플레이어 퇴장: 방 {}, 사용자 {} ({})", 
-                            m_roomId, userId, username);
-                    }
-                }
-            }
-            
-            // 새 호스트 선정 (필요한 경우)
-            if (!m_players.empty() && m_playersToLeave.find(m_hostId) != m_playersToLeave.end()) {
-                autoSelectNewHost();
-                std::string newHostName = "";
-                for (const auto& player : m_players) {
-                    if (player.isHost()) {
-                        newHostName = player.getUsername();
-                        break;
-                    }
-                }
-                if (!newHostName.empty()) {
-                    broadcastMessageLocked("HOST_CHANGED:" + newHostName);
-                    std::ostringstream hostMsg;
-                    hostMsg << newHostName << "님이 방장이 되셨습니다";
-                    broadcastMessageLocked("SYSTEM:" + hostMsg.str());
-                }
-            }
-            
-            // 방이 비었는지 확인
-            if (m_players.empty()) {
-                spdlog::info("🏠 방 {} 모든 플레이어 퇴장으로 인한 방 해체", m_roomId);
-                m_state = RoomState::Disbanded;
-                return;
-            }
-            
-            // 게임 초기화 및 대기 상태로 전환
-            spdlog::info("🔄 게임 초기화 및 대기 상태 전환: 방 {}", m_roomId);
-            
-            // 게임 상태 초기화
-            m_gameLogic->clearBoard();
-            m_gameStateManager->resetGame();
-            m_state = RoomState::Waiting;
-            
-            // 남은 플레이어들 상태 초기화
-            for (auto& player : m_players) {
-                player.resetForNewGame();
-                // 세션 상태를 방에 있는 상태로 설정
-                if (player.getSession()) {
-                    player.getSession()->setStateToInRoom(m_roomId);
-                }
-            }
-            
-            // 플레이어 색상 재할당
-            assignColorsAutomatically();
-            
-            // 응답 데이터 정리
-            m_gameResultResponses.clear();
-            m_playersToLeave.clear();
-            
-            // 방 정보 업데이트 브로드캐스트
-            broadcastRoomInfoLocked();
-            
-            // 클라이언트에게 게임 리셋 알림
-            broadcastMessageLocked("GAME_RESET");
-            
-            // 게임 완료 상태 설정 (새로운 플레이어 입장 시 동기화용)
-            m_hasCompletedGame = true;
-            
-            // 게임 초기화 완료 메시지
-            broadcastMessageLocked("SYSTEM:새로운 게임을 시작할 수 있습니다!");
-            
-            spdlog::info("✅ 게임 결과 처리 완료: 방 {}, 남은 플레이어 {}명", m_roomId, m_players.size());
-        }
+        // processGameResultResponses 메서드 제거됨 - 즉시 초기화 방식으로 변경
+
+        // processPlayersLeaving 메서드 제거됨 - 즉시 초기화 방식으로 변경
 
     } // namespace Server
 } // namespace Blokus
