@@ -477,6 +477,14 @@ namespace Blokus::Server {
                 // 11. 방 전체 사용자에게 업데이트된 방 정보 전송 (플레이어 목록 동기화)
                 broadcastRoomInfoToRoom(room);
 
+                // 12. 새로 입장한 플레이어에게 게임 리셋 상태 동기화
+                // 방이 대기 상태이고 이전에 게임이 진행되었다면 리셋 신호 전송
+                if (!room->isPlaying() && room->hasCompletedGame()) {
+                    session_->sendMessage("GAME_RESET");
+                    session_->sendMessage("SYSTEM:새로운 게임을 시작할 수 있습니다!");
+                    spdlog::info("🔄 새 플레이어 {}에게 게임 리셋 상태 동기화 완료", username);
+                }
+
                 spdlog::info("✅ 방 참여 성공: '{}' -> 방 {} ({}명)",
                     username, roomId, room->getPlayerCount());
             }

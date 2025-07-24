@@ -665,6 +665,19 @@ private slots:
         }
     }
     
+    void onGameReset()
+    {
+        qDebug() << QString::fromUtf8("🔄 게임 리셋 신호 수신됨");
+        
+        if (m_gameRoomWindow) {
+            qDebug() << QString::fromUtf8("✅ 게임룸 UI 리셋 진행");
+            // 게임룸 창의 모든 게임 관련 UI를 리셋
+            m_gameRoomWindow->resetGameState();
+        } else {
+            qDebug() << QString::fromUtf8("❌ 게임룸창이 없어서 리셋할 수 없음");
+        }
+    }
+    
 
 private:
     void showGameResultDialog(const QString& resultJson)
@@ -871,6 +884,8 @@ private:
                 this, &AppController::onGameEnded);
         connect(m_networkClient, &NetworkClient::gameResult,
                 this, &AppController::onGameResult);
+        connect(m_networkClient, &NetworkClient::gameReset,
+                this, &AppController::onGameReset);
         
         qDebug() << QString::fromUtf8("네트워크 클라이언트 설정 완료");
     }

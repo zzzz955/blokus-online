@@ -564,6 +564,10 @@ namespace Blokus {
             QString resultJson = parts.mid(1).join(":");
             emit gameResult(resultJson);
         }
+        else if (parts[0] == "GAME_RESET") {
+            // 게임 리셋 신호 발생
+            emit gameReset();
+        }
         else if (parts[0] == "LEAVE_ROOM_CONFIRMED") {
             // 방 나가기가 확인되면 로비로 이동하는 신호 발생
             emit roomLeft();

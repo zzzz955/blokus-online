@@ -60,6 +60,7 @@ namespace Blokus {
             bool canStartGame() const;
             bool isPlaying() const { return m_state == RoomState::Playing; }
             bool isWaiting() const { return m_state == RoomState::Waiting; }
+            bool hasCompletedGame() const { return m_hasCompletedGame; }
             
             // 방 추가 정보 getter (기본 정보는 위에 이미 선언됨)
             std::string getHostName() const;
@@ -163,6 +164,9 @@ namespace Blokus {
             std::map<std::string, std::string> m_gameResultResponses; // userId -> response (CONTINUE/LEAVE)
             std::set<std::string> m_playersToLeave; // 방을 나가기로 선택한 플레이어들
             bool m_waitingForGameResultResponses;
+            
+            // 게임 완료 추적
+            bool m_hasCompletedGame; // 게임이 완료되어 리셋된 상태인지 추적
 
             // 색상 배정
             void assignPlayerColor(PlayerInfo& player);

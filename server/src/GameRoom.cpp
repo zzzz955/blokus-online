@@ -28,6 +28,7 @@ namespace Blokus {
             , m_password("")
             , m_maxPlayers(Common::MAX_PLAYERS)
             , m_waitingForGameResultResponses(false)
+            , m_hasCompletedGame(false)
         {
             m_players.reserve(Common::MAX_PLAYERS);
             spdlog::info("🏠 방 생성: ID={}, Name='{}', Host={}", m_roomId, m_roomName, m_hostId);
@@ -393,6 +394,9 @@ namespace Blokus {
             m_state = RoomState::Playing;
             m_gameStartTime = std::chrono::steady_clock::now();
             updateActivity();
+            
+            // 게임 완료 상태 초기화
+            m_hasCompletedGame = false;
 
             // 게임 로직 초기화
             m_gameLogic->clearBoard();
@@ -1686,6 +1690,12 @@ namespace Blokus {
             
             // 방 정보 업데이트 브로드캐스트
             broadcastRoomInfoLocked();
+            
+            // 클라이언트에게 게임 리셋 알림
+            broadcastMessageLocked("GAME_RESET");
+            
+            // 게임 완료 상태 설정 (새로운 플레이어 입장 시 동기화용)
+            m_hasCompletedGame = true;
             
             // 게임 초기화 완료 메시지
             broadcastMessageLocked("SYSTEM:새로운 게임을 시작할 수 있습니다!");
