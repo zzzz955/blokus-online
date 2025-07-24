@@ -631,7 +631,7 @@ private slots:
         qDebug() << QString::fromUtf8("게임 시작!");
         if (m_gameRoomWindow) {
             m_gameRoomWindow->startGame();
-            m_gameRoomWindow->addSystemMessage(QString::fromUtf8("게임이 시작되었습니다!"));
+            // 시스템 메시지는 SYSTEM: 메시지에서 처리하므로 여기서는 제거
         }
     }
     
@@ -641,7 +641,7 @@ private slots:
         if (m_gameRoomWindow) {
             // 게임 종료 처리: UI를 대기 상태로 리셋
             m_gameRoomWindow->resetGameToWaitingState();
-            m_gameRoomWindow->addSystemMessage(QString::fromUtf8("게임이 종료되었습니다."));
+            // 시스템 메시지는 SYSTEM: 메시지에서 처리하므로 여기서는 제거
         }
     }
     

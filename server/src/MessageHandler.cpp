@@ -722,10 +722,7 @@ namespace Blokus::Server {
 
             // 4. RoomManager를 통한 게임 종료
             if (roomManager_->endGame(roomId)) {
-                // 5. 브로드캐스트 (데드락 방지를 위해 여기서 호출)
-                room->broadcastGameEnd();
-
-                // 6. 방의 모든 플레이어 세션 상태를 방 대기로 변경
+                // 5. 방의 모든 플레이어 세션 상태를 방 대기로 변경
                 auto playerList = room->getPlayerList();
                 for (const auto& player : playerList) {
                     if (player.getSession()) {
