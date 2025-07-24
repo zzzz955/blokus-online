@@ -1937,7 +1937,8 @@ namespace Blokus {
         if (it != m_blockButtons.end()) {
             QPushButton* button = it->second;
             m_blockGrid->removeWidget(button);
-            button->deleteLater();
+            // 즉시 삭제하여 지연 방지
+            delete button;
             m_blockButtons.erase(it);
         }
 

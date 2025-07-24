@@ -677,7 +677,7 @@ namespace Blokus::Server {
 
     void GameServer::startCleanupTimer() {
         cleanupTimer_ = std::make_unique<boost::asio::steady_timer>(ioContext_);
-        cleanupTimer_->expires_after(std::chrono::minutes(5)); // 5분마다 정리
+        cleanupTimer_->expires_after(std::chrono::seconds(30)); // 30초마다 정리 (좀비방 방지)
         cleanupTimer_->async_wait([this](const boost::system::error_code& error) {
             if (!error && running_.load()) {
                 performCleanup();
