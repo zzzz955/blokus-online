@@ -45,6 +45,9 @@ namespace Blokus {
             
             // 캐시 무효화
             invalidateCache();
+            
+            // 보드 초기화 시에만 영구 차단 캐시 초기화
+            m_playerBlockedPermanently.clear();
         }
 
         PlayerColor GameLogic::getCellOwner(const Position& pos) const
@@ -528,9 +531,9 @@ namespace Blokus {
         {
             m_cacheValid = false;
             m_canPlaceAnyBlockCache.clear();
-            // 게임 상태가 변경되었으므로 영구 차단 캐시도 초기화
-            // (새로운 블록 배치로 인해 다른 플레이어가 배치 가능해질 수 있음)
-            m_playerBlockedPermanently.clear();
+            // 영구 차단 상태는 유지 - 다른 플레이어의 블록 배치로 인해 
+            // 이미 차단된 플레이어가 다시 배치 가능해지는 경우는 없음
+            // m_playerBlockedPermanently는 보드 초기화 시에만 clear
         }
         
         // getBlockShape�� ���� - Block Ŭ������ ���� ���
