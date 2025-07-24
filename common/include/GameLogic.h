@@ -46,6 +46,7 @@ namespace Blokus {
 
             // 게임 진행 상태
             bool canPlayerPlaceAnyBlock(PlayerColor player) const;
+            bool canPlayerPlaceAnyBlockOptimized(PlayerColor player) const; // 최적화된 버전
             bool isGameFinished() const;
             std::map<PlayerColor, int> calculateScores() const;
 
@@ -62,6 +63,10 @@ namespace Blokus {
             std::map<PlayerColor, std::set<BlockType>> m_usedBlocks;
             std::map<PlayerColor, std::vector<Position>> m_playerOccupiedCells;
             std::map<PlayerColor, bool> m_hasPlacedFirstBlock;
+            
+            // 성능 최적화를 위한 캐싱
+            mutable std::map<PlayerColor, bool> m_canPlaceAnyBlockCache;
+            mutable bool m_cacheValid;
 
             // 내부 헬퍼 함수들
             bool isPositionValid(const Position& pos) const;
@@ -77,6 +82,9 @@ namespace Blokus {
             // 블록 변환 헬퍼
             PositionList getBlockShape(const BlockPlacement& placement) const;
             PositionList applyTransformation(const PositionList& shape, Rotation rotation, FlipState flip) const;
+            
+            // 캐시 관리
+            void invalidateCache() const;
             PositionList normalizeShape(const PositionList& shape) const;
         };
 

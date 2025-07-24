@@ -11,7 +11,7 @@ namespace Blokus {
         // ========================================
 
         GameLogic::GameLogic()
-            : m_currentPlayer(PlayerColor::Blue)
+            : m_currentPlayer(PlayerColor::Blue), m_cacheValid(false)
         {
             initializeBoard();
 
@@ -42,6 +42,9 @@ namespace Blokus {
             for (auto& pair : m_hasPlacedFirstBlock) {
                 pair.second = false;
             }
+            
+            // 캐시 무효화
+            invalidateCache();
         }
 
         PlayerColor GameLogic::getCellOwner(const Position& pos) const
@@ -101,6 +104,9 @@ namespace Blokus {
             if (!hasPlayerPlacedFirstBlock(placement.player)) {
                 m_hasPlacedFirstBlock[placement.player] = true;
             }
+            
+            // 게임 상태가 변경되었으므로 캐시 무효화
+            invalidateCache();
 
             return true;
         }
@@ -125,6 +131,8 @@ namespace Blokus {
         void GameLogic::setPlayerBlockUsed(PlayerColor player, BlockType blockType)
         {
             m_usedBlocks[player].insert(blockType);
+            // 블록 사용 상태가 변경되었으므로 캐시 무효화
+            invalidateCache();
         }
 
         bool GameLogic::isBlockUsed(PlayerColor player, BlockType blockType) const
@@ -180,17 +188,65 @@ namespace Blokus {
 
         bool GameLogic::canPlayerPlaceAnyBlock(PlayerColor player) const
         {
+            // 최적화된 버전 사용  
+            return canPlayerPlaceAnyBlockOptimized(player);
+        }
+
+        bool GameLogic::canPlayerPlaceAnyBlockOptimized(PlayerColor player) const
+        {
+            // 캐시가 유효하면 캐시된 결과 반환
+            if (m_cacheValid) {
+                auto it = m_canPlaceAnyBlockCache.find(player);
+                if (it != m_canPlaceAnyBlockCache.end()) {
+                    return it->second;
+                }
+            }
+
+            // 캐시 미스 또는 무효한 경우 계산 수행
+            bool result = false;
             auto availableBlocks = getAvailableBlocks(player);
 
-            for (BlockType blockType : availableBlocks) {
-                // ��� ������ ��ġ�� ȸ��/������ ���¸� �׽�Ʈ
-                for (int row = 0; row < BOARD_SIZE; ++row) {
-                    for (int col = 0; col < BOARD_SIZE; ++col) {
-                        Position testPos = { row, col };
+            // 빈 블록 리스트이면 바로 false 반환
+            if (availableBlocks.empty()) {
+                result = false;
+            } else {
+                // 작은 블록부터 우선 검사 (배치 가능성이 높음)
+                std::sort(availableBlocks.begin(), availableBlocks.end(), 
+                    [](BlockType a, BlockType b) {
+                        return Utils::getBlockScore(a) < Utils::getBlockScore(b);
+                    });
 
-                        // 4���� ȸ�� x 4���� ������ = 16���� ���� �׽�Ʈ
-                        for (int rot = 0; rot < 4; ++rot) {
-                            for (int flip = 0; flip < 4; ++flip) {
+                // 보드 가장자리부터 검사 (배치 가능성이 높음)
+                std::vector<Position> priorityPositions;
+                
+                // 1단계: 가장자리 위치 우선
+                for (int i = 0; i < BOARD_SIZE; ++i) {
+                    priorityPositions.push_back({0, i});         // 상단
+                    priorityPositions.push_back({BOARD_SIZE-1, i}); // 하단
+                    priorityPositions.push_back({i, 0});         // 좌측
+                    priorityPositions.push_back({i, BOARD_SIZE-1}); // 우측
+                }
+                
+                // 2단계: 내부 위치
+                for (int row = 1; row < BOARD_SIZE - 1; ++row) {
+                    for (int col = 1; col < BOARD_SIZE - 1; ++col) {
+                        priorityPositions.push_back({row, col});
+                    }
+                }
+
+                // 중복 제거
+                std::sort(priorityPositions.begin(), priorityPositions.end());
+                priorityPositions.erase(std::unique(priorityPositions.begin(), priorityPositions.end()), 
+                                      priorityPositions.end());
+
+                // 각 블록 타입에 대해 검사
+                for (BlockType blockType : availableBlocks) {
+                    // 우선순위가 높은 위치부터 검사
+                    for (const Position& testPos : priorityPositions) {
+                        
+                        // 기본 회전/대칭 조합만 검사 (최적화)
+                        for (int rot = 0; rot < 4; ++rot) {  
+                            for (int flip = 0; flip < 2; ++flip) { // flip 줄임 (0, 1만)
                                 BlockPlacement testPlacement;
                                 testPlacement.type = blockType;
                                 testPlacement.position = testPos;
@@ -199,15 +255,26 @@ namespace Blokus {
                                 testPlacement.player = player;
 
                                 if (canPlaceBlock(testPlacement)) {
-                                    return true;
+                                    result = true;
+                                    goto found; // 조기 종료
                                 }
                             }
                         }
                     }
                 }
+                
+                found:
+                result = result; // goto 레이블용
             }
 
-            return false;
+            // 결과를 캐시에 저장
+            if (!m_cacheValid) {
+                m_canPlaceAnyBlockCache.clear();
+                m_cacheValid = true;
+            }
+            m_canPlaceAnyBlockCache[player] = result;
+
+            return result;
         }
 
         bool GameLogic::isGameFinished() const
@@ -420,6 +487,16 @@ namespace Blokus {
             }
         }
 
+        // ========================================
+        // 캐시 관리 함수들
+        // ========================================
+        
+        void GameLogic::invalidateCache() const
+        {
+            m_cacheValid = false;
+            m_canPlaceAnyBlockCache.clear();
+        }
+        
         // getBlockShape�� ���� - Block Ŭ������ ���� ���
         // applyTransformation�� ���� - Block Ŭ������ ���� ���
         // normalizeShape�� ���� - Block Ŭ������ ���� ���
