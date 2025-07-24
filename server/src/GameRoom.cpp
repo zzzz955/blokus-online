@@ -1618,11 +1618,12 @@ namespace Blokus {
                 if (player) {
                     std::string username = player->getUsername();
                     
+                    // 플레이어에게 방 나가기 확인 메시지 전송 (세션 상태 변경 전)
+                    spdlog::info("📤 방 나가기 확인 메시지 전송: 사용자 {} ({})", userId, username);
+                    player->sendMessage("LOBBY_LEAVE_SUCCESS");
+                    
                     // 플레이어의 세션 상태를 InLobby로 변경
                     player->getSession()->setStateToLobby();
-                    
-                    // 플레이어에게 방 나가기 확인 메시지 전송
-                    player->sendMessage("LEAVE_ROOM_CONFIRMED");
                     
                     // 플레이어 제거 (removePlayer는 이미 뮤텍스를 사용하므로 직접 제거)
                     auto it = std::find_if(m_players.begin(), m_players.end(),
