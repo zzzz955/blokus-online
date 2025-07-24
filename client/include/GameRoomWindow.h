@@ -149,6 +149,9 @@ namespace Blokus {
         
         // 턴 전환 알림
         void showTurnChangeNotification(const QString& playerName, bool isMyTurn);
+        
+        // 게임 리셋 (대기 상태로 복원)
+        void resetGameToWaitingState();
 
     signals:
         // 룸 관리 시그널

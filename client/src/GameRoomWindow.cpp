@@ -1079,6 +1079,21 @@ namespace Blokus {
         }
     }
 
+    void GameRoomWindow::setPlayerRemainingBlocks(PlayerColor player, int remainingBlocks)
+    {
+        for (int i = 0; i < m_roomInfo.playerSlots.size(); ++i) {
+            if (m_roomInfo.playerSlots[i].color == player) {
+                m_roomInfo.playerSlots[i].remainingBlocks = remainingBlocks;
+
+                // 해당 슬롯 위젯 업데이트
+                if (i < m_playerSlotWidgets.size()) {
+                    m_playerSlotWidgets[i]->updatePlayerSlot(m_roomInfo.playerSlots[i]);
+                }
+                break;
+            }
+        }
+    }
+
     // 플레이어 남은 블록 수 업데이트
     void GameRoomWindow::updatePlayerRemainingBlocks(PlayerColor player, int change)
     {

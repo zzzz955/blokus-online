@@ -520,6 +520,13 @@ namespace Blokus {
             }
         }
 
+        void GameStateManager::setCurrentPlayerIndex(int index)
+        {
+            if (index >= 0 && index < static_cast<int>(m_playerOrder.size())) {
+                m_currentPlayerIndex = index;
+            }
+        }
+
         PlayerColor GameStateManager::getNextPlayer() const
         {
             if (m_playerOrder.empty()) {

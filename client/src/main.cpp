@@ -593,9 +593,10 @@ private slots:
     void onPlayerLeft(const QString& username)
     {
         qDebug() << QString::fromUtf8("플레이어 방 퇴장: %1").arg(username);
-        if (m_gameRoomWindow) {
-            m_gameRoomWindow->addSystemMessage(QString::fromUtf8("%1님이 방을 나갔습니다.").arg(username));
-        }
+        // 서버에서 이미 시스템 메시지를 보내므로 클라이언트에서 중복 메시지 제거
+        // if (m_gameRoomWindow) {
+        //     m_gameRoomWindow->addSystemMessage(QString::fromUtf8("%1님이 방을 나갔습니다.").arg(username));
+        // }
     }
     
     void onPlayerReady(const QString& username, bool ready)
@@ -636,7 +637,8 @@ private slots:
     {
         qDebug() << QString::fromUtf8("게임 종료!");
         if (m_gameRoomWindow) {
-            // TODO: 게임 종료 처리 구현
+            // 게임 종료 처리: UI를 대기 상태로 리셋
+            m_gameRoomWindow->resetGameToWaitingState();
             m_gameRoomWindow->addSystemMessage(QString::fromUtf8("게임이 종료되었습니다."));
         }
     }

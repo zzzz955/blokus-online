@@ -142,22 +142,59 @@ namespace Blokus {
 
             // 게임 중이었다면 추가 처리
             if (wasInGame && m_gameStateManager && m_state == RoomState::Playing) {
-                // 현재 턴이 나간 플레이어였다면 다음 턴으로 넘어감
-                if (m_gameStateManager->getCurrentPlayer() == playerColor) {
-                    spdlog::info("🔄 나간 플레이어의 턴이었음, 다음 턴으로 전환");
-                    
-                    // 남은 플레이어 중에서 다음 턴 찾기
-                    Common::PlayerColor nextPlayer = playerColor;
-                    int attempts = 0;
-                    do {
-                        m_gameStateManager->nextTurn();
+                // 현재 턴 순서와 인덱스 저장
+                std::vector<Common::PlayerColor> oldTurnOrder = m_gameStateManager->getTurnOrder();
+                int oldPlayerIndex = m_gameStateManager->getCurrentPlayerIndex();
+                bool wasCurrentPlayerTurn = (m_gameStateManager->getCurrentPlayer() == playerColor);
+                
+                // 남은 플레이어들로 턴 순서 재설정
+                std::vector<Common::PlayerColor> remainingTurnOrder;
+                for (const auto& player : m_players) {
+                    if (player.getColor() != Common::PlayerColor::None) {
+                        remainingTurnOrder.push_back(player.getColor());
+                    }
+                }
+                
+                spdlog::info("🔄 플레이어 이탈로 인한 턴 순서 재설정: {} -> {}명", 
+                    static_cast<int>(playerColor), remainingTurnOrder.size());
+                
+                // 게임 상태 매니저에 새로운 턴 순서 설정
+                if (!remainingTurnOrder.empty()) {
+                    // 나간 플레이어가 현재 턴이었다면 다음 플레이어 찾기
+                    Common::PlayerColor nextPlayer = Common::PlayerColor::None;
+                    if (wasCurrentPlayerTurn) {
+                        // 기존 턴 순서에서 나간 플레이어 다음의 플레이어 찾기
+                        for (int i = oldPlayerIndex + 1; i < oldTurnOrder.size() + oldPlayerIndex + 1; ++i) {
+                            Common::PlayerColor candidatePlayer = oldTurnOrder[i % oldTurnOrder.size()];
+                            // 남은 플레이어 목록에 있는지 확인
+                            if (std::find(remainingTurnOrder.begin(), remainingTurnOrder.end(), candidatePlayer) != remainingTurnOrder.end()) {
+                                nextPlayer = candidatePlayer;
+                                break;
+                            }
+                        }
+                    } else {
+                        // 나간 플레이어가 현재 턴이 아니었다면 현재 턴 유지
                         nextPlayer = m_gameStateManager->getCurrentPlayer();
-                        attempts++;
-                    } while (nextPlayer == playerColor && attempts < 5); // 무한 루프 방지
+                    }
                     
-                    // 턴 변경 브로드캐스트 (뮤텍스 내에서 안전하게)
-                    if (nextPlayer != playerColor) {
-                        broadcastTurnChangeLocked(nextPlayer);
+                    m_gameStateManager->setTurnOrder(remainingTurnOrder);
+                    
+                    // 다음 플레이어로 턴 설정
+                    if (nextPlayer != Common::PlayerColor::None) {
+                        // nextPlayer에 해당하는 인덱스 찾기
+                        auto it = std::find(remainingTurnOrder.begin(), remainingTurnOrder.end(), nextPlayer);
+                        if (it != remainingTurnOrder.end()) {
+                            int newPlayerIndex = std::distance(remainingTurnOrder.begin(), it);
+                            m_gameStateManager->setCurrentPlayerIndex(newPlayerIndex);
+                            m_gameStateManager->getGameLogic().setCurrentPlayer(nextPlayer);
+                            
+                            // 턴 변경 브로드캐스트
+                            if (wasCurrentPlayerTurn) {
+                                spdlog::info("🔄 나간 플레이어의 턴이었음, 다음 플레이어로 전환: {} -> {}", 
+                                    static_cast<int>(playerColor), static_cast<int>(nextPlayer));
+                                broadcastTurnChangeLocked(nextPlayer);
+                            }
+                        }
                     }
                 }
                 
@@ -635,9 +672,8 @@ namespace Blokus {
         void GameRoom::broadcastGameEnd() {
             std::lock_guard<std::mutex> lock(m_playersMutex);
             
-            // 구조화된 메시지와 시스템 메시지 모두 전송
+            // 구조화된 메시지만 전송 (시스템 메시지는 endGameLocked에서 처리)
             broadcastMessageLocked("GAME_ENDED");
-            broadcastMessageLocked("SYSTEM:게임이 종료되었습니다.");
         }
 
         void GameRoom::broadcastGameState() {
@@ -982,47 +1018,7 @@ namespace Blokus {
             }
 
             // 전체 게임 상태 브로드캐스트 (뮤텍스 내에서 안전하게)
-            spdlog::info("🔄 게임 상태 브로드캐스트 시작");
-            if (m_state == RoomState::Playing) {
-                // JSON 형태로 게임 상태 생성
-                std::ostringstream gameStateJson;
-                gameStateJson << "GAME_STATE_UPDATE:{";
-                
-                // 현재 턴 정보
-                Common::PlayerColor currentPlayer = m_gameStateManager->getCurrentPlayer();
-                gameStateJson << "\"currentPlayer\":" << static_cast<int>(currentPlayer) << ",";
-                gameStateJson << "\"turnNumber\":" << m_gameStateManager->getTurnNumber() << ",";
-                
-                // 플레이어 점수 정보
-                gameStateJson << "\"scores\":{";
-                auto currentScores = m_gameLogic->calculateScores();
-                bool firstScore = true;
-                for (const auto& score : currentScores) {
-                    if (!firstScore) gameStateJson << ",";
-                    gameStateJson << "\"" << static_cast<int>(score.first) << "\":" << score.second;
-                    firstScore = false;
-                }
-                gameStateJson << "},";
-                
-                // 플레이어 남은 블록 개수 정보
-                gameStateJson << "\"remainingBlocks\":{";
-                bool firstRemaining = true;
-                for (const auto& player : m_players) {
-                    if (!firstRemaining) gameStateJson << ",";
-                    
-                    // 남은 블록 개수 계산 (전체 블록 수 - 사용된 블록 수)
-                    auto availableBlocks = m_gameLogic->getAvailableBlocks(player.getColor());
-                    int remainingCount = static_cast<int>(availableBlocks.size());
-                    
-                    gameStateJson << "\"" << static_cast<int>(player.getColor()) << "\":" << remainingCount;
-                    firstRemaining = false;
-                }
-                gameStateJson << "}";
-                
-                gameStateJson << "}";
-                
-                broadcastMessageLocked(gameStateJson.str());
-            }
+            broadcastGameStateLocked();
 
             // 게임 종료 조건 확인
             if (m_gameStateManager->getGameState() == Common::GameState::Finished) {
