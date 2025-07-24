@@ -3,6 +3,11 @@
 #include <QTimer>
 #include <QFont>
 #include <QMessageBox>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QPushButton>
+#include <QThread>
 
 #include "LoginWindow.h"
 #include "LobbyWindow.h"
@@ -645,8 +650,170 @@ private slots:
         }
     }
     
+    void onGameResult(const QString& resultJson)
+    {
+        qDebug() << QString::fromUtf8("🎯 게임 결과 수신됨");
+        qDebug() << QString::fromUtf8("📦 데이터 크기: %1 바이트").arg(resultJson.size());
+        qDebug() << QString::fromUtf8("📄 게임룸창 상태: %1").arg(m_gameRoomWindow ? "활성" : "비활성");
+        
+        if (m_gameRoomWindow) {
+            qDebug() << QString::fromUtf8("✅ 게임 결과 다이얼로그 표시 진행");
+            // JSON 파싱 및 게임 결과 다이얼로그 표시
+            showGameResultDialog(resultJson);
+        } else {
+            qDebug() << QString::fromUtf8("❌ 게임룸창이 없어서 다이얼로그를 표시할 수 없음");
+        }
+    }
+    
+    void onGameReset()
+    {
+        qDebug() << QString::fromUtf8("🔄 게임 리셋 신호 수신됨");
+        
+        if (m_gameRoomWindow) {
+            qDebug() << QString::fromUtf8("✅ 게임룸 UI 리셋 진행");
+            // 게임룸 창의 모든 게임 관련 UI를 리셋
+            m_gameRoomWindow->resetGameState();
+        } else {
+            qDebug() << QString::fromUtf8("❌ 게임룸창이 없어서 리셋할 수 없음");
+        }
+    }
+    
 
 private:
+    void showGameResultDialog(const QString& resultJson)
+    {
+        try {
+            qDebug() << QString::fromUtf8("📨 게임 결과 다이얼로그 표시 시작");
+            qDebug() << QString::fromUtf8("📋 수신된 JSON: %1").arg(resultJson);
+            
+            // JSON 파싱
+            QJsonParseError error;
+            QJsonDocument doc = QJsonDocument::fromJson(resultJson.toUtf8(), &error);
+            
+            if (error.error != QJsonParseError::NoError) {
+                qDebug() << QString::fromUtf8("❌ JSON 파싱 오류: %1").arg(error.errorString());
+                qDebug() << QString::fromUtf8("❌ 오류 위치: offset %1").arg(error.offset);
+                
+                // 파싱 오류가 있어도 기본 메시지 표시
+                showFallbackGameResult();
+                return;
+            }
+            
+            qDebug() << QString::fromUtf8("✅ JSON 파싱 성공");
+            
+            QJsonObject result = doc.object();
+            QJsonObject scores = result["scores"].toObject();
+            QJsonArray winners = result["winners"].toArray();
+            
+            qDebug() << QString::fromUtf8("📊 점수 데이터: %1개").arg(scores.size());
+            qDebug() << QString::fromUtf8("🏆 승자 데이터: %1명").arg(winners.size());
+        
+        // 결과 메시지 생성
+        QString resultMessage = QString::fromUtf8("🎉 게임이 종료되었습니다!\n\n");
+        
+        // 점수 표시
+        resultMessage += QString::fromUtf8("📊 최종 점수:\n");
+        for (auto it = scores.begin(); it != scores.end(); ++it) {
+            QString playerName = it.key();
+            int score = it.value().toInt();
+            resultMessage += QString::fromUtf8("  %1: %2점\n").arg(playerName).arg(score);
+        }
+        
+        // 승자 표시
+        resultMessage += QString::fromUtf8("\n🏆 승리자: ");
+        if (winners.size() == 1) {
+            resultMessage += winners[0].toString() + QString::fromUtf8("님!");
+        } else if (winners.size() > 1) {
+            QStringList winnerNames;
+            for (int i = 0; i < winners.size(); ++i) {
+                winnerNames << winners[i].toString();
+            }
+            resultMessage += winnerNames.join(", ") + QString::fromUtf8("님들! (동점)");
+        } else {
+            resultMessage += QString::fromUtf8("없음");
+        }
+        
+        // 다이얼로그 생성
+        QMessageBox msgBox;
+        msgBox.setWindowTitle(QString::fromUtf8("게임 결과"));
+        msgBox.setText(resultMessage);
+        msgBox.setIcon(QMessageBox::Information);
+        
+        // 버튼 추가
+        QPushButton* continueBtn = msgBox.addButton(QString::fromUtf8("계속하기"), QMessageBox::AcceptRole);
+        QPushButton* leaveBtn = msgBox.addButton(QString::fromUtf8("방 나가기"), QMessageBox::RejectRole);
+        
+        msgBox.setDefaultButton(continueBtn);
+        
+        // 다이얼로그 표시 및 결과 처리
+        msgBox.exec();
+        
+        if (msgBox.clickedButton() == continueBtn) {
+            // 계속하기 선택 - 방에 머물기
+            qDebug() << QString::fromUtf8("플레이어가 계속하기를 선택");
+            // 서버에 게임 결과 응답 전송
+            if (m_networkClient) {
+                m_networkClient->sendMessage("game:result:CONTINUE");
+                // 서버 처리 완료를 위한 약간의 대기 시간
+                QThread::msleep(100);
+            }
+        } else if (msgBox.clickedButton() == leaveBtn) {
+            // 방 나가기 선택
+            qDebug() << QString::fromUtf8("플레이어가 방 나가기를 선택");
+            // 서버에 게임 결과 응답 전송 (방 나가기는 서버에서 처리됨)
+            if (m_networkClient) {
+                m_networkClient->sendMessage("game:result:LEAVE");
+                // 서버 처리 완료를 위한 약간의 대기 시간
+                QThread::msleep(100);
+            }
+            // 로비로 이동은 서버에서 LEAVE_ROOM_CONFIRMED 메시지를 받으면 처리됨
+        }
+        } catch (const std::exception& e) {
+            qDebug() << QString::fromUtf8("❌ 게임 결과 처리 중 예외 발생: %1").arg(e.what());
+            showFallbackGameResult();
+        } catch (...) {
+            qDebug() << QString::fromUtf8("❌ 게임 결과 처리 중 알 수 없는 예외 발생");
+            showFallbackGameResult();
+        }
+    }
+    
+    void showFallbackGameResult()
+    {
+        qDebug() << QString::fromUtf8("🔄 기본 게임 결과 다이얼로그 표시");
+        
+        try {
+            QMessageBox msgBox;
+            msgBox.setWindowTitle(QString::fromUtf8("게임 종료"));
+            msgBox.setText(QString::fromUtf8("🎉 게임이 종료되었습니다!\n\n결과 정보를 표시할 수 없습니다."));
+            msgBox.setIcon(QMessageBox::Information);
+            
+            // 버튼 추가
+            QPushButton* continueBtn = msgBox.addButton(QString::fromUtf8("계속하기"), QMessageBox::AcceptRole);
+            QPushButton* leaveBtn = msgBox.addButton(QString::fromUtf8("방 나가기"), QMessageBox::RejectRole);
+            
+            msgBox.setDefaultButton(continueBtn);
+            
+            // 다이얼로그 표시 및 결과 처리
+            msgBox.exec();
+            
+            if (msgBox.clickedButton() == continueBtn) {
+                qDebug() << QString::fromUtf8("플레이어가 계속하기를 선택 (기본 다이얼로그)");
+                if (m_networkClient) {
+                    m_networkClient->sendMessage("game:result:CONTINUE");
+                    QThread::msleep(100);
+                }
+            } else if (msgBox.clickedButton() == leaveBtn) {
+                qDebug() << QString::fromUtf8("플레이어가 방 나가기를 선택 (기본 다이얼로그)");
+                if (m_networkClient) {
+                    m_networkClient->sendMessage("game:result:LEAVE");
+                    QThread::msleep(100);
+                }
+            }
+        } catch (...) {
+            qDebug() << QString::fromUtf8("❌ 기본 다이얼로그 표시 중에도 예외 발생");
+        }
+    }
+
     void initializeApplication()
     {
         qDebug() << QString::fromUtf8("=== 블로커스 온라인 초기화 ===");
@@ -715,6 +882,10 @@ private:
                 this, &AppController::onGameStarted);
         connect(m_networkClient, &NetworkClient::gameEnded,
                 this, &AppController::onGameEnded);
+        connect(m_networkClient, &NetworkClient::gameResult,
+                this, &AppController::onGameResult);
+        connect(m_networkClient, &NetworkClient::gameReset,
+                this, &AppController::onGameReset);
         
         qDebug() << QString::fromUtf8("네트워크 클라이언트 설정 완료");
     }

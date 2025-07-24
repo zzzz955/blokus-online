@@ -92,6 +92,8 @@ namespace Blokus {
         void hostChanged(const QString& newHost);
         void gameStarted();
         void gameEnded();
+        void gameResult(const QString& resultJson);
+        void gameReset(); // 게임 리셋 신호
         
         // 게임 상태 동기화 시그널
         void gameStateUpdated(const QString& gameStateJson);

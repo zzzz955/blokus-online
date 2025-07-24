@@ -60,6 +60,7 @@ namespace Blokus {
             bool canStartGame() const;
             bool isPlaying() const { return m_state == RoomState::Playing; }
             bool isWaiting() const { return m_state == RoomState::Waiting; }
+            bool hasCompletedGame() const { return m_hasCompletedGame; }
             
             // 방 추가 정보 getter (기본 정보는 위에 이미 선언됨)
             std::string getHostName() const;
@@ -80,6 +81,9 @@ namespace Blokus {
             bool isPlayerTurn(const std::string& userId) const;
             Common::PlayerColor getCurrentPlayer() const;
             std::vector<Common::PlayerColor> getTurnOrder() const;
+            
+            // 자동 턴 스킵 관련
+            bool canCurrentPlayerMakeMove() const;
 
             // 게임 로직 접근
             Common::GameLogic* getGameLogic() const { return m_gameLogic.get(); }
@@ -109,6 +113,11 @@ namespace Blokus {
 
             // 정리 함수
             void cleanupDisconnectedPlayers();
+            
+            // 게임 결과 응답 처리
+            bool handleGameResultResponse(const std::string& userId, const std::string& response);
+            bool allPlayersResponded() const;
+            void processGameResultResponses();
 
             // 브로드캐스트 함수들 (public - 데드락 방지)
             void broadcastPlayerJoined(const std::string& username);
@@ -123,6 +132,8 @@ namespace Blokus {
             void broadcastBlockPlacementLocked(const std::string& playerName, const Common::BlockPlacement& placement, int scoreGained); // 데드락 방지용 내부 메서드
             void broadcastTurnChange(Common::PlayerColor newPlayer);
             void broadcastTurnChangeLocked(Common::PlayerColor newPlayer); // 데드락 방지용 내부 메서드
+            void broadcastGameResultLocked(const std::map<Common::PlayerColor, int>& finalScores, 
+                                         const std::vector<Common::PlayerColor>& winners); // 게임 결과 브로드캐스트
 
         private:
             // 기본 정보
@@ -148,6 +159,14 @@ namespace Blokus {
             bool m_isPrivate;
             std::string m_password;
             int m_maxPlayers;
+            
+            // 게임 결과 응답 추적
+            std::map<std::string, std::string> m_gameResultResponses; // userId -> response (CONTINUE/LEAVE)
+            std::set<std::string> m_playersToLeave; // 방을 나가기로 선택한 플레이어들
+            bool m_waitingForGameResultResponses;
+            
+            // 게임 완료 추적
+            bool m_hasCompletedGame; // 게임이 완료되어 리셋된 상태인지 추적
 
             // 색상 배정
             void assignPlayerColor(PlayerInfo& player);

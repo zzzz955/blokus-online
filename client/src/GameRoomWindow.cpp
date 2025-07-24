@@ -1197,6 +1197,46 @@ namespace Blokus {
         qDebug() << QString::fromUtf8("게임 대기 상태로 초기화됨");
     }
 
+    void GameRoomWindow::resetGameState()
+    {
+        qDebug() << QString::fromUtf8("🔄 게임 상태 완전 리셋 시작");
+        
+        // 기본 리셋 먼저 수행
+        resetGameToWaitingState();
+        
+        // 추가 리셋 작업
+        // MyBlockPalette 완전 초기화
+        if (m_myBlockPalette) {
+            m_myBlockPalette->resetAllBlocks();
+            m_myBlockPalette->setEnabled(false); // 게임 시작 전까지 비활성화
+        }
+        
+        // 모든 플레이어 슬롯 준비 상태 초기화
+        for (auto& slot : m_roomInfo.playerSlots) {
+            if (!slot.isEmpty()) {
+                slot.isReady = false;
+                slot.score = 0;
+            }
+        }
+        
+        // UI 강제 업데이트
+        updatePlayerSlotsDisplay();
+        updateGameControlsState();
+        
+        // 게임 컨트롤 버튼 상태 복원
+        if (m_gameStartButton) {
+            if (isHost()) {
+                m_gameStartButton->setText(QString::fromUtf8("게임 시작"));
+                m_gameStartButton->setEnabled(canStartGame());
+            } else {
+                m_gameStartButton->setText(QString::fromUtf8("준비 완료"));
+                m_gameStartButton->setEnabled(true);
+            }
+        }
+        
+        qDebug() << QString::fromUtf8("✅ 게임 상태 완전 리셋 완료");
+    }
+
     // 턴 스킵 처리 (블록이 없는 플레이어)
     void GameRoomWindow::checkAndSkipPlayerTurn()
     {
@@ -1937,7 +1977,8 @@ namespace Blokus {
         if (it != m_blockButtons.end()) {
             QPushButton* button = it->second;
             m_blockGrid->removeWidget(button);
-            button->deleteLater();
+            // 즉시 삭제하여 지연 방지
+            delete button;
             m_blockButtons.erase(it);
         }
 

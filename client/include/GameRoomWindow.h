@@ -153,6 +153,9 @@ namespace Blokus {
         
         // 게임 리셋 (대기 상태로 복원)
         void resetGameToWaitingState();
+        
+        // 게임 상태 완전 리셋 (서버에서 GAME_RESET 신호 받았을 때)
+        void resetGameState();
 
     signals:
         // 룸 관리 시그널

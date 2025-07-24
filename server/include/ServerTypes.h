@@ -104,6 +104,7 @@ namespace Blokus {
             Game = 400,
             GameMove = 401,
             GameEnd = 402,
+            GameResultResponse = 403,
 
             // ä�� ���� (500-599)
             Chat = 500,
