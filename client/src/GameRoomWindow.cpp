@@ -1081,12 +1081,12 @@ namespace Blokus {
 
     void GameRoomWindow::setPlayerRemainingBlocks(PlayerColor player, int remainingBlocks)
     {
-        for (int i = 0; i < m_roomInfo.playerSlots.size(); ++i) {
+        for (int i = 0; i < static_cast<int>(m_roomInfo.playerSlots.size()); ++i) {
             if (m_roomInfo.playerSlots[i].color == player) {
                 m_roomInfo.playerSlots[i].remainingBlocks = remainingBlocks;
 
                 // 해당 슬롯 위젯 업데이트
-                if (i < m_playerSlotWidgets.size()) {
+                if (i < static_cast<int>(m_playerSlotWidgets.size())) {
                     m_playerSlotWidgets[i]->updatePlayerSlot(m_roomInfo.playerSlots[i]);
                 }
                 break;
@@ -1100,21 +1100,6 @@ namespace Blokus {
         for (int i = 0; i < m_roomInfo.playerSlots.size(); ++i) {
             if (m_roomInfo.playerSlots[i].color == player) {
                 m_roomInfo.playerSlots[i].remainingBlocks += change;
-
-                // 해당 슬롯 위젯 업데이트
-                if (i < m_playerSlotWidgets.size()) {
-                    m_playerSlotWidgets[i]->updatePlayerSlot(m_roomInfo.playerSlots[i]);
-                }
-                break;
-            }
-        }
-    }
-
-    void GameRoomWindow::setPlayerRemainingBlocks(PlayerColor player, int remainingBlocks)
-    {
-        for (int i = 0; i < m_roomInfo.playerSlots.size(); ++i) {
-            if (m_roomInfo.playerSlots[i].color == player) {
-                m_roomInfo.playerSlots[i].remainingBlocks = remainingBlocks;
 
                 // 해당 슬롯 위젯 업데이트
                 if (i < m_playerSlotWidgets.size()) {
@@ -1201,10 +1186,10 @@ namespace Blokus {
         }
 
         // 플레이어 슬롯 점수 및 블록 수 초기화
-        for (auto& slot : m_roomInfo.playerSlots) {
-            if (!slot.isEmpty()) {
-                slot.score = 0;
-                slot.remainingBlocks = Common::BLOCKS_PER_PLAYER;
+        for (int i = 0; i < static_cast<int>(m_roomInfo.playerSlots.size()); ++i) {
+            if (!m_roomInfo.playerSlots[i].isEmpty()) {
+                m_roomInfo.playerSlots[i].score = 0;
+                m_roomInfo.playerSlots[i].remainingBlocks = Common::BLOCKS_PER_PLAYER;
             }
         }
 
