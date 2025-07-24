@@ -115,10 +115,7 @@ namespace Blokus {
             // 정리 함수
             void cleanupDisconnectedPlayers();
             
-            // 게임 결과 응답 처리
-            bool handleGameResultResponse(const std::string& userId, const std::string& response);
-            bool allPlayersResponded() const;
-            void processGameResultResponses();
+            // 기존 게임 결과 응답 처리 로직 제거됨 - 즉시 초기화 방식으로 변경
 
             // 브로드캐스트 함수들 (public - 데드락 방지)
             void broadcastPlayerJoined(const std::string& username);
@@ -161,10 +158,7 @@ namespace Blokus {
             std::string m_password;
             int m_maxPlayers;
             
-            // 게임 결과 응답 추적
-            std::map<std::string, std::string> m_gameResultResponses; // userId -> response (CONTINUE/LEAVE)
-            std::set<std::string> m_playersToLeave; // 방을 나가기로 선택한 플레이어들
-            bool m_waitingForGameResultResponses;
+            // 기존 게임 결과 응답 추적 변수들 제거됨 - 즉시 초기화 방식으로 변경
             
             // 게임 완료 추적
             bool m_hasCompletedGame; // 게임이 완료되어 리셋된 상태인지 추적

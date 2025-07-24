@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <sstream>
 #include <ctime>
+#include <thread>
 
 namespace Blokus {
     namespace Server {
@@ -28,7 +29,6 @@ namespace Blokus {
             , m_isPrivate(false)
             , m_password("")
             , m_maxPlayers(Common::MAX_PLAYERS)
-            , m_waitingForGameResultResponses(false)
             , m_hasCompletedGame(false)
             , m_roomManager(roomManager)
         {
@@ -1057,12 +1057,43 @@ namespace Blokus {
             }
             broadcastMessageLocked(systemMsg.str());
             
-            // 게임 결과 응답 대기 상태로 설정
-            m_waitingForGameResultResponses = true;
-            m_gameResultResponses.clear();
-            m_playersToLeave.clear();
+            // 즉시 게임 초기화 및 대기 상태로 전환
+            spdlog::info("🏆 게임 결과 브로드캐스트: 방 {}, 승자 수: {}명, 즉시 초기화 시작", m_roomId, winners.size());
             
-            spdlog::info("🏆 게임 결과 브로드캐스트: 방 {}, 승자 수: {}명, 응답 대기 시작", m_roomId, winners.size());
+            // 게임 상태 초기화
+            m_gameLogic->clearBoard();
+            m_gameStateManager->resetGame();
+            m_state = RoomState::Waiting;
+            
+            // 모든 플레이어 상태 초기화 (호스트 제외하고 준비 해제)
+            for (auto& player : m_players) {
+                player.resetForNewGame();
+                if (!player.isHost()) {
+                    player.setReady(false);  // 호스트가 아닌 플레이어는 준비 해제
+                }
+                // 세션 상태를 InRoom(2)으로 변경
+                if (player.getSession()) {
+                    player.getSession()->setStateToInRoom(m_roomId);
+                }
+                spdlog::debug("🏠 세션 상태 변경: {} -> 방 {}", player.getUsername(), m_roomId);
+            }
+            
+            // 플레이어 색상 재할당
+            assignColorsAutomatically();
+            
+            // 방 정보 업데이트 브로드캐스트
+            broadcastRoomInfoLocked();
+            
+            // 클라이언트에게 게임 리셋 알림
+            broadcastMessageLocked("GAME_RESET");
+            
+            // 게임 완료 상태 설정
+            m_hasCompletedGame = true;
+            
+            // 게임 초기화 완료 메시지
+            broadcastMessageLocked("SYSTEM:새로운 게임을 시작할 수 있습니다!");
+            
+            spdlog::info("✅ 게임 종료 후 즉시 초기화 완료: 방 {}, 플레이어 {}명", m_roomId, m_players.size());
         }
 
         // ========================================
@@ -1557,146 +1588,13 @@ namespace Blokus {
         // 게임 결과 응답 처리 메서드들
         // ========================================
 
-        bool GameRoom::handleGameResultResponse(const std::string& userId, const std::string& response) {
-            std::lock_guard<std::mutex> lock(m_playersMutex);
-            
-            // 게임 결과 응답 대기 중이 아니면 무시
-            if (!m_waitingForGameResultResponses) {
-                spdlog::warn("⚠️ 게임 결과 응답 처리 실패: 응답 대기 중이 아님 (방 {}, 사용자 {})", m_roomId, userId);
-                return false;
-            }
-            
-            // 플레이어 존재 확인
-            auto* player = findPlayerById(m_players, userId);
-            if (!player) {
-                spdlog::warn("⚠️ 게임 결과 응답 처리 실패: 플레이어를 찾을 수 없음 (방 {}, 사용자 {})", m_roomId, userId);
-                return false;
-            }
-            
-            // 이미 응답한 플레이어인지 확인
-            if (m_gameResultResponses.find(userId) != m_gameResultResponses.end()) {
-                spdlog::warn("⚠️ 게임 결과 응답 처리 실패: 이미 응답한 플레이어 (방 {}, 사용자 {})", m_roomId, userId);
-                return false;
-            }
-            
-            // 응답 저장
-            m_gameResultResponses[userId] = response;
-            
-            // LEAVE 응답인 경우 나가기 목록에 추가
-            if (response == "LEAVE") {
-                m_playersToLeave.insert(userId);
-            }
-            
-            spdlog::info("📝 게임 결과 응답 처리: 방 {}, 사용자 {}, 응답 {}, 응답 수: {}/{}", 
-                m_roomId, userId, response, m_gameResultResponses.size(), m_players.size());
-            
-            // 모든 플레이어가 응답했는지 확인
-            if (allPlayersResponded()) {
-                spdlog::info("✅ 모든 플레이어 응답 완료, 게임 결과 처리 시작 (방 {})", m_roomId);
-                processGameResultResponses();
-            }
-            
-            return true;
-        }
+        // 기존 게임 결과 응답 처리 로직 제거됨 - 즉시 초기화 방식으로 변경
 
-        bool GameRoom::allPlayersResponded() const {
-            // 뮤텍스가 이미 잠겨있다고 가정
-            return m_gameResultResponses.size() == m_players.size();
-        }
+        // allPlayersResponded 메서드 제거됨 - 즉시 초기화 방식으로 변경
 
-        void GameRoom::processGameResultResponses() {
-            // 뮤텍스가 이미 잠겨있다고 가정하고 실행 (데드락 방지용)
-            
-            spdlog::info("🔄 게임 결과 응답 처리 시작: 방 {}, 나가기 선택: {}명, 남기 선택: {}명", 
-                m_roomId, m_playersToLeave.size(), m_players.size() - m_playersToLeave.size());
-            
-            // 응답 대기 상태 해제
-            m_waitingForGameResultResponses = false;
-            
-            // 방을 나가기로 선택한 플레이어들 제거
-            std::vector<std::string> playersToRemove(m_playersToLeave.begin(), m_playersToLeave.end());
-            for (const auto& userId : playersToRemove) {
-                auto* player = findPlayerById(m_players, userId);
-                if (player) {
-                    std::string username = player->getUsername();
-                    
-                    // 플레이어에게 방 나가기 확인 메시지 전송
-                    spdlog::info("📤 방 나가기 확인 메시지 전송: 사용자 {} ({})", userId, username);
-                    player->sendMessage("LOBBY_LEAVE_SUCCESS");
-                    
-                    // RoomManager를 통해 플레이어 제거 (매핑도 함께 업데이트됨)
-                    if (m_roomManager && m_roomManager->leaveRoom(userId)) {
-                        spdlog::info("👋 게임 결과로 인한 플레이어 퇴장: 방 {}, 사용자 {} ({})", 
-                            m_roomId, userId, username);
-                    } else {
-                        spdlog::error("❌ 게임 결과 처리 중 플레이어 제거 실패: 사용자 {} ({})", userId, username);
-                    }
-                }
-            }
-            
-            // 새 호스트 선정 (필요한 경우)
-            if (!m_players.empty() && m_playersToLeave.find(m_hostId) != m_playersToLeave.end()) {
-                autoSelectNewHost();
-                std::string newHostName = "";
-                for (const auto& player : m_players) {
-                    if (player.isHost()) {
-                        newHostName = player.getUsername();
-                        break;
-                    }
-                }
-                if (!newHostName.empty()) {
-                    broadcastMessageLocked("HOST_CHANGED:" + newHostName);
-                    std::ostringstream hostMsg;
-                    hostMsg << newHostName << "님이 방장이 되셨습니다";
-                    broadcastMessageLocked("SYSTEM:" + hostMsg.str());
-                }
-            }
-            
-            // 방이 비었는지 확인
-            if (m_players.empty()) {
-                spdlog::info("🏠 방 {} 모든 플레이어 퇴장으로 인한 방 해체", m_roomId);
-                m_state = RoomState::Disbanded;
-                return;
-            }
-            
-            // 게임 초기화 및 대기 상태로 전환
-            spdlog::info("🔄 게임 초기화 및 대기 상태 전환: 방 {}", m_roomId);
-            
-            // 게임 상태 초기화
-            m_gameLogic->clearBoard();
-            m_gameStateManager->resetGame();
-            m_state = RoomState::Waiting;
-            
-            // 남은 플레이어들 상태 초기화
-            for (auto& player : m_players) {
-                player.resetForNewGame();
-                // 세션 상태를 방에 있는 상태로 설정
-                if (player.getSession()) {
-                    player.getSession()->setStateToInRoom(m_roomId);
-                }
-            }
-            
-            // 플레이어 색상 재할당
-            assignColorsAutomatically();
-            
-            // 응답 데이터 정리
-            m_gameResultResponses.clear();
-            m_playersToLeave.clear();
-            
-            // 방 정보 업데이트 브로드캐스트
-            broadcastRoomInfoLocked();
-            
-            // 클라이언트에게 게임 리셋 알림
-            broadcastMessageLocked("GAME_RESET");
-            
-            // 게임 완료 상태 설정 (새로운 플레이어 입장 시 동기화용)
-            m_hasCompletedGame = true;
-            
-            // 게임 초기화 완료 메시지
-            broadcastMessageLocked("SYSTEM:새로운 게임을 시작할 수 있습니다!");
-            
-            spdlog::info("✅ 게임 결과 처리 완료: 방 {}, 남은 플레이어 {}명", m_roomId, m_players.size());
-        }
+        // processGameResultResponses 메서드 제거됨 - 즉시 초기화 방식으로 변경
+
+        // processPlayersLeaving 메서드 제거됨 - 즉시 초기화 방식으로 변경
 
     } // namespace Server
 } // namespace Blokus
