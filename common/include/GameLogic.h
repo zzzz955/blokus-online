@@ -67,6 +67,9 @@ namespace Blokus {
             // 성능 최적화를 위한 캐싱
             mutable std::map<PlayerColor, bool> m_canPlaceAnyBlockCache;
             mutable bool m_cacheValid;
+            
+            // 영구 캐시: 더 이상 블록을 배치할 수 없는 플레이어 추적
+            mutable std::map<PlayerColor, bool> m_playerBlockedPermanently;
 
             // 내부 헬퍼 함수들
             bool isPositionValid(const Position& pos) const;

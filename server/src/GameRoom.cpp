@@ -951,6 +951,8 @@ namespace Blokus {
                                                const std::vector<Common::PlayerColor>& winners) {
             // 뮤텍스가 이미 잠겨있다고 가정하고 실행 (데드락 방지용)
             
+            spdlog::info("📨 게임 결과 JSON 메시지 생성 시작 (방 {})", m_roomId);
+            
             // 게임 결과 JSON 메시지 생성
             std::ostringstream gameResultMsg;
             gameResultMsg << "GAME_RESULT:{";
@@ -970,10 +972,20 @@ namespace Blokus {
                     }
                 }
                 
-                if (!playerName.empty()) {
-                    gameResultMsg << "\"" << playerName << "\":" << score.second;
-                    firstScore = false;
+                // 플레이어 이름을 찾지 못한 경우 색상 이름 사용
+                if (playerName.empty()) {
+                    switch (score.first) {
+                        case Common::PlayerColor::Blue: playerName = "Blue Player"; break;
+                        case Common::PlayerColor::Yellow: playerName = "Yellow Player"; break;
+                        case Common::PlayerColor::Red: playerName = "Red Player"; break;
+                        case Common::PlayerColor::Green: playerName = "Green Player"; break;
+                        default: playerName = "Unknown Player"; break;
+                    }
+                    spdlog::warn("⚠️ 플레이어 이름을 찾지 못해 대체 이름 사용: {} (방 {})", playerName, m_roomId);
                 }
+                
+                gameResultMsg << "\"" << playerName << "\":" << score.second;
+                firstScore = false;
             }
             gameResultMsg << "},";
             
@@ -992,10 +1004,20 @@ namespace Blokus {
                     }
                 }
                 
-                if (!winnerName.empty()) {
-                    gameResultMsg << "\"" << winnerName << "\"";
-                    firstWinner = false;
+                // 승자 이름을 찾지 못한 경우 색상 이름 사용
+                if (winnerName.empty()) {
+                    switch (winnerColor) {
+                        case Common::PlayerColor::Blue: winnerName = "Blue Player"; break;
+                        case Common::PlayerColor::Yellow: winnerName = "Yellow Player"; break;
+                        case Common::PlayerColor::Red: winnerName = "Red Player"; break;
+                        case Common::PlayerColor::Green: winnerName = "Green Player"; break;
+                        default: winnerName = "Unknown Player"; break;
+                    }
+                    spdlog::warn("⚠️ 승자 이름을 찾지 못해 대체 이름 사용: {} (방 {})", winnerName, m_roomId);
                 }
+                
+                gameResultMsg << "\"" << winnerName << "\"";
+                firstWinner = false;
             }
             gameResultMsg << "],";
             
@@ -1005,8 +1027,11 @@ namespace Blokus {
             gameResultMsg << "\"timestamp\":\"" << std::time(nullptr) << "\"";
             gameResultMsg << "}";
             
+            std::string finalMessage = gameResultMsg.str();
+            spdlog::info("📤 게임 결과 메시지 완성: {} (방 {})", finalMessage, m_roomId);
+            
             // 게임 결과 브로드캐스트
-            broadcastMessageLocked(gameResultMsg.str());
+            broadcastMessageLocked(finalMessage);
             
             // 시스템 메시지로도 결과 알림
             std::ostringstream systemMsg;
@@ -1326,11 +1351,15 @@ namespace Blokus {
             }
 
             // 게임 종료 조건 확인: 모든 플레이어가 더 이상 블록을 배치할 수 없는 경우
-            if (m_gameLogic->isGameFinished()) {
+            bool gameFinished = m_gameLogic->isGameFinished();
+            spdlog::info("🔍 게임 종료 조건 확인: {} (방 {})", gameFinished ? "종료" : "계속", m_roomId);
+            
+            if (gameFinished) {
                 spdlog::info("🏁 게임 종료 조건 충족: 모든 플레이어가 블록 배치 불가 (방 {})", m_roomId);
                 
                 // 최종 점수 계산
                 auto finalScores = m_gameLogic->calculateScores();
+                spdlog::info("📊 최종 점수 계산 완료: {}명의 플레이어 (방 {})", finalScores.size(), m_roomId);
                 
                 // 승자 결정 (가장 높은 점수를 가진 플레이어)
                 Common::PlayerColor winner = Common::PlayerColor::None;
@@ -1338,6 +1367,8 @@ namespace Blokus {
                 std::vector<Common::PlayerColor> winners; // 동점자 처리
                 
                 for (const auto& score : finalScores) {
+                    spdlog::info("🎯 플레이어 점수: 색상={}, 점수={} (방 {})", 
+                               static_cast<int>(score.first), score.second, m_roomId);
                     if (score.second > highestScore) {
                         highestScore = score.second;
                         winners.clear();
@@ -1348,11 +1379,14 @@ namespace Blokus {
                     }
                 }
                 
+                spdlog::info("🏆 승자 결정 완료: {}명의 승자, 최고 점수={} (방 {})", winners.size(), highestScore, m_roomId);
+                
                 // 게임 결과 브로드캐스트
                 broadcastGameResultLocked(finalScores, winners);
                 
                 // 게임 종료 처리는 플레이어 응답 후에 수행하므로 여기서는 하지 않음
             } else if (m_gameStateManager->getGameState() == Common::GameState::Finished) {
+                spdlog::info("🔚 게임 상태가 Finished로 변경되어 게임 종료 처리 (방 {})", m_roomId);
                 endGameLocked();
             }
 

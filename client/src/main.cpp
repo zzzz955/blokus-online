@@ -651,11 +651,16 @@ private slots:
     
     void onGameResult(const QString& resultJson)
     {
-        qDebug() << QString::fromUtf8("게임 결과 수신: %1").arg(resultJson);
+        qDebug() << QString::fromUtf8("🎯 게임 결과 수신됨");
+        qDebug() << QString::fromUtf8("📦 데이터 크기: %1 바이트").arg(resultJson.size());
+        qDebug() << QString::fromUtf8("📄 게임룸창 상태: %1").arg(m_gameRoomWindow ? "활성" : "비활성");
         
         if (m_gameRoomWindow) {
+            qDebug() << QString::fromUtf8("✅ 게임 결과 다이얼로그 표시 진행");
             // JSON 파싱 및 게임 결과 다이얼로그 표시
             showGameResultDialog(resultJson);
+        } else {
+            qDebug() << QString::fromUtf8("❌ 게임룸창이 없어서 다이얼로그를 표시할 수 없음");
         }
     }
     
@@ -663,18 +668,34 @@ private slots:
 private:
     void showGameResultDialog(const QString& resultJson)
     {
+        qDebug() << QString::fromUtf8("📨 게임 결과 다이얼로그 표시 시작");
+        qDebug() << QString::fromUtf8("📋 수신된 JSON: %1").arg(resultJson);
+        
         // JSON 파싱
         QJsonParseError error;
         QJsonDocument doc = QJsonDocument::fromJson(resultJson.toUtf8(), &error);
         
         if (error.error != QJsonParseError::NoError) {
-            qDebug() << QString::fromUtf8("JSON 파싱 오류: %1").arg(error.errorString());
+            qDebug() << QString::fromUtf8("❌ JSON 파싱 오류: %1").arg(error.errorString());
+            qDebug() << QString::fromUtf8("❌ 오류 위치: offset %1").arg(error.offset);
+            
+            // 파싱 오류가 있어도 기본 메시지 표시
+            QMessageBox msgBox;
+            msgBox.setWindowTitle(QString::fromUtf8("게임 종료"));
+            msgBox.setText(QString::fromUtf8("🎉 게임이 종료되었습니다!\n\n결과 정보를 표시할 수 없습니다."));
+            msgBox.setStandardButtons(QMessageBox::Ok);
+            msgBox.exec();
             return;
         }
+        
+        qDebug() << QString::fromUtf8("✅ JSON 파싱 성공");
         
         QJsonObject result = doc.object();
         QJsonObject scores = result["scores"].toObject();
         QJsonArray winners = result["winners"].toArray();
+        
+        qDebug() << QString::fromUtf8("📊 점수 데이터: %1개").arg(scores.size());
+        qDebug() << QString::fromUtf8("🏆 승자 데이터: %1명").arg(winners.size());
         
         // 결과 메시지 생성
         QString resultMessage = QString::fromUtf8("🎉 게임이 종료되었습니다!\n\n");

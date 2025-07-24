@@ -194,6 +194,12 @@ namespace Blokus {
 
         bool GameLogic::canPlayerPlaceAnyBlockOptimized(PlayerColor player) const
         {
+            // 영구 차단된 플레이어인지 먼저 확인
+            auto permanentIt = m_playerBlockedPermanently.find(player);
+            if (permanentIt != m_playerBlockedPermanently.end() && permanentIt->second) {
+                return false; // 이미 영구적으로 블록을 배치할 수 없는 상태
+            }
+
             // 캐시가 유효하면 캐시된 결과 반환
             if (m_cacheValid) {
                 auto it = m_canPlaceAnyBlockCache.find(player);
@@ -273,6 +279,11 @@ namespace Blokus {
                 m_cacheValid = true;
             }
             m_canPlaceAnyBlockCache[player] = result;
+            
+            // 블록을 배치할 수 없으면 영구 차단 상태로 설정
+            if (!result) {
+                m_playerBlockedPermanently[player] = true;
+            }
 
             return result;
         }
@@ -495,6 +506,9 @@ namespace Blokus {
         {
             m_cacheValid = false;
             m_canPlaceAnyBlockCache.clear();
+            // 게임 상태가 변경되었으므로 영구 차단 캐시도 초기화
+            // (새로운 블록 배치로 인해 다른 플레이어가 배치 가능해질 수 있음)
+            m_playerBlockedPermanently.clear();
         }
         
         // getBlockShape�� ���� - Block Ŭ������ ���� ���
