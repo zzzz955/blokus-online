@@ -1214,25 +1214,18 @@ namespace Blokus {
         // 모든 플레이어 슬롯 준비 상태 초기화
         for (auto& slot : m_roomInfo.playerSlots) {
             if (!slot.isEmpty()) {
-                slot.isReady = false;
+                // 호스트는 준비 완료 상태 유지, 비호스트는 준비 해제
+                slot.isReady = slot.isHost;
                 slot.score = 0;
             }
         }
         
+        // 내 준비 상태도 서버와 동기화 (호스트면 준비 완료, 아니면 준비 해제)
+        m_isReady = isHost();
+        
         // UI 강제 업데이트
         updatePlayerSlotsDisplay();
         updateGameControlsState();
-        
-        // 게임 컨트롤 버튼 상태 복원
-        if (m_gameStartButton) {
-            if (isHost()) {
-                m_gameStartButton->setText(QString::fromUtf8("게임 시작"));
-                m_gameStartButton->setEnabled(canStartGame());
-            } else {
-                m_gameStartButton->setText(QString::fromUtf8("준비 완료"));
-                m_gameStartButton->setEnabled(true);
-            }
-        }
         
         qDebug() << QString::fromUtf8("✅ 게임 상태 완전 리셋 완료");
     }

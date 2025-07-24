@@ -209,13 +209,13 @@ namespace Blokus::Server {
     }
 
     void PlayerInfo::resetForNewGame() {
-        color_ = Common::PlayerColor::None;
+        // color_ 는 유지 (게임 종료 후에도 기존 색깔 유지)
         isReady_ = isHost_; // 호스트만 자동으로 준비됨
         score_ = 0;
         remainingBlocks_ = Common::BLOCKS_PER_PLAYER;
         updateActivity();
 
-        spdlog::debug("Player '{}' reset for new game", getUsername());
+        spdlog::debug("Player '{}' reset for new game (color maintained: {})", getUsername(), static_cast<int>(color_));
     }
 
     bool PlayerInfo::canContinueGame() const {

@@ -152,11 +152,26 @@ namespace Blokus {
                 int oldPlayerIndex = m_gameStateManager->getCurrentPlayerIndex();
                 bool wasCurrentPlayerTurn = (m_gameStateManager->getCurrentPlayer() == playerColor);
                 
-                // 남은 플레이어들로 턴 순서 재설정
+                // 남은 플레이어들로 턴 순서 재설정 (색깔 고정 순서 유지)
                 std::vector<Common::PlayerColor> remainingTurnOrder;
-                for (const auto& player : m_players) {
-                    if (player.getColor() != Common::PlayerColor::None) {
-                        remainingTurnOrder.push_back(player.getColor());
+                std::vector<Common::PlayerColor> fixedColorOrder = {
+                    Common::PlayerColor::Blue,
+                    Common::PlayerColor::Yellow, 
+                    Common::PlayerColor::Red,
+                    Common::PlayerColor::Green
+                };
+                
+                // 고정 순서에 따라 실제 플레이어가 있는 색깔만 추가
+                for (Common::PlayerColor color : fixedColorOrder) {
+                    bool hasPlayer = false;
+                    for (const auto& player : m_players) {
+                        if (player.getColor() == color) {
+                            hasPlayer = true;
+                            break;
+                        }
+                    }
+                    if (hasPlayer) {
+                        remainingTurnOrder.push_back(color);
                     }
                 }
                 
@@ -168,18 +183,31 @@ namespace Blokus {
                     // 나간 플레이어가 현재 턴이었다면 다음 플레이어 찾기
                     Common::PlayerColor nextPlayer = Common::PlayerColor::None;
                     if (wasCurrentPlayerTurn) {
-                        // 기존 턴 순서에서 나간 플레이어 다음의 플레이어 찾기
-                        for (int i = oldPlayerIndex + 1; i < oldTurnOrder.size() + oldPlayerIndex + 1; ++i) {
-                            Common::PlayerColor candidatePlayer = oldTurnOrder[i % oldTurnOrder.size()];
-                            // 남은 플레이어 목록에 있는지 확인
-                            if (std::find(remainingTurnOrder.begin(), remainingTurnOrder.end(), candidatePlayer) != remainingTurnOrder.end()) {
-                                nextPlayer = candidatePlayer;
+                        // 고정 색깔 순서에서 나간 플레이어 다음의 플레이어 찾기
+                        int playerColorIndex = -1;
+                        for (int i = 0; i < fixedColorOrder.size(); ++i) {
+                            if (fixedColorOrder[i] == playerColor) {
+                                playerColorIndex = i;
                                 break;
+                            }
+                        }
+                        
+                        if (playerColorIndex != -1) {
+                            // 나간 플레이어 다음부터 순회하며 남은 플레이어 찾기
+                            for (int i = 1; i < fixedColorOrder.size(); ++i) {
+                                Common::PlayerColor candidateColor = fixedColorOrder[(playerColorIndex + i) % fixedColorOrder.size()];
+                                if (std::find(remainingTurnOrder.begin(), remainingTurnOrder.end(), candidateColor) != remainingTurnOrder.end()) {
+                                    nextPlayer = candidateColor;
+                                    break;
+                                }
                             }
                         }
                     } else {
                         // 나간 플레이어가 현재 턴이 아니었다면 현재 턴 유지
-                        nextPlayer = m_gameStateManager->getCurrentPlayer();
+                        Common::PlayerColor currentPlayer = m_gameStateManager->getCurrentPlayer();
+                        if (std::find(remainingTurnOrder.begin(), remainingTurnOrder.end(), currentPlayer) != remainingTurnOrder.end()) {
+                            nextPlayer = currentPlayer;
+                        }
                     }
                     
                     m_gameStateManager->setTurnOrder(remainingTurnOrder);
@@ -402,14 +430,43 @@ namespace Blokus {
 
             // 게임 로직 초기화
             m_gameLogic->clearBoard();
-            assignColorsAutomatically();
+            // 게임 시작 시에는 색깔 재배정하지 않음 (기존 색깔 유지)
 
-            // 턴 순서 설정 (플레이어 색상 기준)
+            // 턴 순서 설정 (색깔 고정 순서: 파란색 → 노란색 → 빨간색 → 초록색)
             std::vector<Common::PlayerColor> turnOrder;
-            for (const auto& player : m_players) {
-                if (player.getColor() != Common::PlayerColor::None) {
-                    turnOrder.push_back(player.getColor());
+            std::vector<Common::PlayerColor> fixedColorOrder = {
+                Common::PlayerColor::Blue,
+                Common::PlayerColor::Yellow, 
+                Common::PlayerColor::Red,
+                Common::PlayerColor::Green
+            };
+            
+            // 실제 플레이어가 있는 색깔만 턴 순서에 추가
+            for (Common::PlayerColor color : fixedColorOrder) {
+                bool hasPlayer = false;
+                for (const auto& player : m_players) {
+                    if (player.getColor() == color) {
+                        hasPlayer = true;
+                        break;
+                    }
                 }
+                if (hasPlayer) {
+                    turnOrder.push_back(color);
+                }
+            }
+            
+            // 디버그: 턴 순서 로그 출력
+            spdlog::info("🎯 게임 시작 턴 순서 (색깔 고정): ");
+            for (int i = 0; i < turnOrder.size(); ++i) {
+                std::string colorName = "";
+                switch (turnOrder[i]) {
+                    case Common::PlayerColor::Blue: colorName = "파란색"; break;
+                    case Common::PlayerColor::Yellow: colorName = "노란색"; break;
+                    case Common::PlayerColor::Red: colorName = "빨간색"; break;
+                    case Common::PlayerColor::Green: colorName = "초록색"; break;
+                    default: colorName = "없음"; break;
+                }
+                spdlog::info("  {}순: {} ({})", i+1, colorName, static_cast<int>(turnOrder[i]));
             }
             
             // 게임 상태 관리자 시작
@@ -535,6 +592,7 @@ namespace Blokus {
                         }
                         
                         // 게임 결과 브로드캐스트
+                        spdlog::info("🎯 게임 종료 조건 충족: 블록 배치 후 승패 결정 (방 {})", m_roomId);
                         broadcastGameResultLocked(finalScores, winners);
                         shouldCheckAutoSkip = false;
                         break;
@@ -569,8 +627,7 @@ namespace Blokus {
                 }
             }
 
-            // 게임 종료 후 플레이어 색상 재할당
-            assignColorsAutomatically();
+            // 게임 종료 후에는 기존 색깔 유지 (재배정하지 않음)
 
             // 게임 종료 브로드캐스트 (뮤텍스 내에서 안전하게)
             broadcastMessageLocked("GAME_ENDED");
@@ -1078,8 +1135,7 @@ namespace Blokus {
                 spdlog::debug("🏠 세션 상태 변경: {} -> 방 {}", player.getUsername(), m_roomId);
             }
             
-            // 플레이어 색상 재할당
-            assignColorsAutomatically();
+            // 게임 종료 후에는 기존 색깔 유지 (재배정하지 않음)
             
             // 방 정보 업데이트 브로드캐스트
             broadcastRoomInfoLocked();
@@ -1213,8 +1269,8 @@ namespace Blokus {
 
             // 플레이어 턴 확인 (직접 확인으로 데드락 방지)
             if (player->getColor() != m_gameStateManager->getCurrentPlayer()) {
-                spdlog::warn("❌ 블록 배치 실패: 플레이어 턴이 아님 (방 {}, 사용자 {}, 현재 턴: {})", 
-                    m_roomId, userId, static_cast<int>(m_gameStateManager->getCurrentPlayer()));
+                spdlog::warn("❌ 블록 배치 실패: 플레이어 턴이 아님 (방 {}, 사용자 {}, 플레이어 색깔: {}, 현재 턴: {})", 
+                    m_roomId, userId, static_cast<int>(player->getColor()), static_cast<int>(m_gameStateManager->getCurrentPlayer()));
                 return false;
             }
 
