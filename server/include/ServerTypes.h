@@ -208,17 +208,6 @@ namespace Blokus {
         // ========================================
         // ��ƿ��Ƽ �Լ���
         // ========================================
-        //std::string errorCodeToString(ServerErrorCode code);
-        //std::string connectionStateToString(ConnectionState state);
-        //std::string sessionStateToString(SessionState state);
-        //std::string roomStateToString(RoomState state);
-        //std::string messageTypeToString(MessageType type);
-
-        //bool isValidUsername(const std::string& username);
-        //bool isValidRoomName(const std::string& roomName);
-        //std::string generateSessionId();
-        //std::string hashPassword(const std::string& password);
-        //bool verifyPassword(const std::string& password, const std::string& hash);
 
     } // namespace Server
 } // namespace Blokus

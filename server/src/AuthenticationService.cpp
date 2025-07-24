@@ -86,9 +86,6 @@ namespace Blokus {
                     return RegisterResult(false, "잘못된 사용자명 형식입니다", "");
                 }
 
-                //if (!validateEmail(email)) {
-                //    return RegisterResult(false, "잘못된 이메일 형식입니다", "");
-                //}
 
                 if (!validatePassword(password)) {
                     return RegisterResult(false,
@@ -107,9 +104,6 @@ namespace Blokus {
                     return RegisterResult(false, "이미 사용 중인 사용자명입니다", "");
                 }
 
-                //if (!isEmailAvailable(email)) {
-                //    return RegisterResult(false, "이미 사용 중인 이메일입니다", "");
-                //}
 
                 // 비밀번호 해시화
                 std::string salt = generateSalt();
@@ -343,75 +337,6 @@ namespace Blokus {
         // 계정 관리
         // ========================================
 
-        bool AuthenticationService::changePassword(const std::string& userId, const std::string& oldPassword,
-            const std::string& newPassword) {
-            try {
-                if (!validatePassword(newPassword)) {
-                    spdlog::warn("비밀번호 변경 실패: 잘못된 새 비밀번호 (사용자: {})", userId);
-                    return false;
-                }
-
-                // TODO: 데이터베이스에서 기존 비밀번호 확인 및 변경
-                spdlog::info("비밀번호 변경 요청: {}", userId);
-
-                // 모든 세션 무효화 (보안상 이유)
-                invalidateAllUserSessions(userId);
-
-                return true;
-            }
-            catch (const std::exception& e) {
-                spdlog::error("비밀번호 변경 중 오류: {}", e.what());
-                return false;
-            }
-        }
-
-        bool AuthenticationService::requestPasswordReset(const std::string& email) {
-            try {
-                if (!validateEmail(email)) {
-                    return false;
-                }
-
-                // TODO: 이메일로 리셋 토큰 전송
-                std::string resetToken = generateResetToken();
-
-                spdlog::info("비밀번호 재설정 요청: {}", email);
-                return true;
-            }
-            catch (const std::exception& e) {
-                spdlog::error("비밀번호 재설정 요청 중 오류: {}", e.what());
-                return false;
-            }
-        }
-
-        bool AuthenticationService::resetPassword(const std::string& resetToken, const std::string& newPassword) {
-            try {
-                if (!validatePassword(newPassword)) {
-                    return false;
-                }
-
-                // TODO: 리셋 토큰 검증 및 비밀번호 변경
-                spdlog::info("비밀번호 재설정 실행");
-                return true;
-            }
-            catch (const std::exception& e) {
-                spdlog::error("비밀번호 재설정 중 오류: {}", e.what());
-                return false;
-            }
-        }
-
-        bool AuthenticationService::deleteAccount(const std::string& userId, const std::string& password) {
-            try {
-                // TODO: 계정 삭제 로직
-                invalidateAllUserSessions(userId);
-
-                spdlog::info("계정 삭제 요청: {}", userId);
-                return true;
-            }
-            catch (const std::exception& e) {
-                spdlog::error("계정 삭제 중 오류: {}", e.what());
-                return false;
-            }
-        }
 
         // ========================================
         // 검증 함수들
@@ -437,16 +362,6 @@ namespace Blokus {
             }
         }
 
-        bool AuthenticationService::isEmailAvailable(const std::string& email) {
-            try {
-                // TODO: 데이터베이스에서 중복 확인
-                return true;
-            }
-            catch (const std::exception& e) {
-                spdlog::error("이메일 중복 확인 중 오류: {}", e.what());
-                return false;
-            }
-        }
 
         bool AuthenticationService::validateUsername(const std::string& username) const {
             if (username.length() < m_minUsernameLength || username.length() > m_maxUsernameLength) {
@@ -481,10 +396,6 @@ namespace Blokus {
             return m_activeSessions.size();
         }
 
-        std::chrono::system_clock::time_point AuthenticationService::getLastLoginTime(const std::string& userId) const {
-            // TODO: 데이터베이스에서 마지막 로그인 시간 조회
-            return std::chrono::system_clock::now();
-        }
 
         // ========================================
         // 내부 헬퍼 함수들

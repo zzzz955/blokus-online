@@ -11,11 +11,11 @@
 namespace Blokus {
     namespace Server {
 
-        // Àü¹æ ¼±¾ð
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         class DatabaseManager;
 
         // ========================================
-        // ÀÎÁõ °á°ú ±¸Á¶Ã¼
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Ã¼
         // ========================================
         struct AuthResult {
             bool success;
@@ -51,125 +51,113 @@ namespace Blokus {
         };
 
         // ========================================
-        // ÀÎÁõ ¼­ºñ½º Å¬·¡½º
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Å¬ï¿½ï¿½ï¿½ï¿½
         // ========================================
         class AuthenticationService {
         public:
             explicit AuthenticationService(std::shared_ptr<DatabaseManager> dbManager = nullptr);
             ~AuthenticationService();
 
-            // ÃÊ±âÈ­
+            // ï¿½Ê±ï¿½È­
             bool initialize();
             void shutdown();
 
             // ========================================
-            // È¸¿ø°¡ÀÔ/·Î±×ÀÎ (µ¿±â ¹öÀü - ´Ü¼øÈ­)
+            // È¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½/ï¿½Î±ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ - ï¿½Ü¼ï¿½È­)
             // ========================================
 
-            // È¸¿ø°¡ÀÔ
+            // È¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
             RegisterResult registerUser(const std::string& username, const std::string& password);
 
-            // ·Î±×ÀÎ (¾ÆÀÌµð/ÆÐ½º¿öµå)
+            // ï¿½Î±ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½Ìµï¿½/ï¿½Ð½ï¿½ï¿½ï¿½ï¿½ï¿½)
             AuthResult loginUser(const std::string& username, const std::string& password);
 
-            // °Ô½ºÆ® ·Î±×ÀÎ (ÀÓ½Ã °èÁ¤)
+            // ï¿½Ô½ï¿½Æ® ï¿½Î±ï¿½ï¿½ï¿½ (ï¿½Ó½ï¿½ ï¿½ï¿½ï¿½ï¿½)
             AuthResult loginGuest(const std::string& guestName = "");
 
-            // ·Î±×¾Æ¿ô
+            // ï¿½Î±×¾Æ¿ï¿½
             bool logoutUser(const std::string& sessionToken);
 
             // ========================================
-            // ¼¼¼Ç °ü¸®
+            // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             // ========================================
 
-            // ¼¼¼Ç °ËÁõ
+            // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             std::optional<SessionInfo> validateSession(const std::string& sessionToken);
 
-            // ¼¼¼Ç °»½Å
+            // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             bool refreshSession(const std::string& sessionToken);
 
-            // ¸ðµç ¼¼¼Ç ¹«È¿È­ (ºñ¹Ð¹øÈ£ º¯°æ ½Ã µî)
+            // ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½È¿È­ (ï¿½ï¿½Ð¹ï¿½È£ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½)
             bool invalidateAllUserSessions(const std::string& userId);
 
-            // ¸¸·áµÈ ¼¼¼Ç Á¤¸®
+            // ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             void cleanupExpiredSessions();
 
             // ========================================
-            // °èÁ¤ °ü¸®
+            // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             // ========================================
 
-            // ºñ¹Ð¹øÈ£ º¯°æ
-            bool changePassword(const std::string& userId, const std::string& oldPassword,
-                const std::string& newPassword);
-
-            // ºñ¹Ð¹øÈ£ Àç¼³Á¤ (ÀÌ¸ÞÀÏ ±â¹Ý)
-            bool requestPasswordReset(const std::string& email);
-            bool resetPassword(const std::string& resetToken, const std::string& newPassword);
-
-            // °èÁ¤ »èÁ¦
-            bool deleteAccount(const std::string& userId, const std::string& password);
 
             // ========================================
-            // °ËÁõ ÇÔ¼öµé
+            // ï¿½ï¿½ï¿½ï¿½ ï¿½Ô¼ï¿½ï¿½ï¿½
             // ========================================
 
-            // »ç¿ëÀÚ¸í/ÀÌ¸ÞÀÏ Áßº¹ È®ÀÎ
+            // ï¿½ï¿½ï¿½ï¿½Ú¸ï¿½/ï¿½Ì¸ï¿½ï¿½ï¿½ ï¿½ßºï¿½ È®ï¿½ï¿½
             bool isUsernameAvailable(const std::string& username);
-            bool isEmailAvailable(const std::string& email);
 
-            // ÀÔ·Â µ¥ÀÌÅÍ °ËÁõ
+            // ï¿½Ô·ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             bool validateUsername(const std::string& username) const;
             bool validateEmail(const std::string& email) const;
             bool validatePassword(const std::string& password) const;
 
             // ========================================
-            // Åë°è ¹× Á¤º¸
+            // ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             // ========================================
             size_t getActiveSessionCount() const;
-            std::chrono::system_clock::time_point getLastLoginTime(const std::string& userId) const;
 
         private:
-            // ¾ÏÈ£È­/ÇØ½Ã
+            // ï¿½ï¿½È£È­/ï¿½Ø½ï¿½
             std::string hashPassword(const std::string& password, const std::string& salt = "") const;
             std::string generateSalt() const;
             bool verifyPassword(const std::string& password, const std::string& hash) const;
 
-            // ¼¼¼Ç ÅäÅ« »ý¼º
+            // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Å« ï¿½ï¿½ï¿½ï¿½
             std::string generateSessionToken() const;
             std::string generateResetToken() const;
 
-            // ¼¼¼Ç ¸¸·á ½Ã°£ °è»ê
+            // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ã°ï¿½ ï¿½ï¿½ï¿½
             std::chrono::system_clock::time_point getSessionExpireTime() const;
 
-            // °Ô½ºÆ® °èÁ¤ °ü¸®
+            // ï¿½Ô½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             std::string generateGuestUsername();
             std::string generateGuestUserId() const;
 
-            // ³»ºÎ ÇïÆÛ ÇÔ¼öµé
+            // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ô¼ï¿½ï¿½ï¿½
             bool storeSession(const std::string& token, const std::string& userId, const std::string& username);
             bool removeSession(const std::string& token);
             std::optional<SessionInfo> getSessionInfo(const std::string& token) const;
 
-            // ÀÔ·Â µ¥ÀÌÅÍ Á¤±ÔÈ­
+            // ï¿½Ô·ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½È­
             std::string normalizeUsername(const std::string& username) const;
             std::string normalizeEmail(const std::string& email) const;
 
         private:
             std::shared_ptr<DatabaseManager> m_dbManager;
 
-            // ¼¼¼Ç ÀúÀå¼Ò (¸Þ¸ð¸® ±â¹Ý - ´Ü¼øÈ­)
+            // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ (ï¿½Þ¸ï¿½ ï¿½ï¿½ï¿½ - ï¿½Ü¼ï¿½È­)
             mutable std::mutex m_sessionsMutex;
             std::unordered_map<std::string, SessionInfo> m_activeSessions;
 
-            // ¼³Á¤
-            std::chrono::hours m_sessionDuration{ 24 };        // ¼¼¼Ç À¯È¿ ±â°£
-            std::chrono::minutes m_resetTokenDuration{ 30 };   // ¸®¼Â ÅäÅ« À¯È¿ ±â°£
-            int m_minPasswordLength{ 6 };                      // ÃÖ¼Ò ºñ¹Ð¹øÈ£ ±æÀÌ
-            int m_maxUsernameLength{ 20 };                     // ÃÖ´ë »ç¿ëÀÚ¸í ±æÀÌ
-            int m_minUsernameLength{ 3 };                      // ÃÖ¼Ò »ç¿ëÀÚ¸í ±æÀÌ
+            // ï¿½ï¿½ï¿½ï¿½
+            std::chrono::hours m_sessionDuration{ 24 };        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½È¿ ï¿½â°£
+            std::chrono::minutes m_resetTokenDuration{ 30 };   // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Å« ï¿½ï¿½È¿ ï¿½â°£
+            int m_minPasswordLength{ 6 };                      // ï¿½Ö¼ï¿½ ï¿½ï¿½Ð¹ï¿½È£ ï¿½ï¿½ï¿½ï¿½
+            int m_maxUsernameLength{ 20 };                     // ï¿½Ö´ï¿½ ï¿½ï¿½ï¿½ï¿½Ú¸ï¿½ ï¿½ï¿½ï¿½ï¿½
+            int m_minUsernameLength{ 3 };                      // ï¿½Ö¼ï¿½ ï¿½ï¿½ï¿½ï¿½Ú¸ï¿½ ï¿½ï¿½ï¿½ï¿½
 
             std::atomic<bool> m_isInitialized{ false };
-            std::atomic<uint32_t> m_guestCounter{ 1000 };      // °Ô½ºÆ® ¹øÈ£ Ä«¿îÅÍ
+            std::atomic<uint32_t> m_guestCounter{ 1000 };      // ï¿½Ô½ï¿½Æ® ï¿½ï¿½È£ Ä«ï¿½ï¿½ï¿½ï¿½
         };
 
     } // namespace Server
