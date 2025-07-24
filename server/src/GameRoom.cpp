@@ -473,6 +473,9 @@ namespace Blokus {
                 }
             }
 
+            // 게임 종료 후 플레이어 색상 재할당
+            assignColorsAutomatically();
+
             // 게임 종료 브로드캐스트 (뮤텍스 내에서 안전하게)
             broadcastMessageLocked("GAME_ENDED");
             broadcastMessageLocked("SYSTEM:게임이 종료되었습니다.");

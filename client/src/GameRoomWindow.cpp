@@ -1185,13 +1185,7 @@ namespace Blokus {
             m_myBlockPalette->clearAllBlocks();
         }
 
-        // 플레이어 슬롯 점수 및 블록 수 초기화
-        for (int i = 0; i < static_cast<int>(m_roomInfo.playerSlots.size()); ++i) {
-            if (!m_roomInfo.playerSlots[i].isEmpty()) {
-                m_roomInfo.playerSlots[i].score = 0;
-                m_roomInfo.playerSlots[i].remainingBlocks = Common::BLOCKS_PER_PLAYER;
-            }
-        }
+        // 플레이어 슬롯 정보는 서버에서 브로드캐스트로 업데이트됨 (로컬 초기화 제거)
 
         // UI 업데이트
         updatePlayerSlotsDisplay();

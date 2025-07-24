@@ -532,9 +532,11 @@ private slots:
                 qDebug() << QString::fromUtf8("  - 사용자: %1, 색상: %2").arg(username).arg(colorIndex);
                 
                 // 색상 인덱스를 기반으로 정확한 슬롯에 배치 (PlayerColor 1-4를 배열 인덱스 0-3으로 변환)
-                if (colorIndex >= 1 && colorIndex <= 4) {
-                    PlayerColor playerColor = static_cast<PlayerColor>(colorIndex);
-                    int slotIndex = colorIndex - 1;  // PlayerColor 1-4를 배열 인덱스 0-3으로 변환
+                // 잘못된 색상 값(11 등)을 1-4 범위로 정규화
+                int normalizedColorIndex = ((colorIndex - 1) % 4) + 1;
+                if (normalizedColorIndex >= 1 && normalizedColorIndex <= 4) {
+                    PlayerColor playerColor = static_cast<PlayerColor>(normalizedColorIndex);
+                    int slotIndex = normalizedColorIndex - 1;  // PlayerColor 1-4를 배열 인덱스 0-3으로 변환
                     
                     qDebug() << QString::fromUtf8("🔧 슬롯 %1에 플레이어 배치: %2 (색상=%3)")
                         .arg(slotIndex).arg(username).arg(colorIndex);
