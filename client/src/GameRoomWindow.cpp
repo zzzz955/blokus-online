@@ -1026,8 +1026,6 @@ namespace Blokus {
         }
 
         // 점수와 남은 블록 수 업데이트는 서버 브로드캐스트에서 처리 (중복 방지)
-        // updatePlayerScore(player, BlockFactory::getBlockScore(blockType));
-        // updatePlayerRemainingBlocks(player, -1);
 
         // 다음 턴으로 이동
         m_gameManager->nextTurn();
@@ -1609,7 +1607,8 @@ namespace Blokus {
             rank++;
         }
 
-        QMessageBox::information(this, QString::fromUtf8("게임 종료"), resultText);
+        // 게임 결과는 main.cpp에서 비모달 다이얼로그로 표시되므로 중복 제거
+        // QMessageBox::information(this, QString::fromUtf8("게임 종료"), resultText);
     }
 
     void GameRoomWindow::enableGameControls(bool enabled)

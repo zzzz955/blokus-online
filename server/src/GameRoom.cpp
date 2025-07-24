@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <sstream>
 #include <ctime>
-#include <thread>
 
 namespace Blokus {
     namespace Server {
@@ -1640,17 +1639,6 @@ namespace Blokus {
             return m_gameLogic->canPlayerPlaceAnyBlock(currentPlayer);
         }
 
-        // ========================================
-        // 게임 결과 응답 처리 메서드들
-        // ========================================
-
-        // 기존 게임 결과 응답 처리 로직 제거됨 - 즉시 초기화 방식으로 변경
-
-        // allPlayersResponded 메서드 제거됨 - 즉시 초기화 방식으로 변경
-
-        // processGameResultResponses 메서드 제거됨 - 즉시 초기화 방식으로 변경
-
-        // processPlayersLeaving 메서드 제거됨 - 즉시 초기화 방식으로 변경
 
     } // namespace Server
 } // namespace Blokus
