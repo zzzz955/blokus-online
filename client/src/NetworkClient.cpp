@@ -560,6 +560,14 @@ namespace Blokus {
         else if (parts[0] == "GAME_ENDED") {
             emit gameEnded();
         }
+        else if (parts[0] == "GAME_RESULT" && parts.size() >= 2) {
+            QString resultJson = parts.mid(1).join(":");
+            emit gameResult(resultJson);
+        }
+        else if (parts[0] == "LEAVE_ROOM_CONFIRMED") {
+            // 방 나가기가 확인되면 로비로 이동하는 신호 발생
+            emit roomLeft();
+        }
         else if (parts[0] == "SYSTEM" && parts.size() >= 2) {
             QString systemMessage = parts.mid(1).join(":");
             // 시스템 메시지를 채팅으로 처리

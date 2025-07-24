@@ -5,6 +5,7 @@
 #include <spdlog/spdlog.h>
 #include <algorithm>
 #include <sstream>
+#include <ctime>
 
 namespace Blokus {
     namespace Server {
@@ -26,6 +27,7 @@ namespace Blokus {
             , m_isPrivate(false)
             , m_password("")
             , m_maxPlayers(Common::MAX_PLAYERS)
+            , m_waitingForGameResultResponses(false)
         {
             m_players.reserve(Common::MAX_PLAYERS);
             spdlog::info("🏠 방 생성: ID={}, Name='{}', Host={}", m_roomId, m_roomName, m_hostId);
@@ -446,6 +448,78 @@ namespace Blokus {
                 broadcastMessageLocked(gameStateJson.str());
             }
 
+            // 게임 시작 후 첫 번째 플레이어가 블록을 배치할 수 없다면 자동 스킵 체크
+            bool shouldCheckAutoSkip = true;
+            while (shouldCheckAutoSkip && m_state == RoomState::Playing) {
+                Common::PlayerColor checkPlayer = m_gameStateManager->getCurrentPlayer();
+                
+                if (m_gameLogic->canPlayerPlaceAnyBlock(checkPlayer)) {
+                    // 현재 플레이어가 블록을 배치할 수 있으면 중단
+                    shouldCheckAutoSkip = false;
+                } else {
+                    // 현재 플레이어가 블록을 배치할 수 없으면 자동 스킵
+                    std::string playerName = "";
+                    for (const auto& player : m_players) {
+                        if (player.getColor() == checkPlayer) {
+                            playerName = player.getUsername();
+                            break;
+                        }
+                    }
+                    
+                    spdlog::info("🔄 게임 시작 후 자동 턴 스킵: {} (색상 {})님이 더 이상 배치할 블록이 없음", 
+                        playerName, static_cast<int>(checkPlayer));
+                    
+                    // 자동 턴 스킵 알림 메시지
+                    std::ostringstream skipMsg;
+                    skipMsg << "SYSTEM:" << playerName << "님이 배치할 수 있는 블록이 없어 자동으로 턴이 넘어갑니다.";
+                    broadcastMessageLocked(skipMsg.str());
+                    
+                    // 턴 넘기기
+                    Common::PlayerColor prevPlayer = checkPlayer;
+                    m_gameStateManager->nextTurn();
+                    Common::PlayerColor nextPlayer = m_gameStateManager->getCurrentPlayer();
+                    
+                    spdlog::info("🔄 게임 시작 후 자동 턴 전환: {} -> {}", static_cast<int>(prevPlayer), static_cast<int>(nextPlayer));
+                    
+                    // 턴 변경 브로드캐스트
+                    if (nextPlayer != prevPlayer) {
+                        broadcastTurnChangeLocked(nextPlayer);
+                    }
+                    
+                    // 게임 상태 브로드캐스트
+                    broadcastGameStateLocked();
+                    
+                    // 게임 종료 조건 확인 (이론상 게임 시작 직후 모든 플레이어가 블록을 배치할 수 없는 경우)
+                    if (m_gameLogic->isGameFinished()) {
+                        spdlog::info("🏁 게임 시작 직후 게임 종료 조건 충족 (방 {})", m_roomId);
+                        
+                        // 최종 점수 계산
+                        auto finalScores = m_gameLogic->calculateScores();
+                        
+                        // 승자 결정 (가장 높은 점수를 가진 플레이어)
+                        Common::PlayerColor winner = Common::PlayerColor::None;
+                        int highestScore = -1;
+                        std::vector<Common::PlayerColor> winners; // 동점자 처리
+                        
+                        for (const auto& score : finalScores) {
+                            if (score.second > highestScore) {
+                                highestScore = score.second;
+                                winners.clear();
+                                winners.push_back(score.first);
+                                winner = score.first;
+                            } else if (score.second == highestScore) {
+                                winners.push_back(score.first);
+                            }
+                        }
+                        
+                        // 게임 결과 브로드캐스트
+                        broadcastGameResultLocked(finalScores, winners);
+                        shouldCheckAutoSkip = false;
+                        break;
+                    }
+                }
+            }
+
             spdlog::info("🎮 방 {} 게임 시작: {} 플레이어, 턴 순서 설정됨", m_roomId, m_players.size());
             return true;
         }
@@ -857,6 +931,93 @@ namespace Blokus {
                 m_roomId, newPlayerName, static_cast<int>(newPlayer));
         }
 
+        void GameRoom::broadcastGameResultLocked(const std::map<Common::PlayerColor, int>& finalScores, 
+                                               const std::vector<Common::PlayerColor>& winners) {
+            // 뮤텍스가 이미 잠겨있다고 가정하고 실행 (데드락 방지용)
+            
+            // 게임 결과 JSON 메시지 생성
+            std::ostringstream gameResultMsg;
+            gameResultMsg << "GAME_RESULT:{";
+            
+            // 점수 정보
+            gameResultMsg << "\"scores\":{";
+            bool firstScore = true;
+            for (const auto& score : finalScores) {
+                if (!firstScore) gameResultMsg << ",";
+                
+                // 플레이어 이름 찾기
+                std::string playerName = "";
+                for (const auto& player : m_players) {
+                    if (player.getColor() == score.first) {
+                        playerName = player.getUsername();
+                        break;
+                    }
+                }
+                
+                if (!playerName.empty()) {
+                    gameResultMsg << "\"" << playerName << "\":" << score.second;
+                    firstScore = false;
+                }
+            }
+            gameResultMsg << "},";
+            
+            // 승자 정보
+            gameResultMsg << "\"winners\":[";
+            bool firstWinner = true;
+            for (const auto& winnerColor : winners) {
+                if (!firstWinner) gameResultMsg << ",";
+                
+                // 승자 이름 찾기
+                std::string winnerName = "";
+                for (const auto& player : m_players) {
+                    if (player.getColor() == winnerColor) {
+                        winnerName = player.getUsername();
+                        break;
+                    }
+                }
+                
+                if (!winnerName.empty()) {
+                    gameResultMsg << "\"" << winnerName << "\"";
+                    firstWinner = false;
+                }
+            }
+            gameResultMsg << "],";
+            
+            // 게임 타입 및 기타 정보
+            gameResultMsg << "\"gameType\":\"블로커스\",";
+            gameResultMsg << "\"roomId\":" << m_roomId << ",";
+            gameResultMsg << "\"timestamp\":\"" << std::time(nullptr) << "\"";
+            gameResultMsg << "}";
+            
+            // 게임 결과 브로드캐스트
+            broadcastMessageLocked(gameResultMsg.str());
+            
+            // 시스템 메시지로도 결과 알림
+            std::ostringstream systemMsg;
+            if (winners.size() == 1) {
+                std::string winnerName = "";
+                for (const auto& player : m_players) {
+                    if (player.getColor() == winners[0]) {
+                        winnerName = player.getUsername();
+                        break;
+                    }
+                }
+                systemMsg << "SYSTEM:🎉 게임이 종료되었습니다! 승자: " << winnerName << "님!";
+            } else if (winners.size() > 1) {
+                systemMsg << "SYSTEM:🎉 게임이 종료되었습니다! 동점 승부입니다!";
+            } else {
+                systemMsg << "SYSTEM:🎉 게임이 종료되었습니다!";
+            }
+            broadcastMessageLocked(systemMsg.str());
+            
+            // 게임 결과 응답 대기 상태로 설정
+            m_waitingForGameResultResponses = true;
+            m_gameResultResponses.clear();
+            m_playersToLeave.clear();
+            
+            spdlog::info("🏆 게임 결과 브로드캐스트: 방 {}, 승자 수: {}명, 응답 대기 시작", m_roomId, winners.size());
+        }
+
         // ========================================
         // 내부 유틸리티 함수들
         // ========================================
@@ -1054,8 +1215,84 @@ namespace Blokus {
             // 전체 게임 상태 브로드캐스트 (뮤텍스 내에서 안전하게)
             broadcastGameStateLocked();
 
-            // 게임 종료 조건 확인
-            if (m_gameStateManager->getGameState() == Common::GameState::Finished) {
+            // 새 플레이어가 블록을 배치할 수 없다면 자동 턴 스킵 체크
+            // 단, 뮤텍스를 이미 잡고 있으므로 별도 함수 호출하지 않고 직접 처리
+            bool shouldCheckAutoSkip = true;
+            while (shouldCheckAutoSkip && m_state == RoomState::Playing) {
+                Common::PlayerColor checkPlayer = m_gameStateManager->getCurrentPlayer();
+                
+                if (m_gameLogic->canPlayerPlaceAnyBlock(checkPlayer)) {
+                    // 현재 플레이어가 블록을 배치할 수 있으면 중단
+                    shouldCheckAutoSkip = false;
+                } else {
+                    // 현재 플레이어가 블록을 배치할 수 없으면 자동 스킵
+                    std::string playerName = "";
+                    for (const auto& player : m_players) {
+                        if (player.getColor() == checkPlayer) {
+                            playerName = player.getUsername();
+                            break;
+                        }
+                    }
+                    
+                    spdlog::info("🔄 자동 턴 스킵: {} (색상 {})님이 더 이상 배치할 블록이 없음", 
+                        playerName, static_cast<int>(checkPlayer));
+                    
+                    // 자동 턴 스킵 알림 메시지
+                    std::ostringstream skipMsg;
+                    skipMsg << "SYSTEM:" << playerName << "님이 배치할 수 있는 블록이 없어 자동으로 턴이 넘어갑니다.";
+                    broadcastMessageLocked(skipMsg.str());
+                    
+                    // 턴 넘기기
+                    Common::PlayerColor prevPlayer = checkPlayer;
+                    m_gameStateManager->nextTurn();
+                    Common::PlayerColor nextPlayer = m_gameStateManager->getCurrentPlayer();
+                    
+                    spdlog::info("🔄 자동 턴 전환: {} -> {}", static_cast<int>(prevPlayer), static_cast<int>(nextPlayer));
+                    
+                    // 턴 변경 브로드캐스트
+                    if (nextPlayer != prevPlayer) {
+                        broadcastTurnChangeLocked(nextPlayer);
+                    }
+                    
+                    // 게임 상태 브로드캐스트
+                    broadcastGameStateLocked();
+                    
+                    // 한 바퀴 돌았는지 확인 (모든 플레이어가 스킵되었는지)
+                    if (m_gameLogic->isGameFinished()) {
+                        shouldCheckAutoSkip = false;
+                        break;
+                    }
+                }
+            }
+
+            // 게임 종료 조건 확인: 모든 플레이어가 더 이상 블록을 배치할 수 없는 경우
+            if (m_gameLogic->isGameFinished()) {
+                spdlog::info("🏁 게임 종료 조건 충족: 모든 플레이어가 블록 배치 불가 (방 {})", m_roomId);
+                
+                // 최종 점수 계산
+                auto finalScores = m_gameLogic->calculateScores();
+                
+                // 승자 결정 (가장 높은 점수를 가진 플레이어)
+                Common::PlayerColor winner = Common::PlayerColor::None;
+                int highestScore = -1;
+                std::vector<Common::PlayerColor> winners; // 동점자 처리
+                
+                for (const auto& score : finalScores) {
+                    if (score.second > highestScore) {
+                        highestScore = score.second;
+                        winners.clear();
+                        winners.push_back(score.first);
+                        winner = score.first;
+                    } else if (score.second == highestScore) {
+                        winners.push_back(score.first);
+                    }
+                }
+                
+                // 게임 결과 브로드캐스트
+                broadcastGameResultLocked(finalScores, winners);
+                
+                // 게임 종료 처리는 플레이어 응답 후에 수행하므로 여기서는 하지 않음
+            } else if (m_gameStateManager->getGameState() == Common::GameState::Finished) {
                 endGameLocked();
             }
 
@@ -1076,12 +1313,94 @@ namespace Blokus {
             }
 
             // 턴 스킵
-            spdlog::info("⏭️ 턴 스킵 (방 {}, 사용자 {})", m_roomId, userId);
+            spdlog::info("⏭️ 수동 턴 스킵 (방 {}, 사용자 {})", m_roomId, userId);
+            
+            Common::PlayerColor previousPlayer = m_gameStateManager->getCurrentPlayer();
             m_gameStateManager->skipTurn();
+            Common::PlayerColor newPlayer = m_gameStateManager->getCurrentPlayer();
+            
+            // 턴 변경 브로드캐스트
+            if (newPlayer != previousPlayer) {
+                broadcastTurnChangeLocked(newPlayer);
+            }
+            
+            // 게임 상태 브로드캐스트
+            broadcastGameStateLocked();
+            
+            // 자동 턴 스킵 체크 (새로운 플레이어도 블록을 배치할 수 없다면)
+            bool shouldCheckAutoSkip = true;
+            while (shouldCheckAutoSkip && m_state == RoomState::Playing) {
+                Common::PlayerColor checkPlayer = m_gameStateManager->getCurrentPlayer();
+                
+                if (m_gameLogic->canPlayerPlaceAnyBlock(checkPlayer)) {
+                    // 현재 플레이어가 블록을 배치할 수 있으면 중단
+                    shouldCheckAutoSkip = false;
+                } else {
+                    // 현재 플레이어가 블록을 배치할 수 없으면 자동 스킵
+                    std::string playerName = "";
+                    for (const auto& player : m_players) {
+                        if (player.getColor() == checkPlayer) {
+                            playerName = player.getUsername();
+                            break;
+                        }
+                    }
+                    
+                    spdlog::info("🔄 자동 턴 스킵: {} (색상 {})님이 더 이상 배치할 블록이 없음", 
+                        playerName, static_cast<int>(checkPlayer));
+                    
+                    // 자동 턴 스킵 알림 메시지
+                    std::ostringstream skipMsg;
+                    skipMsg << "SYSTEM:" << playerName << "님이 배치할 수 있는 블록이 없어 자동으로 턴이 넘어갑니다.";
+                    broadcastMessageLocked(skipMsg.str());
+                    
+                    // 턴 넘기기
+                    Common::PlayerColor prevPlayer = checkPlayer;
+                    m_gameStateManager->nextTurn();
+                    Common::PlayerColor nextPlayer = m_gameStateManager->getCurrentPlayer();
+                    
+                    spdlog::info("🔄 자동 턴 전환: {} -> {}", static_cast<int>(prevPlayer), static_cast<int>(nextPlayer));
+                    
+                    // 턴 변경 브로드캐스트
+                    if (nextPlayer != prevPlayer) {
+                        broadcastTurnChangeLocked(nextPlayer);
+                    }
+                    
+                    // 게임 상태 브로드캐스트
+                    broadcastGameStateLocked();
+                    
+                    // 게임 종료 조건 확인
+                    if (m_gameLogic->isGameFinished()) {
+                        shouldCheckAutoSkip = false;
+                        break;
+                    }
+                }
+            }
 
             // 게임 종료 조건 확인
-            if (m_gameStateManager->getGameState() == Common::GameState::Finished) {
-                endGame();
+            if (m_gameLogic->isGameFinished()) {
+                spdlog::info("🏁 수동 턴 스킵 후 게임 종료 조건 충족: 모든 플레이어가 블록 배치 불가 (방 {})", m_roomId);
+                
+                // 최종 점수 계산
+                auto finalScores = m_gameLogic->calculateScores();
+                
+                // 승자 결정 (가장 높은 점수를 가진 플레이어)
+                Common::PlayerColor winner = Common::PlayerColor::None;
+                int highestScore = -1;
+                std::vector<Common::PlayerColor> winners; // 동점자 처리
+                
+                for (const auto& score : finalScores) {
+                    if (score.second > highestScore) {
+                        highestScore = score.second;
+                        winners.clear();
+                        winners.push_back(score.first);
+                        winner = score.first;
+                    } else if (score.second == highestScore) {
+                        winners.push_back(score.first);
+                    }
+                }
+                
+                // 게임 결과 브로드캐스트
+                broadcastGameResultLocked(finalScores, winners);
             }
 
             return true;
@@ -1106,6 +1425,161 @@ namespace Blokus {
 
         std::vector<Common::PlayerColor> GameRoom::getTurnOrder() const {
             return m_gameStateManager->getTurnOrder();
+        }
+
+        bool GameRoom::canCurrentPlayerMakeMove() const {
+            if (m_state != RoomState::Playing) {
+                return false;
+            }
+            
+            Common::PlayerColor currentPlayer = m_gameStateManager->getCurrentPlayer();
+            return m_gameLogic->canPlayerPlaceAnyBlock(currentPlayer);
+        }
+
+        // ========================================
+        // 게임 결과 응답 처리 메서드들
+        // ========================================
+
+        bool GameRoom::handleGameResultResponse(const std::string& userId, const std::string& response) {
+            std::lock_guard<std::mutex> lock(m_playersMutex);
+            
+            // 게임 결과 응답 대기 중이 아니면 무시
+            if (!m_waitingForGameResultResponses) {
+                spdlog::warn("⚠️ 게임 결과 응답 처리 실패: 응답 대기 중이 아님 (방 {}, 사용자 {})", m_roomId, userId);
+                return false;
+            }
+            
+            // 플레이어 존재 확인
+            auto* player = findPlayerById(m_players, userId);
+            if (!player) {
+                spdlog::warn("⚠️ 게임 결과 응답 처리 실패: 플레이어를 찾을 수 없음 (방 {}, 사용자 {})", m_roomId, userId);
+                return false;
+            }
+            
+            // 이미 응답한 플레이어인지 확인
+            if (m_gameResultResponses.find(userId) != m_gameResultResponses.end()) {
+                spdlog::warn("⚠️ 게임 결과 응답 처리 실패: 이미 응답한 플레이어 (방 {}, 사용자 {})", m_roomId, userId);
+                return false;
+            }
+            
+            // 응답 저장
+            m_gameResultResponses[userId] = response;
+            
+            // LEAVE 응답인 경우 나가기 목록에 추가
+            if (response == "LEAVE") {
+                m_playersToLeave.insert(userId);
+            }
+            
+            spdlog::info("📝 게임 결과 응답 처리: 방 {}, 사용자 {}, 응답 {}, 응답 수: {}/{}", 
+                m_roomId, userId, response, m_gameResultResponses.size(), m_players.size());
+            
+            // 모든 플레이어가 응답했는지 확인
+            if (allPlayersResponded()) {
+                spdlog::info("✅ 모든 플레이어 응답 완료, 게임 결과 처리 시작 (방 {})", m_roomId);
+                processGameResultResponses();
+            }
+            
+            return true;
+        }
+
+        bool GameRoom::allPlayersResponded() const {
+            // 뮤텍스가 이미 잠겨있다고 가정
+            return m_gameResultResponses.size() == m_players.size();
+        }
+
+        void GameRoom::processGameResultResponses() {
+            // 뮤텍스가 이미 잠겨있다고 가정하고 실행 (데드락 방지용)
+            
+            spdlog::info("🔄 게임 결과 응답 처리 시작: 방 {}, 나가기 선택: {}명, 남기 선택: {}명", 
+                m_roomId, m_playersToLeave.size(), m_players.size() - m_playersToLeave.size());
+            
+            // 응답 대기 상태 해제
+            m_waitingForGameResultResponses = false;
+            
+            // 방을 나가기로 선택한 플레이어들 제거
+            std::vector<std::string> playersToRemove(m_playersToLeave.begin(), m_playersToLeave.end());
+            for (const auto& userId : playersToRemove) {
+                auto* player = findPlayerById(m_players, userId);
+                if (player) {
+                    std::string username = player->getUsername();
+                    
+                    // 플레이어에게 방 나가기 확인 메시지 전송
+                    player->sendMessage("LEAVE_ROOM_CONFIRMED");
+                    
+                    // 플레이어 제거 (removePlayer는 이미 뮤텍스를 사용하므로 직접 제거)
+                    auto it = std::find_if(m_players.begin(), m_players.end(),
+                        [&userId](const PlayerInfo& p) { return p.getUserId() == userId; });
+                    if (it != m_players.end()) {
+                        m_players.erase(it);
+                        
+                        // 다른 플레이어들에게 알림
+                        std::ostringstream leftMsg;
+                        leftMsg << username << "님이 퇴장하셨습니다. 현재 인원 : " << m_players.size() << "명";
+                        broadcastMessageLocked("PLAYER_LEFT:" + username);
+                        broadcastMessageLocked("SYSTEM:" + leftMsg.str());
+                        
+                        spdlog::info("👋 게임 결과로 인한 플레이어 퇴장: 방 {}, 사용자 {} ({})", 
+                            m_roomId, userId, username);
+                    }
+                }
+            }
+            
+            // 새 호스트 선정 (필요한 경우)
+            if (!m_players.empty() && m_playersToLeave.find(m_hostId) != m_playersToLeave.end()) {
+                autoSelectNewHost();
+                std::string newHostName = "";
+                for (const auto& player : m_players) {
+                    if (player.isHost()) {
+                        newHostName = player.getUsername();
+                        break;
+                    }
+                }
+                if (!newHostName.empty()) {
+                    broadcastMessageLocked("HOST_CHANGED:" + newHostName);
+                    std::ostringstream hostMsg;
+                    hostMsg << newHostName << "님이 방장이 되셨습니다";
+                    broadcastMessageLocked("SYSTEM:" + hostMsg.str());
+                }
+            }
+            
+            // 방이 비었는지 확인
+            if (m_players.empty()) {
+                spdlog::info("🏠 방 {} 모든 플레이어 퇴장으로 인한 방 해체", m_roomId);
+                m_state = RoomState::Disbanded;
+                return;
+            }
+            
+            // 게임 초기화 및 대기 상태로 전환
+            spdlog::info("🔄 게임 초기화 및 대기 상태 전환: 방 {}", m_roomId);
+            
+            // 게임 상태 초기화
+            m_gameLogic->clearBoard();
+            m_gameStateManager->resetGame();
+            m_state = RoomState::Waiting;
+            
+            // 남은 플레이어들 상태 초기화
+            for (auto& player : m_players) {
+                player.resetForNewGame();
+                // 세션 상태를 방에 있는 상태로 설정
+                if (player.getSession()) {
+                    player.getSession()->setStateToInRoom(m_roomId);
+                }
+            }
+            
+            // 플레이어 색상 재할당
+            assignColorsAutomatically();
+            
+            // 응답 데이터 정리
+            m_gameResultResponses.clear();
+            m_playersToLeave.clear();
+            
+            // 방 정보 업데이트 브로드캐스트
+            broadcastRoomInfoLocked();
+            
+            // 게임 초기화 완료 메시지
+            broadcastMessageLocked("SYSTEM:새로운 게임을 시작할 수 있습니다!");
+            
+            spdlog::info("✅ 게임 결과 처리 완료: 방 {}, 남은 플레이어 {}명", m_roomId, m_players.size());
         }
 
     } // namespace Server

@@ -95,6 +95,7 @@ namespace Blokus::Server {
 
         // 게임 관련 핸들러들
         void handleGameMove(const std::vector<std::string>& params);
+        void handleGameResultResponse(const std::vector<std::string>& params);
 
         // 기본 핸들러들
         void handlePing(const std::vector<std::string>& params);
