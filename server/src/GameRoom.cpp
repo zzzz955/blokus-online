@@ -477,6 +477,9 @@ namespace Blokus {
             broadcastMessageLocked("GAME_ENDED");
             broadcastMessageLocked("SYSTEM:게임이 종료되었습니다.");
 
+            // 게임 종료 후 방 정보 업데이트 브로드캐스트
+            broadcastRoomInfoLocked();
+
             spdlog::info("🎮 방 {} 게임 종료", m_roomId);
             return true;
         }
@@ -660,12 +663,8 @@ namespace Blokus {
         void GameRoom::broadcastHostChanged(const std::string& newHostName) {
             std::lock_guard<std::mutex> lock(m_playersMutex);
             
-            // 구조화된 메시지와 시스템 메시지 모두 전송
+            // 구조화된 메시지만 전송 (시스템 메시지는 호출하는 곳에서 처리)
             broadcastMessageLocked("HOST_CHANGED:" + newHostName);
-            
-            std::ostringstream oss;
-            oss << newHostName << "님이 방장이 되셨습니다";
-            broadcastMessageLocked("SYSTEM:" + oss.str());
         }
 
 
@@ -674,6 +673,38 @@ namespace Blokus {
             
             // 구조화된 메시지만 전송 (시스템 메시지는 endGameLocked에서 처리)
             broadcastMessageLocked("GAME_ENDED");
+        }
+
+        void GameRoom::broadcastRoomInfoLocked() {
+            // 뮤텍스가 이미 잠겨있다고 가정하고 실행 (데드락 방지용)
+            
+            // 호스트 이름 직접 찾기 (뮤텍스 데드락 방지)
+            std::string hostName = "Unknown";
+            const auto* host = findPlayerById(m_players, m_hostId);
+            if (host) {
+                hostName = host->getUsername();
+            }
+            
+            // ROOM_INFO 메시지 생성
+            std::ostringstream response;
+            response << "ROOM_INFO:" << m_roomId << ":" << m_roomName
+                     << ":" << hostName << ":" << m_players.size()
+                     << ":" << m_maxPlayers << ":" << (m_isPrivate ? "1" : "0")
+                     << ":" << (m_state == RoomState::Playing ? "1" : "0") << ":클래식";
+            
+            // 플레이어 데이터 추가 (userId,username,isHost,isReady,colorIndex)
+            for (const auto& player : m_players) {
+                response << ":" << player.getUserId() << "," << player.getUsername()
+                         << "," << (player.isHost() ? "1" : "0") << "," << (player.isReady() ? "1" : "0")
+                         << "," << static_cast<int>(player.getColor());
+            }
+            
+            std::string roomInfoMessage = response.str();
+            
+            spdlog::info("📤 방 {} ROOM_INFO 브로드캐스트: {}", m_roomId, roomInfoMessage);
+            
+            // 방의 모든 플레이어에게 브로드캐스트
+            broadcastMessageLocked(roomInfoMessage);
         }
 
         void GameRoom::broadcastGameState() {

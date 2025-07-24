@@ -43,6 +43,7 @@ namespace Blokus {
         void setPlayer(PlayerColor player);
         void removeBlock(BlockType blockType);
         void resetAllBlocks();
+        void clearAllBlocks();
         void setEnabled(bool enabled);
         void clearSelection();
 
@@ -221,7 +222,6 @@ namespace Blokus {
         void enableGameControls(bool enabled);
         void showGameResults(const std::map<PlayerColor, int>& scores);
         void showFinalResults();
-        void resetGameToWaitingState();
         void checkGameEndConditions();
         void checkAndSkipPlayerTurn();
 

@@ -1025,9 +1025,9 @@ namespace Blokus {
             m_myBlockPalette->removeBlock(blockType);
         }
 
-        // 플레이어 슬롯의 점수와 남은 블록 수 업데이트
-        updatePlayerScore(player, BlockFactory::getBlockScore(blockType));
-        updatePlayerRemainingBlocks(player, -1);
+        // 점수와 남은 블록 수 업데이트는 서버 브로드캐스트에서 처리 (중복 방지)
+        // updatePlayerScore(player, BlockFactory::getBlockScore(blockType));
+        // updatePlayerRemainingBlocks(player, -1);
 
         // 다음 턴으로 이동
         m_gameManager->nextTurn();
@@ -1180,9 +1180,9 @@ namespace Blokus {
             m_gameBoard->clearAllBlocks();
         }
 
-        // 내 팔레트 초기화
+        // 내 팔레트 초기화 (대기 상태에서는 블록 숨김)
         if (m_myBlockPalette) {
-            m_myBlockPalette->resetAllBlocks();
+            m_myBlockPalette->clearAllBlocks();
         }
 
         // 플레이어 슬롯 점수 및 블록 수 초기화
@@ -1984,6 +1984,15 @@ namespace Blokus {
         qDebug() << QString::fromUtf8("모든 블록 리셋됨: %1개").arg(m_availableBlocks.size());
     }
 
+    void MyBlockPalette::clearAllBlocks()
+    {
+        clearBlockButtons();
+        m_availableBlocks.clear();
+        clearSelection();
+        
+        qDebug() << QString::fromUtf8("모든 블록 클리어됨 (대기 상태)");
+    }
+
     void MyBlockPalette::clearBlockButtons()
     {
         for (auto& pair : m_blockButtons) {
@@ -2250,6 +2259,15 @@ namespace Blokus {
                 m_gameManager->getGameLogic().placeBlock(placement);
             }
         }
+        
+        // 플레이어 점수와 남은 블록 수 업데이트 (서버에서 받은 정보 기반)
+        PlayerColor currentPlayerColor = static_cast<PlayerColor>(playerColor);
+        
+        // 점수는 증분 업데이트 (서버에서 scoreGained만 보내주므로)
+        updatePlayerScore(currentPlayerColor, scoreGained);
+        
+        // 남은 블록 수는 증분 업데이트 (블록 하나 사용)
+        updatePlayerRemainingBlocks(currentPlayerColor, -1);
         
         // 시스템 메시지는 서버에서 오는 SYSTEM: 메시지로만 표시 (중복 방지)
     }
