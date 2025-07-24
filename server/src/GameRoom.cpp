@@ -2,6 +2,7 @@
 #include "Session.h"
 #include "PlayerInfo.h"  // 🔥 새로 추가
 #include "Block.h"       // BlockFactory를 위해 추가
+#include "RoomManager.h" // RoomManager 헤더 추가
 #include <spdlog/spdlog.h>
 #include <algorithm>
 #include <sstream>
@@ -14,7 +15,7 @@ namespace Blokus {
         // 생성자/소멸자
         // ========================================
 
-        GameRoom::GameRoom(int roomId, const std::string& roomName, const std::string& hostId)
+        GameRoom::GameRoom(int roomId, const std::string& roomName, const std::string& hostId, RoomManager* roomManager)
             : m_roomId(roomId)
             , m_roomName(roomName)
             , m_hostId(hostId)
@@ -29,6 +30,7 @@ namespace Blokus {
             , m_maxPlayers(Common::MAX_PLAYERS)
             , m_waitingForGameResultResponses(false)
             , m_hasCompletedGame(false)
+            , m_roomManager(roomManager)
         {
             m_players.reserve(Common::MAX_PLAYERS);
             spdlog::info("🏠 방 생성: ID={}, Name='{}', Host={}", m_roomId, m_roomName, m_hostId);
@@ -1618,27 +1620,16 @@ namespace Blokus {
                 if (player) {
                     std::string username = player->getUsername();
                     
-                    // 플레이어에게 방 나가기 확인 메시지 전송 (세션 상태 변경 전)
+                    // 플레이어에게 방 나가기 확인 메시지 전송
                     spdlog::info("📤 방 나가기 확인 메시지 전송: 사용자 {} ({})", userId, username);
                     player->sendMessage("LOBBY_LEAVE_SUCCESS");
                     
-                    // 플레이어의 세션 상태를 InLobby로 변경
-                    player->getSession()->setStateToLobby();
-                    
-                    // 플레이어 제거 (removePlayer는 이미 뮤텍스를 사용하므로 직접 제거)
-                    auto it = std::find_if(m_players.begin(), m_players.end(),
-                        [&userId](const PlayerInfo& p) { return p.getUserId() == userId; });
-                    if (it != m_players.end()) {
-                        m_players.erase(it);
-                        
-                        // 다른 플레이어들에게 알림
-                        std::ostringstream leftMsg;
-                        leftMsg << username << "님이 퇴장하셨습니다. 현재 인원 : " << m_players.size() << "명";
-                        broadcastMessageLocked("PLAYER_LEFT:" + username);
-                        broadcastMessageLocked("SYSTEM:" + leftMsg.str());
-                        
+                    // RoomManager를 통해 플레이어 제거 (매핑도 함께 업데이트됨)
+                    if (m_roomManager && m_roomManager->leaveRoom(userId)) {
                         spdlog::info("👋 게임 결과로 인한 플레이어 퇴장: 방 {}, 사용자 {} ({})", 
                             m_roomId, userId, username);
+                    } else {
+                        spdlog::error("❌ 게임 결과 처리 중 플레이어 제거 실패: 사용자 {} ({})", userId, username);
                     }
                 }
             }

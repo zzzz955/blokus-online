@@ -54,7 +54,7 @@ namespace Blokus {
 
             // 4. 새 방 생성
             int roomId = m_nextRoomId++;
-            auto room = std::make_shared<GameRoom>(roomId, roomName, hostId);
+            auto room = std::make_shared<GameRoom>(roomId, roomName, hostId, this);
 
             m_rooms[roomId] = room;
 

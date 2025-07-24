@@ -858,6 +858,8 @@ private:
                 this, &AppController::onRoomJoined);
         connect(m_networkClient, &NetworkClient::roomLeft,
                 this, &AppController::onRoomLeft);
+        connect(m_networkClient, &NetworkClient::lobbyLeft,
+                this, &AppController::onRoomLeft);
         connect(m_networkClient, &NetworkClient::roomError,
                 this, &AppController::onRoomError);
         
