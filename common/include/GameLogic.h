@@ -99,6 +99,7 @@ namespace Blokus {
             void nextTurn();
             void skipTurn();
             void setTurnOrder(const std::vector<PlayerColor>& turnOrder);
+            void setCurrentPlayerIndex(int index);
 
             // 상태 확인
             GameState getGameState() const { return m_gameState; }

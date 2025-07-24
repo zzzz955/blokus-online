@@ -43,6 +43,7 @@ namespace Blokus {
         void setPlayer(PlayerColor player);
         void removeBlock(BlockType blockType);
         void resetAllBlocks();
+        void clearAllBlocks();
         void setEnabled(bool enabled);
         void clearSelection();
 
@@ -149,6 +150,9 @@ namespace Blokus {
         
         // 턴 전환 알림
         void showTurnChangeNotification(const QString& playerName, bool isMyTurn);
+        
+        // 게임 리셋 (대기 상태로 복원)
+        void resetGameToWaitingState();
 
     signals:
         // 룸 관리 시그널
@@ -218,7 +222,6 @@ namespace Blokus {
         void enableGameControls(bool enabled);
         void showGameResults(const std::map<PlayerColor, int>& scores);
         void showFinalResults();
-        void resetGameToWaitingState();
         void checkGameEndConditions();
         void checkAndSkipPlayerTurn();
 
