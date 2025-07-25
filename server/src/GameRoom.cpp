@@ -3,6 +3,7 @@
 #include "PlayerInfo.h"  // 🔥 새로 추가
 #include "Block.h"       // BlockFactory를 위해 추가
 #include "RoomManager.h" // RoomManager 헤더 추가
+#include "DatabaseManager.h" // DB 저장을 위해 추가
 #include <spdlog/spdlog.h>
 #include <algorithm>
 #include <sstream>
@@ -593,6 +594,9 @@ namespace Blokus {
                         // 게임 결과 브로드캐스트
                         spdlog::info("🎯 게임 종료 조건 충족: 블록 배치 후 승패 결정 (방 {})", m_roomId);
                         broadcastGameResultLocked(finalScores, winners);
+                
+                // 게임 결과를 DB에 저장
+                saveGameResultsToDatabase(finalScores, winners);
                         shouldCheckAutoSkip = false;
                         break;
                     }
@@ -1440,6 +1444,9 @@ namespace Blokus {
                 
                 // 게임 결과 브로드캐스트
                 broadcastGameResultLocked(finalScores, winners);
+                
+                // 게임 결과를 DB에 저장
+                saveGameResultsToDatabase(finalScores, winners);
             }
 
             // 게임 종료 조건 확인: 모든 플레이어가 더 이상 블록을 배치할 수 없는 경우
@@ -1475,6 +1482,9 @@ namespace Blokus {
                 
                 // 게임 결과 브로드캐스트
                 broadcastGameResultLocked(finalScores, winners);
+                
+                // 게임 결과를 DB에 저장
+                saveGameResultsToDatabase(finalScores, winners);
                 
                 // 게임 종료 처리는 플레이어 응답 후에 수행하므로 여기서는 하지 않음
             } else if (m_gameStateManager->getGameState() == Common::GameState::Finished) {
@@ -1604,6 +1614,9 @@ namespace Blokus {
                 
                 // 게임 결과 브로드캐스트
                 broadcastGameResultLocked(finalScores, winners);
+                
+                // 게임 결과를 DB에 저장
+                saveGameResultsToDatabase(finalScores, winners);
             }
 
             return true;
@@ -1637,6 +1650,70 @@ namespace Blokus {
             
             Common::PlayerColor currentPlayer = m_gameStateManager->getCurrentPlayer();
             return m_gameLogic->canPlayerPlaceAnyBlock(currentPlayer);
+        }
+        
+        void GameRoom::saveGameResultsToDatabase(const std::map<Common::PlayerColor, int>& finalScores, 
+                                               const std::vector<Common::PlayerColor>& winners) {
+            if (!m_roomManager) {
+                spdlog::warn("⚠️ RoomManager가 없어 게임 결과를 DB에 저장할 수 없습니다 (방 {})", m_roomId);
+                return;
+            }
+            
+            auto dbManager = m_roomManager->getDatabaseManager();
+            if (!dbManager) {
+                spdlog::warn("⚠️ DatabaseManager가 없어 게임 결과를 DB에 저장할 수 없습니다 (방 {})", m_roomId);
+                return;
+            }
+            
+            try {
+                // 플레이어 정보 수집
+                std::vector<uint32_t> playerIds;
+                std::vector<int> scores;
+                std::vector<bool> isWinner;
+                
+                for (const auto& scoreEntry : finalScores) {
+                    Common::PlayerColor color = scoreEntry.first;
+                    int score = scoreEntry.second;
+                    
+                    // 해당 색상의 플레이어 찾기
+                    for (const auto& player : m_players) {
+                        if (player.getColor() == color) {
+                            // 사용자 ID를 uint32_t로 변환
+                            try {
+                                uint32_t userId = std::stoul(player.getUserId());
+                                playerIds.push_back(userId);
+                                scores.push_back(score);
+                                
+                                // 승자인지 확인
+                                bool won = std::find(winners.begin(), winners.end(), color) != winners.end();
+                                isWinner.push_back(won);
+                                
+                                spdlog::info("📊 플레이어 {}({}) 게임 결과: 점수={}, 승리={}", 
+                                           player.getUsername(), userId, score, won);
+                                break;
+                            }
+                            catch (const std::exception& e) {
+                                spdlog::error("❌ 사용자 ID 변환 실패: {} -> {}", player.getUserId(), e.what());
+                            }
+                        }
+                    }
+                }
+                
+                if (!playerIds.empty()) {
+                    // DB에 게임 결과 저장
+                    bool success = dbManager->saveGameResults(playerIds, scores, isWinner);
+                    if (success) {
+                        spdlog::info("✅ 방 {} 게임 결과가 DB에 성공적으로 저장되었습니다", m_roomId);
+                    } else {
+                        spdlog::error("❌ 방 {} 게임 결과 DB 저장 실패", m_roomId);
+                    }
+                } else {
+                    spdlog::warn("⚠️ 저장할 플레이어 데이터가 없습니다 (방 {})", m_roomId);
+                }
+                
+            } catch (const std::exception& e) {
+                spdlog::error("❌ 게임 결과 DB 저장 중 예외 발생 (방 {}): {}", m_roomId, e.what());
+            }
         }
 
 

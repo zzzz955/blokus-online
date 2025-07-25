@@ -14,120 +14,131 @@
 namespace Blokus {
     namespace Server {
 
+        // ì „ë°© ì„ ì–¸
+        class DatabaseManager;
+
         // ========================================
-        // RoomManager Å¬·¡½º
+        // RoomManager í´ë˜ìŠ¤
         // ========================================
         class RoomManager {
         public:
-            // »ı¼ºÀÚ/¼Ò¸êÀÚ
+            // ìƒì„±ì/ì†Œë©¸ì
             RoomManager();
+            explicit RoomManager(std::shared_ptr<DatabaseManager> dbManager);
             ~RoomManager();
+            
+            // DatabaseManager ì„¤ì •
+            void setDatabaseManager(std::shared_ptr<DatabaseManager> dbManager);
+            std::shared_ptr<DatabaseManager> getDatabaseManager() const;
 
-            // ¹æ »ı¼º/»èÁ¦
+            // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½
             int createRoom(const std::string& hostId, const std::string& hostUsername,
                 const std::string& roomName, bool isPrivate = false,
                 const std::string& password = "");
             bool removeRoom(int roomId);
             void removeAllRooms();
 
-            // ¹æ Á¢±Ù
+            // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             GameRoomPtr getRoom(int roomId);
             const GameRoomPtr getRoom(int roomId) const;
             bool hasRoom(int roomId) const;
 
-            // ÇÃ·¹ÀÌ¾î ¹æ °ü¸®
+            // ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             bool joinRoom(int roomId, SessionPtr session, const std::string& userId,
                 const std::string& username, const std::string& password = "");
             bool leaveRoom(const std::string& userId);
             bool leaveRoom(int roomId, const std::string& userId);
 
-            // ÇÃ·¹ÀÌ¾î »óÅÂ °ü¸®
+            // ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             bool setPlayerReady(const std::string& userId, bool ready);
             bool startGame(const std::string& hostId);
             bool endGame(int roomId);
 
-            // È£½ºÆ® ±ÇÇÑ
+            // È£ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½
             bool transferHost(int roomId, const std::string& currentHostId, const std::string& newHostId);
 
-            // ¹æ °Ë»ö/¸ñ·Ï
+            // ï¿½ï¿½ ï¿½Ë»ï¿½/ï¿½ï¿½ï¿½
             std::vector<Common::RoomInfo> getRoomList() const;
             std::vector<GameRoomPtr> findRooms(std::function<bool(const GameRoom&)> predicate) const;
             std::vector<GameRoomPtr> getWaitingRooms() const;
             std::vector<GameRoomPtr> getPlayingRooms() const;
 
-            // ÇÃ·¹ÀÌ¾î °Ë»ö
+            // ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½Ë»ï¿½
             GameRoomPtr findPlayerRoom(const std::string& userId) const;
             bool isPlayerInRoom(const std::string& userId) const;
             bool isPlayerInGame(const std::string& userId) const;
 
-            // Åë°è
+            // ï¿½ï¿½ï¿½
             size_t getRoomCount() const;
             size_t getTotalPlayers() const;
             size_t getWaitingRoomCount() const;
             size_t getPlayingRoomCount() const;
 
-            // À¯Áöº¸¼ö
+            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
             void cleanupEmptyRooms();
             void cleanupInactiveRooms(std::chrono::minutes threshold = std::chrono::minutes(30));
             void cleanupDisconnectedPlayers();
             void performPeriodicCleanup();
 
-            // ºê·ÎµåÄ³½ºÆÃ
+            // ï¿½ï¿½Îµï¿½Ä³ï¿½ï¿½ï¿½ï¿½
             void broadcastToAllRooms(const std::string& message);
             void broadcastToWaitingRooms(const std::string& message);
             void broadcastToPlayingRooms(const std::string& message);
 
-            // ¼³Á¤
+            // ï¿½ï¿½ï¿½ï¿½
             void setMaxRooms(size_t maxRooms) { m_maxRooms = maxRooms; }
             void setMaxPlayersPerRoom(size_t maxPlayers) { m_maxPlayersPerRoom = maxPlayers; }
             size_t getMaxRooms() const { return m_maxRooms; }
 
-            // Äİ¹é ¼³Á¤ (ÀÌº¥Æ® Ã³¸®¿ë)
+            // ï¿½İ¹ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½Ìºï¿½Æ® Ã³ï¿½ï¿½ï¿½ï¿½)
             using RoomEventCallback = std::function<void(int roomId, const std::string& event, const std::string& data)>;
             void setRoomEventCallback(RoomEventCallback callback) { m_eventCallback = callback; }
 
         private:
-            // ¹æ ÀúÀå¼Ò
+            // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½
             std::unordered_map<int, GameRoomPtr> m_rooms;
             mutable std::shared_mutex m_roomsMutex;
 
-            // ÇÃ·¹ÀÌ¾î-¹æ ¸ÅÇÎ (ºü¸¥ °Ë»öÀ» À§ÇØ)
+            // ï¿½Ã·ï¿½ï¿½Ì¾ï¿½-ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ ï¿½Ë»ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
             std::unordered_map<std::string, int> m_playerToRoom;
             mutable std::shared_mutex m_playerMappingMutex;
 
-            // ¹æ ID »ı¼º
+            // ï¿½ï¿½ ID ï¿½ï¿½ï¿½ï¿½
             std::atomic<int> m_nextRoomId;
 
-            // ¼³Á¤
+            // ï¿½ï¿½ï¿½ï¿½
             size_t m_maxRooms;
             size_t m_maxPlayersPerRoom;
 
-            // ÀÌº¥Æ® Äİ¹é
+            // ì´ë²¤íŠ¸ ì½œë°±
             RoomEventCallback m_eventCallback;
+            
+            // DatabaseManager ì°¸ì¡°
+            std::shared_ptr<DatabaseManager> m_databaseManager;
 
-            // ³»ºÎ À¯Æ¿¸®Æ¼ ÇÔ¼öµé
+            // ë‚´ë¶€ ìœ í‹¸ë¦¬í‹° í•¨ìˆ˜ë“¤
             bool validateRoomCreation(const std::string& roomName) const;
             bool validateJoinRoom(int roomId, const std::string& userId, const std::string& password) const;
             void updatePlayerMapping(const std::string& userId, int roomId);
             void removePlayerMapping(const std::string& userId);
             int getPlayerRoomId(const std::string& userId) const;
 
-            // Á¤¸® ÇÔ¼öµé
+            // ï¿½ï¿½ï¿½ï¿½ ï¿½Ô¼ï¿½ï¿½ï¿½
             void cleanupSingleRoom(GameRoomPtr room);
             bool shouldRemoveRoom(const GameRoom& room) const;
 
-            // ÀÌº¥Æ® ¹ß»ı
+            // ï¿½Ìºï¿½Æ® ï¿½ß»ï¿½
             void triggerRoomEvent(int roomId, const std::string& event, const std::string& data = "");
 
-            // Åë°è ¼öÁı
+            // ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             void updateStatistics();
         };
 
         // ========================================
-        // ÆíÀÇ ÇÔ¼öµé
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½Ô¼ï¿½ï¿½ï¿½
         // ========================================
 
-        // ¹æ »óÅÂ È®ÀÎ ÇÔ¼öµé
+        // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ È®ï¿½ï¿½ ï¿½Ô¼ï¿½ï¿½ï¿½
         inline bool isRoomWaiting(const GameRoom& room) {
             return room.getState() == RoomState::Waiting;
         }

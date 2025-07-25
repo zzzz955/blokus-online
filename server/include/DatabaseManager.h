@@ -75,6 +75,11 @@ namespace Blokus {
 
             bool updateGameStats(uint32_t userId, bool won, bool draw = false, int score = 0);
             bool updateUserRating(uint32_t userId, int opponentRating, bool won, bool draw = false);
+            
+            // 게임 결과 저장 (멀티플레이어용)
+            bool saveGameResults(const std::vector<uint32_t>& playerIds, 
+                               const std::vector<int>& scores, 
+                               const std::vector<bool>& isWinner);
 
             // ========================================
             // 조회 기능

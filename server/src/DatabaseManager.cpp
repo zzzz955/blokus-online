@@ -434,9 +434,21 @@ namespace Blokus {
             auto conn = dbPool_->getConnection();
             pqxx::work txn(*conn);
             try {
-                // PostgreSQL 함수가 있다면 사용, 없다면 직접 업데이트
+                // 직접 업데이트 방식 (PostgreSQL 함수 대신)
                 txn.exec_params(
-                    "SELECT update_game_stats($1, $2, $3, $4)",
+                    "UPDATE user_stats SET "
+                    "total_games = total_games + 1, "
+                    "wins = wins + CASE WHEN $2 THEN 1 ELSE 0 END, "
+                    "losses = losses + CASE WHEN NOT $2 AND NOT $3 THEN 1 ELSE 0 END, "
+                    "draws = draws + CASE WHEN $3 THEN 1 ELSE 0 END, "
+                    "total_score = total_score + $4, "
+                    "best_score = GREATEST(best_score, $4), "
+                    "current_win_streak = CASE WHEN $2 THEN current_win_streak + 1 ELSE 0 END, "
+                    "longest_win_streak = GREATEST(longest_win_streak, "
+                        "CASE WHEN $2 THEN current_win_streak + 1 ELSE current_win_streak END), "
+                    "last_played = CURRENT_TIMESTAMP, "
+                    "updated_at = CURRENT_TIMESTAMP "
+                    "WHERE user_id = $1",
                     userId, won, draw, score
                 );
 
@@ -449,6 +461,88 @@ namespace Blokus {
                 txn.abort();
                 dbPool_->returnConnection(std::move(conn));
                 spdlog::error("updateGameStats 오류: {}", e.what());
+                return false;
+            }
+        }
+
+        bool DatabaseManager::saveGameResults(const std::vector<uint32_t>& playerIds, 
+                                            const std::vector<int>& scores, 
+                                            const std::vector<bool>& isWinner) {
+            if (!isInitialized_) return false;
+            
+            if (playerIds.size() != scores.size() || playerIds.size() != isWinner.size()) {
+                spdlog::error("saveGameResults: 매개변수 배열 크기가 일치하지 않음");
+                return false;
+            }
+
+            auto conn = dbPool_->getConnection();
+            pqxx::work txn(*conn);
+            try {
+                spdlog::info("💾 게임 결과 저장 시작: {} 명의 플레이어", playerIds.size());
+                
+                // 모든 플레이어의 통계를 업데이트
+                for (size_t i = 0; i < playerIds.size(); ++i) {
+                    bool won = isWinner[i];
+                    bool draw = false; // 블로커스는 무승부가 없다고 가정
+                    int score = scores[i];
+                    
+                    // 해당 플레이어가 존재하는지 확인
+                    auto userCheck = txn.exec_params(
+                        "SELECT user_id FROM users WHERE user_id = $1 AND is_active = true",
+                        playerIds[i]
+                    );
+                    
+                    if (userCheck.empty()) {
+                        spdlog::warn("⚠️ 존재하지 않는 사용자 ID: {}", playerIds[i]);
+                        continue;
+                    }
+                    
+                    // user_stats에 해당 유저의 레코드가 있는지 확인하고 없으면 생성
+                    auto statsCheck = txn.exec_params(
+                        "SELECT user_id FROM user_stats WHERE user_id = $1",
+                        playerIds[i]
+                    );
+                    
+                    if (statsCheck.empty()) {
+                        txn.exec_params(
+                            "INSERT INTO user_stats (user_id) VALUES ($1)",
+                            playerIds[i]
+                        );
+                        spdlog::info("📊 새 통계 레코드 생성: 사용자 ID {}", playerIds[i]);
+                    }
+                    
+                    // 통계 업데이트
+                    txn.exec_params(
+                        "UPDATE user_stats SET "
+                        "total_games = total_games + 1, "
+                        "wins = wins + CASE WHEN $2 THEN 1 ELSE 0 END, "
+                        "losses = losses + CASE WHEN NOT $2 AND NOT $3 THEN 1 ELSE 0 END, "
+                        "draws = draws + CASE WHEN $3 THEN 1 ELSE 0 END, "
+                        "total_score = total_score + $4, "
+                        "best_score = GREATEST(best_score, $4), "
+                        "current_win_streak = CASE WHEN $2 THEN current_win_streak + 1 ELSE 0 END, "
+                        "longest_win_streak = GREATEST(longest_win_streak, "
+                            "CASE WHEN $2 THEN current_win_streak + 1 ELSE current_win_streak END), "
+                        "last_played = CURRENT_TIMESTAMP, "
+                        "updated_at = CURRENT_TIMESTAMP "
+                        "WHERE user_id = $1",
+                        playerIds[i], won, draw, score
+                    );
+                    
+                    spdlog::info("📈 플레이어 {} 통계 업데이트: 점수={}, 승리={}", 
+                               playerIds[i], score, won);
+                }
+
+                txn.commit();
+                dbPool_->returnConnection(std::move(conn));
+                spdlog::info("✅ 게임 결과 저장 완료");
+                return true;
+
+            }
+            catch (const std::exception& e) {
+                txn.abort();
+                dbPool_->returnConnection(std::move(conn));
+                spdlog::error("saveGameResults 오류: {}", e.what());
                 return false;
             }
         }
