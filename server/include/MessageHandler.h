@@ -4,6 +4,7 @@
 #include <memory>
 #include <functional>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <cstdint>
 
@@ -26,6 +27,7 @@ namespace Blokus::Server {
     class Session;
     class AuthenticationService;
     class RoomManager;
+    class DatabaseManager;
     class GameServer;
 
     // 🔥 채팅 브로드캐스트용 콜백만 유지
@@ -39,7 +41,7 @@ namespace Blokus::Server {
     // 단순화된 메시지 핸들러 클래스 (직접 처리 방식)
     class MessageHandler {
     public:
-        explicit MessageHandler(Session* session, RoomManager* roomManager = nullptr, AuthenticationService* authService = nullptr, GameServer* gameServer = nullptr);
+        explicit MessageHandler(Session* session, RoomManager* roomManager = nullptr, AuthenticationService* authService = nullptr, DatabaseManager* databaseManager_ = nullptr, GameServer* gameServer = nullptr);
         ~MessageHandler();
 
         // 메시지 처리 (현재: 텍스트 우선)
@@ -92,6 +94,9 @@ namespace Blokus::Server {
         void handleLobbyEnter(const std::vector<std::string>& params);
         void handleLobbyLeave(const std::vector<std::string>& params);
         void handleLobbyList(const std::vector<std::string>& params);
+        
+        // 사용자 정보 관련 핸들러들
+        void handleGetUserStats(const std::vector<std::string>& params);
 
         // 게임 관련 핸들러들
         void handleGameMove(const std::vector<std::string>& params);
@@ -115,23 +120,11 @@ namespace Blokus::Server {
         void sendRoomInfo(const std::shared_ptr<GameRoom>& room);
         void broadcastRoomInfoToRoom(const std::shared_ptr<GameRoom>& room);
 
-        // TODO: 2단계에서 구현 예정 (현재는 사용하지 않음)
-        /*
-        bool parseProtobufMessage(const std::string& data, blokus::MessageWrapper* wrapper);
-        void handleProtobufMessage(const blokus::MessageWrapper* wrapper);
-        void routeAuthMessage(const blokus::MessageWrapper* wrapper);
-        void routeRoomMessage(const blokus::MessageWrapper* wrapper);
-        void routeChatMessage(const blokus::MessageWrapper* wrapper);
-        void routeHeartbeat(const blokus::MessageWrapper* wrapper);
-        void sendAckResponse(uint32_t sequenceId, bool success, const std::string& errorMessage);
-        bool validateMessage(const blokus::MessageWrapper* wrapper);
-        std::string extractPayloadData(const blokus::MessageWrapper* wrapper);
-        */
-
     private:
         Session* session_;  // 소유하지 않음, 단순 참조
         RoomManager* roomManager_;  // RoomManager 참조
         AuthenticationService* authService_;  // AuthService 참조
+        DatabaseManager* databaseManager_;
         GameServer* gameServer_;  // GameServer 참조
 
         // 시퀀스 관리

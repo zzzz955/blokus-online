@@ -63,13 +63,19 @@ namespace Blokus {
         int averageScore;
         bool isOnline;
         QString status;
+        int experience;      // 현재 경험치
+        int requiredExp;     // 다음 레벨까지 필요한 경험치
+        int gamesPlayed;
+        double winRate;
 
         // 기본 생성자
         UserInfo()
             : username(QString::fromUtf8("익명"))
             , level(1), totalGames(0), wins(0), losses(0)
             , averageScore(0), isOnline(true)
-            , status(QString::fromUtf8("로비")) {
+            , status(QString::fromUtf8("로비"))
+            , experience(0), requiredExp(100)
+            , gamesPlayed(0), winRate(0.0) {
         }
 
         // Common::UserInfo에서 변환 (자동 변환)
@@ -78,7 +84,9 @@ namespace Blokus {
             , level(common.level), totalGames(common.totalGames)
             , wins(common.wins), losses(common.losses)
             , averageScore(common.averageScore), isOnline(common.isOnline)
-            , status(QString::fromUtf8(common.status.c_str())) {
+            , status(QString::fromUtf8(common.status.c_str()))
+            , experience(0), requiredExp(100)
+            , gamesPlayed(common.totalGames), winRate(getWinRate()) {
         }
 
         // Common::UserInfo로 변환

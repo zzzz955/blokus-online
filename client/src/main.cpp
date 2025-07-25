@@ -287,6 +287,7 @@ private slots:
         if (m_networkClient && m_networkClient->isConnected()) {
             m_networkClient->requestLobbyList();
             m_networkClient->requestRoomList();
+            m_networkClient->requestUserStats();
         }
     }
     
@@ -361,6 +362,36 @@ private slots:
             }
             
             m_lobbyWindow->updateRoomList(roomList);
+        }
+    }
+    
+    void onUserStatsReceived(const QString& statsJson)
+    {
+        qDebug() << QString::fromUtf8("사용자 통계 정보 수신: %1").arg(statsJson);
+        if (m_lobbyWindow) {
+            // JSON 파싱해서 UserInfo 구조체 업데이트
+            // 간단한 파싱 (실제로는 QJsonDocument를 사용해야 함)
+            UserInfo userInfo;
+            userInfo.username = m_currentUsername;
+            
+            // JSON에서 필요한 정보 추출
+            QRegExp levelRegex("\"level\":(\\d+)");
+            QRegExp currentExpRegex("\"currentExp\":(\\d+)");
+            QRegExp requiredExpRegex("\"requiredExp\":(\\d+)");
+            QRegExp totalGamesRegex("\"totalGames\":(\\d+)");
+            QRegExp winsRegex("\"wins\":(\\d+)");
+            QRegExp winRateRegex("\"winRate\":([\\d.]+)");
+            
+            if (levelRegex.indexIn(statsJson) != -1) userInfo.level = levelRegex.cap(1).toInt();
+            if (currentExpRegex.indexIn(statsJson) != -1) userInfo.experience = currentExpRegex.cap(1).toInt();
+            if (requiredExpRegex.indexIn(statsJson) != -1) userInfo.requiredExp = requiredExpRegex.cap(1).toInt();
+            if (totalGamesRegex.indexIn(statsJson) != -1) userInfo.gamesPlayed = totalGamesRegex.cap(1).toInt();
+            if (winsRegex.indexIn(statsJson) != -1) userInfo.wins = winsRegex.cap(1).toInt();
+            if (winRateRegex.indexIn(statsJson) != -1) userInfo.winRate = winRateRegex.cap(1).toDouble();
+            
+            userInfo.status = QString::fromUtf8("로비");
+            
+            m_lobbyWindow->setMyUserInfo(userInfo);
         }
     }
     
@@ -840,6 +871,8 @@ private:
                 this, &AppController::onLobbyUserLeft);
         connect(m_networkClient, &NetworkClient::roomListReceived, 
                 this, &AppController::onRoomListReceived);
+        connect(m_networkClient, &NetworkClient::userStatsReceived,
+                this, &AppController::onUserStatsReceived);
         
         // 방 관련 시그널 추가
         connect(m_networkClient, &NetworkClient::roomCreated,

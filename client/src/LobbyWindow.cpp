@@ -403,27 +403,58 @@ namespace Blokus {
     void LobbyWindow::setupInfoPanel()
     {
         m_infoPanel = new QWidget();
-        m_infoPanel->setFixedHeight(60);
+        m_infoPanel->setFixedHeight(70);
 
-        QHBoxLayout* layout = new QHBoxLayout(m_infoPanel);
-        layout->setContentsMargins(15, 10, 15, 10);
+        QHBoxLayout* mainLayout = new QHBoxLayout(m_infoPanel);
+        mainLayout->setContentsMargins(15, 10, 15, 10);
 
         // 환영 메시지
         m_welcomeLabel = new QLabel(QString::fromUtf8("🎮 %1님, 환영합니다!").arg(m_myUsername));
         m_welcomeLabel->setStyleSheet("font-size: 16px; font-weight: bold; color: #2c3e50;");
 
-        // 사용자 통계
+        // 사용자 통계 (한 줄로 모든 정보 표시)
         m_userStatsLabel = new QLabel();
-        updateUserStatsDisplay();
+        m_userStatsLabel->setStyleSheet("color: #34495e; font-size: 13px; font-weight: bold;");
+
+        // 경험치 라벨
+        m_expLabel = new QLabel();
+        m_expLabel->setStyleSheet("color: #7f8c8d; font-size: 11px;");
+        m_expLabel->setFixedWidth(100);
+
+        // 경험치 진행바
+        m_expProgressBar = new QProgressBar();
+        m_expProgressBar->setFixedHeight(15);
+        m_expProgressBar->setFixedWidth(150);
+        m_expProgressBar->setStyleSheet(
+            "QProgressBar {"
+            "    border: 1px solid #bdc3c7;"
+            "    border-radius: 7px;"
+            "    background-color: #ecf0f1;"
+            "    text-align: center;"
+            "    font-size: 10px;"
+            "    color: #2c3e50;"
+            "}"
+            "QProgressBar::chunk {"
+            "    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #3498db, stop:1 #2980b9);"
+            "    border-radius: 6px;"
+            "}"
+        );
 
         // 로그아웃 버튼
         m_logoutButton = new QPushButton(QString::fromUtf8("로그아웃"));
         m_logoutButton->setFixedSize(80, 35);
 
-        layout->addWidget(m_welcomeLabel);
-        layout->addStretch();
-        layout->addWidget(m_userStatsLabel);
-        layout->addWidget(m_logoutButton);
+        // 한 줄 레이아웃으로 모든 요소 배치
+        mainLayout->addWidget(m_welcomeLabel);
+        mainLayout->addStretch();
+        mainLayout->addWidget(m_userStatsLabel);
+        mainLayout->addSpacing(20);
+        mainLayout->addWidget(m_expLabel);
+        mainLayout->addWidget(m_expProgressBar);
+        mainLayout->addSpacing(10);
+        mainLayout->addWidget(m_logoutButton);
+
+        updateUserStatsDisplay();
 
         connect(m_logoutButton, &QPushButton::clicked, this, &LobbyWindow::onLogoutClicked);
     }
@@ -1034,14 +1065,38 @@ namespace Blokus {
 
     void LobbyWindow::updateUserStatsDisplay()
     {
-        QString statsText = QString::fromUtf8("레벨 %1 | %2승 %3패 | 승률 %4%")
+        // 기본 통계 정보
+        QString statsText = QString::fromUtf8("레벨 %1 | %2승 %3패 | 승률 %4% | 게임 %5회")
             .arg(m_myUserInfo.level)
             .arg(m_myUserInfo.wins)
             .arg(m_myUserInfo.losses)
-            .arg(QString::number(m_myUserInfo.getWinRate(), 'f', 1));
+            .arg(QString::number(m_myUserInfo.winRate, 'f', 1))
+            .arg(m_myUserInfo.gamesPlayed);
 
         m_userStatsLabel->setText(statsText);
-        m_userStatsLabel->setStyleSheet("color: white; font-size: 13px;");
+
+        // 경험치 정보가 있을 때만 업데이트
+        if (m_expProgressBar && m_expLabel) {
+            // 경험치 진행바 설정
+            if (m_myUserInfo.requiredExp > 0) {
+                m_expProgressBar->setMaximum(m_myUserInfo.requiredExp);
+                m_expProgressBar->setValue(m_myUserInfo.experience);
+                
+                // 진행률 계산
+                double progress = static_cast<double>(m_myUserInfo.experience) / m_myUserInfo.requiredExp * 100.0;
+                m_expProgressBar->setFormat(QString("%1%").arg(QString::number(progress, 'f', 1)));
+            } else {
+                m_expProgressBar->setMaximum(100);
+                m_expProgressBar->setValue(100);
+                m_expProgressBar->setFormat(QString::fromUtf8("MAX"));
+            }
+
+            // 경험치 라벨 설정
+            QString expText = QString::fromUtf8("EXP: %1 / %2")
+                .arg(m_myUserInfo.experience)
+                .arg(m_myUserInfo.requiredExp);
+            m_expLabel->setText(expText);
+        }
     }
 
     // ========================================

@@ -1734,6 +1734,25 @@ namespace Blokus {
                                     if (expSuccess) {
                                         spdlog::info("🎉 플레이어 {} 경험치 획득: +{}", 
                                                    completedPlayerIds[i], expGained);
+                                        
+                                        // 세션 정보 동기화: DB 업데이트 후 세션의 UserAccount 정보도 갱신
+                                        for (const auto& player : m_players) {
+                                            if (player.getUserId() == std::to_string(completedPlayerIds[i])) {
+                                                auto session = player.getSession();
+                                                if (session) {
+                                                    // DB에서 최신 사용자 정보 조회
+                                                    auto updatedAccount = dbManager->getUserById(completedPlayerIds[i]);
+                                                    if (updatedAccount.has_value()) {
+                                                        session->updateUserAccount(updatedAccount.value());
+                                                        spdlog::debug("🔄 세션 정보 동기화 완료: {} (레벨: {}, 경험치: {})", 
+                                                                     player.getUsername(), 
+                                                                     updatedAccount->level, 
+                                                                     updatedAccount->experiencePoints);
+                                                    }
+                                                }
+                                                break;
+                                            }
+                                        }
                                     } else {
                                         spdlog::error("❌ 플레이어 {} 경험치 업데이트 실패", 
                                                     completedPlayerIds[i]);

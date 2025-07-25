@@ -325,6 +325,7 @@ namespace Blokus::Server {
                 session.get(),          // Session 포인터
                 roomManager_.get(),     // RoomManager 포인터  
                 authService_.get(),     // AuthenticationService 포인터
+                databaseManager_.get(),
                 this                    // GameServer 포인터
             );
 
@@ -642,12 +643,14 @@ namespace Blokus::Server {
             response << "LOBBY_USER_LIST:" << lobbyUsers.size();
             
             int validUserCount = 0;
-            for (const auto& session : lobbyUsers) {
-                if (session && session->isActive() && !session->getUsername().empty()) {
-                    std::string userStatus = session->isInLobby() ? "LOBBY" : "ROOM";
-                    response << ":" << session->getUsername() << "," << userStatus;
+            for (const auto& lobbySession : lobbyUsers) {
+                if (lobbySession && lobbySession->isActive() && !lobbySession->getUsername().empty()) {
+                    std::string username = lobbySession->getUsername();
+                    int userLevel = lobbySession->getUserLevel();
+                    std::string userStatus = lobbySession->getUserStatusString();
+                    
+                    response << ":" << username << "," << userLevel << "," << userStatus;
                     validUserCount++;
-                    spdlog::debug("   - 주기적 브로드캐스트 포함: '{}' (상태: {})", session->getUsername(), userStatus);
                 }
             }
             
@@ -661,8 +664,6 @@ namespace Blokus::Server {
                     sentCount++;
                 }
             }
-            
-            spdlog::info("🔄 주기적 로비 사용자 목록 브로드캐스트: {}명 유효, {}명 전송", validUserCount, sentCount);
         }
         catch (const std::exception& e) {
             spdlog::error("주기적 로비 사용자 목록 브로드캐스트 중 오류: {}", e.what());

@@ -88,6 +88,7 @@ namespace Blokus::Server {
 
         // 접근자
         boost::asio::io_context& getIOContext() { return ioContext_; }
+        std::shared_ptr<DatabaseManager> getDatabaseManager() const { return databaseManager_; }
 
         // 통계 접근자
         int getCurrentConnections() const {

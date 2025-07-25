@@ -3,9 +3,11 @@
 #include "RoomManager.h"
 #include "AuthenticationService.h"
 #include "GameServer.h"
+#include "DatabaseManager.h"
 #include <spdlog/spdlog.h>
 #include <sstream>
 #include <algorithm>
+#include <iomanip>
 
 namespace Blokus::Server {
 
@@ -13,10 +15,11 @@ namespace Blokus::Server {
     // 생성자 및 소멸자
     // ========================================
 
-    MessageHandler::MessageHandler(Session* session, RoomManager* roomManager, AuthenticationService* authService, GameServer* gameServer)
+    MessageHandler::MessageHandler(Session* session, RoomManager* roomManager, AuthenticationService* authService, DatabaseManager* databaseManager, GameServer* gameServer)
         : session_(session)
         , roomManager_(roomManager)
         , authService_(authService)
+        , databaseManager_(databaseManager)
         , gameServer_(gameServer)
     {
         // 🔥 enum 기반 핸들러 등록
@@ -42,6 +45,9 @@ namespace Blokus::Server {
         handlers_[MessageType::LobbyEnter] = [this](const auto& params) { handleLobbyEnter(params); };
         handlers_[MessageType::LobbyLeave] = [this](const auto& params) { handleLobbyLeave(params); };
         handlers_[MessageType::LobbyList] = [this](const auto& params) { handleLobbyList(params); };
+        
+        // 사용자 정보 관련
+        handlers_[MessageType::GetUserStats] = [this](const auto& params) { handleGetUserStats(params); };
 
         // 게임 관련
         handlers_[MessageType::GameMove] = [this](const auto& params) { handleGameMove(params); };
@@ -108,7 +114,7 @@ namespace Blokus::Server {
 
         // room:xxx, game:xxx 형태 처리
         if (parts.size() >= 2) {
-            if (commandStr == "room" || commandStr == "game") {
+            if (commandStr == "room" || commandStr == "game" || commandStr == "lobby") {
                 commandStr += ":" + parts[1];
                 // 파라미터는 2번째 인덱스부터
                 std::vector<std::string> params(parts.begin() + 2, parts.end());
@@ -177,6 +183,19 @@ namespace Blokus::Server {
 
         if (result.success) {
             session_->setAuthenticated(result.userId, result.username);
+            
+            // DB에서 사용자 계정 정보를 불러와 세션에 저장
+            if (databaseManager_) {
+                auto userAccount = databaseManager_->getUserByUsername(result.username);
+                if (userAccount.has_value()) {
+                    session_->setUserAccount(userAccount.value());
+                    spdlog::debug("💾 사용자 계정 정보 로드 완료: {} (레벨: {}, 경험치: {})", 
+                                 result.username, userAccount->level, userAccount->experiencePoints);
+                } else {
+                    spdlog::warn("⚠️ 사용자 계정 정보를 찾을 수 없음: {}", result.username);
+                }
+            }
+            
             sendResponse("AUTH_SUCCESS:" + result.username + ":" + result.sessionToken);
             
             // 로그인 성공 시 자동으로 로비에 입장되므로 다른 사용자들에게 브로드캐스트
@@ -254,6 +273,19 @@ namespace Blokus::Server {
 
         if (result.success) {
             session_->setAuthenticated(result.userId, result.username);
+            
+            // DB에서 사용자 계정 정보 조회 (게스트도 DB에 저장될 수 있음)
+            if (databaseManager_) {
+                auto userAccount = databaseManager_->getUserByUsername(result.username);
+                if (userAccount.has_value()) {
+                    session_->setUserAccount(userAccount.value());
+                    spdlog::debug("💾 게스트 계정 정보 로드 완료: {} (레벨: {}, 경험치: {})", 
+                                 result.username, userAccount->level, userAccount->experiencePoints);
+                } else {
+                    spdlog::debug("💾 게스트 계정 정보 없음: {} (기본값 사용)", result.username);
+                }
+            }
+            
             sendResponse("GUEST_LOGIN_SUCCESS:" + result.username + ":" + result.sessionToken);
             
             // 게스트 로그인 성공 시 자동으로 로비에 입장되므로 다른 사용자들에게 브로드캐스트
@@ -1046,7 +1078,6 @@ namespace Blokus::Server {
 
             // GameServer에서 실제 로비 사용자 목록을 가져옴
             auto lobbyUsers = gameServer_->getLobbyUsers();
-            spdlog::info("🔍 로비 사용자 목록 조회: 총 {}명", lobbyUsers.size());
             
             std::ostringstream response;
             response << "LOBBY_USER_LIST:" << lobbyUsers.size();
@@ -1054,21 +1085,15 @@ namespace Blokus::Server {
             int validUserCount = 0;
             for (const auto& lobbySession : lobbyUsers) {
                 if (lobbySession && lobbySession->isActive() && !lobbySession->getUsername().empty()) {
-                    std::string userStatus = lobbySession->isInLobby() ? "LOBBY" : "ROOM";
-                    response << ":" << lobbySession->getUsername() << "," << userStatus;
+                    std::string username = lobbySession->getUsername();
+                    int userLevel = lobbySession->getUserLevel();
+                    std::string userStatus = lobbySession->getUserStatusString();
+                    
+                    response << ":" << username << "," << userLevel << "," << userStatus;
                     validUserCount++;
-                    spdlog::info("   - 유효한 접속 사용자: '{}' (상태: {})", lobbySession->getUsername(), userStatus);
-                } else {
-                    spdlog::warn("   - 무효한 세션: session={}, active={}, username='{}'", 
-                        (bool)lobbySession, 
-                        lobbySession ? lobbySession->isActive() : false,
-                        lobbySession ? lobbySession->getUsername() : "(null)");
                 }
             }
-            spdlog::info("🔍 유효한 접속 사용자: {}명/{} 명", validUserCount, lobbyUsers.size());
-            
             sendResponse(response.str());
-            spdlog::info("📋 로비 사용자 목록 전송: {}명 - 메시지: {}", lobbyUsers.size(), response.str());
         }
         catch (const std::exception& e) {
             spdlog::error("로비 사용자 목록 전송 중 오류: {}", e.what());
@@ -1262,28 +1287,80 @@ namespace Blokus::Server {
         }
     }
 
-    // TODO: Protobuf 관련 구현 (향후)
-    /*
-    bool MessageHandler::parseProtobufMessage(const std::string& data, blokus::MessageWrapper& wrapper) {
+    // ========================================
+    // 사용자 정보 관련 핸들러
+    // ========================================
+
+    void MessageHandler::handleGetUserStats(const std::vector<std::string>& params) {
+        if (!session_ || !gameServer_) {
+            sendError("Invalid session or server");
+            return;
+        }
+
+        // 현재 세션의 사용자 인증 확인
+        std::string username = session_->getUsername();
+        if (username.empty()) {
+            sendError("User not authenticated");
+            return;
+        }
+
         try {
-            return wrapper.ParseFromString(data);
+            // 세션에 저장된 사용자 계정 정보 사용
+            auto userAccountOpt = session_->getUserAccount();
+            if (!userAccountOpt.has_value()) {
+                // 세션에 정보가 없는 경우 DB에서 조회하여 업데이트
+                auto dbManager = gameServer_->getDatabaseManager();
+                if (!dbManager) {
+                    sendError("Database not available");
+                    return;
+                }
+                
+                auto dbUserAccount = dbManager->getUserByUsername(username);
+                if (!dbUserAccount.has_value()) {
+                    sendError("User not found");
+                    return;
+                }
+                
+                // 세션에 정보 저장
+                session_->setUserAccount(dbUserAccount.value());
+                userAccountOpt = dbUserAccount;
+            }
+
+            const UserAccount& userAccount = userAccountOpt.value();
+
+            // 현재 경험치에서 다음 레벨까지 필요한 경험치 계산
+            auto dbManager = gameServer_->getDatabaseManager();
+            int requiredExpForNextLevel = 100; // 기본값
+            if (dbManager) {
+                requiredExpForNextLevel = dbManager->getRequiredExpForLevel(userAccount.level + 1);
+            }
+            
+            // 세션의 상태 문자열 사용
+            std::string status = session_->getUserStatusString();
+
+            // JSON 형태로 응답 생성
+            std::ostringstream response;
+            response << "USER_STATS_RESPONSE:{";
+            response << "\"username\":\"" << userAccount.username << "\",";
+            response << "\"level\":" << userAccount.level << ",";
+            response << "\"totalGames\":" << userAccount.totalGames << ",";
+            response << "\"wins\":" << userAccount.wins << ",";
+            response << "\"losses\":" << userAccount.losses << ",";
+            response << "\"draws\":" << userAccount.draws << ",";
+            response << "\"currentExp\":" << userAccount.experiencePoints << ",";
+            response << "\"requiredExp\":" << requiredExpForNextLevel << ",";
+            response << "\"winRate\":" << std::fixed << std::setprecision(1) << userAccount.getWinRate() << ",";
+            response << "\"status\":\"" << status << "\"";
+            response << "}";
+
+            sendResponse(response.str());
+            spdlog::debug("사용자 {} 통계 정보 전송 완료 (세션 캐시 사용)", userAccount.username);
+
         }
         catch (const std::exception& e) {
-            spdlog::debug("Protobuf 파싱 실패: {}", e.what());
-            return false;
+            spdlog::error("handleGetUserStats 오류: {}", e.what());
+            sendError("Failed to get user stats");
         }
     }
-
-    void MessageHandler::handleProtobufMessage(const blokus::MessageWrapper& wrapper) {
-        // 메시지 타입별 라우팅
-        auto it = protobufHandlers_.find(static_cast<int>(wrapper.type()));
-        if (it != protobufHandlers_.end()) {
-            it->second(wrapper);
-        } else {
-            spdlog::warn("처리되지 않은 protobuf 메시지 타입: {}", wrapper.type());
-            sendError("Unhandled message type");
-        }
-    }
-    */
 
 } // namespace Blokus::Server

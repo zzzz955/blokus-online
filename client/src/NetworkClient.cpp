@@ -217,6 +217,17 @@ namespace Blokus {
         qDebug() << QString::fromUtf8("방 목록 요청 전송");
     }
     
+    void NetworkClient::requestUserStats()
+    {
+        if (!isConnected()) {
+            qWarning() << QString::fromUtf8("사용자 정보 요청 실패: 서버에 연결되지 않음");
+            return;
+        }
+        
+        sendMessage("lobby:stats");
+        qDebug() << QString::fromUtf8("사용자 통계 정보 요청 전송");
+    }
+    
     void NetworkClient::createRoom(const QString& roomName, bool isPrivate, const QString& password)
     {
         if (!isConnected()) {
@@ -484,13 +495,21 @@ namespace Blokus {
             
             qDebug() << QString::fromUtf8("로비 사용자 목록 수신: 총 %1명, 파트 개수: %2").arg(userCount).arg(parts.size());
             
-            // 서버 형식: LOBBY_USER_LIST:count:user1,status1:user2,status2...
+            // 서버 형식: LOBBY_USER_LIST:count:user1,level1,status1:user2,level2,status2...
             for (int i = 2; i < parts.size(); ++i) {
                 if (!parts[i].isEmpty()) {
                     QStringList userInfo = parts[i].split(',');
-                    if (!userInfo.isEmpty()) {
-                        users.append(userInfo[0]); // 사용자명만 추출
-                        qDebug() << QString::fromUtf8("사용자 추가: %1").arg(userInfo[0]);
+                    if (userInfo.size() >= 3) {
+                        QString username = userInfo[0];
+                        int level = userInfo[1].toInt();
+                        QString status = userInfo[2];
+                        
+                        users.append(QString::fromUtf8("Lv.%1 %2 (%3)").arg(level).arg(username).arg(status));
+                        qDebug() << QString::fromUtf8("사용자 추가: %1 (레벨: %2, 상태: %3)").arg(username).arg(level).arg(status);
+                    } else if (userInfo.size() >= 1) {
+                        // 구버전 호환성을 위한 처리
+                        users.append(userInfo[0]);
+                        qDebug() << QString::fromUtf8("사용자 추가 (구버전): %1").arg(userInfo[0]);
                     }
                 }
             }
@@ -576,6 +595,10 @@ namespace Blokus {
             QString systemMessage = parts.mid(1).join(":");
             // 시스템 메시지를 채팅으로 처리
             emit chatMessageReceived(QString::fromUtf8("시스템"), systemMessage);
+        }
+        else if (parts[0] == "USER_STATS_RESPONSE" && parts.size() >= 2) {
+            QString statsJson = parts.mid(1).join(":");
+            emit userStatsReceived(statsJson);
         }
     }
 

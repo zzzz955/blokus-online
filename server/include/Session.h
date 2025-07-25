@@ -1,6 +1,7 @@
 #pragma once
 
-#include "ServerTypes.h"  // ConnectionState´Â ¿©±â¿¡ Á¤ÀÇµÊ
+#include "ServerTypes.h"  // ConnectionStateï¿½ï¿½ ï¿½ï¿½ï¿½â¿¡ ï¿½ï¿½ï¿½Çµï¿½
+#include "DatabaseManager.h"  // UserAccount êµ¬ì¡°ì²´ë¥¼ ìœ„í•´ ì¶”ê°€
 #include <boost/asio.hpp>
 #include <spdlog/spdlog.h>
 #include <memory>
@@ -11,8 +12,9 @@
 #include <mutex>
 #include <functional>
 #include <vector>
+#include <optional>
 
-// Àü¹æ ¼±¾ğ
+// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 namespace Blokus::Server {
     class MessageHandler;
 }
@@ -20,87 +22,96 @@ namespace Blokus::Server {
 namespace Blokus::Server {
 
     // ========================================
-    // Session Å¬·¡½º (±âÁ¸ ÇÁ·ÎÁ§Æ® ±¸Á¶ ±â¹İ)
+    // Session Å¬ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½)
     // ========================================
     class Session : public std::enable_shared_from_this<Session> {
     public:
-        // Äİ¹é Å¸ÀÔ Á¤ÀÇ (±âÁ¸ ÇÁ·ÎÁ§Æ® ¹æ½Ä)
+        // ï¿½İ¹ï¿½ Å¸ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½)
         using SessionEventCallback = std::function<void(const std::string&)>;
         using MessageEventCallback = std::function<void(const std::string&, const std::string&)>;
 
-        // »ı¼ºÀÚ/¼Ò¸êÀÚ
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½/ï¿½Ò¸ï¿½ï¿½ï¿½
         explicit Session(boost::asio::ip::tcp::socket socket);
         ~Session();
 
-        // ¼¼¼Ç Á¦¾î
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         void start();
         void stop();
         bool isActive() const { return active_.load(); }
 
-        // ¸Ş½ÃÁö ÇÚµé·¯ ¼³Á¤
+        // ï¿½Ş½ï¿½ï¿½ï¿½ ï¿½Úµé·¯ ï¿½ï¿½ï¿½ï¿½
         void setMessageHandler(std::unique_ptr<MessageHandler> handler);
         MessageHandler* getMessageHandler() const { return messageHandler_.get(); }
 
-        // ±âº» Á¤º¸ Á¢±ÙÀÚ
+        // ï¿½âº» ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         const std::string& getSessionId() const { return sessionId_; }
         const std::string& getUserId() const { return userId_; }
         const std::string& getUsername() const { return username_; }
         ConnectionState getState() const { return state_; }
         int getCurrentRoomId() const { return currentRoomId_; }
 
-        // »óÅÂ È®ÀÎ ÇÔ¼öµé (±âÁ¸ Session.h ¹æ½Ä)
+        // ì‚¬ìš©ì ê³„ì • ì •ë³´ ì ‘ê·¼ì
+        const std::optional<UserAccount>& getUserAccount() const { return userAccount_; }
+        bool hasUserAccount() const { return userAccount_.has_value(); }
+        int getUserLevel() const { return userAccount_ ? userAccount_->level : 1; }
+        int getUserExperience() const { return userAccount_ ? userAccount_->experiencePoints : 0; }
+        std::string getUserStatusString() const;
+
+        // ï¿½ï¿½ï¿½ï¿½ È®ï¿½ï¿½ ï¿½Ô¼ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ Session.h ï¿½ï¿½ï¿½)
         bool isConnected() const { return state_ >= ConnectionState::Connected; }
         bool isInLobby() const { return state_ == ConnectionState::InLobby; }
         bool isInRoom() const { return state_ == ConnectionState::InRoom; }
         bool isInGame() const { return state_ == ConnectionState::InGame; }
 
-        // ±ÇÇÑ È®ÀÎ ÇÔ¼öµé (ºñÁî´Ï½º ·ÎÁ÷¿ë)
+        // ï¿½ï¿½ï¿½ï¿½ È®ï¿½ï¿½ ï¿½Ô¼ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½Ï½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½)
         bool canCreateRoom() const { return isInLobby(); }
         bool canJoinRoom() const { return isInLobby(); }
         bool canLeaveRoom() const { return isInRoom() || isInGame(); }
         bool canStartGame() const { return isInRoom(); }
         bool canMakeGameMove() const { return isInGame(); }
 
-        // »óÅÂ º¯°æ ÇÔ¼öµé
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ô¼ï¿½ï¿½ï¿½
         void setStateToConnected();
         void setStateToLobby();
         void setStateToInRoom(int roomId = -1);
         void setStateToInGame();
 
-        // ÀÎÁõ °ü·Ã
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         void setAuthenticated(const std::string& userId, const std::string& username);
+        void setUserAccount(const UserAccount& account);
+        void updateUserAccount(const UserAccount& account);
 
-        // ¸Ş½ÃÁö ¼Û¼ö½Å
+        // ï¿½Ş½ï¿½ï¿½ï¿½ ï¿½Û¼ï¿½ï¿½ï¿½
         void sendMessage(const std::string& message);
         void sendBinary(const std::vector<uint8_t>& data);
 
-        // Äİ¹é ¼³Á¤ (±âÁ¸ ÇÁ·ÎÁ§Æ® ¹æ½Ä)
+        // ï¿½İ¹ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½)
         void setDisconnectCallback(SessionEventCallback callback) { disconnectCallback_ = callback; }
         void setMessageCallback(MessageEventCallback callback) { messageCallback_ = callback; }
 
-        // È°µ¿ ÃßÀû
+        // È°ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         void updateLastActivity() { lastActivity_ = std::chrono::steady_clock::now(); }
         bool isTimedOut(std::chrono::seconds timeout) const;
         std::chrono::steady_clock::time_point getLastActivity() const { return lastActivity_; }
 
-        // ³×Æ®¿öÅ© Á¤º¸
+        // ï¿½ï¿½Æ®ï¿½ï¿½Å© ï¿½ï¿½ï¿½ï¿½
         std::string getRemoteAddress() const;
-        boost::asio::ip::tcp::socket& getSocket() { return socket_; }  // GameServer¿¡¼­ ÇÊ¿ä
+        boost::asio::ip::tcp::socket& getSocket() { return socket_; }  // GameServerï¿½ï¿½ï¿½ï¿½ ï¿½Ê¿ï¿½
 
-        // Åë°è ¹× µğ¹ö±ë
+        // ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½
         size_t getPendingMessageCount() const {
             std::lock_guard<std::mutex> lock(sendMutex_);
             return outgoingMessages_.size();
         }
 
     private:
-        // ³×Æ®¿öÅ© °ü·Ã
+        // ï¿½ï¿½Æ®ï¿½ï¿½Å© ï¿½ï¿½ï¿½ï¿½
         boost::asio::ip::tcp::socket socket_;
         static constexpr size_t MAX_MESSAGE_LENGTH = 8192;
         char readBuffer_[MAX_MESSAGE_LENGTH];
         std::string messageBuffer_;
 
-        // ¼¼¼Ç Á¤º¸
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         std::string sessionId_;
         std::string userId_;
         std::string username_;
@@ -108,41 +119,44 @@ namespace Blokus::Server {
         int currentRoomId_;
         std::atomic<bool> active_;
         std::chrono::steady_clock::time_point lastActivity_;
+        
+        // ì‚¬ìš©ì ê³„ì • ì •ë³´
+        std::optional<UserAccount> userAccount_;
 
-        // ¸Ş½ÃÁö Ã³¸®
+        // ï¿½Ş½ï¿½ï¿½ï¿½ Ã³ï¿½ï¿½
         std::unique_ptr<MessageHandler> messageHandler_;
 
-        // ºñµ¿±â ¾²±â °ü¸®
+        // ï¿½ñµ¿±ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         mutable std::mutex sendMutex_;
         std::queue<std::string> outgoingMessages_;
         bool writing_;
 
-        // Äİ¹é
+        // ï¿½İ¹ï¿½
         SessionEventCallback disconnectCallback_;
         MessageEventCallback messageCallback_;
 
-        // ³»ºÎ ³×Æ®¿öÅ© ÇÔ¼öµé
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Æ®ï¿½ï¿½Å© ï¿½Ô¼ï¿½ï¿½ï¿½
         void startRead();
         void handleRead(const boost::system::error_code& error, size_t bytesTransferred);
         void doWrite();
         void handleWrite(const boost::system::error_code& error, size_t bytesTransferred);
 
-        // ¸Ş½ÃÁö Ã³¸®
+        // ï¿½Ş½ï¿½ï¿½ï¿½ Ã³ï¿½ï¿½
         void processMessage(const std::string& message);
         void handleError(const boost::system::error_code& error);
         void cleanup();
 
-        // Äİ¹é È£Ãâ
+        // ï¿½İ¹ï¿½ È£ï¿½ï¿½
         void notifyDisconnect();
         void notifyMessage(const std::string& message);
 
-        // À¯Æ¿¸®Æ¼
+        // ï¿½ï¿½Æ¿ï¿½ï¿½Æ¼
         std::string generateSessionId();
     };
 
     // ========================================
-    // ÆíÀÇ ÇÔ¼öµé (±âÁ¸ ServerTypes.h¿¡ ÀÌ¹Ì ÀÖÀ½)
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½Ô¼ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ ServerTypes.hï¿½ï¿½ ï¿½Ì¹ï¿½ ï¿½ï¿½ï¿½ï¿½)
     // ========================================
-    // connectionStateToStringÀº ServerTypes.h¿¡ Á¤ÀÇµÊ
+    // connectionStateToStringï¿½ï¿½ ServerTypes.hï¿½ï¿½ ï¿½ï¿½ï¿½Çµï¿½
 
 } // namespace Blokus::Server

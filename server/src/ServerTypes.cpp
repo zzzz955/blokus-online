@@ -42,6 +42,7 @@ namespace Blokus {
                 {"lobby:enter", MessageType::LobbyEnter},
                 {"lobby:leave", MessageType::LobbyLeave},
                 {"lobby:list", MessageType::LobbyList},
+                {"lobby:stats", MessageType::GetUserStats},
 
                 // �� ����
                 {"room:create", MessageType::RoomCreate},
@@ -78,6 +79,7 @@ namespace Blokus {
             case MessageType::LobbyEnter: return "lobby:enter";
             case MessageType::LobbyLeave: return "lobby:leave";
             case MessageType::LobbyList: return "lobby:list";
+            case MessageType::GetUserStats: return "lobby:stats";
             case MessageType::RoomCreate: return "room:create";
             case MessageType::RoomJoin: return "room:join";
             case MessageType::RoomLeave: return "room:leave";
