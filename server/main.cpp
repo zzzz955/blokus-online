@@ -45,36 +45,34 @@ int main() {
         dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
         SetConsoleMode(hOut, dwMode);
 #endif
+        spdlog::set_pattern("[%Y-%m-%d %H:%M:%S] [%l] [%t] %v");
+        spdlog::set_level(spdlog::level::info);  // 개발용 상세 로그
 
-        // 로깅 패턴 설정 (이모지 제거, 영문만 사용)
-        spdlog::set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] [%t] %v");
-        spdlog::set_level(spdlog::level::debug);  // 개발용 상세 로그
-
-        spdlog::info("Blokus Online Server v1.0.0");
+        spdlog::info("블로커스 온라인 서버 v1.0.0");
         spdlog::info("========================================");
 
         // ========================================
         // 2. 설정 및 환경 초기화
         // ========================================
-        spdlog::info("Initializing configuration...");
+        spdlog::info("설정 및 환경 초기화 진행 중...");
 
         Blokus::Server::ConfigManager::initialize();
         if (!Blokus::Server::ConfigManager::validate()) {
-            spdlog::error("Configuration validation failed");
+            spdlog::error("환경 초기화 실패");
             return 1;
         }
 
         // 설정 정보 출력 (영문으로)
-        spdlog::info("Server Configuration:");
-        spdlog::info("  Port: {}", Blokus::Server::ConfigManager::serverPort);
-        spdlog::info("  Max Clients: {}", Blokus::Server::ConfigManager::maxClients);
-        spdlog::info("  Thread Pool Size: {}", Blokus::Server::ConfigManager::threadPoolSize);
-        spdlog::info("  Debug Mode: {}", Blokus::Server::ConfigManager::debugMode ? "ON" : "OFF");
+        spdlog::info("[서버 초기화]");
+        spdlog::info("  서버 포트: {}", Blokus::Server::ConfigManager::serverPort);
+        spdlog::info("  최대 세션: {}", Blokus::Server::ConfigManager::maxClients);
+        spdlog::info("  스레드풀 크기: {}", Blokus::Server::ConfigManager::threadPoolSize);
+        spdlog::info("  디버그 모드 여부: {}", Blokus::Server::ConfigManager::debugMode ? "ON" : "OFF");
 
         // ========================================
         // 3. 게임 서버 생성 및 실행
         // ========================================
-        spdlog::info("Starting game server...");
+        spdlog::info("게임 서버 실행 중...");
 
         g_server = std::make_unique<Blokus::Server::GameServer>();
 

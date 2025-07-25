@@ -175,6 +175,8 @@ namespace Blokus {
         QWidget* m_infoPanel;
         QLabel* m_welcomeLabel;
         QLabel* m_userStatsLabel;
+        QProgressBar* m_expProgressBar;
+        QLabel* m_expLabel;
         QPushButton* m_logoutButton;
 
         // 데이터 저장소

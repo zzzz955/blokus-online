@@ -101,6 +101,37 @@ namespace Blokus::Server {
         spdlog::info("✅ 세션 인증 완료: {} (사용자: '{}')", sessionId_, username);
     }
 
+    void Session::setUserAccount(const UserAccount& account) {
+        userAccount_ = account;
+        spdlog::debug("💾 사용자 계정 정보 설정: {} (레벨: {}, 경험치: {})", 
+                     username_, account.level, account.experiencePoints);
+    }
+
+    void Session::updateUserAccount(const UserAccount& account) {
+        if (userAccount_.has_value()) {
+            userAccount_ = account;
+            spdlog::debug("🔄 사용자 계정 정보 업데이트: {} (레벨: {}, 경험치: {})", 
+                         username_, account.level, account.experiencePoints);
+        } else {
+            setUserAccount(account);
+        }
+    }
+
+    std::string Session::getUserStatusString() const {
+        switch (state_) {
+            case ConnectionState::Connected:
+                return "접속중";
+            case ConnectionState::InLobby:
+                return "로비";
+            case ConnectionState::InRoom:
+                return std::to_string(currentRoomId_) + "번 방";
+            case ConnectionState::InGame:
+                return std::to_string(currentRoomId_) + "번 방";
+            default:
+                return "알수없음";
+        }
+    }
+
     void Session::setStateToConnected() {
         state_ = ConnectionState::Connected;
         updateLastActivity();
@@ -292,7 +323,7 @@ namespace Blokus::Server {
     // ========================================
 
     void Session::processMessage(const std::string& message) {
-        spdlog::debug("📨 메시지 처리 시작: {}", message);
+        spdlog::info("📨 메시지 처리 시작: {}", message);
         if (messageHandler_) {
             try {
                 messageHandler_->handleMessage(message);
@@ -301,7 +332,7 @@ namespace Blokus::Server {
                 spdlog::error("❌ 메시지 핸들러 오류 ({}): {}", sessionId_, e.what());
                 sendMessage("ERROR:Message processing failed");
             }
-            spdlog::debug("📨 메시지 처리 완료: {}", message);
+            spdlog::info("📨 메시지 처리 완료: {}", message);
         }
         else {
             notifyMessage(message);

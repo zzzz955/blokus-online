@@ -42,7 +42,6 @@ namespace Blokus {
                 {"lobby:enter", MessageType::LobbyEnter},
                 {"lobby:leave", MessageType::LobbyLeave},
                 {"lobby:list", MessageType::LobbyList},
-
                 // �� ����
                 {"room:create", MessageType::RoomCreate},
                 {"room:join", MessageType::RoomJoin},
