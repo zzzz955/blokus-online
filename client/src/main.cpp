@@ -90,11 +90,7 @@ private slots:
 
         createLobbyWindow();
 
-        // 로비 입장 요청
-        if (m_networkClient && m_networkClient->isConnected())
-        {
-            m_networkClient->enterLobby();
-        }
+        // 로그인 성공 시 서버에서 자동으로 로비 진입 및 정보 전송하므로 별도 요청 불필요
     }
 
     void handleLogoutRequest()
@@ -305,11 +301,7 @@ private slots:
     void onLobbyEntered()
     {
         qDebug() << QString::fromUtf8("로비 입장 성공");
-        if (m_networkClient && m_networkClient->isConnected())
-        {
-            m_networkClient->requestLobbyList();
-            m_networkClient->requestRoomList();
-        }
+        // 서버에서 로그인 시 자동으로 로비 정보를 전송하므로 별도 요청 불필요
     }
 
     void onLobbyUserListReceived(const QStringList &users)
@@ -338,11 +330,14 @@ private slots:
         qDebug() << QString::fromUtf8("사용자 로비 입장: %1").arg(username);
         if (m_lobbyWindow)
         {
-            m_lobbyWindow->addSystemMessage(QString::fromUtf8("%1님이 로비에 입장했습니다.").arg(username));
-            // 새로운 사용자 목록 요청
-            if (m_networkClient && m_networkClient->isConnected())
-            {
-                m_networkClient->requestLobbyList();
+            // 자신의 로그인 브로드캐스트는 시스템 메시지 및 중복 요청 제외
+            if (username != m_currentUsername) {
+                m_lobbyWindow->addSystemMessage(QString::fromUtf8("%1님이 로비에 입장했습니다.").arg(username));
+                // 새로운 사용자 목록 요청
+                if (m_networkClient && m_networkClient->isConnected())
+                {
+                    m_networkClient->requestLobbyList();
+                }
             }
         }
     }
