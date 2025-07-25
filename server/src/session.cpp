@@ -124,9 +124,9 @@ namespace Blokus::Server {
             case ConnectionState::InLobby:
                 return "로비";
             case ConnectionState::InRoom:
-                return std::to_string(currentRoomId_) + "번방";
+                return std::to_string(currentRoomId_) + "번 방";
             case ConnectionState::InGame:
-                return std::to_string(currentRoomId_) + "번방";
+                return std::to_string(currentRoomId_) + "번 방";
             default:
                 return "알수없음";
         }

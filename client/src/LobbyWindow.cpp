@@ -1167,7 +1167,7 @@ namespace Blokus {
             statusIcon = "🟢";
         }
 
-        return QString::fromUtf8("%1 %2 (Lv.%3)").arg(statusIcon, user.username).arg(user.level);
+        return QString::fromUtf8("%1 %2").arg(statusIcon, user.username);
     }
 
     QString LobbyWindow::formatRoomStatus(const RoomInfo& room)
