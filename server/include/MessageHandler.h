@@ -95,8 +95,6 @@ namespace Blokus::Server {
         void handleLobbyLeave(const std::vector<std::string>& params);
         void handleLobbyList(const std::vector<std::string>& params);
         
-        // 사용자 정보 관련 핸들러들
-        void handleGetUserStats(const std::vector<std::string>& params);
 
         // 게임 관련 핸들러들
         void handleGameMove(const std::vector<std::string>& params);
@@ -119,6 +117,9 @@ namespace Blokus::Server {
         // 방 정보 동기화 헬퍼 함수
         void sendRoomInfo(const std::shared_ptr<GameRoom>& room);
         void broadcastRoomInfoToRoom(const std::shared_ptr<GameRoom>& room);
+
+        // 유저 스탯 정보 조회 헬퍼 함수
+        std::string generateUserStatsResponse();
 
     private:
         Session* session_;  // 소유하지 않음, 단순 참조

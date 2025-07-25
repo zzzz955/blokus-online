@@ -88,7 +88,6 @@ namespace Blokus {
             LobbyEnter = 201,
             LobbyLeave = 202,
             LobbyList = 203,
-            GetUserStats = 204,
 
             // �� ���� (300-399)
             Room = 300,

@@ -94,7 +94,6 @@ private slots:
         if (m_networkClient && m_networkClient->isConnected())
         {
             m_networkClient->enterLobby();
-            m_networkClient->getUserStats();
         }
     }
 
@@ -167,10 +166,10 @@ private slots:
     {
         qDebug() << QString::fromUtf8("방 나가기 요청");
 
-        // 실제 서버에 방 나가기 요청 전송
-        if (m_networkClient && m_networkClient->isConnected())
+        if (!(m_networkClient && m_networkClient->isConnected()))
         {
-            m_networkClient->leaveRoom();
+            qWarning() << "서버에 연결되어 있지 않아 방 나가기 실패";
+            return;
         }
 
         // 게임 룸 창 닫고 로비로 돌아가기
@@ -192,14 +191,10 @@ private slots:
         {
             createLobbyWindow(); // 로비 창이 없으면 새로 생성
         }
-
-        // ✅ 유저 정보 재요청
-        if (m_networkClient && m_networkClient->isConnected())
-        {
-            m_networkClient->getUserStats();
-        }
-
         m_currentRoomInfo = GameRoomInfo();
+
+        // 서버에 방 나가기 요청
+        m_networkClient->leaveRoom();
     }
 
     void handleGameStartRequest()
@@ -314,7 +309,6 @@ private slots:
         {
             m_networkClient->requestLobbyList();
             m_networkClient->requestRoomList();
-            m_networkClient->requestUserStats();
         }
     }
 

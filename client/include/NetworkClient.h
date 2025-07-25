@@ -43,7 +43,6 @@ namespace Blokus {
         void leaveLobby();
         void requestLobbyList();
         void requestRoomList();
-        void requestUserStats();
         
         // 방 관련
         void createRoom(const QString& roomName, bool isPrivate = false, const QString& password = "");
@@ -51,9 +50,6 @@ namespace Blokus {
         void leaveRoom();
         void setPlayerReady(bool ready);
         void startGame();
-
-        // 유저 관련
-        void getUserStats();
         
         // 채팅 관련
         void sendChatMessage(const QString& message);
