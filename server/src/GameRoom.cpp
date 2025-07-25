@@ -1666,10 +1666,15 @@ namespace Blokus {
             }
             
             try {
-                // 플레이어 정보 수집
+                // 플레이어 정보 수집 (게임 통계용)
                 std::vector<uint32_t> playerIds;
                 std::vector<int> scores;
                 std::vector<bool> isWinner;
+                
+                // 경험치용 별도 컬렉션 (게임 완료자만)
+                std::vector<uint32_t> completedPlayerIds;
+                std::vector<int> completedScores;
+                std::vector<bool> completedIsWinner;
                 
                 for (const auto& scoreEntry : finalScores) {
                     Common::PlayerColor color = scoreEntry.first;
@@ -1688,8 +1693,19 @@ namespace Blokus {
                                 bool won = std::find(winners.begin(), winners.end(), color) != winners.end();
                                 isWinner.push_back(won);
                                 
-                                spdlog::info("📊 플레이어 {}({}) 게임 결과: 점수={}, 승리={}", 
-                                           player.getUsername(), userId, score, won);
+                                // 게임 완료자인지 확인 (현재 연결되어 있는 플레이어만)
+                                bool completedGame = player.isConnected() && player.isValid();
+                                if (completedGame) {
+                                    completedPlayerIds.push_back(userId);
+                                    completedScores.push_back(score);
+                                    completedIsWinner.push_back(won);
+                                    spdlog::info("📊 게임 완료 플레이어 {}({}) 게임 결과: 점수={}, 승리={}", 
+                                               player.getUsername(), userId, score, won);
+                                } else {
+                                    spdlog::info("📊 게임 미완료 플레이어 {}({}) - 경험치 없음", 
+                                               player.getUsername(), userId);
+                                }
+                                
                                 break;
                             }
                             catch (const std::exception& e) {
@@ -1700,10 +1716,35 @@ namespace Blokus {
                 }
                 
                 if (!playerIds.empty()) {
-                    // DB에 게임 결과 저장
+                    // DB에 게임 결과 저장 (모든 플레이어)
                     bool success = dbManager->saveGameResults(playerIds, scores, isWinner);
                     if (success) {
                         spdlog::info("✅ 방 {} 게임 결과가 DB에 성공적으로 저장되었습니다", m_roomId);
+                        
+                        // 게임 완료자에게만 경험치 지급
+                        if (!completedPlayerIds.empty()) {
+                            for (size_t i = 0; i < completedPlayerIds.size(); ++i) {
+                                int expGained = dbManager->calculateExperienceGain(
+                                    completedIsWinner[i], completedScores[i], true);
+                                
+                                if (expGained > 0) {
+                                    bool expSuccess = dbManager->updatePlayerExperience(
+                                        completedPlayerIds[i], expGained);
+                                    
+                                    if (expSuccess) {
+                                        spdlog::info("🎉 플레이어 {} 경험치 획득: +{}", 
+                                                   completedPlayerIds[i], expGained);
+                                    } else {
+                                        spdlog::error("❌ 플레이어 {} 경험치 업데이트 실패", 
+                                                    completedPlayerIds[i]);
+                                    }
+                                }
+                            }
+                            spdlog::info("✅ 방 {} 경험치 지급 완료 ({}/{}명)", 
+                                       m_roomId, completedPlayerIds.size(), playerIds.size());
+                        } else {
+                            spdlog::warn("⚠️ 게임 완료자가 없어 경험치 지급 없음 (방 {})", m_roomId);
+                        }
                     } else {
                         spdlog::error("❌ 방 {} 게임 결과 DB 저장 실패", m_roomId);
                     }
