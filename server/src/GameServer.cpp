@@ -473,7 +473,10 @@ namespace Blokus::Server {
                 spdlog::error("RoomManager 생성 실패");
                 return false;
             }
-            spdlog::info("RoomManager 초기화 완료");
+            
+            // RoomManager에 DatabaseManager 설정
+            roomManager_->setDatabaseManager(databaseManager_);
+            spdlog::info("RoomManager 초기화 완료 (DB 연결 포함)");
 
             spdlog::info("모든 서비스 초기화 완료");
             return true;

@@ -15,14 +15,12 @@ namespace Blokus {
             uint32_t userId;
             std::string username;
             std::string passwordHash;
-            std::string displayName;
-            std::string avatarUrl;
             int totalGames;
             int wins;
             int losses;
             int draws;
-            int rating;
             int level;
+            int experiencePoints;
             bool isActive;
 
             // 계산된 필드
@@ -74,7 +72,17 @@ namespace Blokus {
             // ========================================
 
             bool updateGameStats(uint32_t userId, bool won, bool draw = false, int score = 0);
-            bool updateUserRating(uint32_t userId, int opponentRating, bool won, bool draw = false);
+            
+            // 게임 결과 저장 (멀티플레이어용)
+            bool saveGameResults(const std::vector<uint32_t>& playerIds, 
+                               const std::vector<int>& scores, 
+                               const std::vector<bool>& isWinner);
+            
+            // 경험치 및 레벨 시스템
+            bool updatePlayerExperience(uint32_t userId, int expGained);
+            bool checkAndProcessLevelUp(uint32_t userId);
+            int getRequiredExpForLevel(int level) const;
+            int calculateExperienceGain(bool won, int score, bool completedGame) const;
 
             // ========================================
             // 조회 기능

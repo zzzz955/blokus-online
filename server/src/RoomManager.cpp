@@ -1,4 +1,5 @@
 ﻿#include "RoomManager.h"
+#include "DatabaseManager.h"
 #include <spdlog/spdlog.h>
 #include <algorithm>
 #include <random>
@@ -15,14 +16,35 @@ namespace Blokus {
             , m_maxRooms(100)     // 최대 100개 방
             , m_maxPlayersPerRoom(Common::MAX_PLAYERS)
             , m_eventCallback(nullptr)
+            , m_databaseManager(nullptr)
         {
             spdlog::info("🏠 RoomManager 초기화 (최대 방: {}, 최대 플레이어/방: {})",
+                m_maxRooms, m_maxPlayersPerRoom);
+        }
+        
+        RoomManager::RoomManager(std::shared_ptr<DatabaseManager> dbManager)
+            : m_nextRoomId(1001)
+            , m_maxRooms(100)
+            , m_maxPlayersPerRoom(Common::MAX_PLAYERS)
+            , m_eventCallback(nullptr)
+            , m_databaseManager(dbManager)
+        {
+            spdlog::info("🏠 RoomManager 초기화 with DB (최대 방: {}, 최대 플레이어/방: {})",
                 m_maxRooms, m_maxPlayersPerRoom);
         }
 
         RoomManager::~RoomManager() {
             removeAllRooms();
             spdlog::info("🏠 RoomManager 소멸");
+        }
+        
+        void RoomManager::setDatabaseManager(std::shared_ptr<DatabaseManager> dbManager) {
+            m_databaseManager = dbManager;
+            spdlog::info("🗄️ RoomManager에 DatabaseManager 설정 완료");
+        }
+        
+        std::shared_ptr<DatabaseManager> RoomManager::getDatabaseManager() const {
+            return m_databaseManager;
         }
 
         // ========================================

@@ -131,9 +131,9 @@ namespace Blokus {
             pqxx::work txn(*conn);
             try {
                 auto result = txn.exec_params(
-                    "SELECT u.user_id, u.username, u.password_hash, u.display_name, u.avatar_url, "
+                    "SELECT u.user_id, u.username, u.password_hash, "
                     "       COALESCE(s.total_games, 0), COALESCE(s.wins, 0), COALESCE(s.losses, 0), "
-                    "       COALESCE(s.draws, 0), COALESCE(s.rating, 1200), COALESCE(s.level, 1), "
+                    "       COALESCE(s.draws, 0), COALESCE(s.level, 1), COALESCE(s.experience_points, 0), "
                     "       u.is_active "
                     "FROM users u "
                     "LEFT JOIN user_stats s ON u.user_id = s.user_id "
@@ -151,14 +151,12 @@ namespace Blokus {
                 user.userId = result[0]["user_id"].as<uint32_t>();
                 user.username = result[0]["username"].as<std::string>();
                 user.passwordHash = result[0]["password_hash"].as<std::string>();
-                user.displayName = result[0]["display_name"].is_null() ? "" : result[0]["display_name"].as<std::string>();
-                user.avatarUrl = result[0]["avatar_url"].is_null() ? "" : result[0]["avatar_url"].as<std::string>();
-                user.totalGames = result[0][5].as<int>();
-                user.wins = result[0][6].as<int>();
-                user.losses = result[0][7].as<int>();
-                user.draws = result[0][8].as<int>();
-                user.rating = result[0][9].as<int>();
-                user.level = result[0][10].as<int>();
+                user.totalGames = result[0][3].as<int>();
+                user.wins = result[0][4].as<int>();
+                user.losses = result[0][5].as<int>();
+                user.draws = result[0][6].as<int>();
+                user.level = result[0][7].as<int>();
+                user.experiencePoints = result[0][8].as<int>();
                 user.isActive = result[0]["is_active"].as<bool>();
 
                 txn.commit();
@@ -181,9 +179,9 @@ namespace Blokus {
             pqxx::work txn(*conn);
             try {
                 auto result = txn.exec_params(
-                    "SELECT u.user_id, u.username, u.password_hash, u.display_name, u.avatar_url, "
+                    "SELECT u.user_id, u.username, u.password_hash, "
                     "       COALESCE(s.total_games, 0), COALESCE(s.wins, 0), COALESCE(s.losses, 0), "
-                    "       COALESCE(s.draws, 0), COALESCE(s.rating, 1200), COALESCE(s.level, 1), "
+                    "       COALESCE(s.draws, 0), COALESCE(s.level, 1), COALESCE(s.experience_points, 0), "
                     "       u.is_active "
                     "FROM users u "
                     "LEFT JOIN user_stats s ON u.user_id = s.user_id "
@@ -201,14 +199,12 @@ namespace Blokus {
                 user.userId = result[0]["user_id"].as<uint32_t>();
                 user.username = result[0]["username"].as<std::string>();
                 user.passwordHash = result[0]["password_hash"].as<std::string>();
-                user.displayName = result[0]["display_name"].is_null() ? "" : result[0]["display_name"].as<std::string>();
-                user.avatarUrl = result[0]["avatar_url"].is_null() ? "" : result[0]["avatar_url"].as<std::string>();
-                user.totalGames = result[0][5].as<int>();
-                user.wins = result[0][6].as<int>();
-                user.losses = result[0][7].as<int>();
-                user.draws = result[0][8].as<int>();
-                user.rating = result[0][9].as<int>();
-                user.level = result[0][10].as<int>();
+                user.totalGames = result[0][3].as<int>();
+                user.wins = result[0][4].as<int>();
+                user.losses = result[0][5].as<int>();
+                user.draws = result[0][6].as<int>();
+                user.level = result[0][7].as<int>();
+                user.experiencePoints = result[0][8].as<int>();
                 user.isActive = result[0]["is_active"].as<bool>();
 
                 txn.commit();
@@ -315,9 +311,9 @@ namespace Blokus {
             pqxx::work txn(*conn);
             try {
                 auto result = txn.exec_params(
-                    "SELECT u.user_id, u.username, u.password_hash, u.display_name, u.avatar_url, "
+                    "SELECT u.user_id, u.username, u.password_hash, "
                     "       COALESCE(s.total_games, 0), COALESCE(s.wins, 0), COALESCE(s.losses, 0), "
-                    "       COALESCE(s.draws, 0), COALESCE(s.rating, 1200), COALESCE(s.level, 1), "
+                    "       COALESCE(s.draws, 0), COALESCE(s.level, 1), COALESCE(s.experience_points, 0), "
                     "       u.is_active "
                     "FROM users u "
                     "LEFT JOIN user_stats s ON u.user_id = s.user_id "
@@ -335,14 +331,12 @@ namespace Blokus {
                 user.userId = result[0]["user_id"].as<uint32_t>();
                 user.username = result[0]["username"].as<std::string>();
                 user.passwordHash = result[0]["password_hash"].as<std::string>();
-                user.displayName = result[0]["display_name"].is_null() ? "" : result[0]["display_name"].as<std::string>();
-                user.avatarUrl = result[0]["avatar_url"].is_null() ? "" : result[0]["avatar_url"].as<std::string>();
-                user.totalGames = result[0][5].as<int>();
-                user.wins = result[0][6].as<int>();
-                user.losses = result[0][7].as<int>();
-                user.draws = result[0][8].as<int>();
-                user.rating = result[0][9].as<int>();
-                user.level = result[0][10].as<int>();
+                user.totalGames = result[0][3].as<int>();
+                user.wins = result[0][4].as<int>();
+                user.losses = result[0][5].as<int>();
+                user.draws = result[0][6].as<int>();
+                user.level = result[0][7].as<int>();
+                user.experiencePoints = result[0][8].as<int>();
                 user.isActive = result[0]["is_active"].as<bool>();
 
                 txn.commit();
@@ -434,9 +428,21 @@ namespace Blokus {
             auto conn = dbPool_->getConnection();
             pqxx::work txn(*conn);
             try {
-                // PostgreSQL 함수가 있다면 사용, 없다면 직접 업데이트
+                // 직접 업데이트 방식 (PostgreSQL 함수 대신)
                 txn.exec_params(
-                    "SELECT update_game_stats($1, $2, $3, $4)",
+                    "UPDATE user_stats SET "
+                    "total_games = total_games + 1, "
+                    "wins = wins + CASE WHEN $2 THEN 1 ELSE 0 END, "
+                    "losses = losses + CASE WHEN NOT $2 AND NOT $3 THEN 1 ELSE 0 END, "
+                    "draws = draws + CASE WHEN $3 THEN 1 ELSE 0 END, "
+                    "total_score = total_score + $4, "
+                    "best_score = GREATEST(best_score, $4), "
+                    "current_win_streak = CASE WHEN $2 THEN current_win_streak + 1 ELSE 0 END, "
+                    "longest_win_streak = GREATEST(longest_win_streak, "
+                        "CASE WHEN $2 THEN current_win_streak + 1 ELSE current_win_streak END), "
+                    "last_played = CURRENT_TIMESTAMP, "
+                    "updated_at = CURRENT_TIMESTAMP "
+                    "WHERE user_id = $1",
                     userId, won, draw, score
                 );
 
@@ -449,6 +455,88 @@ namespace Blokus {
                 txn.abort();
                 dbPool_->returnConnection(std::move(conn));
                 spdlog::error("updateGameStats 오류: {}", e.what());
+                return false;
+            }
+        }
+
+        bool DatabaseManager::saveGameResults(const std::vector<uint32_t>& playerIds, 
+                                            const std::vector<int>& scores, 
+                                            const std::vector<bool>& isWinner) {
+            if (!isInitialized_) return false;
+            
+            if (playerIds.size() != scores.size() || playerIds.size() != isWinner.size()) {
+                spdlog::error("saveGameResults: 매개변수 배열 크기가 일치하지 않음");
+                return false;
+            }
+
+            auto conn = dbPool_->getConnection();
+            pqxx::work txn(*conn);
+            try {
+                spdlog::info("💾 게임 결과 저장 시작: {} 명의 플레이어", playerIds.size());
+                
+                // 모든 플레이어의 통계를 업데이트
+                for (size_t i = 0; i < playerIds.size(); ++i) {
+                    bool won = isWinner[i];
+                    bool draw = false; // 블로커스는 무승부가 없다고 가정
+                    int score = scores[i];
+                    
+                    // 해당 플레이어가 존재하는지 확인
+                    auto userCheck = txn.exec_params(
+                        "SELECT user_id FROM users WHERE user_id = $1 AND is_active = true",
+                        playerIds[i]
+                    );
+                    
+                    if (userCheck.empty()) {
+                        spdlog::warn("⚠️ 존재하지 않는 사용자 ID: {}", playerIds[i]);
+                        continue;
+                    }
+                    
+                    // user_stats에 해당 유저의 레코드가 있는지 확인하고 없으면 생성
+                    auto statsCheck = txn.exec_params(
+                        "SELECT user_id FROM user_stats WHERE user_id = $1",
+                        playerIds[i]
+                    );
+                    
+                    if (statsCheck.empty()) {
+                        txn.exec_params(
+                            "INSERT INTO user_stats (user_id) VALUES ($1)",
+                            playerIds[i]
+                        );
+                        spdlog::info("📊 새 통계 레코드 생성: 사용자 ID {}", playerIds[i]);
+                    }
+                    
+                    // 통계 업데이트
+                    txn.exec_params(
+                        "UPDATE user_stats SET "
+                        "total_games = total_games + 1, "
+                        "wins = wins + CASE WHEN $2 THEN 1 ELSE 0 END, "
+                        "losses = losses + CASE WHEN NOT $2 AND NOT $3 THEN 1 ELSE 0 END, "
+                        "draws = draws + CASE WHEN $3 THEN 1 ELSE 0 END, "
+                        "total_score = total_score + $4, "
+                        "best_score = GREATEST(best_score, $4), "
+                        "current_win_streak = CASE WHEN $2 THEN current_win_streak + 1 ELSE 0 END, "
+                        "longest_win_streak = GREATEST(longest_win_streak, "
+                            "CASE WHEN $2 THEN current_win_streak + 1 ELSE current_win_streak END), "
+                        "last_played = CURRENT_TIMESTAMP, "
+                        "updated_at = CURRENT_TIMESTAMP "
+                        "WHERE user_id = $1",
+                        playerIds[i], won, draw, score
+                    );
+                    
+                    spdlog::info("📈 플레이어 {} 통계 업데이트: 점수={}, 승리={}", 
+                               playerIds[i], score, won);
+                }
+
+                txn.commit();
+                dbPool_->returnConnection(std::move(conn));
+                spdlog::info("✅ 게임 결과 저장 완료");
+                return true;
+
+            }
+            catch (const std::exception& e) {
+                txn.abort();
+                dbPool_->returnConnection(std::move(conn));
+                spdlog::error("saveGameResults 오류: {}", e.what());
                 return false;
             }
         }
@@ -481,9 +569,140 @@ namespace Blokus {
             }
         }
 
-        bool DatabaseManager::updateUserRating(uint32_t userId, int opponentRating, bool won, bool draw) {
-            // 간단한 ELO 계산 또는 PostgreSQL 함수 호출
-            return true; // 임시 구현
+
+        // ========================================
+        // 🔥 경험치 및 레벨 시스템
+        // ========================================
+        
+        int DatabaseManager::getRequiredExpForLevel(int level) const {
+            if (level <= 10) return level * 100;           // 1~10레벨: 선형 (100, 200, 300...)
+            if (level <= 30) return 1000 + (level-10) * 150; // 11~30레벨: 중간 증가 (1150, 1300, 1450...)
+            return 4000 + (level-30) * 200;                // 31+레벨: 큰 증가 (4200, 4400, 4600...)
+        }
+        
+        int DatabaseManager::calculateExperienceGain(bool won, int score, bool completedGame) const {
+            if (!completedGame) {
+                return 0; // 게임을 완료하지 않으면 경험치 없음
+            }
+            
+            int baseExp = 50;  // 기본 참여 경험치
+            int winBonus = won ? 100 : 0;  // 승리 보너스
+            int scoreBonus = score / 5;  // 점수 비례 보너스 (점수 5당 1 경험치)
+            
+            return baseExp + winBonus + scoreBonus;
+        }
+        
+        bool DatabaseManager::updatePlayerExperience(uint32_t userId, int expGained) {
+            if (!isInitialized_ || expGained <= 0) return false;
+
+            auto conn = dbPool_->getConnection();
+            pqxx::work txn(*conn);
+            try {
+                // 현재 경험치와 레벨 조회
+                auto currentStats = txn.exec_params(
+                    "SELECT level, experience_points FROM user_stats WHERE user_id = $1",
+                    userId
+                );
+                
+                if (currentStats.empty()) {
+                    // user_stats 레코드가 없으면 생성
+                    txn.exec_params(
+                        "INSERT INTO user_stats (user_id, experience_points) VALUES ($1, $2)",
+                        userId, expGained
+                    );
+                    spdlog::info("📊 새 통계 레코드 생성 및 경험치 추가: 사용자 ID {}, 경험치 +{}", userId, expGained);
+                } else {
+                    int currentLevel = currentStats[0]["level"].as<int>();
+                    int currentExp = currentStats[0]["experience_points"].as<int>();
+                    int newExp = currentExp + expGained;
+                    
+                    // 경험치 업데이트
+                    txn.exec_params(
+                        "UPDATE user_stats SET experience_points = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2",
+                        newExp, userId
+                    );
+                    
+                    spdlog::info("📈 플레이어 {} 경험치 업데이트: {} -> {} (+{})", 
+                               userId, currentExp, newExp, expGained);
+                }
+
+                txn.commit();
+                dbPool_->returnConnection(std::move(conn));
+                
+                // 레벨업 체크
+                return checkAndProcessLevelUp(userId);
+
+            }
+            catch (const std::exception& e) {
+                txn.abort();
+                dbPool_->returnConnection(std::move(conn));
+                spdlog::error("updatePlayerExperience 오류: {}", e.what());
+                return false;
+            }
+        }
+        
+        bool DatabaseManager::checkAndProcessLevelUp(uint32_t userId) {
+            if (!isInitialized_) return false;
+
+            auto conn = dbPool_->getConnection();
+            pqxx::work txn(*conn);
+            try {
+                // 현재 레벨과 경험치 조회
+                auto result = txn.exec_params(
+                    "SELECT level, experience_points FROM user_stats WHERE user_id = $1",
+                    userId
+                );
+                
+                if (result.empty()) {
+                    txn.abort();
+                    dbPool_->returnConnection(std::move(conn));
+                    return false;
+                }
+                
+                int currentLevel = result[0]["level"].as<int>();
+                int currentExp = result[0]["experience_points"].as<int>();
+                int newLevel = currentLevel;
+                int remainingExp = currentExp;
+                
+                // 연속 레벨업 가능성 체크 (소모형)
+                while (true) {
+                    int requiredExp = getRequiredExpForLevel(newLevel + 1);
+                    if (remainingExp >= requiredExp) {
+                        remainingExp -= requiredExp;  // 경험치 소모
+                        newLevel++;
+                        spdlog::info("🎉 레벨업! 플레이어 {} : {} -> {} (소모: {}, 남은 경험치: {})", 
+                                   userId, newLevel-1, newLevel, requiredExp, remainingExp);
+                    } else {
+                        break;
+                    }
+                }
+                
+                // 레벨이 변경되었다면 업데이트 (레벨과 남은 경험치 모두)
+                if (newLevel > currentLevel) {
+                    txn.exec_params(
+                        "UPDATE user_stats SET level = $1, experience_points = $2, updated_at = CURRENT_TIMESTAMP WHERE user_id = $3",
+                        newLevel, remainingExp, userId
+                    );
+                    
+                    txn.commit();
+                    dbPool_->returnConnection(std::move(conn));
+                    
+                    spdlog::info("✅ 플레이어 {} 레벨업 완료: {} -> {} (남은 경험치: {})", 
+                               userId, currentLevel, newLevel, remainingExp);
+                    return true;
+                } else {
+                    txn.abort();
+                    dbPool_->returnConnection(std::move(conn));
+                    return false;
+                }
+
+            }
+            catch (const std::exception& e) {
+                txn.abort();
+                dbPool_->returnConnection(std::move(conn));
+                spdlog::error("checkAndProcessLevelUp 오류: {}", e.what());
+                return false;
+            }
         }
 
         std::vector<UserAccount> DatabaseManager::getRanking(const std::string& orderBy, int limit, int offset) {

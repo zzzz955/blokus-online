@@ -165,6 +165,10 @@ namespace Blokus {
             
             // RoomManager 참조
             RoomManager* m_roomManager;
+            
+            // DB 결과 저장을 위한 헬퍼 함수
+            void saveGameResultsToDatabase(const std::map<Common::PlayerColor, int>& finalScores, 
+                                         const std::vector<Common::PlayerColor>& winners);
 
             // 색상 배정
             void assignPlayerColor(PlayerInfo& player);
