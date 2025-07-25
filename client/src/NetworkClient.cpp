@@ -297,6 +297,17 @@ namespace Blokus {
         qDebug() << QString::fromUtf8("게임 시작 요청 전송");
     }
 
+    void NetworkClient::getUserStats()
+    {
+        if (!isConnected()) {
+            qWarning() << QString::fromUtf8("유저 정보 요청 실패: 서버에 연결되지 않음");
+            return;
+        }
+        
+        sendMessage("user:stats");
+        qDebug() << QString::fromUtf8("유저 정보 요청 전송");
+    }
+
     void NetworkClient::sendChatMessage(const QString& message)
     {
         if (!isConnected()) {
@@ -440,7 +451,7 @@ namespace Blokus {
         }
         else if (message.startsWith("LOBBY_") || message.startsWith("ROOM_") || message.startsWith("CHAT:") || 
                  message.startsWith("PLAYER_") || message.startsWith("HOST_") || message.startsWith("GAME_") ||
-                 message.startsWith("SYSTEM:")) {
+                 message.startsWith("SYSTEM:") || message.startsWith("USER_STATS_RESPONSE:")) {
             processLobbyResponse(message);
         }
         else if (message.startsWith("GAME_STATE_UPDATE:") || 

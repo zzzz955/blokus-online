@@ -59,6 +59,9 @@ namespace Blokus {
                 {"game:end", MessageType::GameEnd},
                 {"game:result", MessageType::GameResultResponse},
 
+                // 유저 관련
+                {"user:stats", MessageType::GetUserStats},
+
                 // ä��
                 {"chat", MessageType::Chat}
             };

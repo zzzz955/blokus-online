@@ -414,11 +414,11 @@ namespace Blokus {
 
         // 사용자 통계 (한 줄로 모든 정보 표시)
         m_userStatsLabel = new QLabel();
-        m_userStatsLabel->setStyleSheet("color: #34495e; font-size: 13px; font-weight: bold;");
+        m_userStatsLabel->setStyleSheet("color: #34495e; font-size: 15px; font-weight: bold;");
 
         // 경험치 라벨
         m_expLabel = new QLabel();
-        m_expLabel->setStyleSheet("color: #7f8c8d; font-size: 11px;");
+        m_expLabel->setStyleSheet("color: #ecf0f1; font-size: 15px;");
         m_expLabel->setFixedWidth(100);
 
         // 경험치 진행바
@@ -428,14 +428,14 @@ namespace Blokus {
         m_expProgressBar->setStyleSheet(
             "QProgressBar {"
             "    border: 1px solid #bdc3c7;"
-            "    border-radius: 7px;"
+            "    border-radius: 2px;"
             "    background-color: #ecf0f1;"
             "    text-align: center;"
-            "    font-size: 10px;"
+            "    font-size: 12px;"
             "    color: #2c3e50;"
             "}"
             "QProgressBar::chunk {"
-            "    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #3498db, stop:1 #2980b9);"
+            "    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #1cff08ff, stop:1 #bcffc7ff);"
             "    border-radius: 6px;"
             "}"
         );
@@ -1072,7 +1072,6 @@ namespace Blokus {
             .arg(m_myUserInfo.losses)
             .arg(QString::number(m_myUserInfo.winRate, 'f', 1))
             .arg(m_myUserInfo.gamesPlayed);
-
         m_userStatsLabel->setText(statsText);
 
         // 경험치 정보가 있을 때만 업데이트

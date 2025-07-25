@@ -51,6 +51,9 @@ namespace Blokus {
         void leaveRoom();
         void setPlayerReady(bool ready);
         void startGame();
+
+        // 유저 관련
+        void getUserStats();
         
         // 채팅 관련
         void sendChatMessage(const QString& message);
