@@ -587,7 +587,7 @@ namespace Blokus {
             
             int baseExp = 50;  // 기본 참여 경험치
             int winBonus = won ? 100 : 0;  // 승리 보너스
-            int scoreBonus = score / 10;  // 점수 비례 보너스 (점수 10당 1 경험치)
+            int scoreBonus = score / 5;  // 점수 비례 보너스 (점수 5당 1 경험치)
             
             return baseExp + winBonus + scoreBonus;
         }
@@ -662,30 +662,33 @@ namespace Blokus {
                 int currentLevel = result[0]["level"].as<int>();
                 int currentExp = result[0]["experience_points"].as<int>();
                 int newLevel = currentLevel;
+                int remainingExp = currentExp;
                 
-                // 연속 레벨업 가능성 체크
+                // 연속 레벨업 가능성 체크 (소모형)
                 while (true) {
                     int requiredExp = getRequiredExpForLevel(newLevel + 1);
-                    if (currentExp >= requiredExp) {
+                    if (remainingExp >= requiredExp) {
+                        remainingExp -= requiredExp;  // 경험치 소모
                         newLevel++;
-                        spdlog::info("🎉 레벨업! 플레이어 {} : {} -> {} (경험치: {}/{})", 
-                                   userId, currentLevel, newLevel, currentExp, requiredExp);
+                        spdlog::info("🎉 레벨업! 플레이어 {} : {} -> {} (소모: {}, 남은 경험치: {})", 
+                                   userId, newLevel-1, newLevel, requiredExp, remainingExp);
                     } else {
                         break;
                     }
                 }
                 
-                // 레벨이 변경되었다면 업데이트
+                // 레벨이 변경되었다면 업데이트 (레벨과 남은 경험치 모두)
                 if (newLevel > currentLevel) {
                     txn.exec_params(
-                        "UPDATE user_stats SET level = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2",
-                        newLevel, userId
+                        "UPDATE user_stats SET level = $1, experience_points = $2, updated_at = CURRENT_TIMESTAMP WHERE user_id = $3",
+                        newLevel, remainingExp, userId
                     );
                     
                     txn.commit();
                     dbPool_->returnConnection(std::move(conn));
                     
-                    spdlog::info("✅ 플레이어 {} 레벨업 완료: {} -> {}", userId, currentLevel, newLevel);
+                    spdlog::info("✅ 플레이어 {} 레벨업 완료: {} -> {} (남은 경험치: {})", 
+                               userId, currentLevel, newLevel, remainingExp);
                     return true;
                 } else {
                     txn.abort();
