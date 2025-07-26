@@ -68,88 +68,66 @@ namespace Blokus {
     };
 
     // ========================================
-    // Qt 전용 BlockFactory 확장
+    // Qt 전용 BlockFactory 유틸리티 함수들 (간소화)
     // ========================================
 
-    class QtBlockFactory : public Common::BlockFactory
-    {
-    public:
-        // Qt 전용 편의 함수들
-        static QString getBlockNameQt(BlockType type) {
+    namespace QtBlockUtils {
+        // Qt 문자열 변환
+        inline QString getBlockNameQt(BlockType type) {
             return QString::fromUtf8(Common::BlockFactory::getBlockName(type).c_str());
         }
 
-        static QString getBlockDescriptionQt(BlockType type) {
+        inline QString getBlockDescriptionQt(BlockType type) {
             return QString::fromUtf8(Common::BlockFactory::getBlockDescription(type).c_str());
         }
 
         // Qt 색상 변환
-        static QColor getPlayerColorQt(PlayerColor player) {
+        inline QColor getPlayerColorQt(PlayerColor player) {
             return Utils::getPlayerColor(player);
         }
 
         // QRect 변환
-        static QRect getBoundingRectQt(const Block& block) {
+        inline QRect getBoundingRectQt(const Block& block) {
             auto rect = block.getBoundingRect();
             return QRect(rect.left, rect.top, rect.width, rect.height);
         }
-
-        // 기존 함수들과의 호환성을 위한 alias
-        static QString getBlockName(BlockType type) {
-            return getBlockNameQt(type);
-        }
-
-        static QString getBlockDescription(BlockType type) {
-            return getBlockDescriptionQt(type);
-        }
-
-        static int getBlockScore(BlockType type) {
-            return Common::BlockFactory::getBlockScore(type);
-        }
-
-        static bool isValidBlockType(BlockType type) {
-            return Common::BlockFactory::isValidBlockType(type);
-        }
-
-        static std::vector<BlockType> getAllBlockTypes() {
-            return Common::BlockFactory::getAllBlockTypes();
-        }
-    };
+    }
 
     // ========================================
-    // 기존 코드 호환성을 위한 alias (클라이언트에서만 사용)
+    // 기존 코드 호환성을 위한 BlockFactory alias (간소화)
     // ========================================
 
-    // 기존 코드에서 BlockFactory::getBlockName()을 사용하던 곳들을 위해
     namespace BlockFactory {
+        // Qt 전용 함수들
         inline QString getBlockName(BlockType type) {
-            return QtBlockFactory::getBlockNameQt(type);
+            return QtBlockUtils::getBlockNameQt(type);
         }
 
         inline QString getBlockDescription(BlockType type) {
-            return QtBlockFactory::getBlockDescriptionQt(type);
+            return QtBlockUtils::getBlockDescriptionQt(type);
         }
 
+        // Common::BlockFactory 함수들을 명시적으로 forwarding
         inline int getBlockScore(BlockType type) {
             return Common::BlockFactory::getBlockScore(type);
         }
-
+        
         inline bool isValidBlockType(BlockType type) {
             return Common::BlockFactory::isValidBlockType(type);
         }
-
+        
         inline std::vector<BlockType> getAllBlockTypes() {
             return Common::BlockFactory::getAllBlockTypes();
         }
-
+        
         inline Block createBlock(BlockType type, PlayerColor player = PlayerColor::None) {
             return Common::BlockFactory::createBlock(type, player);
         }
-
+        
         inline std::vector<Block> createPlayerSet(PlayerColor player) {
             return Common::BlockFactory::createPlayerSet(player);
         }
-
+        
         inline std::vector<Block> createAllBlocks() {
             return Common::BlockFactory::createAllBlocks();
         }
