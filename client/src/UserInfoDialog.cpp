@@ -23,21 +23,15 @@ namespace Blokus {
         , m_basicInfoGroup(nullptr)
         , m_avatarLabel(nullptr)
         , m_usernameLabel(nullptr)
-        , m_levelLabel(nullptr)
         , m_statusLabel(nullptr)
-        , m_onlineTimeLabel(nullptr)
         , m_statsGroup(nullptr)
         , m_totalGamesLabel(nullptr)
         , m_winsLabel(nullptr)
         , m_lossesLabel(nullptr)
         , m_winRateLabel(nullptr)
         , m_averageScoreLabel(nullptr)
-        , m_rankLabel(nullptr)
         , m_expProgressBar(nullptr)
         , m_expLabel(nullptr)
-        , m_historyGroup(nullptr)
-        , m_historyTable(nullptr)
-        , m_recentStatsLabel(nullptr)
         , m_buttonWidget(nullptr)
         , m_addFriendButton(nullptr)
         , m_whisperButton(nullptr)
@@ -103,13 +97,11 @@ namespace Blokus {
         // UI 섹션들 설정
         setupBasicInfo();
         setupStatsInfo();
-        setupGameHistory();
         setupActionButtons();
 
         // 레이아웃에 추가
         contentLayout->addWidget(m_basicInfoGroup);
         contentLayout->addWidget(m_statsGroup);
-        contentLayout->addWidget(m_historyGroup);
         contentLayout->addStretch();
 
         m_scrollArea->setWidget(m_contentWidget);
@@ -140,28 +132,18 @@ namespace Blokus {
         m_avatarLabel->setAlignment(Qt::AlignCenter);
         m_avatarLabel->setText("👤");
 
-        // 사용자명
+        // 사용자명 (레벨 포함)
         m_usernameLabel = new QLabel();
-        m_usernameLabel->setStyleSheet("font-size: 18px; font-weight: bold; color: #2c3e50;");
-
-        // 레벨
-        m_levelLabel = new QLabel();
-        m_levelLabel->setStyleSheet("font-size: 14px; color: #27ae60; font-weight: bold;");
+        m_usernameLabel->setStyleSheet("font-size: 16px; font-weight: bold; color: #2c3e50;");
 
         // 상태
         m_statusLabel = new QLabel();
         m_statusLabel->setStyleSheet("font-size: 13px; color: #7f8c8d;");
 
-        // 온라인 시간 (향후 구현용)
-        m_onlineTimeLabel = new QLabel();
-        m_onlineTimeLabel->setStyleSheet("font-size: 12px; color: #95a5a6;");
-
         // 레이아웃 배치
         layout->addWidget(m_avatarLabel, 0, 0, 3, 1);
         layout->addWidget(m_usernameLabel, 0, 1);
-        layout->addWidget(m_levelLabel, 1, 1);
-        layout->addWidget(m_statusLabel, 2, 1);
-        layout->addWidget(m_onlineTimeLabel, 3, 0, 1, 2);
+        layout->addWidget(m_statusLabel, 1, 1);
 
         layout->setColumnStretch(1, 1);
     }
@@ -198,10 +180,6 @@ namespace Blokus {
         averageScoreTitle->setStyleSheet("font-weight: bold; color: #34495e;");
         m_averageScoreLabel = new QLabel();
         m_averageScoreLabel->setStyleSheet("color: #f39c12; font-weight: bold;");
-
-        QLabel* rankTitle = new QLabel(QString::fromUtf8("등급:"));
-        rankTitle->setStyleSheet("font-weight: bold; color: #34495e;");
-        m_rankLabel = new QLabel();
 
         // 경험치 바
         QLabel* expTitle = new QLabel(QString::fromUtf8("경험치:"));
@@ -240,8 +218,6 @@ namespace Blokus {
 
         layout->addWidget(averageScoreTitle, 2, 0);
         layout->addWidget(m_averageScoreLabel, 2, 1);
-        layout->addWidget(rankTitle, 2, 2);
-        layout->addWidget(m_rankLabel, 2, 3);
 
         layout->addWidget(expTitle, 3, 0);
         layout->addWidget(m_expProgressBar, 3, 1, 1, 2);
@@ -251,35 +227,6 @@ namespace Blokus {
         layout->setColumnStretch(3, 1);
     }
 
-    void UserInfoDialog::setupGameHistory()
-    {
-        m_historyGroup = new QGroupBox(QString::fromUtf8("최근 게임 기록"));
-        QVBoxLayout* layout = new QVBoxLayout(m_historyGroup);
-        layout->setContentsMargins(15, 20, 15, 15);
-
-        // 최근 통계 요약
-        m_recentStatsLabel = new QLabel();
-        m_recentStatsLabel->setStyleSheet("color: #7f8c8d; font-size: 12px; margin-bottom: 10px;");
-        layout->addWidget(m_recentStatsLabel);
-
-        // 게임 기록 테이블 (향후 서버에서 데이터 받을 때 활용)
-        m_historyTable = new QTableWidget();
-        m_historyTable->setColumnCount(3);
-        m_historyTable->setHorizontalHeaderLabels({
-            QString::fromUtf8("날짜"), QString::fromUtf8("결과"), QString::fromUtf8("점수")
-        });
-        m_historyTable->horizontalHeader()->setStretchLastSection(true);
-        m_historyTable->verticalHeader()->setVisible(false);
-        m_historyTable->setAlternatingRowColors(true);
-        m_historyTable->setSelectionBehavior(QAbstractItemView::SelectRows);
-        m_historyTable->setMaximumHeight(150);
-        m_historyTable->setStyleSheet(
-            "QTableWidget { gridline-color: #ddd; border: 1px solid #ddd; }"
-            "QHeaderView::section { background-color: #34495e; color: white; font-weight: bold; padding: 5px; }"
-        );
-
-        layout->addWidget(m_historyTable);
-    }
 
     void UserInfoDialog::setupActionButtons()
     {
@@ -361,10 +308,19 @@ namespace Blokus {
         m_userInfo = userInfo;
         updateBasicInfoDisplay();
         updateStatsDisplay();
-        updateGameHistoryDisplay();
         
         // 자신의 정보인지 확인하여 버튼 표시 조정
         m_isOwnInfo = (userInfo.username == m_currentUsername);
+        m_addFriendButton->setVisible(!m_isOwnInfo);
+        m_whisperButton->setVisible(!m_isOwnInfo);
+    }
+
+    void UserInfoDialog::setCurrentUsername(const QString& currentUsername)
+    {
+        m_currentUsername = currentUsername;
+        
+        // 버튼 표시 업데이트
+        m_isOwnInfo = (m_userInfo.username == m_currentUsername);
         m_addFriendButton->setVisible(!m_isOwnInfo);
         m_whisperButton->setVisible(!m_isOwnInfo);
     }
@@ -376,8 +332,7 @@ namespace Blokus {
             m_avatarLabel->setText(m_userInfo.username.at(0).toUpper());
         }
         
-        m_usernameLabel->setText(m_userInfo.username);
-        m_levelLabel->setText(QString::fromUtf8("레벨 %1").arg(m_userInfo.level));
+        m_usernameLabel->setText(QString::fromUtf8("%1 (레벨 %2)").arg(m_userInfo.username).arg(m_userInfo.level));
         
         // 상태 표시 (아이콘과 함께)
         QString statusText;
@@ -393,9 +348,6 @@ namespace Blokus {
             statusText = QString::fromUtf8("⚫ 오프라인");
         }
         m_statusLabel->setText(statusText);
-        
-        // 온라인 시간 (향후 구현)
-        m_onlineTimeLabel->setText(QString::fromUtf8("접속 시간: 정보 없음"));
     }
 
     void UserInfoDialog::updateStatsDisplay()
@@ -405,12 +357,6 @@ namespace Blokus {
         m_lossesLabel->setText(QString::number(m_userInfo.losses));
         m_winRateLabel->setText(formatWinRate(m_userInfo.getWinRate()));
         m_averageScoreLabel->setText(QString::number(m_userInfo.averageScore));
-        
-        // 등급 표시
-        QString rankText = getRankText(m_userInfo.getWinRate());
-        QColor rankColor = getRankColor(m_userInfo.getWinRate());
-        m_rankLabel->setText(rankText);
-        m_rankLabel->setStyleSheet(QString("color: %1; font-weight: bold;").arg(rankColor.name()));
         
         // 경험치 바 업데이트
         if (m_userInfo.requiredExp > 0) {
@@ -429,40 +375,6 @@ namespace Blokus {
             .arg(m_userInfo.requiredExp));
     }
 
-    void UserInfoDialog::updateGameHistoryDisplay()
-    {
-        // 최근 통계 요약
-        int recentGames = std::min(m_userInfo.totalGames, 10);
-        QString recentText = QString::fromUtf8("최근 %1게임 기록 (실제 데이터는 서버에서 받아올 예정)")
-            .arg(recentGames);
-        m_recentStatsLabel->setText(recentText);
-        
-        // 더미 데이터로 테이블 채우기 (실제로는 서버에서 받아올 예정)
-        m_historyTable->setRowCount(3);
-        
-        QStringList dummyData = {
-            QString::fromUtf8("2024-01-20|승리|89점"),
-            QString::fromUtf8("2024-01-19|패배|45점"),
-            QString::fromUtf8("2024-01-18|승리|92점")
-        };
-        
-        for (int i = 0; i < dummyData.size(); ++i) {
-            QStringList parts = dummyData[i].split("|");
-            if (parts.size() == 3) {
-                m_historyTable->setItem(i, 0, new QTableWidgetItem(parts[0]));
-                
-                QTableWidgetItem* resultItem = new QTableWidgetItem(parts[1]);
-                if (parts[1] == QString::fromUtf8("승리")) {
-                    resultItem->setForeground(QBrush(QColor("#27ae60")));
-                } else {
-                    resultItem->setForeground(QBrush(QColor("#e74c3c")));
-                }
-                m_historyTable->setItem(i, 1, resultItem);
-                
-                m_historyTable->setItem(i, 2, new QTableWidgetItem(parts[2]));
-            }
-        }
-    }
 
     void UserInfoDialog::installBackgroundEventFilter()
     {
@@ -533,25 +445,6 @@ namespace Blokus {
         return QString::fromUtf8("%1게임").arg(games);
     }
 
-    QString UserInfoDialog::getRankText(double winRate) const
-    {
-        if (winRate >= 80.0) return QString::fromUtf8("🏆 마스터");
-        else if (winRate >= 70.0) return QString::fromUtf8("💎 다이아몬드");
-        else if (winRate >= 60.0) return QString::fromUtf8("🥇 골드");
-        else if (winRate >= 50.0) return QString::fromUtf8("🥈 실버");
-        else if (winRate >= 40.0) return QString::fromUtf8("🥉 브론즈");
-        else return QString::fromUtf8("🪨 아이언");
-    }
-
-    QColor UserInfoDialog::getRankColor(double winRate) const
-    {
-        if (winRate >= 80.0) return QColor("#e74c3c");      // 빨강 (마스터)
-        else if (winRate >= 70.0) return QColor("#9b59b6"); // 보라 (다이아)
-        else if (winRate >= 60.0) return QColor("#f39c12"); // 금색 (골드)
-        else if (winRate >= 50.0) return QColor("#95a5a6"); // 은색 (실버)
-        else if (winRate >= 40.0) return QColor("#d35400"); // 구리색 (브론즈)
-        else return QColor("#34495e");                      // 회색 (아이언)
-    }
 
     // 슬롯 구현
     void UserInfoDialog::onAddFriendClicked()

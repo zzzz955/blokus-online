@@ -28,6 +28,7 @@ namespace Blokus {
         ~UserInfoDialog();
 
         void updateUserInfo(const UserInfo& userInfo);
+        void setCurrentUsername(const QString& currentUsername);
 
     signals:
         void getUserStatsRequested(const QString& username);
@@ -49,20 +50,16 @@ namespace Blokus {
         void setupUI();
         void setupBasicInfo();
         void setupStatsInfo();
-        void setupGameHistory();
         void setupActionButtons();
         void setupStyles();
         void updateBasicInfoDisplay();
         void updateStatsDisplay();
-        void updateGameHistoryDisplay();
         void installBackgroundEventFilter();
         void removeBackgroundEventFilter();
 
         QString formatWinRate(double winRate) const;
         QString formatLevel(int level) const;
         QString formatGameCount(int games) const;
-        QString getRankText(double winRate) const;
-        QColor getRankColor(double winRate) const;
 
     private:
         // 사용자 정보
@@ -79,9 +76,7 @@ namespace Blokus {
         QGroupBox* m_basicInfoGroup;
         QLabel* m_avatarLabel;
         QLabel* m_usernameLabel;
-        QLabel* m_levelLabel;
         QLabel* m_statusLabel;
-        QLabel* m_onlineTimeLabel;
 
         // 통계 정보 섹션
         QGroupBox* m_statsGroup;
@@ -90,14 +85,9 @@ namespace Blokus {
         QLabel* m_lossesLabel;
         QLabel* m_winRateLabel;
         QLabel* m_averageScoreLabel;
-        QLabel* m_rankLabel;
         QProgressBar* m_expProgressBar;
         QLabel* m_expLabel;
 
-        // 게임 기록 섹션
-        QGroupBox* m_historyGroup;
-        QTableWidget* m_historyTable;
-        QLabel* m_recentStatsLabel;
 
         // 액션 버튼들
         QWidget* m_buttonWidget;

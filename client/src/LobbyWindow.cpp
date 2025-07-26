@@ -1210,24 +1210,33 @@ namespace Blokus {
             }
         }
         
-        // 사용자를 찾지 못한 경우 기본 정보로 생성
+        // 사용자를 찾지 못한 경우 처리
         if (!userFound) {
-            targetUser.username = username;
-            targetUser.level = 1;
-            targetUser.totalGames = 0;
-            targetUser.wins = 0;
-            targetUser.losses = 0;
-            targetUser.averageScore = 0;
-            targetUser.isOnline = true;
-            targetUser.status = QString::fromUtf8("정보 없음");
-            targetUser.experience = 0;
-            targetUser.requiredExp = 100;
-            targetUser.gamesPlayed = 0;
-            targetUser.winRate = 0.0;
+            // 자신의 정보인 경우 내 정보 사용
+            if (username == m_myUsername) {
+                targetUser = m_myUserInfo;
+            } else {
+                // 다른 사용자의 경우 기본 정보로 생성
+                targetUser.username = username;
+                targetUser.level = 1;
+                targetUser.totalGames = 0;
+                targetUser.wins = 0;
+                targetUser.losses = 0;
+                targetUser.averageScore = 0;
+                targetUser.isOnline = true;
+                targetUser.status = QString::fromUtf8("정보 없음");
+                targetUser.experience = 0;
+                targetUser.requiredExp = 100;
+                targetUser.gamesPlayed = 0;
+                targetUser.winRate = 0.0;
+            }
         }
         
         // UserInfoDialog 생성
         m_currentUserInfoDialog = new UserInfoDialog(targetUser, this);
+        
+        // 현재 사용자명 설정 (자신/타인 구분용)
+        m_currentUserInfoDialog->setCurrentUsername(m_myUsername);
         
         // 시그널 연결
         connect(m_currentUserInfoDialog, &UserInfoDialog::getUserStatsRequested,
@@ -1239,9 +1248,8 @@ namespace Blokus {
         connect(m_currentUserInfoDialog, &QDialog::finished,
             this, &LobbyWindow::onUserInfoDialogClosed);
         
-        // 현재 사용자 정보 설정 (자신인지 확인용)
+        // 모달 표시
         if (m_currentUserInfoDialog) {
-            // UserInfoDialog에 현재 사용자명 전달하는 방법이 필요하면 추가
             m_currentUserInfoDialog->show();
             m_currentUserInfoDialog->raise();
             m_currentUserInfoDialog->activateWindow();
