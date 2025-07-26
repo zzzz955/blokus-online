@@ -70,6 +70,8 @@ namespace Blokus::Server
         { handleLobbyList(params); };
 
         // 사용자 정보 관련
+        handlers_[MessageType::UserStats] = [this](const auto &params)
+        { handleGetUserStats(params); };
 
         // 게임 관련
         handlers_[MessageType::GameMove] = [this](const auto &params)
@@ -1772,6 +1774,103 @@ namespace Blokus::Server
         response << "}";
 
         return response.str();
+    }
+
+    void MessageHandler::handleGetUserStats(const std::vector<std::string>& params)
+    {
+        try
+        {
+            if (params.size() < 1)
+            {
+                sendError("사용자 정보 요청에 사용자명이 필요합니다");
+                return;
+            }
+
+            std::string targetUsername = params[0];
+            spdlog::debug("🔍 사용자 정보 요청: '{}'", targetUsername);
+
+            // RoomManager를 통해 해당 사용자의 세션을 찾기
+            if (!gameServer_)
+            {
+                sendError("서버 오류: 방 관리자를 사용할 수 없습니다");
+                return;
+            }
+
+            // 로비에서 해당 사용자의 세션 검색
+            auto lobbyUsers = gameServer_->getLobbyUsers();
+            std::shared_ptr<Session> targetSession = nullptr;
+
+            for (const auto& lobbySession : lobbyUsers)
+            {
+                if (lobbySession && lobbySession->isActive() && 
+                    lobbySession->getUsername() == targetUsername)
+                {
+                    targetSession = lobbySession;
+                    break;
+                }
+            }
+
+            if (!targetSession)
+            {
+                sendError("요청한 사용자를 찾을 수 없습니다");
+                return;
+            }
+
+            // 대상 사용자의 세션에서 사용자 정보 가져오기
+            auto userAccountOpt = targetSession->getUserAccount();
+            
+            if (!userAccountOpt.has_value())
+            {
+                // 세션에 캐시된 정보가 없으면 DB에서 조회
+                auto dbManager = gameServer_->getDatabaseManager();
+                if (!dbManager)
+                {
+                    sendError("서버 오류: 데이터베이스를 사용할 수 없습니다");
+                    return;
+                }
+
+                auto dbUserAccount = dbManager->getUserByUsername(targetUsername);
+                if (!dbUserAccount.has_value())
+                {
+                    sendError("사용자 정보를 찾을 수 없습니다");
+                    return;
+                }
+                
+                targetSession->setUserAccount(dbUserAccount.value());
+                userAccountOpt = dbUserAccount;
+            }
+
+            const auto& userAccount = userAccountOpt.value();
+            int requiredExp = 100;
+            if (auto dbManager = gameServer_->getDatabaseManager())
+            {
+                requiredExp = dbManager->getRequiredExpForLevel(userAccount.level + 1);
+            }
+
+            // 응답 메시지 생성
+            std::ostringstream response;
+            response << "USER_STATS_RESPONSE:{";
+            response << "\"username\":\"" << userAccount.username << "\",";
+            response << "\"level\":" << userAccount.level << ",";
+            response << "\"totalGames\":" << userAccount.totalGames << ",";
+            response << "\"wins\":" << userAccount.wins << ",";
+            response << "\"losses\":" << userAccount.losses << ",";
+            response << "\"draws\":" << userAccount.draws << ",";
+            response << "\"currentExp\":" << userAccount.experiencePoints << ",";
+            response << "\"requiredExp\":" << requiredExp << ",";
+            response << "\"winRate\":" << std::fixed << std::setprecision(1) << userAccount.getWinRate() << ",";
+            response << "\"status\":\"" << targetSession->getUserStatusString() << "\"";
+            response << "}";
+
+            sendResponse(response.str());
+            spdlog::debug("✅ 사용자 정보 응답 전송 완료: '{}' -> '{}'", 
+                         targetUsername, session_->getUsername());
+        }
+        catch (const std::exception& e)
+        {
+            spdlog::error("사용자 정보 요청 처리 중 오류: {}", e.what());
+            sendError("사용자 정보 조회 중 오류가 발생했습니다");
+        }
     }
 
     // ========================================

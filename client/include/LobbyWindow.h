@@ -73,6 +73,7 @@ namespace Blokus {
         void updateRanking(const QList<UserInfo>& ranking);
         void addChatMessage(const ChatMessage& message);
         void setMyUserInfo(const UserInfo& userInfo);
+        void showUserInfoDialog(const UserInfo& userInfo); // 서버 응답 후 모달 표시
 
     signals:
         // 서버 통신 시그널들

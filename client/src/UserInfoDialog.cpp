@@ -327,6 +327,9 @@ namespace Blokus {
 
     void UserInfoDialog::updateBasicInfoDisplay()
     {
+        qDebug() << QString::fromUtf8("UserInfoDialog::updateBasicInfoDisplay() - 사용자명: '%1', 레벨: %2")
+            .arg(m_userInfo.username).arg(m_userInfo.level);
+            
         // 아바타에 첫 글자 표시
         if (!m_userInfo.username.isEmpty()) {
             m_avatarLabel->setText(m_userInfo.username.at(0).toUpper());

@@ -122,6 +122,8 @@ namespace Blokus::Server {
         void handleLobbyLeave(const std::vector<std::string>& params);
         void handleLobbyList(const std::vector<std::string>& params);
         
+        // 사용자 정보 관련 핸들러들
+        void handleGetUserStats(const std::vector<std::string>& params);
 
         // 게임 관련 핸들러들
         void handleGameMove(const std::vector<std::string>& params);

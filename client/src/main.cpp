@@ -310,16 +310,46 @@ private slots:
         if (m_lobbyWindow)
         {
             QList<UserInfo> userList;
-            for (const QString &username : users)
+            for (const QString &userDisplayText : users)
             {
                 UserInfo user;
-                user.username = username;
-                user.status = QString::fromUtf8("온라인");
-                user.level = 1;
+                
+                // "Lv.3 zzzz955 (로비)" 형태에서 실제 username만 추출
+                // 정규식을 사용하여 "Lv.숫자 실제이름 (상태)" 패턴에서 실제이름만 추출
+                QRegExp userRegex("^Lv\\.\\d+\\s+([^\\s]+)\\s+\\([^)]+\\)$");
+                if (userRegex.indexIn(userDisplayText) != -1) {
+                    // 정규식 매치된 경우 - 새로운 형식
+                    user.username = userRegex.cap(1); // 실제 username
+                    
+                    // 레벨과 상태도 추출
+                    QRegExp levelRegex("^Lv\\.(\\d+)");
+                    QRegExp statusRegex("\\(([^)]+)\\)$");
+                    
+                    if (levelRegex.indexIn(userDisplayText) != -1) {
+                        user.level = levelRegex.cap(1).toInt();
+                    } else {
+                        user.level = 1;
+                    }
+                    
+                    if (statusRegex.indexIn(userDisplayText) != -1) {
+                        user.status = statusRegex.cap(1);
+                    } else {
+                        user.status = QString::fromUtf8("온라인");
+                    }
+                } else {
+                    // 구버전 형식 또는 단순 username
+                    user.username = userDisplayText;
+                    user.status = QString::fromUtf8("온라인");
+                    user.level = 1;
+                }
+                
                 user.totalGames = 0;
                 user.wins = 0;
                 user.losses = 0;
                 userList.append(user);
+                
+                qDebug() << QString::fromUtf8("사용자 파싱: 표시='%1' -> 실제username='%2', 레벨=%3, 상태='%4'")
+                         .arg(userDisplayText).arg(user.username).arg(user.level).arg(user.status);
             }
             m_lobbyWindow->updateUserList(userList);
         }
@@ -396,38 +426,61 @@ private slots:
         qDebug() << QString::fromUtf8("사용자 통계 정보 수신: %1").arg(statsJson);
         if (m_lobbyWindow)
         {
-            // JSON 파싱해서 UserInfo 구조체 업데이트
-            // 간단한 파싱 (실제로는 QJsonDocument를 사용해야 함)
+            // JSON 파싱해서 UserInfo 구조체 구성
             UserInfo userInfo;
-            userInfo.username = m_currentUsername;
 
-            // JSON에서 필요한 정보 추출
+            // JSON에서 정보 추출
+            QRegExp usernameRegex("\"username\":\"([^\"]+)\"");
             QRegExp levelRegex("\"level\":(\\d+)");
             QRegExp currentExpRegex("\"currentExp\":(\\d+)");
             QRegExp requiredExpRegex("\"requiredExp\":(\\d+)");
             QRegExp totalGamesRegex("\"totalGames\":(\\d+)");
             QRegExp winsRegex("\"wins\":(\\d+)");
             QRegExp lossesRegex("\"losses\":(\\d+)");
+            QRegExp drawsRegex("\"draws\":(\\d+)");
             QRegExp winRateRegex("\"winRate\":([\\d.]+)");
+            QRegExp statusRegex("\"status\":\"([^\"]+)\"");
 
+            if (usernameRegex.indexIn(statsJson) != -1)
+                userInfo.username = usernameRegex.cap(1);
             if (levelRegex.indexIn(statsJson) != -1)
                 userInfo.level = levelRegex.cap(1).toInt();
             if (currentExpRegex.indexIn(statsJson) != -1)
                 userInfo.experience = currentExpRegex.cap(1).toInt();
             if (requiredExpRegex.indexIn(statsJson) != -1)
                 userInfo.requiredExp = requiredExpRegex.cap(1).toInt();
-            if (totalGamesRegex.indexIn(statsJson) != -1)
-                userInfo.gamesPlayed = totalGamesRegex.cap(1).toInt();
+            if (totalGamesRegex.indexIn(statsJson) != -1) {
+                int totalGames = totalGamesRegex.cap(1).toInt();
+                userInfo.gamesPlayed = totalGames;
+                userInfo.totalGames = totalGames;
+            }
             if (winsRegex.indexIn(statsJson) != -1)
                 userInfo.wins = winsRegex.cap(1).toInt();
             if (lossesRegex.indexIn(statsJson) != -1)
                 userInfo.losses = lossesRegex.cap(1).toInt();
+            if (drawsRegex.indexIn(statsJson) != -1)
+                userInfo.draws = drawsRegex.cap(1).toInt();
             if (winRateRegex.indexIn(statsJson) != -1)
                 userInfo.winRate = winRateRegex.cap(1).toDouble();
+            if (statusRegex.indexIn(statsJson) != -1)
+                userInfo.status = statusRegex.cap(1);
+            
+            // averageScore는 서버에서 제공하지 않으므로 기본값 설정
+            userInfo.averageScore = 0;
 
-            userInfo.status = QString::fromUtf8("로비");
-
-            m_lobbyWindow->setMyUserInfo(userInfo);
+            // 자신의 정보인지 다른 사용자의 정보인지 확인
+            qDebug() << QString::fromUtf8("사용자 정보 비교: 응답='%1', 현재='%2'").arg(userInfo.username).arg(m_currentUsername);
+            
+            if (userInfo.username == m_currentUsername) {
+                // 자신의 정보면 UI 업데이트 + 모달 표시
+                qDebug() << QString::fromUtf8("자신의 정보로 판단하여 setMyUserInfo + showUserInfoDialog 호출");
+                m_lobbyWindow->setMyUserInfo(userInfo);
+                m_lobbyWindow->showUserInfoDialog(userInfo);
+            } else {
+                // 다른 사용자의 정보면 UserInfoDialog 표시
+                qDebug() << QString::fromUtf8("다른 사용자 정보로 판단하여 showUserInfoDialog 호출");
+                m_lobbyWindow->showUserInfoDialog(userInfo);
+            }
         }
     }
 
@@ -561,6 +614,18 @@ private slots:
         if (m_networkClient && m_networkClient->isConnected())
         {
             m_networkClient->requestRoomList();
+        }
+    }
+
+    void handleGetUserStatsRequest(const QString &username)
+    {
+        qDebug() << QString::fromUtf8("사용자 정보 요청: %1").arg(username);
+
+        if (m_networkClient && m_networkClient->isConnected())
+        {
+            // USER_STATS:사용자명 형식으로 서버에 요청
+            QString message = QString("user:stats:%1").arg(username);
+            m_networkClient->sendMessage(message);
         }
     }
 
@@ -1052,6 +1117,8 @@ private:
                     this, &AppController::handleLobbyChatMessage);
             connect(m_lobbyWindow, &Blokus::LobbyWindow::refreshRoomListRequested,
                     this, &AppController::handleRefreshRoomListRequest);
+            connect(m_lobbyWindow, &Blokus::LobbyWindow::getUserStatsRequested,
+                    this, &AppController::handleGetUserStatsRequest);
 
             m_lobbyWindow->show();
             m_lobbyWindow->raise();

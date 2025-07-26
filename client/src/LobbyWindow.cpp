@@ -226,13 +226,19 @@ namespace Blokus {
             updateRoomListDisplay();
             updateRankingDisplay();
 
-            // 내 정보 설정
+            // 내 정보 설정 (기본값)
             m_myUserInfo.username = username;
-            m_myUserInfo.totalGames = 45;
-            m_myUserInfo.wins = 28;
-            m_myUserInfo.losses = 17;
-            m_myUserInfo.level = m_myUserInfo.calculateLevel();
-            m_myUserInfo.averageScore = 52;
+            m_myUserInfo.totalGames = 0;
+            m_myUserInfo.wins = 0;
+            m_myUserInfo.losses = 0;
+            m_myUserInfo.level = 1;
+            m_myUserInfo.averageScore = 0;
+            m_myUserInfo.experience = 0;
+            m_myUserInfo.requiredExp = 100;
+            m_myUserInfo.isOnline = true;
+            m_myUserInfo.status = QString::fromUtf8("로비");
+            
+            // 실제 데이터는 서버에서 받아서 updateUserList(), setMyUserInfo() 호출로 업데이트될 예정
 
             // 타이머 설정 (30초마다 방 목록 갱신)
             if (m_refreshTimer) {
@@ -882,23 +888,19 @@ namespace Blokus {
         QListWidgetItem* item = m_userList->currentItem();
         if (!item) return;
 
-        // 첫 번째 단어가 사용자명 (아이콘 제거)
-        QString itemText = item->text();
-        QStringList parts = itemText.split(" ");
-        if (parts.isEmpty()) return;
+        int currentRow = m_userList->currentRow();
+        if (currentRow < 0 || currentRow >= m_userList_data.size()) return;
         
-        QString username = parts[0];
-        // 이모지나 아이콘이 포함된 경우 제거
-        if (username.startsWith("🟢") || username.startsWith("🎮") || username.startsWith("💤")) {
-            if (parts.size() > 1) {
-                username = parts[1];
-            }
-        }
+        // 리스트에서 현재 행의 사용자명만 추출 (식별용)
+        const UserInfo& user = m_userList_data[currentRow];
+        QString username = user.username;
         
         if (username.isEmpty()) return;
         
-        // 사용자 정보 모달 표시
-        onUserInfoDialogRequested(username);
+        qDebug() << QString::fromUtf8("사용자 더블클릭: %1 - 서버에 정보 요청").arg(username);
+        
+        // 서버에 해당 사용자의 상세 정보 요청 (서버 응답 후 showUserInfoDialog 호출될 예정)
+        emit getUserStatsRequested(username);
     }
 
     void LobbyWindow::onTabChanged(int index)
@@ -1166,18 +1168,11 @@ namespace Blokus {
 
     QString LobbyWindow::formatUserStatus(const UserInfo& user)
     {
-        QString statusIcon;
-        if (user.status == QString::fromUtf8("게임중")) {
-            statusIcon = "🎮";
-        }
-        else if (user.status == QString::fromUtf8("자리비움")) {
-            statusIcon = "💤";
-        }
-        else {
-            statusIcon = "🟢";
-        }
-
-        return QString::fromUtf8("%1 %2").arg(statusIcon, user.username);
+        // Lv.N 유저이름 (상태) 형식으로 표시
+        return QString::fromUtf8("🟢 Lv.%1 %2 (%3)")
+               .arg(user.level)
+               .arg(user.username)
+               .arg(user.status);
     }
 
     QString LobbyWindow::formatRoomStatus(const RoomInfo& room)
@@ -1191,6 +1186,18 @@ namespace Blokus {
 
     void LobbyWindow::onUserInfoDialogRequested(const QString& username)
     {
+        // 이 함수는 더 이상 직접 모달을 표시하지 않음
+        // 대신 서버에 사용자 정보 요청만 보냄
+        qDebug() << QString::fromUtf8("사용자 정보 요청: %1").arg(username);
+        emit getUserStatsRequested(username);
+    }
+
+    void LobbyWindow::showUserInfoDialog(const UserInfo& userInfo)
+    {
+        // 서버에서 받은 사용자 정보로 모달 표시
+        qDebug() << QString::fromUtf8("서버 응답으로 사용자 정보 모달 표시: %1 (레벨: %2, 게임수: %3)")
+            .arg(userInfo.username).arg(userInfo.level).arg(userInfo.totalGames);
+        
         // 기존 다이얼로그가 열려있으면 닫기
         if (m_currentUserInfoDialog) {
             m_currentUserInfoDialog->close();
@@ -1198,42 +1205,8 @@ namespace Blokus {
             m_currentUserInfoDialog = nullptr;
         }
         
-        // 사용자 정보 찾기
-        UserInfo targetUser;
-        bool userFound = false;
-        
-        for (const UserInfo& user : m_userList_data) {
-            if (user.username == username) {
-                targetUser = user;
-                userFound = true;
-                break;
-            }
-        }
-        
-        // 사용자를 찾지 못한 경우 처리
-        if (!userFound) {
-            // 자신의 정보인 경우 내 정보 사용
-            if (username == m_myUsername) {
-                targetUser = m_myUserInfo;
-            } else {
-                // 다른 사용자의 경우 기본 정보로 생성
-                targetUser.username = username;
-                targetUser.level = 1;
-                targetUser.totalGames = 0;
-                targetUser.wins = 0;
-                targetUser.losses = 0;
-                targetUser.averageScore = 0;
-                targetUser.isOnline = true;
-                targetUser.status = QString::fromUtf8("정보 없음");
-                targetUser.experience = 0;
-                targetUser.requiredExp = 100;
-                targetUser.gamesPlayed = 0;
-                targetUser.winRate = 0.0;
-            }
-        }
-        
-        // UserInfoDialog 생성
-        m_currentUserInfoDialog = new UserInfoDialog(targetUser, this);
+        // UserInfoDialog 생성 (서버에서 받은 실제 데이터 사용)
+        m_currentUserInfoDialog = new UserInfoDialog(userInfo, this);
         
         // 현재 사용자명 설정 (자신/타인 구분용)
         m_currentUserInfoDialog->setCurrentUsername(m_myUsername);
@@ -1254,9 +1227,6 @@ namespace Blokus {
             m_currentUserInfoDialog->raise();
             m_currentUserInfoDialog->activateWindow();
         }
-        
-        // 서버에 상세 정보 요청 (있다면)
-        emit getUserStatsRequested(username);
     }
 
     void LobbyWindow::onUserInfoDialogClosed()
