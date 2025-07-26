@@ -629,8 +629,11 @@ namespace Blokus {
                 txn.commit();
                 dbPool_->returnConnection(std::move(conn));
                 
-                // 레벨업 체크
-                return checkAndProcessLevelUp(userId);
+                // 레벨업 체크 (경험치 업데이트 성공과 독립적으로 처리)
+                checkAndProcessLevelUp(userId);
+                
+                // 경험치 업데이트는 성공
+                return true;
 
             }
             catch (const std::exception& e) {

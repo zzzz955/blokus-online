@@ -6,14 +6,14 @@ import "google/protobuf/timestamp.proto";
 import "common.proto";
 
 // ========================================
-// 인증 관련 열거형
+// Authentication System Messages
 // ========================================
 
 enum AuthMethod {
   AUTH_METHOD_USERNAME_PASSWORD = 0;
   AUTH_METHOD_EMAIL_PASSWORD = 1;
   AUTH_METHOD_GUEST = 2;
-  AUTH_METHOD_TOKEN = 3;  // 세션 토큰 기반
+  AUTH_METHOD_TOKEN = 3;  // Session token auth
 }
 
 enum AccountStatus {
@@ -25,246 +25,139 @@ enum AccountStatus {
 }
 
 // ========================================
-// 로그인 요청/응답
+// Login Request/Response
 // ========================================
 
 message AuthRequest {
   AuthMethod method = 1;
   
-  // 기본 인증 정보
+  // Basic auth fields
   string username = 2;
   string password = 3;
   string email = 4;
   
-  // 세션 토큰 기반 인증
+  // Session token auth fields
   string session_token = 5;
   
-  // 게스트 로그인
+  // Guest login
   string guest_id = 6;
   
-  // 클라이언트 정보
+  // Client information
   string client_version = 10;
-  string platform = 11;      // "Windows", "Android", "iOS" 등
-  string device_id = 12;     // 기기 고유 ID
-  string user_agent = 13;    // 브라우저 정보 (웹 클라이언트)
-  
-  // 보안 관련
-  bool remember_me = 15;     // 자동 로그인 설정
-  string captcha_response = 16; // CAPTCHA 응답 (필요시)
+  string platform = 11;      // "Windows", "Android", "iOS" etc
+  string device_id = 12;     // Unique device ID
+  string user_agent = 13;    // Browser info (web client)
 }
 
 message AuthResponse {
   Result result = 1;
   
-  // 성공 시 반환되는 정보
+  // Success case
   string session_token = 2;
-  google.protobuf.Timestamp token_expires_at = 3;
+  string user_id = 3;
   UserInfo user_info = 4;
   
-  // 추가 인증 정보
-  repeated string permissions = 5;  // 사용자 권한 목록
-  bool is_first_login = 6;         // 첫 로그인 여부
-  int32 consecutive_login_days = 7; // 연속 로그인 일수
+  // Session information
+  google.protobuf.Timestamp expires_at = 5;
+  string refresh_token = 6;
   
-  // 서버 정보
-  ServerInfo server_info = 8;
+  // Account status
+  AccountStatus account_status = 7;
+  string status_message = 8;
   
-  // 실패 시 추가 정보
-  int32 retry_after_seconds = 10;  // 재시도까지 대기 시간
-  bool requires_captcha = 11;      // CAPTCHA 필요 여부
-  string password_reset_token = 12; // 비밀번호 재설정 토큰
+  // Server information
+  ServerInfo server_info = 9;
 }
 
 // ========================================
-// 회원가입 요청/응답
+// Registration Request/Response
 // ========================================
 
 message RegisterRequest {
   string username = 1;
-  string password = 2;
-  string email = 3;
+  string email = 2;
+  string password = 3;
   
-  // 선택 정보
-  string display_name = 4;   // 표시명 (username과 다를 수 있음)
-  string country = 5;        // 국가 코드
-  string language = 6;       // 언어 설정
+  // Terms and conditions
+  bool terms_accepted = 4;
+  bool privacy_accepted = 5;
   
-  // 약관 동의
-  bool terms_accepted = 10;
-  bool privacy_accepted = 11;
-  bool marketing_accepted = 12; // 마케팅 수신 동의 (선택)
-  
-  // 검증 관련
-  string email_verification_token = 15; // 이메일 인증 토큰
-  string referral_code = 16;           // 추천인 코드
-  
-  // 클라이언트 정보
-  string client_version = 20;
-  string platform = 21;
+  // Client information
+  string client_version = 10;
+  string platform = 11;
+  string device_id = 12;
 }
 
 message RegisterResponse {
   Result result = 1;
   
-  // 성공 시 정보
+  // Success case
   string user_id = 2;
-  bool email_verification_required = 3;
-  string verification_email_sent_to = 4;
+  string verification_token = 3;  // For email verification
   
-  // 자동 로그인 정보 (이메일 인증이 불필요한 경우)
-  string session_token = 5;
-  google.protobuf.Timestamp token_expires_at = 6;
-  UserInfo user_info = 7;
-  
-  // 실패 시 상세 정보
-  repeated string validation_errors = 10; // 필드별 오류 메시지
-  repeated string conflicting_fields = 11; // 중복된 필드들
+  // Auto-login after registration
+  string session_token = 4;
+  UserInfo user_info = 5;
 }
 
 // ========================================
-// 로그아웃 요청/응답
+// Logout Request/Response
 // ========================================
 
 message LogoutRequest {
   string session_token = 1;
-  bool logout_all_sessions = 2; // 모든 세션 로그아웃
-  string reason = 3;            // 로그아웃 사유 (선택)
+  string reason = 2;  // "user_logout", "timeout", "forced" etc
+  bool invalidate_all_sessions = 3;
 }
 
 message LogoutResponse {
   Result result = 1;
   string message = 2;
-  google.protobuf.Timestamp logged_out_at = 3;
 }
 
 // ========================================
-// 하트비트 (연결 유지)
+// Session Management
+// ========================================
+
+message SessionValidateRequest {
+  string session_token = 1;
+  bool extend_session = 2;  // Extend session if valid
+}
+
+message SessionValidateResponse {
+  Result result = 1;
+  bool is_valid = 2;
+  UserInfo user_info = 3;
+  google.protobuf.Timestamp expires_at = 4;
+  string new_token = 5;  // If session was extended
+}
+
+message RefreshTokenRequest {
+  string refresh_token = 1;
+  string client_version = 2;
+}
+
+message RefreshTokenResponse {
+  Result result = 1;
+  string new_session_token = 2;
+  string new_refresh_token = 3;
+  google.protobuf.Timestamp expires_at = 4;
+}
+
+// ========================================
+// Heartbeat System
 // ========================================
 
 message HeartbeatRequest {
-  google.protobuf.Timestamp client_time = 1;
-  uint32 sequence_number = 2;
-  
-  // 클라이언트 상태 정보
-  float cpu_usage = 3;
-  uint32 memory_usage_mb = 4;
-  uint32 fps = 5;              // 게임 FPS
-  bool is_window_focused = 6;   // 창이 활성화 상태인지
+  uint32 sequence_number = 1;
+  float cpu_usage = 2;
+  uint32 memory_usage_mb = 3;
+  uint32 fps = 4;
+  bool is_window_focused = 5;
 }
 
 message HeartbeatResponse {
-  google.protobuf.Timestamp server_time = 1;
-  uint32 sequence_number = 2;
-  
-  // 서버 상태 정보
-  ServerInfo server_info = 3;
-  
-  // 클라이언트에게 전달할 정보
-  bool force_update_required = 4; // 강제 업데이트 필요
-  string update_url = 5;          // 업데이트 다운로드 URL
-  repeated string server_messages = 6; // 서버 공지사항
-}
-
-// ========================================
-// 환영 메시지 (로그인 후 초기 정보)
-// ========================================
-
-message WelcomeMessage {
-  UserInfo user_info = 1;
+  uint32 sequence_number = 1;
   ServerInfo server_info = 2;
-  
-  // 게임 관련 정보
-  repeated string available_game_modes = 3;
-  int32 recommended_room_count = 4;
-  
-  // 사용자별 개인화 정보
-  repeated string daily_rewards = 5;     // 일일 보상
-  repeated string achievements = 6;      // 새로 획득한 업적
-  repeated string friend_online = 7;     // 온라인 친구 목록
-  
-  // 시스템 메시지
-  repeated string system_notifications = 10;
-  string motd = 11;                     // 오늘의 메시지
-  
-  // 게임 통계
-  int32 rank_position = 15;            // 현재 랭킹 순위
-  int32 total_players = 16;            // 전체 플레이어 수
-  float win_rate = 17;                 // 승률
-}
-
-// ========================================
-// 세션 관리
-// ========================================
-
-message SessionValidationRequest {
-  string session_token = 1;
-  google.protobuf.Timestamp last_activity = 2;
-}
-
-message SessionValidationResponse {
-  Result result = 1;
-  bool is_valid = 2;
-  google.protobuf.Timestamp expires_at = 3;
-  bool requires_renewal = 4;   // 토큰 갱신 필요
-  string new_token = 5;        // 새로운 토큰 (갱신 시)
-}
-
-// ========================================
-// 비밀번호 관리
-// ========================================
-
-message PasswordResetRequest {
-  string email = 1;
-  string username = 2;     // email 또는 username 중 하나
-  string captcha_response = 3;
-}
-
-message PasswordResetResponse {
-  Result result = 1;
-  string message = 2;
-  bool email_sent = 3;
-  string masked_email = 4; // 마스킹된 이메일 주소 표시
-}
-
-message PasswordChangeRequest {
-  string current_password = 1;
-  string new_password = 2;
-  string reset_token = 3;     // 비밀번호 재설정 토큰 (토큰 기반 변경 시)
-  string session_token = 4;
-}
-
-message PasswordChangeResponse {
-  Result result = 1;
-  string message = 2;
-  bool requires_relogin = 3;  // 재로그인 필요 여부
-}
-
-// ========================================
-// 계정 상태 및 관리
-// ========================================
-
-message AccountStatusInfo {
-  AccountStatus status = 1;
-  string status_reason = 2;
-  google.protobuf.Timestamp status_since = 3;
-  google.protobuf.Timestamp status_until = 4; // 정지/밴 해제 시점
-  
-  // 제재 정보
-  int32 warning_count = 5;
-  repeated string violation_history = 6;
-  string appeal_url = 7;      // 이의제기 URL
-}
-
-message EmailVerificationRequest {
-  string verification_token = 1;
-  string email = 2;
-}
-
-message EmailVerificationResponse {
-  Result result = 1;
-  bool verified = 2;
-  google.protobuf.Timestamp verified_at = 3;
-  
-  // 인증 완료 후 혜택
-  repeated string rewards = 4; // 인증 완료 보상
+  google.protobuf.Timestamp server_time = 3;
 }

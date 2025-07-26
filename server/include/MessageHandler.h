@@ -19,6 +19,31 @@ namespace google::protobuf {
 namespace blokus {
     class MessageWrapper;     // message_wrapper.proto에서 생성
     enum MessageType : int;   // message_wrapper.proto에서 생성
+    
+    // Proto 메시지 타입들
+    class AuthRequest;
+    class AuthResponse;
+    class RegisterRequest;
+    class RegisterResponse;
+    class LogoutRequest;
+    class LogoutResponse;
+    class HeartbeatRequest;
+    class HeartbeatResponse;
+    class CreateRoomRequest;
+    class CreateRoomResponse;
+    class JoinRoomRequest;
+    class JoinRoomResponse;
+    class LeaveRoomRequest;
+    class LeaveRoomResponse;
+    class SendChatRequest;
+    class SendChatResponse;
+    class PlaceBlockRequest;
+    class PlaceBlockResponse;
+    class StartGameRequest;
+    class StartGameResponse;
+    class GameStartedNotification;
+    class GameEndedNotification;
+    class ErrorResponse;
 }
 
 namespace Blokus::Server {
@@ -44,8 +69,9 @@ namespace Blokus::Server {
         explicit MessageHandler(Session* session, RoomManager* roomManager = nullptr, AuthenticationService* authService = nullptr, DatabaseManager* databaseManager_ = nullptr, GameServer* gameServer = nullptr);
         ~MessageHandler();
 
-        // 메시지 처리 (현재: 텍스트 우선)
+        // 메시지 처리 (텍스트 및 Protobuf 지원)
         void handleMessage(const std::string& rawMessage);
+        void handleProtobufMessage(const blokus::MessageWrapper& wrapper);
 
         // 🔥 채팅 콜백만 유지 (브로드캐스트 필요)
         void setChatCallback(ChatCallback callback) { chatCallback_ = callback; }
@@ -59,8 +85,9 @@ namespace Blokus::Server {
         void sendTextMessage(const std::string& message);
         void sendError(const std::string& errorMessage);
 
-        // TODO: 향후 Protobuf 지원
+        // Protobuf 메시지 전송
         void sendProtobufMessage(blokus::MessageType type, const google::protobuf::Message& payload);
+        void sendProtobufResponse(uint32_t sequenceId, blokus::MessageType type, const google::protobuf::Message& payload);
 
     private:
         // enum 기반 핸들러 테이블
@@ -131,12 +158,33 @@ namespace Blokus::Server {
         // 시퀀스 관리
         uint32_t sequenceId_{ 0 };
         uint32_t lastReceivedSequence_{ 0 };
+        
+        // Protobuf 지원 플래그
+        bool protobufEnabled_{ true };
 
         // 🔥 채팅 콜백만 유지
         ChatCallback chatCallback_;
 
-        // 메시지 라우팅 테이블 (Protobuf용)
+        // Protobuf 메시지 핸들러들
         std::unordered_map<int, std::function<void(const blokus::MessageWrapper&)>> protobufHandlers_;
+        
+        // Protobuf 핸들러 함수들
+        void handleProtobufAuth(const blokus::MessageWrapper& wrapper);
+        void handleProtobufRegister(const blokus::MessageWrapper& wrapper);
+        void handleProtobufLogout(const blokus::MessageWrapper& wrapper);
+        void handleProtobufHeartbeat(const blokus::MessageWrapper& wrapper);
+        void handleProtobufCreateRoom(const blokus::MessageWrapper& wrapper);
+        void handleProtobufJoinRoom(const blokus::MessageWrapper& wrapper);
+        void handleProtobufLeaveRoom(const blokus::MessageWrapper& wrapper);
+        void handleProtobufSendChat(const blokus::MessageWrapper& wrapper);
+        void handleProtobufPlaceBlock(const blokus::MessageWrapper& wrapper);
+        void handleProtobufStartGame(const blokus::MessageWrapper& wrapper);
+        
+        // Protobuf 유틸리티 함수들
+        void setupProtobufHandlers();
+        template<typename T>
+        bool unpackMessage(const blokus::MessageWrapper& wrapper, T& message);
+        blokus::MessageWrapper createResponseWrapper(uint32_t sequenceId, blokus::MessageType type, const google::protobuf::Message& payload);
     };
 
 } // namespace Blokus::Server

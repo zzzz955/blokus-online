@@ -11,6 +11,7 @@ protobuf_generate(
     LANGUAGE cpp
     OUT_VAR PROTO_GENERATED_FILES
     PROTOS ${PROTO_FILES}
+    PROTOC_OPTIONS --error_format=msvs
 )
 
 # 라이브러리 생성
