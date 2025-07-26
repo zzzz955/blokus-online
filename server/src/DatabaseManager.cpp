@@ -59,6 +59,10 @@ namespace Blokus {
             return totalGames > 0 ? static_cast<double>(wins) / totalGames * 100.0 : 0.0;
         }
 
+        double UserAccount::getAverageScore() const {
+            return totalGames > 0 ? static_cast<double>(totalScore) / totalGames : 0.0;
+        }
+
         // ========================================
         // 🔥 DatabaseManager 구현
         // ========================================
@@ -134,6 +138,7 @@ namespace Blokus {
                     "SELECT u.user_id, u.username, u.password_hash, "
                     "       COALESCE(s.total_games, 0), COALESCE(s.wins, 0), COALESCE(s.losses, 0), "
                     "       COALESCE(s.draws, 0), COALESCE(s.level, 1), COALESCE(s.experience_points, 0), "
+                    "       COALESCE(s.total_score, 0), COALESCE(s.best_score, 0), "
                     "       u.is_active "
                     "FROM users u "
                     "LEFT JOIN user_stats s ON u.user_id = s.user_id "
@@ -148,16 +153,18 @@ namespace Blokus {
                 }
 
                 UserAccount user;
-                user.userId = result[0]["user_id"].as<uint32_t>();
-                user.username = result[0]["username"].as<std::string>();
-                user.passwordHash = result[0]["password_hash"].as<std::string>();
+                user.userId = result[0][0].as<uint32_t>();
+                user.username = result[0][1].as<std::string>();
+                user.passwordHash = result[0][2].as<std::string>();
                 user.totalGames = result[0][3].as<int>();
                 user.wins = result[0][4].as<int>();
                 user.losses = result[0][5].as<int>();
                 user.draws = result[0][6].as<int>();
                 user.level = result[0][7].as<int>();
                 user.experiencePoints = result[0][8].as<int>();
-                user.isActive = result[0]["is_active"].as<bool>();
+                user.totalScore = result[0][9].as<int>();
+                user.bestScore = result[0][10].as<int>();
+                user.isActive = result[0][11].as<bool>();
 
                 txn.commit();
                 dbPool_->returnConnection(std::move(conn));

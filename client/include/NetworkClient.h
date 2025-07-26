@@ -117,6 +117,7 @@ namespace Blokus {
         void lobbyUserLeft(const QString& username);
         void roomListReceived(const QStringList& rooms);
         void userStatsReceived(const QString& statsJson);
+        void myStatsUpdated(const QString& statsJson);
         
         // 방 시그널
         void roomCreated(int roomId, const QString& roomName);

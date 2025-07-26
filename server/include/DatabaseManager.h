@@ -21,10 +21,13 @@ namespace Blokus {
             int draws;
             int level;
             int experiencePoints;
+            int totalScore;      // 누적 점수
+            int bestScore;       // 최고 점수
             bool isActive;
 
             // 계산된 필드
             double getWinRate() const;
+            double getAverageScore() const;
         };
 
         // 🔥 시스템 통계 구조체

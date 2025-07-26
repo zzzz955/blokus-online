@@ -181,6 +181,16 @@ namespace Blokus {
         m_averageScoreLabel = new QLabel();
         m_averageScoreLabel->setStyleSheet("color: #f39c12; font-weight: bold;");
 
+        QLabel* totalScoreTitle = new QLabel(QString::fromUtf8("누적 점수:"));
+        totalScoreTitle->setStyleSheet("font-weight: bold; color: #34495e;");
+        m_totalScoreLabel = new QLabel();
+        m_totalScoreLabel->setStyleSheet("color: #9b59b6; font-weight: bold;");
+
+        QLabel* bestScoreTitle = new QLabel(QString::fromUtf8("최고 점수:"));
+        bestScoreTitle->setStyleSheet("font-weight: bold; color: #34495e;");
+        m_bestScoreLabel = new QLabel();
+        m_bestScoreLabel->setStyleSheet("color: #e67e22; font-weight: bold; font-size: 14px;");
+
         // 경험치 바
         QLabel* expTitle = new QLabel(QString::fromUtf8("경험치:"));
         expTitle->setStyleSheet("font-weight: bold; color: #34495e;");
@@ -218,10 +228,15 @@ namespace Blokus {
 
         layout->addWidget(averageScoreTitle, 2, 0);
         layout->addWidget(m_averageScoreLabel, 2, 1);
+        layout->addWidget(totalScoreTitle, 2, 2);
+        layout->addWidget(m_totalScoreLabel, 2, 3);
 
-        layout->addWidget(expTitle, 3, 0);
-        layout->addWidget(m_expProgressBar, 3, 1, 1, 2);
-        layout->addWidget(m_expLabel, 3, 3);
+        layout->addWidget(bestScoreTitle, 3, 0);
+        layout->addWidget(m_bestScoreLabel, 3, 1);
+
+        layout->addWidget(expTitle, 4, 0);
+        layout->addWidget(m_expProgressBar, 4, 1, 1, 2);
+        layout->addWidget(m_expLabel, 4, 3);
 
         layout->setColumnStretch(1, 1);
         layout->setColumnStretch(3, 1);
@@ -359,7 +374,9 @@ namespace Blokus {
         m_winsLabel->setText(QString::number(m_userInfo.wins));
         m_lossesLabel->setText(QString::number(m_userInfo.losses));
         m_winRateLabel->setText(formatWinRate(m_userInfo.getWinRate()));
-        m_averageScoreLabel->setText(QString::number(m_userInfo.averageScore));
+        m_averageScoreLabel->setText(QString::number(m_userInfo.averageScore, 'f', 1));
+        m_totalScoreLabel->setText(QString::number(m_userInfo.totalScore));
+        m_bestScoreLabel->setText(QString::number(m_userInfo.bestScore));
         
         // 경험치 바 업데이트
         if (m_userInfo.requiredExp > 0) {

@@ -465,8 +465,25 @@ private slots:
             if (statusRegex.indexIn(statsJson) != -1)
                 userInfo.status = statusRegex.cap(1);
             
-            // averageScore는 서버에서 제공하지 않으므로 기본값 설정
-            userInfo.averageScore = 0;
+            // 점수 관련 필드 파싱 (서버에서 제공)
+            QRegExp averageScoreRegex("\"averageScore\":([\\d.]+)");
+            QRegExp totalScoreRegex("\"totalScore\":(\\d+)");
+            QRegExp bestScoreRegex("\"bestScore\":(\\d+)");
+            
+            if (averageScoreRegex.indexIn(statsJson) != -1)
+                userInfo.averageScore = averageScoreRegex.cap(1).toDouble();
+            else
+                userInfo.averageScore = 0;
+                
+            if (totalScoreRegex.indexIn(statsJson) != -1)
+                userInfo.totalScore = totalScoreRegex.cap(1).toInt();
+            else
+                userInfo.totalScore = 0;
+                
+            if (bestScoreRegex.indexIn(statsJson) != -1)
+                userInfo.bestScore = bestScoreRegex.cap(1).toInt();
+            else
+                userInfo.bestScore = 0;
 
             // 자신의 정보인지 다른 사용자의 정보인지 확인
             qDebug() << QString::fromUtf8("사용자 정보 비교: 응답='%1', 현재='%2'").arg(userInfo.username).arg(m_currentUsername);
@@ -481,6 +498,75 @@ private slots:
                 qDebug() << QString::fromUtf8("다른 사용자 정보로 판단하여 showUserInfoDialog 호출");
                 m_lobbyWindow->showUserInfoDialog(userInfo);
             }
+        }
+    }
+
+    void onMyStatsUpdated(const QString &statsJson)
+    {
+        qDebug() << QString::fromUtf8("내 통계 정보 자동 업데이트: %1").arg(statsJson);
+        if (m_lobbyWindow)
+        {
+            // JSON 파싱해서 UserInfo 구조체 구성 (onUserStatsReceived와 동일한 로직)
+            UserInfo userInfo;
+
+            // JSON에서 정보 추출
+            QRegExp usernameRegex("\"username\":\"([^\"]+)\"");
+            QRegExp levelRegex("\"level\":(\\d+)");
+            QRegExp currentExpRegex("\"currentExp\":(\\d+)");
+            QRegExp requiredExpRegex("\"requiredExp\":(\\d+)");
+            QRegExp totalGamesRegex("\"totalGames\":(\\d+)");
+            QRegExp winsRegex("\"wins\":(\\d+)");
+            QRegExp lossesRegex("\"losses\":(\\d+)");
+            QRegExp drawsRegex("\"draws\":(\\d+)");
+            QRegExp winRateRegex("\"winRate\":([\\d.]+)");
+            QRegExp statusRegex("\"status\":\"([^\"]+)\"");
+
+            if (usernameRegex.indexIn(statsJson) != -1)
+                userInfo.username = usernameRegex.cap(1);
+            if (levelRegex.indexIn(statsJson) != -1)
+                userInfo.level = levelRegex.cap(1).toInt();
+            if (currentExpRegex.indexIn(statsJson) != -1)
+                userInfo.experience = currentExpRegex.cap(1).toInt();
+            if (requiredExpRegex.indexIn(statsJson) != -1)
+                userInfo.requiredExp = requiredExpRegex.cap(1).toInt();
+            if (totalGamesRegex.indexIn(statsJson) != -1) {
+                int totalGames = totalGamesRegex.cap(1).toInt();
+                userInfo.gamesPlayed = totalGames;
+                userInfo.totalGames = totalGames;
+            }
+            if (winsRegex.indexIn(statsJson) != -1)
+                userInfo.wins = winsRegex.cap(1).toInt();
+            if (lossesRegex.indexIn(statsJson) != -1)
+                userInfo.losses = lossesRegex.cap(1).toInt();
+            if (drawsRegex.indexIn(statsJson) != -1)
+                userInfo.draws = drawsRegex.cap(1).toInt();
+            if (winRateRegex.indexIn(statsJson) != -1)
+                userInfo.winRate = winRateRegex.cap(1).toDouble();
+            if (statusRegex.indexIn(statsJson) != -1)
+                userInfo.status = statusRegex.cap(1);
+            
+            // 점수 관련 필드 파싱 (서버에서 제공)
+            QRegExp averageScoreRegex("\"averageScore\":([\\d.]+)");
+            QRegExp totalScoreRegex("\"totalScore\":(\\d+)");
+            QRegExp bestScoreRegex("\"bestScore\":(\\d+)");
+            
+            if (averageScoreRegex.indexIn(statsJson) != -1)
+                userInfo.averageScore = averageScoreRegex.cap(1).toDouble();
+            else
+                userInfo.averageScore = 0;
+                
+            if (totalScoreRegex.indexIn(statsJson) != -1)
+                userInfo.totalScore = totalScoreRegex.cap(1).toInt();
+            else
+                userInfo.totalScore = 0;
+                
+            if (bestScoreRegex.indexIn(statsJson) != -1)
+                userInfo.bestScore = bestScoreRegex.cap(1).toInt();
+            else
+                userInfo.bestScore = 0;
+
+            // 자동 업데이트는 모달 표시 없이 UI만 업데이트
+            m_lobbyWindow->setMyUserInfo(userInfo);
         }
     }
 
@@ -1033,6 +1119,8 @@ private:
                 this, &AppController::onRoomListReceived);
         connect(m_networkClient, &NetworkClient::userStatsReceived,
                 this, &AppController::onUserStatsReceived);
+        connect(m_networkClient, &NetworkClient::myStatsUpdated,
+                this, &AppController::onMyStatsUpdated);
 
         // 방 관련 시그널 추가
         connect(m_networkClient, &NetworkClient::roomCreated,

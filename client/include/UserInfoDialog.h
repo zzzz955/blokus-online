@@ -85,6 +85,8 @@ namespace Blokus {
         QLabel* m_lossesLabel;
         QLabel* m_winRateLabel;
         QLabel* m_averageScoreLabel;
+        QLabel* m_totalScoreLabel;
+        QLabel* m_bestScoreLabel;
         QProgressBar* m_expProgressBar;
         QLabel* m_expLabel;
 

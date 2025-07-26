@@ -1760,7 +1760,7 @@ namespace Blokus::Server
         }
 
         std::ostringstream response;
-        response << "USER_STATS_RESPONSE:{";
+        response << "MY_STATS_UPDATE:{"; // 자동 업데이트용 메시지 타입
         response << "\"username\":\"" << userAccount.username << "\",";
         response << "\"level\":" << userAccount.level << ",";
         response << "\"totalGames\":" << userAccount.totalGames << ",";
@@ -1770,6 +1770,9 @@ namespace Blokus::Server
         response << "\"currentExp\":" << userAccount.experiencePoints << ",";
         response << "\"requiredExp\":" << requiredExp << ",";
         response << "\"winRate\":" << std::fixed << std::setprecision(1) << userAccount.getWinRate() << ",";
+        response << "\"averageScore\":" << std::fixed << std::setprecision(1) << userAccount.getAverageScore() << ",";
+        response << "\"totalScore\":" << userAccount.totalScore << ",";
+        response << "\"bestScore\":" << userAccount.bestScore << ",";
         response << "\"status\":\"" << session_->getUserStatusString() << "\"";
         response << "}";
 
@@ -1859,6 +1862,9 @@ namespace Blokus::Server
             response << "\"currentExp\":" << userAccount.experiencePoints << ",";
             response << "\"requiredExp\":" << requiredExp << ",";
             response << "\"winRate\":" << std::fixed << std::setprecision(1) << userAccount.getWinRate() << ",";
+            response << "\"averageScore\":" << std::fixed << std::setprecision(1) << userAccount.getAverageScore() << ",";
+            response << "\"totalScore\":" << userAccount.totalScore << ",";
+            response << "\"bestScore\":" << userAccount.bestScore << ",";
             response << "\"status\":\"" << targetSession->getUserStatusString() << "\"";
             response << "}";
 
