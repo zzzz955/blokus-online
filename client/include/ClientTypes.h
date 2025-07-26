@@ -15,7 +15,7 @@
 namespace Blokus {
 
     // ========================================
-    // Common 네임스페이스의 타입들을 기본으로 가져오기
+    // Common 네임스페이스의 타입들을 기본으로 가져오기 (명시적 별칭)
     // ========================================
     using PlayerColor = Common::PlayerColor;
     using BlockType = Common::BlockType;
@@ -30,7 +30,6 @@ namespace Blokus {
 
     // 🔥 Block과 관련 클래스들도 가져오기 (서버와 동일한 로직)
     using Block = Common::Block;
-    //using BlockFactory = Common::BlockFactory;
     using GameLogic = Common::GameLogic;
     using GameStateManager = Common::GameStateManager;
 
@@ -246,23 +245,43 @@ namespace Blokus {
     };
 
     // ========================================
-    // Utils 네임스페이스 (Common::Utils를 Qt로 래핑)
+    // Utils 네임스페이스 (Qt 전용 함수들과 Common 함수들의 인라인 래퍼)
     // ========================================
     namespace Utils {
+        // Qt-specific functions (구현은 ClientUtils.cpp에 있음)
         QString playerColorToString(PlayerColor color);
         QColor getPlayerColor(PlayerColor color);
-        PlayerColor getNextPlayer(PlayerColor current);
-        bool isPositionValid(const Position& pos, int boardSize = Common::BOARD_SIZE);
-        int manhattanDistance(const Position& a, const Position& b);
-        bool isCornerAdjacent(const Position& pos1, const Position& pos2);
-        bool isEdgeAdjacent(const Position& pos1, const Position& pos2);
         QString trim(const QString& str);
         bool isValidUsername(const QString& username);
         bool isValidRoomName(const QString& roomName);
-        int getBlockScore(BlockType blockType);
         QString getBlockName(BlockType blockType);
         QString formatTurnTime(int seconds);
         bool isTurnTimeExpired(int remainingSeconds);
+        
+        // Common::Utils 함수들의 인라인 래퍼 (헤더에서 직접 구현)
+        inline PlayerColor getNextPlayer(PlayerColor current) {
+            return Common::Utils::getNextPlayer(current);
+        }
+        
+        inline bool isPositionValid(const Position& pos, int boardSize = Common::BOARD_SIZE) {
+            return Common::Utils::isPositionValid(pos, boardSize);
+        }
+        
+        inline int manhattanDistance(const Position& a, const Position& b) {
+            return Common::Utils::manhattanDistance(a, b);
+        }
+        
+        inline bool isCornerAdjacent(const Position& pos1, const Position& pos2) {
+            return Common::Utils::isCornerAdjacent(pos1, pos2);
+        }
+        
+        inline bool isEdgeAdjacent(const Position& pos1, const Position& pos2) {
+            return Common::Utils::isEdgeAdjacent(pos1, pos2);
+        }
+        
+        inline int getBlockScore(BlockType blockType) {
+            return Common::Utils::getBlockScore(blockType);
+        }
     }
 
 } // namespace Blokus

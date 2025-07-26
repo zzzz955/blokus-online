@@ -22,6 +22,7 @@ set(CLIENT_SOURCES
     "src/UserInfoDialog.cpp"
     "src/Block.cpp"
     "src/QtAdapter.cpp"
+    "src/ClientUtils.cpp"
     "src/NetworkClient.cpp"
 )
 
