@@ -1,14 +1,15 @@
 ﻿#include "LobbyWindow.h"
+#include "UserInfoDialog.h"
 #include "ClientTypes.h"  // 🔥 UserInfo 등을 위해 추가
 #include <QApplication>
 #include <QDesktopWidget>
 #include <QHeaderView>
 #include <QMessageBox>
+#include <QInputDialog>
 #include <QCloseEvent>
 #include <QMenuBar>
 #include <QStatusBar>
 #include <QDateTime>
-#include <QInputDialog>
 #include <QSplitter>
 
 namespace Blokus {
@@ -199,6 +200,7 @@ namespace Blokus {
         , m_refreshTimer(new QTimer(this))
         , m_selectedRoomId(-1)
         , m_buttonCooldownTimer(new QTimer(this))
+        , m_currentUserInfoDialog(nullptr)
     {
         qDebug() << QString::fromUtf8("LobbyWindow 생성자 시작: %1").arg(username);
 
@@ -276,6 +278,13 @@ namespace Blokus {
     {
         if (m_refreshTimer) {
             m_refreshTimer->stop();
+        }
+        
+        // UserInfoDialog 정리
+        if (m_currentUserInfoDialog) {
+            m_currentUserInfoDialog->close();
+            m_currentUserInfoDialog->deleteLater();
+            m_currentUserInfoDialog = nullptr;
         }
     }
 
@@ -873,21 +882,23 @@ namespace Blokus {
         QListWidgetItem* item = m_userList->currentItem();
         if (!item) return;
 
-        QString username = item->text().split(" ")[0]; // 첫 번째 단어가 사용자명
-        if (username == m_myUsername) return;
-
-        // 귓속말 기능 (향후 구현)
-        QString whisper = QInputDialog::getText(this, QString::fromUtf8("귓속말"),
-            QString::fromUtf8("%1님에게 귓속말:").arg(username));
-
-        if (!whisper.isEmpty()) {
-            ChatMessage msg;
-            msg.username = QString::fromUtf8("귓속말 to %1").arg(username);
-            msg.message = whisper;
-            msg.timestamp = QDateTime::currentDateTime();
-            msg.type = ChatMessage::Whisper;
-            addChatMessage(msg);
+        // 첫 번째 단어가 사용자명 (아이콘 제거)
+        QString itemText = item->text();
+        QStringList parts = itemText.split(" ");
+        if (parts.isEmpty()) return;
+        
+        QString username = parts[0];
+        // 이모지나 아이콘이 포함된 경우 제거
+        if (username.startsWith("🟢") || username.startsWith("🎮") || username.startsWith("💤")) {
+            if (parts.size() > 1) {
+                username = parts[1];
+            }
         }
+        
+        if (username.isEmpty()) return;
+        
+        // 사용자 정보 모달 표시
+        onUserInfoDialogRequested(username);
     }
 
     void LobbyWindow::onTabChanged(int index)
@@ -1174,7 +1185,81 @@ namespace Blokus {
         return QString::fromUtf8("%1/%2명").arg(room.currentPlayers).arg(room.maxPlayers);
     }
 
+    // ========================================
+    // UserInfoDialog 관련 함수들
+    // ========================================
+
+    void LobbyWindow::onUserInfoDialogRequested(const QString& username)
+    {
+        // 기존 다이얼로그가 열려있으면 닫기
+        if (m_currentUserInfoDialog) {
+            m_currentUserInfoDialog->close();
+            m_currentUserInfoDialog->deleteLater();
+            m_currentUserInfoDialog = nullptr;
+        }
+        
+        // 사용자 정보 찾기
+        UserInfo targetUser;
+        bool userFound = false;
+        
+        for (const UserInfo& user : m_userList_data) {
+            if (user.username == username) {
+                targetUser = user;
+                userFound = true;
+                break;
+            }
+        }
+        
+        // 사용자를 찾지 못한 경우 기본 정보로 생성
+        if (!userFound) {
+            targetUser.username = username;
+            targetUser.level = 1;
+            targetUser.totalGames = 0;
+            targetUser.wins = 0;
+            targetUser.losses = 0;
+            targetUser.averageScore = 0;
+            targetUser.isOnline = true;
+            targetUser.status = QString::fromUtf8("정보 없음");
+            targetUser.experience = 0;
+            targetUser.requiredExp = 100;
+            targetUser.gamesPlayed = 0;
+            targetUser.winRate = 0.0;
+        }
+        
+        // UserInfoDialog 생성
+        m_currentUserInfoDialog = new UserInfoDialog(targetUser, this);
+        
+        // 시그널 연결
+        connect(m_currentUserInfoDialog, &UserInfoDialog::getUserStatsRequested,
+            this, &LobbyWindow::getUserStatsRequested);
+        connect(m_currentUserInfoDialog, &UserInfoDialog::addFriendRequested,
+            this, &LobbyWindow::addFriendRequested);
+        connect(m_currentUserInfoDialog, &UserInfoDialog::sendWhisperRequested,
+            this, &LobbyWindow::sendWhisperRequested);
+        connect(m_currentUserInfoDialog, &QDialog::finished,
+            this, &LobbyWindow::onUserInfoDialogClosed);
+        
+        // 현재 사용자 정보 설정 (자신인지 확인용)
+        if (m_currentUserInfoDialog) {
+            // UserInfoDialog에 현재 사용자명 전달하는 방법이 필요하면 추가
+            m_currentUserInfoDialog->show();
+            m_currentUserInfoDialog->raise();
+            m_currentUserInfoDialog->activateWindow();
+        }
+        
+        // 서버에 상세 정보 요청 (있다면)
+        emit getUserStatsRequested(username);
+    }
+
+    void LobbyWindow::onUserInfoDialogClosed()
+    {
+        if (m_currentUserInfoDialog) {
+            m_currentUserInfoDialog->deleteLater();
+            m_currentUserInfoDialog = nullptr;
+        }
+    }
+
 
 } // namespace Blokus
 
-#include "ui/LobbyWindow.moc"
+#include "LobbyWindow.moc"
