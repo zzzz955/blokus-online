@@ -6,311 +6,68 @@ import "google/protobuf/timestamp.proto";
 import "common.proto";
 
 // ========================================
-// 에러 분류 및 심각도
+// Error Handling and Diagnostics
 // ========================================
 
 enum ErrorCategory {
   ERROR_CATEGORY_UNKNOWN = 0;
-  ERROR_CATEGORY_AUTHENTICATION = 1;    // 인증 관련
-  ERROR_CATEGORY_AUTHORIZATION = 2;     // 권한 관련
-  ERROR_CATEGORY_VALIDATION = 3;        // 입력 검증
-  ERROR_CATEGORY_BUSINESS_LOGIC = 4;    // 비즈니스 로직
-  ERROR_CATEGORY_NETWORK = 5;           // 네트워크 관련
-  ERROR_CATEGORY_DATABASE = 6;          // 데이터베이스
-  ERROR_CATEGORY_GAME_LOGIC = 7;        // 게임 로직
-  ERROR_CATEGORY_RATE_LIMIT = 8;        // 속도 제한
-  ERROR_CATEGORY_SERVER_ERROR = 9;      // 서버 내부 오류
-  ERROR_CATEGORY_CLIENT_ERROR = 10;     // 클라이언트 오류
+  ERROR_CATEGORY_AUTHENTICATION = 1;    // Auth errors
+  ERROR_CATEGORY_AUTHORIZATION = 2;     // Permission errors
+  ERROR_CATEGORY_VALIDATION = 3;        // Input validation errors
+  ERROR_CATEGORY_BUSINESS_LOGIC = 4;    // Business logic errors
+  ERROR_CATEGORY_NETWORK = 5;           // Network errors
+  ERROR_CATEGORY_DATABASE = 6;          // Database errors
+  ERROR_CATEGORY_GAME_LOGIC = 7;        // Game logic errors
+  ERROR_CATEGORY_SYSTEM = 8;            // System errors
 }
 
 enum ErrorSeverity {
-  ERROR_SEVERITY_INFO = 0;      // 정보성 (경고)
-  ERROR_SEVERITY_WARNING = 1;   // 경고
-  ERROR_SEVERITY_ERROR = 2;     // 오류
-  ERROR_SEVERITY_CRITICAL = 3;  // 치명적 오류
-  ERROR_SEVERITY_FATAL = 4;     // 복구 불가능한 오류
+  ERROR_SEVERITY_LOW = 0;      // Info/Warning
+  ERROR_SEVERITY_MEDIUM = 1;   // Recoverable error
+  ERROR_SEVERITY_HIGH = 2;     // Serious error
+  ERROR_SEVERITY_CRITICAL = 3; // System failure
 }
 
-// ========================================
-// 상세 에러 코드 (카테고리별)
-// ========================================
-
-enum AuthenticationError {
-  AUTH_ERROR_INVALID_CREDENTIALS = 0;
-  AUTH_ERROR_USER_NOT_FOUND = 1;
-  AUTH_ERROR_PASSWORD_INCORRECT = 2;
-  AUTH_ERROR_ACCOUNT_SUSPENDED = 3;
-  AUTH_ERROR_ACCOUNT_BANNED = 4;
-  AUTH_ERROR_EMAIL_NOT_VERIFIED = 5;
-  AUTH_ERROR_SESSION_EXPIRED = 6;
-  AUTH_ERROR_SESSION_INVALID = 7;
-  AUTH_ERROR_TOO_MANY_ATTEMPTS = 8;
-  AUTH_ERROR_CAPTCHA_REQUIRED = 9;
-  AUTH_ERROR_CAPTCHA_INVALID = 10;
-}
-
-enum ValidationError {
-  VALIDATION_ERROR_REQUIRED_FIELD = 0;
-  VALIDATION_ERROR_INVALID_FORMAT = 1;
-  VALIDATION_ERROR_TOO_SHORT = 2;
-  VALIDATION_ERROR_TOO_LONG = 3;
-  VALIDATION_ERROR_INVALID_CHARACTERS = 4;
-  VALIDATION_ERROR_DUPLICATE_VALUE = 5;
-  VALIDATION_ERROR_OUT_OF_RANGE = 6;
-  VALIDATION_ERROR_INVALID_EMAIL = 7;
-  VALIDATION_ERROR_WEAK_PASSWORD = 8;
-  VALIDATION_ERROR_INVALID_USERNAME = 9;
-}
-
-enum GameLogicError {
-  GAME_ERROR_INVALID_MOVE = 0;
-  GAME_ERROR_NOT_YOUR_TURN = 1;
-  GAME_ERROR_GAME_NOT_STARTED = 2;
-  GAME_ERROR_GAME_ALREADY_ENDED = 3;
-  GAME_ERROR_BLOCK_COLLISION = 4;
-  GAME_ERROR_INVALID_POSITION = 5;
-  GAME_ERROR_BLOCK_ALREADY_USED = 6;
-  GAME_ERROR_NO_CORNER_CONNECTION = 7;
-  GAME_ERROR_INVALID_FIRST_MOVE = 8;
-  GAME_ERROR_EDGE_COLLISION = 9;
-  GAME_ERROR_ROOM_FULL = 10;
-  GAME_ERROR_ALREADY_IN_ROOM = 11;
-  GAME_ERROR_NOT_IN_ROOM = 12;
-  GAME_ERROR_INSUFFICIENT_PLAYERS = 13;
-  GAME_ERROR_GAME_IN_PROGRESS = 14;
-}
-
-enum NetworkError {
-  NETWORK_ERROR_CONNECTION_LOST = 0;
-  NETWORK_ERROR_TIMEOUT = 1;
-  NETWORK_ERROR_PROTOCOL_ERROR = 2;
-  NETWORK_ERROR_MESSAGE_TOO_LARGE = 3;
-  NETWORK_ERROR_INVALID_MESSAGE = 4;
-  NETWORK_ERROR_COMPRESSION_ERROR = 5;
-  NETWORK_ERROR_ENCRYPTION_ERROR = 6;
-  NETWORK_ERROR_HANDSHAKE_FAILED = 7;
-}
-
-// ========================================
-// 에러 응답 메시지
-// ========================================
-
+// Detailed Error Response
 message ErrorResponse {
-  // 기본 에러 정보
   ResultCode result_code = 1;
-  ErrorCategory category = 2;
-  ErrorSeverity severity = 3;
+  string message = 2;
+  ErrorCategory category = 3;
+  ErrorSeverity severity = 4;
   
-  // 에러 메시지
-  string error_code = 4;       // "AUTH_001", "GAME_005" 등
-  string message = 5;          // 사용자에게 표시할 메시지
-  string technical_message = 6; // 개발자용 기술적 메시지
+  // Additional error details
+  string error_id = 5;             // Unique error identifier
+  string stack_trace = 6;          // For debugging (dev mode only)
+  map<string, string> context = 7; // Additional context
   
-  // 상세 정보
-  repeated FieldError field_errors = 7; // 필드별 검증 오류
-  map<string, string> details = 8;      // 추가 세부 정보
+  // Retry information
+  bool retryable = 8;              // Can client retry?
+  int32 retry_after_seconds = 9;   // Suggested retry delay
   
-  // 해결 방안
-  repeated string suggested_actions = 9; // 제안하는 해결 방법
-  string help_url = 10;                 // 도움말 URL
-  string contact_support = 11;          // 지원팀 연락처
-  
-  // 메타데이터
-  google.protobuf.Timestamp timestamp = 12;
-  string trace_id = 13;                 // 분산 추적 ID
-  string server_id = 14;                // 에러 발생 서버
-  
-  // 재시도 정보
-  bool retryable = 15;                  // 재시도 가능 여부
-  int32 retry_after_seconds = 16;       // 재시도까지 대기 시간
-  int32 max_retries = 17;               // 최대 재시도 횟수
+  // Timestamp and tracking
+  google.protobuf.Timestamp occurred_at = 10;
+  string trace_id = 11;            // Request trace ID
 }
 
-message FieldError {
-  string field_name = 1;       // 오류가 발생한 필드명
-  string error_code = 2;       // 필드별 에러 코드
-  string message = 3;          // 필드별 에러 메시지
-  string current_value = 4;    // 현재 잘못된 값
-  repeated string valid_values = 5; // 유효한 값들 (열거형인 경우)
-  string validation_rule = 6;  // 검증 규칙
+// Error Statistics
+message ErrorStats {
+  ErrorCategory category = 1;
+  ResultCode error_code = 2;
+  int32 count = 3;
+  google.protobuf.Timestamp first_seen = 4;
+  google.protobuf.Timestamp last_seen = 5;
 }
 
-// ========================================
-// 속도 제한 관련
-// ========================================
-
-message RateLimitExceeded {
-  string limit_type = 1;       // "login_attempts", "messages_per_minute" 등
-  int32 current_count = 2;     // 현재 요청 수
-  int32 limit_count = 3;       // 제한 수
-  int32 reset_after_seconds = 4; // 제한 리셋까지 시간
-  google.protobuf.Timestamp reset_time = 5;
-  
-  // 추가 정보
-  string client_ip = 6;        // 클라이언트 IP (로깅용)
-  string rate_limit_key = 7;   // 속도 제한 키
-  map<string, int32> rate_limit_info = 8; // 다른 제한 정보
-}
-
-// ========================================
-// 서버 오류 및 상태
-// ========================================
-
-message ServerError {
-  enum ServerErrorType {
-    INTERNAL_ERROR = 0;
-    DATABASE_ERROR = 1;
-    SERVICE_UNAVAILABLE = 2;
-    MAINTENANCE_MODE = 3;
-    OVERLOADED = 4;
-    CONFIGURATION_ERROR = 5;
-    DEPENDENCY_FAILURE = 6;
+// Health Check Response
+message HealthCheckResponse {
+  enum Status {
+    HEALTHY = 0;
+    DEGRADED = 1;
+    UNHEALTHY = 2;
   }
   
-  ServerErrorType error_type = 1;
-  string service_name = 2;     // 오류가 발생한 서비스
-  string error_message = 3;
-  
-  // 복구 정보
-  google.protobuf.Timestamp estimated_recovery = 4;
-  string maintenance_url = 5;   // 정비 안내 페이지
-  repeated string affected_features = 6; // 영향받는 기능들
-  
-  // 대안 정보
-  repeated string workarounds = 7; // 임시 해결 방법
-  bool partial_service = 8;        // 일부 서비스 가능 여부
-}
-
-// ========================================
-// 클라이언트 오류
-// ========================================
-
-message ClientError {
-  enum ClientErrorType {
-    INVALID_REQUEST = 0;
-    UNSUPPORTED_VERSION = 1;
-    MALFORMED_MESSAGE = 2;
-    MISSING_PARAMETERS = 3;
-    PROTOCOL_VIOLATION = 4;
-    CLIENT_TOO_OLD = 5;
-    CLIENT_CONFIGURATION_ERROR = 6;
-  }
-  
-  ClientErrorType error_type = 1;
-  string client_version = 2;
-  string required_version = 3;    // 필요한 최소 버전
-  string update_url = 4;          // 업데이트 다운로드 URL
-  
-  // 설정 오류 정보
-  repeated string missing_parameters = 5;
-  repeated string invalid_parameters = 6;
-  string configuration_help = 7;
-}
-
-// ========================================
-// 연결 및 세션 오류
-// ========================================
-
-message ConnectionError {
-  enum ConnectionErrorType {
-    CONNECTION_REFUSED = 0;
-    CONNECTION_TIMEOUT = 1;
-    CONNECTION_RESET = 2;
-    HANDSHAKE_FAILED = 3;
-    PROTOCOL_MISMATCH = 4;
-    AUTHENTICATION_FAILED = 5;
-    SESSION_TERMINATED = 6;
-    KEEPALIVE_TIMEOUT = 7;
-  }
-  
-  ConnectionErrorType error_type = 1;
-  string reason = 2;
-  google.protobuf.Timestamp disconnected_at = 3;
-  
-  // 재연결 정보
-  bool auto_reconnect_enabled = 4;
-  int32 reconnect_delay_seconds = 5;
-  int32 max_reconnect_attempts = 6;
-  repeated string alternate_servers = 7; // 대체 서버 목록
-}
-
-// ========================================
-// 게임 오류 세부 정보
-// ========================================
-
-message GameErrorDetails {
-  GameLogicError game_error = 1;
-  
-  // 블록 배치 관련 오류
-  BlockPlacement attempted_placement = 2;  // 시도한 블록 배치
-  repeated Position valid_positions = 3;   // 유효한 위치들
-  repeated Position blocking_positions = 4; // 막고 있는 위치들
-  
-  // 게임 상태 정보
-  PlayerColor current_player = 5;
-  GameState game_state = 6;
-  int32 turn_number = 7;
-  
-  // 규칙 위반 세부사항
-  string rule_violated = 8;    // 위반된 규칙명
-  string rule_description = 9; // 규칙 설명
-  string suggestion = 10;      // 해결 제안
-}
-
-// ========================================
-// 사용자 친화적 오류 메시지
-// ========================================
-
-message UserFriendlyError {
-  string title = 1;            // 오류 제목
-  string description = 2;      // 오류 설명
-  string icon = 3;             // 표시할 아이콘
-  
-  // 액션 버튼들
-  repeated ErrorAction actions = 4;
-  
-  // 표시 옵션
-  bool show_technical_details = 5; // 기술적 세부사항 표시 여부
-  bool dismissible = 6;           // 사용자가 닫을 수 있는지
-  int32 auto_dismiss_seconds = 7; // 자동 닫기 시간
-}
-
-message ErrorAction {
-  string action_id = 1;        // "retry", "contact_support", "go_back" 등
-  string label = 2;            // 버튼 텍스트
-  string action_type = 3;      // "button", "link", "callback" 등
-  string action_data = 4;      // 액션 데이터 (URL, 콜백 정보 등)
-  bool is_primary = 5;         // 주요 액션 여부
-}
-
-// ========================================
-// 에러 리포팅 및 분석
-// ========================================
-
-message ErrorReport {
-  ErrorResponse error = 1;
-  
-  // 클라이언트 환경 정보
-  string client_version = 2;
-  string platform = 3;
-  string user_agent = 4;
-  string device_info = 5;
-  
-  // 에러 발생 컨텍스트
-  string current_screen = 6;   // 현재 화면
-  string last_action = 7;      // 마지막 수행 액션
-  repeated string breadcrumbs = 8; // 에러까지의 경로
-  
-  // 사용자 정보 (개인정보 제외)
-  string user_id_hash = 9;     // 해시된 사용자 ID
-  int32 user_level = 10;
-  int32 session_duration = 11;
-  
-  // 네트워크 정보
-  string network_type = 12;    // "wifi", "mobile", "ethernet"
-  float network_latency = 13;
-  
-  // 자동 제출 여부
-  bool auto_submitted = 14;
-  google.protobuf.Timestamp reported_at = 15;
+  Status status = 1;
+  string message = 2;
+  map<string, string> details = 3;
+  google.protobuf.Timestamp checked_at = 4;
 }

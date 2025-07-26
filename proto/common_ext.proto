@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package blokus;
+
+import "google/protobuf/timestamp.proto";
+import "common.proto";
+
+// ========================================
+// Extended common types (complement to existing common.proto)
+// ========================================
+
+// User authentication status
+enum AuthenticationStatus {
+  AUTH_STATUS_NOT_AUTHENTICATED = 0;
+  AUTH_STATUS_AUTHENTICATED = 1;
+  AUTH_STATUS_SESSION_EXPIRED = 2;
+  AUTH_STATUS_GUEST = 3;
+}
+
+// Server region or instance information
+message ServerInstance {
+  string server_id = 1;
+  string region = 2;
+  string version = 3;
+  int32 current_load = 4;      // Current load (0-100)
+  bool maintenance_mode = 5;
+}
+
+// Extended server info (complement to existing ServerInfo)
+message ExtendedServerInfo {
+  ServerInfo basic_info = 1;
+  ServerInstance instance = 2;
+  repeated string features = 3;        // Supported features list
+  int32 max_concurrent_users = 4;
+  google.protobuf.Timestamp uptime_since = 5;
+}
+
+// Network connection quality information
+message ConnectionQuality {
+  float latency_ms = 1;
+  float packet_loss_rate = 2;     // 0.0-1.0
+  float jitter_ms = 3;
+  int32 bandwidth_kbps = 4;
+  string connection_type = 5;     // "wifi", "ethernet", "mobile"
+}
+
+// Client device information
+message ClientDevice {
+  string platform = 1;           // "Windows", "Android", "iOS"
+  string os_version = 2;
+  string device_model = 3;
+  string client_version = 4;
+  int32 screen_width = 5;
+  int32 screen_height = 6;
+  bool is_mobile = 7;
+}

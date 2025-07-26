@@ -369,19 +369,19 @@ message SpectatorNotification {
 }
 
 // ========================================
-// 게임 보드 상태 동기화
+// Game board state synchronization
 // ========================================
 
 message BoardSyncRequest {
   int32 room_id = 1;
-  int32 client_board_version = 2;  // 클라이언트 보드 버전
-  bool force_full_sync = 3;        // 전체 동기화 강제 요청
+  int32 client_board_version = 2;  // Client board version
+  bool force_full_sync = 3;        // Force full synchronization request
 }
 
 message BoardSyncResponse {
   Result result = 1;
-  BoardState board_state = 2;      // 전체 보드 상태
-  int32 server_board_version = 3;  // 서버 보드 버전
+  BoardState board_state = 2;      // Full board state
+  int32 server_board_version = 3;  // Server board version
   bool is_full_sync = 4;           // 전체 동기화 여부
   repeated BlockPlacement recent_moves = 5; // 최근 움직임 (부분 동기화용)
 }

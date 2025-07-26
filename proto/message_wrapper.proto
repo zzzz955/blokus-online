@@ -6,14 +6,14 @@ import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
 
 // ========================================
-// �޽��� Ÿ�� ������ (����ÿ�)
+// Message Type Enumeration (Comprehensive)
 // ========================================
 
 enum MessageType {
-  // �⺻ �޽���
+  // Basic messages
   MESSAGE_TYPE_UNKNOWN = 0;
   
-  // ���� �� ���� (100-199)
+  // Authentication and Login (100-199)
   MESSAGE_TYPE_AUTH_REQUEST = 100;
   MESSAGE_TYPE_AUTH_RESPONSE = 101;
   MESSAGE_TYPE_REGISTER_REQUEST = 102;
@@ -23,7 +23,7 @@ enum MessageType {
   MESSAGE_TYPE_HEARTBEAT = 106;
   MESSAGE_TYPE_WELCOME = 107;
   
-  // �κ� �ý��� (200-299)
+  // Lobby System (200-299)
   MESSAGE_TYPE_GET_ROOM_LIST_REQUEST = 200;
   MESSAGE_TYPE_ROOM_LIST_RESPONSE = 201;
   MESSAGE_TYPE_ROOM_LIST_UPDATE = 202;
@@ -39,18 +39,19 @@ enum MessageType {
   MESSAGE_TYPE_GET_USER_STATS_REQUEST = 212;
   MESSAGE_TYPE_USER_STATS_RESPONSE = 213;
   
-  // ���� �� ���� (300-349)
+  // Room Management (300-349)
   MESSAGE_TYPE_ROOM_STATE_UPDATE = 300;
   MESSAGE_TYPE_REMOVE_PLAYER_REQUEST = 301;
   MESSAGE_TYPE_REMOVE_PLAYER_RESPONSE = 302;
   MESSAGE_TYPE_KICK_PLAYER_REQUEST = 303;
   MESSAGE_TYPE_KICK_PLAYER_RESPONSE = 304;
-  MESSAGE_TYPE_PLAYER_READY_REQUEST = 305;
-  MESSAGE_TYPE_PLAYER_READY_RESPONSE = 306;
+  MESSAGE_TYPE_SET_PLAYER_READY_REQUEST = 305;
+  MESSAGE_TYPE_SET_PLAYER_READY_RESPONSE = 306;
   MESSAGE_TYPE_START_GAME_REQUEST = 307;
   MESSAGE_TYPE_START_GAME_RESPONSE = 308;
+  MESSAGE_TYPE_PLAYER_READY_NOTIFICATION = 309;
   
-  // �����÷��� (350-399)
+  // Gameplay (350-399)
   MESSAGE_TYPE_GAME_STARTED_NOTIFICATION = 350;
   MESSAGE_TYPE_TURN_CHANGED_NOTIFICATION = 351;
   MESSAGE_TYPE_PLACE_BLOCK_REQUEST = 352;
@@ -64,22 +65,24 @@ enum MessageType {
   MESSAGE_TYPE_GAME_STATE_RESPONSE = 360;
   MESSAGE_TYPE_UNDO_MOVE_REQUEST = 361;
   MESSAGE_TYPE_UNDO_MOVE_RESPONSE = 362;
+  MESSAGE_TYPE_GAME_RESET_NOTIFICATION = 363;
   
-  // ä�� �ý��� (400-449)
-  MESSAGE_TYPE_CHAT_MESSAGE = 400;
-  MESSAGE_TYPE_CHAT_NOTIFICATION = 401;
-  MESSAGE_TYPE_WHISPER_MESSAGE = 402;
-  MESSAGE_TYPE_SYSTEM_MESSAGE = 403;
-  MESSAGE_TYPE_CHAT_HISTORY_REQUEST = 404;
-  MESSAGE_TYPE_CHAT_HISTORY_RESPONSE = 405;
+  // Chat System (400-449)
+  MESSAGE_TYPE_SEND_CHAT_REQUEST = 400;
+  MESSAGE_TYPE_SEND_CHAT_RESPONSE = 401;
+  MESSAGE_TYPE_CHAT_NOTIFICATION = 402;
+  MESSAGE_TYPE_WHISPER_MESSAGE = 403;
+  MESSAGE_TYPE_SYSTEM_MESSAGE = 404;
+  MESSAGE_TYPE_GET_CHAT_HISTORY_REQUEST = 405;
+  MESSAGE_TYPE_CHAT_HISTORY_RESPONSE = 406;
   
-  // ������ ��� (450-499)
+  // Administration (450-499)
   MESSAGE_TYPE_ADMIN_COMMAND = 450;
   MESSAGE_TYPE_ADMIN_RESPONSE = 451;
   MESSAGE_TYPE_SERVER_ANNOUNCEMENT = 452;
   MESSAGE_TYPE_MAINTENANCE_NOTIFICATION = 453;
   
-  // ��� �� ��ŷ (500-549)
+  // Statistics and Ranking (500-549)
   MESSAGE_TYPE_GET_RANKING_REQUEST = 500;
   MESSAGE_TYPE_RANKING_RESPONSE = 501;
   MESSAGE_TYPE_RANKING_UPDATE = 502;
@@ -87,7 +90,7 @@ enum MessageType {
   MESSAGE_TYPE_GAME_REPLAY_RESPONSE = 504;
   MESSAGE_TYPE_ACHIEVEMENT_UNLOCKED = 505;
   
-  // ���� �� Ư�� (900-999)
+  // Error and Special (900-999)
   MESSAGE_TYPE_ERROR_RESPONSE = 900;
   MESSAGE_TYPE_RATE_LIMIT_EXCEEDED = 901;
   MESSAGE_TYPE_SERVER_SHUTDOWN = 902;
@@ -98,52 +101,52 @@ enum MessageType {
 }
 
 // ========================================
-// �޽��� �켱���� (QoS)
+// Message Priority (QoS)
 // ========================================
 
 enum MessagePriority {
-  PRIORITY_LOW = 0;      // ���, ä�� ��
-  PRIORITY_NORMAL = 1;   // �κ� ������Ʈ, �Ϲ� �˸�
-  PRIORITY_HIGH = 2;     // ���� ���� ����
-  PRIORITY_CRITICAL = 3; // ���� ��ġ, �� ����
+  PRIORITY_LOW = 0;      // Stats, chat etc
+  PRIORITY_NORMAL = 1;   // Lobby updates, general notifications
+  PRIORITY_HIGH = 2;     // Game state changes
+  PRIORITY_CRITICAL = 3; // Block placement, turn changes
 }
 
 // ========================================
-// �޽��� ����
+// Message Wrapper
 // ========================================
 
 message MessageWrapper {
-  // �⺻ ����� ����
+  // Basic envelope fields
   MessageType type = 1;
-  uint32 sequence_id = 2;          // ��û-���� ��Ī��
-  google.protobuf.Any payload = 3;  // ���� �޽��� ������
+  uint32 sequence_id = 2;          // Request-response matching
+  google.protobuf.Any payload = 3;  // Actual message content
   
-  // ��Ÿ������
+  // Metadata
   google.protobuf.Timestamp timestamp = 10;
   string client_version = 11;
   MessagePriority priority = 12;
   
-  // ����� ����
-  string target_room = 15;         // Ư�� ������ ����
-  string target_user = 16;         // Ư�� ����ڿ��� ����
-  bool broadcast = 17;             // ��ü ��ε�ĳ��Ʈ
+  // Routing fields
+  string target_room = 15;         // Target specific room
+  string target_user = 16;         // Target specific user
+  bool broadcast = 17;             // Global broadcast
   
-  // ���� �ɼ�
-  bool requires_ack = 20;          // ���� Ȯ�� �ʿ�
-  uint32 retry_count = 21;         // ��õ� Ƚ��
-  uint32 timeout_ms = 22;          // Ÿ�Ӿƿ� (�и���)
+  // Reliability options
+  bool requires_ack = 20;          // Requires acknowledgment
+  uint32 retry_count = 21;         // Retry attempts
+  uint32 timeout_ms = 22;          // Timeout (milliseconds)
   
-  // ���� �� ����ȭ
-  bool compressed = 25;            // ���̷ε� ���� ����
-  string compression_type = 26;    // "gzip", "lz4" ��
+  // Compression and optimization
+  bool compressed = 25;            // Data compression used
+  string compression_type = 26;    // "gzip", "lz4" etc
   
-  // ����� �� ����
-  string trace_id = 30;           // �л� ������ ID
-  map<string, string> headers = 31; // Ŀ���� ���
+  // Tracing and debugging
+  string trace_id = 30;           // Request trace ID
+  map<string, string> headers = 31; // Custom headers
 }
 
 // ========================================
-// �޽��� Ȯ�� ����
+// Message Acknowledgment
 // ========================================
 
 message MessageAck {
@@ -154,25 +157,25 @@ message MessageAck {
 }
 
 // ========================================
-// ��ġ �޽��� (���� �޽����� ��� ����)
+// Batch Message (for multiple messages at once)
 // ========================================
 
 message BatchMessage {
   repeated MessageWrapper messages = 1;
   uint32 batch_id = 2;
   google.protobuf.Timestamp created_at = 3;
-  bool ordered = 4;  // ���� ���� �ʿ� ����
+  bool ordered = 4;  // Order preservation required
 }
 
 // ========================================
-// ���� ���� ����
+// Keep Alive Messages
 // ========================================
 
 message KeepAlive {
   google.protobuf.Timestamp timestamp = 1;
-  uint32 client_fps = 2;           // Ŭ���̾�Ʈ ���� ����͸�
-  float network_latency_ms = 3;    // ��Ʈ��ũ �����ð�
-  uint32 memory_usage_mb = 4;      // �޸� ��뷮
+  uint32 client_fps = 2;           // Client frame rate
+  float network_latency_ms = 3;    // Network latency
+  uint32 memory_usage_mb = 4;      // Memory usage
 }
 
 message ConnectionStatus {
@@ -190,7 +193,7 @@ message ConnectionStatus {
 }
 
 // ========================================
-// ���� ����
+// Session Management
 // ========================================
 
 message SessionInfo {
@@ -206,11 +209,11 @@ message ReconnectInfo {
   SessionInfo session = 1;
   uint32 missed_message_count = 2;
   repeated MessageWrapper missed_messages = 3;
-  bool full_state_required = 4;  // ��ü ���� ������ �ʿ�
+  bool full_state_required = 4;  // Full state resync required
 }
 
 // ========================================
-// �޽��� ��� �� ����͸�
+// Message Statistics and Monitoring
 // ========================================
 
 message MessageStats {

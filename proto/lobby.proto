@@ -264,12 +264,12 @@ message UserStatsResponse {
 }
 
 // ========================================
-// 게임 준비 및 시작
+// Game Ready and Start
 // ========================================
 
 message SetPlayerReadyRequest {
   int32 room_id = 1;
-  bool ready = 2;              // true: 준비완료, false: 준비해제
+  bool ready = 2;              // true: ready, false: not ready
 }
 
 message SetPlayerReadyResponse {
@@ -277,28 +277,16 @@ message SetPlayerReadyResponse {
   string message = 2;
 }
 
-message StartGameRequest {
-  int32 room_id = 1;
-}
-
-message StartGameResponse {
-  Result result = 1;
-  string message = 2;
-  repeated string not_ready_players = 3; // 준비되지 않은 플레이어 목록
-}
+// StartGameRequest and StartGameResponse moved to game.proto
 
 message PlayerReadyNotification {
   string username = 1;
   PlayerColor color = 2;
-  bool ready = 3;              // 준비 상태
+  bool ready = 3;              // Ready status
   google.protobuf.Timestamp updated_at = 4;
 }
 
-message GameStartNotification {
-  google.protobuf.Timestamp started_at = 1;
-  repeated PlayerColor turn_order = 2;    // 턴 순서
-  string game_id = 3;          // 게임 세션 ID
-}
+// GameStartNotification merged into GameStartedNotification in game.proto
 
 // ========================================
 // ģ�� �ý��� (�⺻)
@@ -347,9 +335,9 @@ message ServerAnnouncementNotification {
   bool requires_acknowledgment = 6; // ����� Ȯ�� �ʿ�
   
   // ǥ�� ����
-  bool show_popup = 7;         // �˾����� ǥ��
-  bool show_banner = 8;        // ��ʷ� ǥ��
-  int32 priority = 9;          // �켱���� (�������� ���� ǥ��)
+  bool show_popup = 7;         // Show popup
+  bool show_banner = 8;        // Show banner
+  int32 priority = 9;          // Priority (higher = display first)
 }
 
 message MaintenanceNotification {

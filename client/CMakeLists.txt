@@ -51,6 +51,7 @@ target_include_directories(BlokusClient PRIVATE
 # 라이브러리 링크
 target_link_libraries(BlokusClient PRIVATE
     BlokusCommon
+    BlokusProto
     Qt5::Core
     Qt5::Widgets
     Qt5::Gui

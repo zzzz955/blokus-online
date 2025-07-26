@@ -5,10 +5,10 @@ package blokus;
 import "google/protobuf/timestamp.proto";
 
 // ========================================
-// �⺻ ���� Ÿ�Ե�
+// Basic Common Types
 // ========================================
 
-// �÷��̾� ����
+// Player Colors
 enum PlayerColor {
   PLAYER_COLOR_NONE = 0;
   PLAYER_COLOR_BLUE = 1;
@@ -17,25 +17,25 @@ enum PlayerColor {
   PLAYER_COLOR_GREEN = 4;
 }
 
-// ���� Ÿ�� (21�� �������̳�)
+// Block Types (21 total polyominoes)
 enum BlockType {
   BLOCK_TYPE_SINGLE = 0;
   
-  // 2ĭ ����
+  // 2-square blocks
   BLOCK_TYPE_DOMINO = 1;
   
-  // 3ĭ ����
+  // 3-square blocks
   BLOCK_TYPE_TRIO_LINE = 2;
   BLOCK_TYPE_TRIO_ANGLE = 3;
   
-  // 4ĭ ���� (��Ʈ�ι̳�)
+  // 4-square blocks (tetrominoes)
   BLOCK_TYPE_TETRO_I = 4;
   BLOCK_TYPE_TETRO_O = 5;
   BLOCK_TYPE_TETRO_T = 6;
   BLOCK_TYPE_TETRO_L = 7;
   BLOCK_TYPE_TETRO_S = 8;
   
-  // 5ĭ ���� (����̳�)
+  // 5-square blocks (pentominoes)
   BLOCK_TYPE_PENTO_F = 9;
   BLOCK_TYPE_PENTO_I = 10;
   BLOCK_TYPE_PENTO_L = 11;
@@ -50,31 +50,31 @@ enum BlockType {
   BLOCK_TYPE_PENTO_Z = 20;
 }
 
-// ���� ȸ�� ����
+// Block Rotation States
 enum Rotation {
-  ROTATION_0 = 0;    // 0��
-  ROTATION_90 = 1;   // 90�� �ð����
-  ROTATION_180 = 2;  // 180��
-  ROTATION_270 = 3;  // 270�� �ð����
+  ROTATION_0 = 0;    // 0 degrees
+  ROTATION_90 = 1;   // 90 degrees clockwise
+  ROTATION_180 = 2;  // 180 degrees
+  ROTATION_270 = 3;  // 270 degrees clockwise
 }
 
-// ���� ������ ����
+// Block Flip States
 enum FlipState {
-  FLIP_NORMAL = 0;      // ����
-  FLIP_HORIZONTAL = 1;  // ���� ������
-  FLIP_VERTICAL = 2;    // ���� ������
-  FLIP_BOTH = 3;        // ���� ������
+  FLIP_NORMAL = 0;      // Normal
+  FLIP_HORIZONTAL = 1;  // Horizontal flip
+  FLIP_VERTICAL = 2;    // Vertical flip
+  FLIP_BOTH = 3;        // Both flips
 }
 
-// ���� ����
+// Game States
 enum GameState {
-  GAME_STATE_WAITING = 0;   // �÷��̾� ��� ��
-  GAME_STATE_PLAYING = 1;   // ���� ���� ��
-  GAME_STATE_FINISHED = 2;  // ���� ����
-  GAME_STATE_PAUSED = 3;    // �Ͻ�����
+  GAME_STATE_WAITING = 0;   // Waiting for players
+  GAME_STATE_PLAYING = 1;   // Game in progress
+  GAME_STATE_FINISHED = 2;  // Game finished
+  GAME_STATE_PAUSED = 3;    // Game paused
 }
 
-// ����� ����
+// User Status
 enum UserStatus {
   USER_STATUS_OFFLINE = 0;
   USER_STATUS_ONLINE = 1;
@@ -83,17 +83,25 @@ enum UserStatus {
   USER_STATUS_AWAY = 4;
 }
 
+// Game Mode
+enum GameMode {
+  GAME_MODE_CLASSIC = 0;
+  GAME_MODE_BEGINNER = 1;
+  GAME_MODE_ADVANCED = 2;
+  GAME_MODE_CUSTOM = 3;
+}
+
 // ========================================
-// �⺻ ������ ����
+// Basic Message Structures
 // ========================================
 
-// 2D ��ġ
+// 2D Position
 message Position {
   int32 row = 1;
   int32 col = 2;
 }
 
-// ���� ��ġ ����
+// Block Placement Information
 message BlockPlacement {
   BlockType type = 1;
   Position position = 2;
@@ -102,7 +110,7 @@ message BlockPlacement {
   PlayerColor player = 5;
 }
 
-// ����� �⺻ ����
+// User Basic Information
 message UserInfo {
   string username = 1;
   int32 level = 2;
@@ -114,7 +122,7 @@ message UserInfo {
   google.protobuf.Timestamp last_seen = 8;
 }
 
-// �÷��̾� ���� ����
+// Player Slot Information
 message PlayerSlot {
   PlayerColor color = 1;
   string username = 2;
@@ -125,7 +133,7 @@ message PlayerSlot {
   repeated BlockType used_blocks = 7;
 }
 
-// �� �⺻ ����
+// Room Basic Information
 message RoomInfo {
   int32 room_id = 1;
   string room_name = 2;
@@ -134,20 +142,20 @@ message RoomInfo {
   int32 max_players = 5;
   bool is_private = 6;
   bool is_playing = 7;
-  string game_mode = 8;  // "Ŭ����", "���" ��
+  GameMode game_mode = 8;
   google.protobuf.Timestamp created_at = 9;
 }
 
-// ���� ���� ���� (����� ����)
+// Game Board State (compressed format)
 message BoardState {
-  // 20x20 ���带 ȿ�������� ���ڵ�
-  // �� ���� 4��Ʈ (0-4: PlayerColor)
-  // 400�� �� 200����Ʈ�� ����
+  // 20x20 board efficiently encoded
+  // Each cell 4 bits (0-4: PlayerColor)
+  // 400 cells = 200 bytes total
   bytes compressed_board = 1;
-  int32 board_version = 2;  // ���� ���� (�浹 ������)
+  int32 board_version = 2;  // Version number (for conflict resolution)
 }
 
-// ���� ���
+// Game Statistics
 message GameStats {
   int32 total_moves = 1;
   int32 game_duration_seconds = 2;
@@ -156,7 +164,7 @@ message GameStats {
   string winner = 5;
 }
 
-// ���� ���� ����
+// Server Information
 message ServerInfo {
   int32 online_users = 1;
   int32 active_rooms = 2;
@@ -167,10 +175,10 @@ message ServerInfo {
 }
 
 // ========================================
-// ���� ��� Ÿ��
+// Result and Error Types
 // ========================================
 
-// ����/���� ���
+// Success/Error Codes
 enum ResultCode {
   RESULT_SUCCESS = 0;
   RESULT_UNKNOWN_ERROR = 1;
@@ -181,11 +189,17 @@ enum ResultCode {
   RESULT_GAME_RULE_VIOLATION = 6;
   RESULT_TIMEOUT = 7;
   RESULT_SERVER_BUSY = 8;
+  RESULT_AUTHENTICATION_REQUIRED = 9;
+  RESULT_ROOM_NOT_FOUND = 10;
+  RESULT_PLAYER_NOT_FOUND = 11;
+  RESULT_GAME_NOT_IN_PROGRESS = 12;
+  RESULT_INVALID_MOVE = 13;
+  RESULT_SERVER_ERROR = 14;
 }
 
-// ���� ���� ���
+// Generic Result Message
 message Result {
   ResultCode code = 1;
   string message = 2;
-  map<string, string> details = 3;  // �߰� ����
+  map<string, string> details = 3;  // Additional details
 }
