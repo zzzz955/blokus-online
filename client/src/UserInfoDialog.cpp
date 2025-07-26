@@ -490,9 +490,11 @@ namespace Blokus {
         m_refreshButton->setEnabled(false);
         
         // 1초 후 원래 상태로 복구 (실제로는 서버 응답 후 복구)
-        QTimer::singleShot(1000, [this]() {
-            m_refreshButton->setText(QString::fromUtf8("새로고침"));
-            m_refreshButton->setEnabled(true);
+        QTimer::singleShot(1000, this, [this]() {
+            if (m_refreshButton) {
+                m_refreshButton->setText(QString::fromUtf8("새로고침"));
+                m_refreshButton->setEnabled(true);
+            }
         });
     }
 
