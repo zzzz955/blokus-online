@@ -60,7 +60,10 @@ namespace Blokus {
         int totalGames;
         int wins;
         int losses;
+        int draws;
         int averageScore;
+        int totalScore;      // 누적 점수
+        int bestScore;       // 최고 점수
         bool isOnline;
         QString status;
         int experience;      // 현재 경험치
@@ -71,8 +74,8 @@ namespace Blokus {
         // 기본 생성자
         UserInfo()
             : username(QString::fromUtf8("익명"))
-            , level(1), totalGames(0), wins(0), losses(0)
-            , averageScore(0), isOnline(true)
+            , level(1), totalGames(0), wins(0), losses(0), draws(0)
+            , averageScore(0), totalScore(0), bestScore(0), isOnline(true)
             , status(QString::fromUtf8("로비"))
             , experience(0), requiredExp(100)
             , gamesPlayed(0), winRate(0.0) {
@@ -82,8 +85,8 @@ namespace Blokus {
         UserInfo(const Common::UserInfo& common)
             : username(QString::fromUtf8(common.username.c_str()))
             , level(common.level), totalGames(common.totalGames)
-            , wins(common.wins), losses(common.losses)
-            , averageScore(common.averageScore), isOnline(common.isOnline)
+            , wins(common.wins), losses(common.losses), draws(0)
+            , averageScore(common.averageScore), totalScore(0), bestScore(0), isOnline(common.isOnline)
             , status(QString::fromUtf8(common.status.c_str()))
             , experience(0), requiredExp(100)
             , gamesPlayed(common.totalGames), winRate(getWinRate()) {

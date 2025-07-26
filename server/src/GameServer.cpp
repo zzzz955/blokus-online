@@ -807,16 +807,16 @@ namespace Blokus::Server {
         auto now = std::chrono::system_clock::now();
         auto uptime = std::chrono::duration_cast<std::chrono::seconds>(now - stats_.serverStartTime).count();
 
-        spdlog::info("=== 서버 통계 ===");
-        spdlog::info("현재 연결: {}", stats_.currentConnections);
-        spdlog::info("인증된 세션: {}", activeAuthSessions);
-        spdlog::info("총 연결 수: {}", stats_.totalConnectionsToday);
-        spdlog::info("피크 연결: {}", stats_.peakConcurrentConnections);
-        spdlog::info("활성 방 수: {}", roomCount);
-        spdlog::info("방 내 플레이어: {}", playersInRooms);
-        spdlog::info("처리된 메시지: {}", stats_.messagesReceived);
-        spdlog::info("업타임: {}초 ({}분)", uptime, uptime / 60);
-        spdlog::info("================");
+        spdlog::debug("=== 서버 통계 ===");
+        spdlog::debug("현재 연결: {}", stats_.currentConnections);
+        spdlog::debug("인증된 세션: {}", activeAuthSessions);
+        spdlog::debug("총 연결 수: {}", stats_.totalConnectionsToday);
+        spdlog::debug("피크 연결: {}", stats_.peakConcurrentConnections);
+        spdlog::debug("활성 방 수: {}", roomCount);
+        spdlog::debug("방 내 플레이어: {}", playersInRooms);
+        spdlog::debug("처리된 메시지: {}", stats_.messagesReceived);
+        spdlog::debug("업타임: {}초 ({}분)", uptime, uptime / 60);
+        spdlog::debug("================");
     }
 
 } // namespace Blokus::Server

@@ -460,7 +460,8 @@ namespace Blokus {
         }
         else if (message.startsWith("LOBBY_") || message.startsWith("ROOM_") || message.startsWith("CHAT:") || 
                  message.startsWith("PLAYER_") || message.startsWith("HOST_") || message.startsWith("GAME_") ||
-                 message.startsWith("SYSTEM:") || message.startsWith("USER_STATS_RESPONSE:")) {
+                 message.startsWith("SYSTEM:") || message.startsWith("USER_STATS_RESPONSE:") || 
+                 message.startsWith("MY_STATS_UPDATE:")) {
             processLobbyResponse(message);
         }
         else if (message.startsWith("GAME_STATE_UPDATE:") || 
@@ -619,6 +620,10 @@ namespace Blokus {
         else if (parts[0] == "USER_STATS_RESPONSE" && parts.size() >= 2) {
             QString statsJson = parts.mid(1).join(":");
             emit userStatsReceived(statsJson);
+        }
+        else if (parts[0] == "MY_STATS_UPDATE" && parts.size() >= 2) {
+            QString statsJson = parts.mid(1).join(":");
+            emit myStatsUpdated(statsJson);
         }
     }
 

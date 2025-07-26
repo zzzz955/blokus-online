@@ -29,6 +29,8 @@
 #include "ClientTypes.h"  // 🔥 Types.h에서 UserInfo, RoomInfo 등을 가져옴
 
 namespace Blokus {
+    // 전방 선언
+    class UserInfoDialog;
     // 방 생성 다이얼로그
     class CreateRoomDialog : public QDialog
     {
@@ -71,6 +73,7 @@ namespace Blokus {
         void updateRanking(const QList<UserInfo>& ranking);
         void addChatMessage(const ChatMessage& message);
         void setMyUserInfo(const UserInfo& userInfo);
+        void showUserInfoDialog(const UserInfo& userInfo); // 서버 응답 후 모달 표시
 
     signals:
         // 서버 통신 시그널들
@@ -80,6 +83,9 @@ namespace Blokus {
         void sendChatMessageRequested(const QString& message);
         void logoutRequested();
         void gameStartRequested(); // 게임 시작 (방에 입장한 상태에서)
+        void getUserStatsRequested(const QString& username); // 사용자 상세 정보 요청
+        void addFriendRequested(const QString& username); // 친구 추가 요청
+        void sendWhisperRequested(const QString& username); // 귓속말 요청
 
     private slots:
         // UI 이벤트 핸들러
@@ -93,6 +99,10 @@ namespace Blokus {
         void onUserDoubleClicked();
         void onTabChanged(int index);
         void onCooldownTimerTick();
+        
+        // UserInfoDialog 관련 슬롯
+        void onUserInfoDialogRequested(const QString& username);
+        void onUserInfoDialogClosed();
 
         // 타이머 이벤트
         void onRefreshTimer();
@@ -190,6 +200,9 @@ namespace Blokus {
 
         // 현재 선택된 방
         int m_selectedRoomId;
+        
+        // 사용자 정보 다이얼로그
+        UserInfoDialog* m_currentUserInfoDialog;
     };
 
 } // namespace Blokus
