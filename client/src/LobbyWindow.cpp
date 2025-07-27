@@ -209,9 +209,9 @@ namespace Blokus {
             setupUI();
             qDebug() << QString::fromUtf8("UI 설정 완료");
 
-            qDebug() << QString::fromUtf8("메뉴바 설정 시작...");
-            setupMenuBar();
-            qDebug() << QString::fromUtf8("메뉴바 설정 완료");
+            // qDebug() << QString::fromUtf8("메뉴바 설정 시작...");
+            // setupMenuBar();
+            // qDebug() << QString::fromUtf8("메뉴바 설정 완료");
 
             qDebug() << QString::fromUtf8("상태바 설정 시작...");
             setupStatusBar();
@@ -252,10 +252,10 @@ namespace Blokus {
             m_buttonCooldownTimer->setInterval(100); // 100ms마다 체크
             connect(m_buttonCooldownTimer, &QTimer::timeout, this, &LobbyWindow::onCooldownTimerTick);
 
-            // 창 설정
+            // 창 설정 - 스크롤바 없이 모든 요소가 보이는 최소 크기
             setWindowTitle(QString::fromUtf8("블로커스 온라인 - 로비 (%1님)").arg(username));
-            setMinimumSize(1200, 800);
-            resize(1400, 900);
+            setMinimumSize(1280, 800);  // 계산된 실제 최소 크기
+            resize(1280, 800);         // 초기 진입 시 진짜 최소 크기로 시작
 
             // 화면 중앙에 배치
             QRect screenGeometry = QApplication::desktop()->screenGeometry();
@@ -406,10 +406,10 @@ namespace Blokus {
         m_mainSplitter->addWidget(m_centerPanel);
         m_mainSplitter->addWidget(m_rightPanel);
 
-        // 스플리터 비율 설정 (2:4:3)
-        m_mainSplitter->setStretchFactor(0, 2);
-        m_mainSplitter->setStretchFactor(1, 4);
-        m_mainSplitter->setStretchFactor(2, 3);
+        // 스플리터 비율 설정 (2:5:2.5) - 중앙 테이블에 더 많은 공간
+        m_mainSplitter->setStretchFactor(0, 3);
+        m_mainSplitter->setStretchFactor(1, 10);
+        m_mainSplitter->setStretchFactor(2, 5);
 
         mainVBoxLayout->addWidget(m_infoPanel);
         mainVBoxLayout->addWidget(m_mainSplitter, 1);
@@ -418,10 +418,10 @@ namespace Blokus {
     void LobbyWindow::setupInfoPanel()
     {
         m_infoPanel = new QWidget();
-        m_infoPanel->setFixedHeight(70);
+        m_infoPanel->setFixedHeight(40);  // 정보 패널 높이 줄여서 공간 절약
 
         QHBoxLayout* mainLayout = new QHBoxLayout(m_infoPanel);
-        mainLayout->setContentsMargins(15, 10, 15, 10);
+        mainLayout->setContentsMargins(10, 5, 15, 5);  // 여백 줄여서 공간 절약
 
         // 환영 메시지
         m_welcomeLabel = new QLabel(QString::fromUtf8("🎮 %1님, 환영합니다!").arg(m_myUsername));
@@ -457,7 +457,7 @@ namespace Blokus {
 
         // 로그아웃 버튼
         m_logoutButton = new QPushButton(QString::fromUtf8("로그아웃"));
-        m_logoutButton->setFixedSize(80, 35);
+        m_logoutButton->setFixedSize(80, 25);
 
         // 한 줄 레이아웃으로 모든 요소 배치
         mainLayout->addWidget(m_welcomeLabel);
@@ -477,7 +477,7 @@ namespace Blokus {
     void LobbyWindow::setupLeftPanel()
     {
         m_leftPanel = new QWidget();
-        m_leftPanel->setMinimumWidth(250);
+        m_leftPanel->setMinimumWidth(200);  // 최소 너비 줄임
         m_leftPanel->setMaximumWidth(350);
 
         QVBoxLayout* layout = new QVBoxLayout(m_leftPanel);
@@ -518,6 +518,11 @@ namespace Blokus {
         m_rankingTable->verticalHeader()->setVisible(false);
         m_rankingTable->setSelectionBehavior(QAbstractItemView::SelectRows);
         m_rankingTable->setAlternatingRowColors(true);
+        
+        // 초기 열 너비 설정 (최소 크기에서도 필드명이 잘리지 않도록)
+        m_rankingTable->setColumnWidth(0, 40);   // 순위
+        m_rankingTable->setColumnWidth(1, 100);  // 플레이어
+        // 마지막 열(승률)는 setStretchLastSection(true)로 자동 조정
 
         rankingLayout->addWidget(rankingLabel);
         rankingLayout->addWidget(m_rankingTable);
@@ -537,8 +542,8 @@ namespace Blokus {
         m_centerPanel = new QWidget();
 
         QVBoxLayout* layout = new QVBoxLayout(m_centerPanel);
-        layout->setContentsMargins(10, 10, 10, 10);
-        layout->setSpacing(10);
+        layout->setContentsMargins(8, 5, 8, 5);  // 여백 줄여서 공간 절약
+        layout->setSpacing(6);  // 요소 간 간격 줄임
 
         // 제목
         QLabel* titleLabel = new QLabel(QString::fromUtf8("🏠 게임방 목록"));
@@ -558,6 +563,14 @@ namespace Blokus {
         m_roomTable->setSelectionBehavior(QAbstractItemView::SelectRows);
         m_roomTable->setAlternatingRowColors(true);
         m_roomTable->setSortingEnabled(true);
+        
+        // 초기 열 너비 설정 (최소 크기에서도 필드명이 잘리지 않도록)
+        m_roomTable->setColumnWidth(0, 60);   // 방 번호
+        m_roomTable->setColumnWidth(1, 120);  // 방 이름
+        m_roomTable->setColumnWidth(2, 80);   // 호스트
+        m_roomTable->setColumnWidth(3, 50);   // 인원
+        m_roomTable->setColumnWidth(4, 60);   // 상태
+        // 마지막 열(모드)는 setStretchLastSection(true)로 자동 조정
 
         // 컨트롤 버튼들
         m_roomControlsWidget = new QWidget();
@@ -568,9 +581,9 @@ namespace Blokus {
         m_joinRoomButton = new QPushButton(QString::fromUtf8("🚪 입장하기"));
         m_refreshRoomButton = new QPushButton(QString::fromUtf8("🔄 새로고침"));
 
-        m_createRoomButton->setMinimumHeight(35);
-        m_joinRoomButton->setMinimumHeight(35);
-        m_refreshRoomButton->setMinimumHeight(35);
+        m_createRoomButton->setMinimumHeight(30);  // 더 컴팩트한 버튼 높이
+        m_joinRoomButton->setMinimumHeight(30);
+        m_refreshRoomButton->setMinimumHeight(30);
 
         controlsLayout->addWidget(m_createRoomButton);
         controlsLayout->addWidget(m_joinRoomButton);
@@ -597,12 +610,12 @@ namespace Blokus {
     void LobbyWindow::setupRightPanel()
     {
         m_rightPanel = new QWidget();
-        m_rightPanel->setMinimumWidth(300);
-        m_rightPanel->setMaximumWidth(400);
+        m_rightPanel->setMinimumWidth(180);  // 더 컴팩트하게 조정
+        m_rightPanel->setMaximumWidth(350);  // 최대 너비도 줄임
 
         QVBoxLayout* layout = new QVBoxLayout(m_rightPanel);
-        layout->setContentsMargins(10, 10, 10, 10);
-        layout->setSpacing(10);
+        layout->setContentsMargins(3, 3, 3, 3);  // 여백 줄여서 공간 절약
+        layout->setSpacing(4);  // 요소 간 간격 줄임
 
         // 채팅 제목
         QLabel* chatLabel = new QLabel(QString::fromUtf8("💬 로비 채팅"));
@@ -624,7 +637,7 @@ namespace Blokus {
         m_chatInput->setMaxLength(200);
 
         m_chatSendButton = new QPushButton(QString::fromUtf8("전송"));
-        m_chatSendButton->setFixedSize(60, 30);
+        m_chatSendButton->setFixedSize(50, 26);  // 더 컴팩트한 버튼 크기
 
         chatInputLayout->addWidget(m_chatInput);
         chatInputLayout->addWidget(m_chatSendButton);
@@ -695,7 +708,7 @@ namespace Blokus {
             // 버튼 스타일
             "QPushButton { "
             "border: none; border-radius: 6px; font-weight: bold; "
-            "font-size: 13px; padding: 8px 15px; } "
+            "font-size: 13px; padding: 5px 8px; } "
             "QPushButton[text*='만들기'] { background-color: #27ae60; color: white; } "
             "QPushButton[text*='만들기']:hover { background-color: #229954; } "
             "QPushButton[text*='입장'] { background-color: #3498db; color: white; } "
@@ -938,11 +951,26 @@ namespace Blokus {
         // 크기 변경 시 테이블 열 너비 조정
         if (m_roomTable) {
             int totalWidth = m_roomTable->width();
-            m_roomTable->setColumnWidth(0, totalWidth * 0.10); // 방 번호
-            m_roomTable->setColumnWidth(1, totalWidth * 0.30); // 방 이름
-            m_roomTable->setColumnWidth(2, totalWidth * 0.20); // 호스트
-            m_roomTable->setColumnWidth(3, totalWidth * 0.15); // 인원
-            m_roomTable->setColumnWidth(4, totalWidth * 0.15); // 상태
+            // 최소 크기에서 필드명이 잘리지 않도록 적절한 너비 설정
+            int minRoomNumWidth = 60;  // "방 번호" 최소 너비
+            int minRoomNameWidth = 120; // "방 이름" 최소 너비
+            
+            int roomNumWidth = std::max(minRoomNumWidth, (int)(totalWidth * 0.10));
+            int roomNameWidth = std::max(minRoomNameWidth, (int)(totalWidth * 0.25)); // 비율 조정
+            
+            m_roomTable->setColumnWidth(0, roomNumWidth);  // 방 번호
+            m_roomTable->setColumnWidth(1, roomNameWidth); // 방 이름
+            int minHostWidth = 80;     // "호스트" 최소 너비
+            int minPlayerWidth = 50;   // "인원" 최소 너비  
+            int minStatusWidth = 60;   // "상태" 최소 너비
+            
+            int hostWidth = std::max(minHostWidth, (int)(totalWidth * 0.20));
+            int playerWidth = std::max(minPlayerWidth, (int)(totalWidth * 0.15));
+            int statusWidth = std::max(minStatusWidth, (int)(totalWidth * 0.15));
+            
+            m_roomTable->setColumnWidth(2, hostWidth);   // 호스트
+            m_roomTable->setColumnWidth(3, playerWidth); // 인원
+            m_roomTable->setColumnWidth(4, statusWidth); // 상태
             // 마지막 열(모드)는 자동으로 남은 공간 차지
         }
     }

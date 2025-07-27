@@ -63,7 +63,7 @@ namespace Blokus {
         m_hostIndicator->setFixedHeight(15);
         QLabel* hostLabel = new QLabel(QString::fromUtf8("👑"));
         hostLabel->setAlignment(Qt::AlignCenter);
-        hostLabel->setStyleSheet("font-size: 10px; font-weight: bold; color: #f39c12;");
+        hostLabel->setStyleSheet("font-size: 12px; font-weight: bold; color: #f39c12;");
         QVBoxLayout* hostLayout = new QVBoxLayout(m_hostIndicator);
         hostLayout->setContentsMargins(0, 0, 0, 0);
         hostLayout->addWidget(hostLabel);
@@ -72,24 +72,24 @@ namespace Blokus {
         // 플레이어 정보
         m_usernameLabel = new QLabel(QString::fromUtf8("빈 슬롯"));
         m_usernameLabel->setAlignment(Qt::AlignCenter);
-        m_usernameLabel->setStyleSheet("font-size: 11px; font-weight: bold;");
+        m_usernameLabel->setStyleSheet("font-size: 12px; font-weight: bold; color: #ffffff;");
 
         // 상태 라벨 제거 (준비 상태 인디케이터로 통합)
 
         m_scoreLabel = new QLabel(QString::fromUtf8("점수: 0"));
         m_scoreLabel->setAlignment(Qt::AlignCenter);
-        m_scoreLabel->setStyleSheet("font-size: 10px; color: #95a5a6;");
+        m_scoreLabel->setStyleSheet("font-size: 12px; color: #35ff72;");
 
         // 남은 블록 수 표시
         m_remainingBlocksLabel = new QLabel(QString::fromUtf8("블록: 21"));
         m_remainingBlocksLabel->setAlignment(Qt::AlignCenter);
-        m_remainingBlocksLabel->setStyleSheet("font-size: 10px; color: #95a5a6;");
+        m_remainingBlocksLabel->setStyleSheet("font-size: 12px; color: #ff4e4e;");
 
         // 준비 상태 인디케이터
         m_readyIndicator = new QLabel(QString::fromUtf8("대기중"));
         m_readyIndicator->setAlignment(Qt::AlignCenter);
         m_readyIndicator->setFixedHeight(20);
-        m_readyIndicator->setStyleSheet("font-size: 10px; font-weight: bold; color: #f39c12;");
+        m_readyIndicator->setStyleSheet("font-size: 12px; font-weight: bold; color: #f39c12;");
 
         // 액션 버튼 (강퇴 전용)
         m_actionButton = new QPushButton(QString::fromUtf8("강퇴"));
@@ -126,8 +126,8 @@ namespace Blokus {
         m_colorFrame->setStyleSheet(QString(
             "QFrame { "
             "background-color: %1; "
-            "border: 2px solid %2; "
-            "border-radius: 6px; "
+            "border: 1px solid %2; "
+            "border-radius: 2px; "
             "}"
         ).arg(playerColor.name(), playerColor.darker(150).name()));
 
@@ -139,8 +139,8 @@ namespace Blokus {
             "border-radius: 4px; "
             "color: white; "
             "font-weight: bold; "
-            "font-size: 12px; "
-            "padding: 4px; "
+            "font-size: 14px; "
+            "padding: 2px; "
             "} "
             "QPushButton:hover { "
             "background-color: #2980b9; "
@@ -341,7 +341,7 @@ namespace Blokus {
             
             // 사용자 이름 라벨 기본 스타일
             if (m_usernameLabel) {
-                m_usernameLabel->setStyleSheet("font-size: 12px; font-weight: bold; color: #2c3e50;");
+                m_usernameLabel->setStyleSheet("font-size: 12px; font-weight: bold; color: #ffffff;");
             }
         }
     }
@@ -394,7 +394,7 @@ namespace Blokus {
         });
 
         setupUI();
-        setupMenuBar();
+        // setupMenuBar();
         setupStatusBar();
         setupStyles();
 
@@ -414,8 +414,8 @@ namespace Blokus {
 
         // 창 설정
         setWindowTitle(QString::fromUtf8("블로커스 온라인 - %1 (%2님)").arg(roomInfo.roomName, myUsername));
-        setMinimumSize(1200, 800);
-        resize(1400, 900);
+        setMinimumSize(1280, 800);  // 더 작은 최소 크기 설정
+        resize(1280, 800);         // 초기 진입 시 최소 크기로 시작
 
         // 화면 중앙에 배치
         QRect screenGeometry = QApplication::desktop()->screenGeometry();
@@ -447,7 +447,7 @@ namespace Blokus {
     void GameRoomWindow::setupMainLayout()
     {
         m_mainLayout = new QVBoxLayout(m_centralWidget);
-        m_mainLayout->setContentsMargins(10, 10, 10, 10);
+        m_mainLayout->setContentsMargins(5, 5, 5, 5);
         m_mainLayout->setSpacing(8);
 
         // 상단 룸 정보
@@ -460,7 +460,7 @@ namespace Blokus {
         QWidget* mainGameArea = new QWidget();
         QHBoxLayout* mainGameLayout = new QHBoxLayout(mainGameArea);
         mainGameLayout->setContentsMargins(0, 0, 0, 0);
-        mainGameLayout->setSpacing(8);
+        mainGameLayout->setSpacing(6);  // 간격 줄임
 
         // 게임 영역 (보드 + 내 팔레트만)
         setupGameArea();
@@ -469,7 +469,7 @@ namespace Blokus {
         setupChatPanel();
 
         // 비율 조정: 게임보드가 훨씬 큰 비중
-        mainGameLayout->addWidget(m_gameArea, 4);
+        mainGameLayout->addWidget(m_gameArea, 3);
         mainGameLayout->addWidget(m_chatPanel, 1);
 
         // 하단 컨트롤
@@ -485,10 +485,10 @@ namespace Blokus {
     void GameRoomWindow::setupRoomInfoPanel()
     {
         m_roomInfoPanel = new QWidget();
-        m_roomInfoPanel->setFixedHeight(40);
+        m_roomInfoPanel->setFixedHeight(35);  // 높이 줄여서 공간 절약
 
         QHBoxLayout* layout = new QHBoxLayout(m_roomInfoPanel);
-        layout->setContentsMargins(15, 5, 15, 5);
+        layout->setContentsMargins(10, 3, 10, 3);  // 여백 줄여서 공간 절약
 
         m_roomNameLabel = new QLabel();
         m_roomNameLabel->setStyleSheet("font-size: 16px; font-weight: bold; color: #2c3e50;");
@@ -501,7 +501,7 @@ namespace Blokus {
 
         // 방 나가기 버튼을 우측 상단에 배치
         m_leaveRoomButton = new QPushButton(QString::fromUtf8("🚪 방 나가기"));
-        m_leaveRoomButton->setFixedSize(120, 30);
+        m_leaveRoomButton->setFixedSize(120, 25);
         m_leaveRoomButton->setStyleSheet(
             "QPushButton { "
             "background-color: #e74c3c; color: white; border: none; "
@@ -524,11 +524,11 @@ namespace Blokus {
     void GameRoomWindow::setupPlayerSlotsPanel()
     {
         m_playerSlotsPanel = new QWidget();
-        m_playerSlotsPanel->setFixedHeight(130);
+        m_playerSlotsPanel->setFixedHeight(115);  // 높이 줄여서 공간 절약
 
         m_slotsLayout = new QHBoxLayout(m_playerSlotsPanel);
-        m_slotsLayout->setContentsMargins(4, 4, 4, 4);
-        m_slotsLayout->setSpacing(5);
+        m_slotsLayout->setContentsMargins(3, 3, 3, 3);  // 여백 줄여서 공간 절약
+        m_slotsLayout->setSpacing(4);  // 간격 줄임
 
         // 4개 슬롯 고정 생성 (클래식 모드만)
         for (int i = 0; i < 4; ++i) {
@@ -551,19 +551,19 @@ namespace Blokus {
         m_gameArea = new QWidget();
 
         QHBoxLayout* gameLayout = new QHBoxLayout(m_gameArea);
-        gameLayout->setContentsMargins(8, 8, 8, 8);
-        gameLayout->setSpacing(8);
+        gameLayout->setContentsMargins(6, 3, 6, 3);  // 여백 줄여서 공간 절약
+        gameLayout->setSpacing(6);  // 간격 줄임
 
         // 게임보드 생성
         m_gameBoard = new GameBoard();
         m_gameBoard->setGameLogic(&m_gameManager->getGameLogic());
-        m_gameBoard->setMinimumSize(400, 400);
+        m_gameBoard->setMinimumSize(320, 320);  // 더 컴팩트하게 조정하여 최소 창 크기에서도 잘 맞도록
 
         // 내 블록 팔레트 생성
         m_myBlockPalette = new MyBlockPalette();
 
         // 게임보드가 훨씬 큰 비중
-        gameLayout->addWidget(m_gameBoard, 4);        // 게임보드 4
+        gameLayout->addWidget(m_gameBoard, 3);        // 게임보드 4
         gameLayout->addWidget(m_myBlockPalette, 1);   // 내 팔레트 1
 
         // 시그널 연결
@@ -576,12 +576,12 @@ namespace Blokus {
     void GameRoomWindow::setupChatPanel()
     {
         m_chatPanel = new QWidget();
-        m_chatPanel->setMinimumWidth(300);
-        m_chatPanel->setMaximumWidth(400);
+        m_chatPanel->setMinimumWidth(180);  // 더 컴팩트하게 조정
+        m_chatPanel->setMaximumWidth(300);  // 최대 너비도 줄임
 
         QVBoxLayout* chatLayout = new QVBoxLayout(m_chatPanel);
-        chatLayout->setContentsMargins(10, 10, 10, 10);
-        chatLayout->setSpacing(10);
+        chatLayout->setContentsMargins(6, 5, 6, 5);  // 여백 줄여서 공간 절약
+        chatLayout->setSpacing(6);  // 간격 줄임
 
         // 채팅 제목
         QLabel* chatTitle = new QLabel(QString::fromUtf8("💬 방 채팅"));
@@ -603,7 +603,7 @@ namespace Blokus {
         m_chatInput->setMaxLength(200);
 
         m_chatSendButton = new QPushButton(QString::fromUtf8("전송"));
-        m_chatSendButton->setFixedSize(60, 30);
+        m_chatSendButton->setFixedSize(50, 26);  // 더 컴팩트한 버튼 크기
 
         chatInputLayout->addWidget(m_chatInput);
         chatInputLayout->addWidget(m_chatSendButton);
@@ -742,7 +742,7 @@ namespace Blokus {
             "border-radius: 6px; "
             "font-weight: bold; "
             "font-size: 13px; "
-            "padding: 8px 15px; "
+            "padding: 5px 8px; "
             "} ";
 
         m_leaveRoomButton->setStyleSheet(buttonStyle +

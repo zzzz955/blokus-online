@@ -87,8 +87,6 @@ namespace Blokus {
 
         // ��Ÿ�� ����
         void updateFormStyles();
-        QString getButtonStyle(const QString& baseColor, const QString& hoverColor) const;
-        QString getInputStyle() const;
 
     private:
         // ���� ������
