@@ -32,6 +32,7 @@ namespace Blokus {
         QSize size = getScreenSize();
         int width = size.width();
         
+        qDebug() << QString::fromUtf8("와이드 크기 %1").arg(width);
         if (width < 800) return ScreenSize::XSmall;
         else if (width < 1024) return ScreenSize::Small;
         else if (width < 1440) return ScreenSize::Medium;
@@ -89,15 +90,21 @@ namespace Blokus {
                 scaledSize = qMax(11, qMin(scaledSize, 24));
                 break;
             case ScreenSize::Large:
-                scaledSize = qMax(12, qMin(scaledSize, 28));
+                scaledSize = qMax(14, qMin(scaledSize, 32));  // Large에서 더 크게
                 break;
             case ScreenSize::XLarge:
-                scaledSize = qMax(14, qMin(scaledSize, 32));
+                scaledSize = qMax(18, qMin(scaledSize, 48));  // XLarge에서 훨씬 크게
                 break;
         }
         
-        font.setPointSize(scaledSize);
+        // 포인트 크기 대신 픽셀 크기로 설정 (더 정확한 렌더링)
+        font.setPixelSize(scaledSize);
         font.setWeight(weight);
+        
+        // 디버그 로그 (폰트 크기 계산 과정)
+        qDebug() << QString("Font calc: base=%1, scale=%2, result=%3, final=%4")
+                   .arg(baseSize).arg(s_scaleFactor).arg(baseSize * s_scaleFactor).arg(scaledSize);
+        
         return font;
     }
 
@@ -272,14 +279,52 @@ namespace Blokus {
 
     void ResponsiveLayoutManager::updateScaleFactor() {
         QSize size = getScreenSize();
-        int baseWidth = 1920; // 기준 해상도
+        int width = size.width();
         
-        // 스케일 팩터 계산 (0.7 ~ 1.5 범위로 제한)
-        s_scaleFactor = qBound(0.7, static_cast<qreal>(size.width()) / baseWidth, 1.5);
+        // 해상도 구간별로 명확한 스케일 팩터 설정
+        if (width < 800) {
+            s_scaleFactor = 0.7;        // XSmall
+        } else if (width < 1024) {
+            s_scaleFactor = 0.8;        // Small  
+        } else if (width < 1440) {
+            s_scaleFactor = 1.0;        // Medium (기준)
+        } else if (width < 1920) {
+            s_scaleFactor = 1.2;        // Large
+        } else {
+            s_scaleFactor = 1.4;        // XLarge (큰 화면에서 더 크게)
+        }
+        
+        qDebug() << QString("Screen width: %1, Scale factor: %2").arg(width).arg(s_scaleFactor);
     }
 
     void ResponsiveLayoutManager::detectScreenSize() {
         s_currentScreenSize = getCurrentScreenSize();
+    }
+
+    void ResponsiveLayoutManager::initialize() {
+        QSize size = getScreenSize();
+        int width = size.width();
+        
+        // 해상도 구간별로 명확한 스케일 팩터 설정
+        if (width < 800) {
+            s_scaleFactor = 0.7;        // XSmall
+            s_currentScreenSize = ScreenSize::XSmall;
+        } else if (width < 1024) {
+            s_scaleFactor = 0.8;        // Small  
+            s_currentScreenSize = ScreenSize::Small;
+        } else if (width < 1440) {
+            s_scaleFactor = 1.0;        // Medium (기준)
+            s_currentScreenSize = ScreenSize::Medium;
+        } else if (width < 1920) {
+            s_scaleFactor = 1.2;        // Large
+            s_currentScreenSize = ScreenSize::Large;
+        } else {
+            s_scaleFactor = 1.4;        // XLarge (큰 화면에서 더 크게)
+            s_currentScreenSize = ScreenSize::XLarge;
+        }
+        
+        qDebug() << QString("ResponsiveLayoutManager initialized: width=%1, scale=%2, size=%3")
+                   .arg(width).arg(s_scaleFactor).arg((int)s_currentScreenSize);
     }
 
     // ===============================================

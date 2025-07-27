@@ -114,6 +114,9 @@ namespace Blokus {
         static QString getCardStyle();
         static QString getLabelStyle(const QColor& textColor = ModernPastelTheme::getTextPrimary());
         
+        // 초기화 메서드
+        static void initialize();
+        
     public slots:
         void onScreenChanged();
         
