@@ -568,6 +568,7 @@ namespace Blokus::Server {
         std::string userId;
         bool wasInLobby = false;
         bool wasInRoom = false;
+        bool wasInGame = false;
         int roomId = -1;
         {
             std::lock_guard<std::mutex> lock(sessionsMutex_);
@@ -577,15 +578,20 @@ namespace Blokus::Server {
                 userId = it->second->getUserId();
                 wasInLobby = it->second->isInLobby();
                 wasInRoom = it->second->isInRoom();
-                if (wasInRoom) {
+                wasInGame = it->second->isInGame();
+                if (wasInRoom || wasInGame) {
                     roomId = it->second->getCurrentRoomId();
                 }
             }
         }
         
         // 방에 있던 사용자가 연결 해제된 경우 자동으로 방에서 나가기
-        if (wasInRoom && !userId.empty() && roomManager_) {
-            spdlog::info("세션 연결 해제로 인한 방 {} 나가기: {}", roomId, username);
+        if ((wasInRoom || wasInGame) && !userId.empty() && roomManager_) {
+            if (wasInGame) {
+                spdlog::warn("🎮 게임 중 세션 강제 종료로 인한 방 {} 나가기: {} (좀비방 방지)", roomId, username);
+            } else {
+                spdlog::info("🏠 방 대기 중 세션 연결 해제로 인한 방 {} 나가기: {}", roomId, username);
+            }
             roomManager_->leaveRoom(userId);
         }
         
@@ -749,9 +755,18 @@ namespace Blokus::Server {
                 }
             }
             else {
-                // 타임아웃 체크 (5분)
-                if (it->second->isTimedOut(std::chrono::seconds(300))) {
-                    spdlog::info("세션 타임아웃: {}", it->first);
+                // 타임아웃 체크 - 게임 중인 세션은 더 짧은 타임아웃 적용
+                std::chrono::seconds timeoutDuration = std::chrono::seconds(300); // 기본 5분
+                if (it->second->isInGame()) {
+                    timeoutDuration = std::chrono::seconds(120); // 게임 중은 2분으로 단축
+                }
+                
+                if (it->second->isTimedOut(timeoutDuration)) {
+                    if (it->second->isInGame()) {
+                        spdlog::warn("🎮 게임 중 세션 타임아웃 (좀비방 방지): {} ({}분)", it->first, timeoutDuration.count() / 60);
+                    } else {
+                        spdlog::info("세션 타임아웃: {} ({}분)", it->first, timeoutDuration.count() / 60);
+                    }
                     it->second->stop();
                     it = sessions_.erase(it);
 
