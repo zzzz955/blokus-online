@@ -789,6 +789,12 @@ namespace Blokus {
         void GameRoom::broadcastPlayerJoined(const std::string& username) {
             std::lock_guard<std::mutex> lock(m_playersMutex);
             
+            // 방에 플레이어가 1명뿐이면 브로드캐스트하지 않음 (방 생성자의 경우)
+            if (m_players.size() <= 1) {
+                spdlog::debug("🏠 방 {} 플레이어 입장 브로드캐스트 생략 (플레이어 1명, 방 생성자)", m_roomId);
+                return;
+            }
+            
             // 구조화된 메시지와 시스템 메시지 모두 전송
             broadcastMessageLocked("PLAYER_JOINED:" + username);
             

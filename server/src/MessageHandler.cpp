@@ -733,7 +733,7 @@ namespace Blokus::Server
 
             if (roomManager_->leaveRoom(userId))
             {
-                session_->setStateToLobby();
+                session_->setStateToLobby(true);  // 방에서 나와서 로비로 이동
 
                 auto room = roomManager_->getRoom(currentRoomId);
                 if (room && !room->isEmpty())
@@ -1217,7 +1217,8 @@ namespace Blokus::Server
             sendResponse("LOBBY_ENTER_SUCCESS");
 
             // 3. 다른 사용자들에게 새 사용자 입장 브로드캐스트 (새로 입장한 경우만)
-            if (!wasAlreadyInLobby)
+            // 방에서 나와서 로비로 온 경우는 입장 메시지를 보내지 않음
+            if (!wasAlreadyInLobby && !session_->justLeftRoom())
             {
                 broadcastLobbyUserJoined(username);
             }
@@ -1227,6 +1228,9 @@ namespace Blokus::Server
 
             // 5. 방 목록 전송
             sendRoomList();
+
+            // 6. 방에서 나온 플래그 리셋 (로비 입장 처리 완료 후)
+            session_->clearJustLeftRoomFlag();
 
             spdlog::debug("✅ 로비 입장/새로고침 완료: '{}'", username);
         }
@@ -2171,6 +2175,7 @@ namespace Blokus::Server
 
             if (success)
             {
+                session_->setStateToLobby(true);  // 방에서 나와서 로비로 이동
                 result->set_code(blokus::RESULT_SUCCESS);
                 result->set_message("방을 성공적으로 나갔습니다");
                 spdlog::info("✅ Protobuf 방 나가기 성공: {} -> 방 {}", userId, roomId);

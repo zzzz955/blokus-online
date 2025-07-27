@@ -20,6 +20,7 @@ namespace Blokus::Server {
         , currentRoomId_(-1)
         , active_(true)
         , lastActivity_(std::chrono::steady_clock::now())
+        , justLeftRoom_(false)
         , messageHandler_(nullptr)
         , writing_(false)
     {
@@ -139,17 +140,19 @@ namespace Blokus::Server {
         spdlog::debug("✅ 세션 상태 변경: {} -> 로그인 화면", sessionId_);
     }
 
-    void Session::setStateToLobby() {
+    void Session::setStateToLobby(bool fromRoom) {
         state_ = ConnectionState::InLobby;
         currentRoomId_ = -1;
+        justLeftRoom_ = fromRoom;
         updateLastActivity();
 
-        spdlog::debug("🏠 세션 상태 변경: {} -> 로비", sessionId_);
+        spdlog::debug("🏠 세션 상태 변경: {} -> 로비 (방에서 이동: {})", sessionId_, fromRoom);
     }
 
     void Session::setStateToInRoom(int roomId) {
         state_ = ConnectionState::InRoom;
         currentRoomId_ = roomId;
+        justLeftRoom_ = false;  // 방에 입장하면 플래그 리셋
         updateLastActivity();
 
         spdlog::debug("🏠 세션 상태 변경: {} -> 방 {}", sessionId_, roomId);
