@@ -62,6 +62,7 @@ namespace Blokus::Server {
         bool isInLobby() const { return state_ == ConnectionState::InLobby; }
         bool isInRoom() const { return state_ == ConnectionState::InRoom; }
         bool isInGame() const { return state_ == ConnectionState::InGame; }
+        bool justLeftRoom() const { return justLeftRoom_; }
 
         // ���� Ȯ�� �Լ��� (����Ͻ� ������)
         bool canCreateRoom() const { return isInLobby(); }
@@ -72,9 +73,10 @@ namespace Blokus::Server {
 
         // ���� ���� �Լ���
         void setStateToConnected();
-        void setStateToLobby();
+        void setStateToLobby(bool fromRoom = false);
         void setStateToInRoom(int roomId = -1);
         void setStateToInGame();
+        void clearJustLeftRoomFlag() { justLeftRoom_ = false; }
 
         // ���� ����
         void setAuthenticated(const std::string& userId, const std::string& username);
@@ -119,6 +121,7 @@ namespace Blokus::Server {
         int currentRoomId_;
         std::atomic<bool> active_;
         std::chrono::steady_clock::time_point lastActivity_;
+        bool justLeftRoom_;
         
         // 사용자 계정 정보
         std::optional<UserAccount> userAccount_;
