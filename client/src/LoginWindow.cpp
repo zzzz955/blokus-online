@@ -1,4 +1,5 @@
 ﻿#include "LoginWindow.h"
+#include "ResponsiveUI.h"
 #include <QApplication>
 #include <QDesktopWidget>
 #include <QPropertyAnimation>
@@ -6,6 +7,8 @@
 #include <QRegularExpression>
 #include <QRegularExpressionValidator>
 #include <QTimer>
+#include <QScreen>
+#include <QGuiApplication>
 
 namespace Blokus {
 
@@ -50,13 +53,49 @@ namespace Blokus {
         // 기본적으로 로그인 폼 표시
         showLoginForm();
 
-        // 창 설정
+        // 반응형 창 설정
         setWindowTitle(QString::fromUtf8("블로커스 온라인 - 로그인"));
-        setMinimumSize(450, 600);
-        resize(450, 600);
+        
+        // 반응형 최소/최대 크기 설정
+        QSize screenSize = ResponsiveLayoutManager::getScreenSize();
+        ScreenSize currentScreenSize = ResponsiveLayoutManager::getCurrentScreenSize();
+        
+        int minWidth, minHeight, maxWidth, maxHeight;
+        
+        switch (currentScreenSize) {
+            case ScreenSize::XSmall:
+                minWidth = 350; minHeight = 500;
+                maxWidth = 400; maxHeight = 600;
+                break;
+            case ScreenSize::Small:
+                minWidth = 400; minHeight = 550;
+                maxWidth = 500; maxHeight = 700;
+                break;
+            case ScreenSize::Medium:
+                minWidth = 450; minHeight = 600;
+                maxWidth = 600; maxHeight = 800;
+                break;
+            case ScreenSize::Large:
+                minWidth = 500; minHeight = 650;
+                maxWidth = 700; maxHeight = 900;
+                break;
+            case ScreenSize::XLarge:
+                minWidth = 550; minHeight = 700;
+                maxWidth = 800; maxHeight = 1000;
+                break;
+        }
+        
+        setMinimumSize(ResponsiveLayoutManager::getResponsiveWidth(minWidth), 
+                      ResponsiveLayoutManager::getResponsiveHeight(minHeight));
+        setMaximumSize(ResponsiveLayoutManager::getResponsiveWidth(maxWidth), 
+                      ResponsiveLayoutManager::getResponsiveHeight(maxHeight));
+        
+        // 초기 크기 설정 (최소 크기보다 약간 크게)
+        resize(ResponsiveLayoutManager::getResponsiveWidth(minWidth + 50), 
+               ResponsiveLayoutManager::getResponsiveHeight(minHeight + 50));
 
         // 화면 중앙에 배치
-        QRect screenGeometry = QApplication::desktop()->screenGeometry();
+        QRect screenGeometry = QGuiApplication::primaryScreen()->availableGeometry();
         int x = (screenGeometry.width() - width()) / 2;
         int y = (screenGeometry.height() - height()) / 2;
         move(x, y);
@@ -75,18 +114,19 @@ namespace Blokus {
         m_centralWidget = new QWidget(this);
         setCentralWidget(m_centralWidget);
 
-        m_mainLayout = new QVBoxLayout(m_centralWidget);
-        m_mainLayout->setContentsMargins(40, 30, 40, 30);
-        m_mainLayout->setSpacing(20);
+        // 메인 레이아웃을 반응형으로 생성
+        m_mainLayout = ResponsiveLayoutManager::createResponsiveVLayout(m_centralWidget, 20);
+
+        // 반응형 정책 설정
+        ResponsiveLayoutManager::setResponsivePolicy(m_centralWidget);
 
         // 타이틀 영역
         setupTitleArea();
 
         // 폼 컨테이너
         m_formContainer = new QWidget();
-        m_formLayout = new QVBoxLayout(m_formContainer);
-        m_formLayout->setContentsMargins(0, 0, 0, 0);
-        m_formLayout->setSpacing(15);
+        m_formLayout = ResponsiveLayoutManager::createResponsiveVLayout(m_formContainer, 15);
+        m_formContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 
         // 개별 폼들 설정
         setupLoginForm();
@@ -107,32 +147,33 @@ namespace Blokus {
     void LoginWindow::setupTitleArea()
     {
         m_titleWidget = new QWidget();
-        QVBoxLayout* titleLayout = new QVBoxLayout(m_titleWidget);
-        titleLayout->setContentsMargins(0, 0, 0, 0);
-        titleLayout->setSpacing(8);
+        QVBoxLayout* titleLayout = ResponsiveLayoutManager::createResponsiveVLayout(m_titleWidget, 8);
 
-        // 메인 타이틀
+        // 메인 타이틀 - 반응형 폰트 적용
         m_titleLabel = new QLabel(QString::fromUtf8("🎮 블로커스 온라인"));
         m_titleLabel->setAlignment(Qt::AlignCenter);
-        m_titleLabel->setStyleSheet(
+        m_titleLabel->setFont(ResponsiveLayoutManager::getTitleFont(24));
+        m_titleLabel->setStyleSheet(QString(
             "QLabel { "
-            "font-size: 28px; "
-            "font-weight: bold; "
-            "color: #2c3e50; "
+            "color: rgba(%1, %2, %3, 255); "
             "margin-bottom: 5px; "
             "}"
-        );
+        ).arg(ModernPastelTheme::getTextPrimary().red())
+         .arg(ModernPastelTheme::getTextPrimary().green())
+         .arg(ModernPastelTheme::getTextPrimary().blue()));
 
-        // 서브타이틀
+        // 서브타이틀 - 반응형 폰트 적용
         m_subtitleLabel = new QLabel(QString::fromUtf8("전략적 블록 배치 게임"));
         m_subtitleLabel->setAlignment(Qt::AlignCenter);
-        m_subtitleLabel->setStyleSheet(
+        m_subtitleLabel->setFont(ResponsiveLayoutManager::getBodyFont(14));
+        m_subtitleLabel->setStyleSheet(QString(
             "QLabel { "
-            "font-size: 14px; "
-            "color: #7f8c8d; "
+            "color: rgba(%1, %2, %3, 255); "
             "margin-bottom: 10px; "
             "}"
-        );
+        ).arg(ModernPastelTheme::getTextSecondary().red())
+         .arg(ModernPastelTheme::getTextSecondary().green())
+         .arg(ModernPastelTheme::getTextSecondary().blue()));
 
         titleLayout->addWidget(m_titleLabel);
         titleLayout->addWidget(m_subtitleLabel);
@@ -141,45 +182,76 @@ namespace Blokus {
     void LoginWindow::setupLoginForm()
     {
         m_loginForm = new QWidget();
-        QVBoxLayout* layout = new QVBoxLayout(m_loginForm);
-        layout->setContentsMargins(20, 20, 20, 20);
-        layout->setSpacing(15);
+        m_loginForm->setStyleSheet(ResponsiveLayoutManager::getCardStyle());
+        
+        QVBoxLayout* layout = ResponsiveLayoutManager::createResponsiveVLayout(m_loginForm, 15);
+        layout->setContentsMargins(ResponsiveLayoutManager::getResponsiveMargins(20));
 
         // 아이디 입력
         QLabel* usernameLabel = new QLabel(QString::fromUtf8("아이디"));
-        usernameLabel->setStyleSheet("font-weight: bold; color: #34495e;");
+        usernameLabel->setFont(ResponsiveLayoutManager::getHeaderFont(14));
+        usernameLabel->setStyleSheet(QString(
+            "QLabel { font-weight: bold; color: rgba(%1, %2, %3, 255); }"
+        ).arg(ModernPastelTheme::getTextPrimary().red())
+         .arg(ModernPastelTheme::getTextPrimary().green())
+         .arg(ModernPastelTheme::getTextPrimary().blue()));
+        
         m_usernameEdit = new QLineEdit();
         m_usernameEdit->setPlaceholderText(QString::fromUtf8("아이디를 입력하세요"));
         m_usernameEdit->setMaxLength(20);
+        m_usernameEdit->setStyleSheet(ResponsiveLayoutManager::getInputStyle());
+        m_usernameEdit->setFont(ResponsiveLayoutManager::getBodyFont(12));
+        ResponsiveLayoutManager::setMinimumResponsiveSize(m_usernameEdit, 200, 35);
 
         // 비밀번호 입력
         QLabel* passwordLabel = new QLabel(QString::fromUtf8("비밀번호"));
-        passwordLabel->setStyleSheet("font-weight: bold; color: #34495e;");
+        passwordLabel->setFont(ResponsiveLayoutManager::getHeaderFont(14));
+        passwordLabel->setStyleSheet(QString(
+            "QLabel { font-weight: bold; color: rgba(%1, %2, %3, 255); }"
+        ).arg(ModernPastelTheme::getTextPrimary().red())
+         .arg(ModernPastelTheme::getTextPrimary().green())
+         .arg(ModernPastelTheme::getTextPrimary().blue()));
+        
         m_passwordEdit = new QLineEdit();
         m_passwordEdit->setPlaceholderText(QString::fromUtf8("비밀번호를 입력하세요"));
         m_passwordEdit->setEchoMode(QLineEdit::Password);
         m_passwordEdit->setMaxLength(50);
+        m_passwordEdit->setStyleSheet(ResponsiveLayoutManager::getInputStyle());
+        m_passwordEdit->setFont(ResponsiveLayoutManager::getBodyFont(12));
+        ResponsiveLayoutManager::setMinimumResponsiveSize(m_passwordEdit, 200, 35);
 
         // 로그인 버튼
         m_loginButton = new QPushButton(QString::fromUtf8("🎯 로그인"));
-        m_loginButton->setMinimumHeight(45);
+        m_loginButton->setStyleSheet(ResponsiveLayoutManager::getButtonStyle(
+            ModernPastelTheme::getAccentBlue(), 
+            ModernPastelTheme::getAccentBlue().lighter(110)));
+        m_loginButton->setFont(ResponsiveLayoutManager::getBodyFont(12));
+        ResponsiveLayoutManager::setMinimumResponsiveSize(m_loginButton, 200, 45);
 
         // 회원가입 버튼
         m_showRegisterButton = new QPushButton(QString::fromUtf8("회원가입"));
-        m_showRegisterButton->setMinimumHeight(40);
+        m_showRegisterButton->setStyleSheet(ResponsiveLayoutManager::getButtonStyle(
+            ModernPastelTheme::getAccentGreen(), 
+            ModernPastelTheme::getAccentGreen().lighter(110)));
+        m_showRegisterButton->setFont(ResponsiveLayoutManager::getBodyFont(12));
+        ResponsiveLayoutManager::setMinimumResponsiveSize(m_showRegisterButton, 200, 40);
 
         // 비밀번호 재설정 버튼
         m_showPasswordResetButton = new QPushButton(QString::fromUtf8("비밀번호를 잊으셨나요?"));
-        m_showPasswordResetButton->setMinimumHeight(35);
+        m_showPasswordResetButton->setStyleSheet(ResponsiveLayoutManager::getButtonStyle(
+            ModernPastelTheme::getTextMuted(), 
+            ModernPastelTheme::getTextMuted().lighter(110)));
+        m_showPasswordResetButton->setFont(ResponsiveLayoutManager::getBodyFont(10));
+        ResponsiveLayoutManager::setMinimumResponsiveSize(m_showPasswordResetButton, 200, 35);
 
         // 레이아웃에 추가
         layout->addWidget(usernameLabel);
         layout->addWidget(m_usernameEdit);
         layout->addWidget(passwordLabel);
         layout->addWidget(m_passwordEdit);
-        layout->addSpacing(10);
+        layout->addSpacing(ResponsiveLayoutManager::getResponsiveSpacing(10));
         layout->addWidget(m_loginButton);
-        layout->addSpacing(5);
+        layout->addSpacing(ResponsiveLayoutManager::getResponsiveSpacing(5));
         layout->addWidget(m_showRegisterButton);
         layout->addWidget(m_showPasswordResetButton);
 
@@ -357,40 +429,123 @@ namespace Blokus {
 
     void LoginWindow::updateFormStyles()
     {
-        QString inputStyle = getInputStyle();
-
-        // 로그인 폼 스타일
-        if (m_usernameEdit) m_usernameEdit->setStyleSheet(inputStyle);
-        if (m_passwordEdit) m_passwordEdit->setStyleSheet(inputStyle);
-        if (m_loginButton) m_loginButton->setStyleSheet(getButtonStyle("#3498db", "#2980b9"));
-        if (m_showRegisterButton) m_showRegisterButton->setStyleSheet(getButtonStyle("#27ae60", "#229954"));
-        if (m_showPasswordResetButton) m_showPasswordResetButton->setStyleSheet(getButtonStyle("#95a5a6", "#7f8c8d"));
+        // 반응형 입력 필드 스타일
+        QString inputStyle = ResponsiveLayoutManager::getInputStyle();
+        
+        // 로그인 폼 스타일 (현대적 파스텔 색상 사용)
+        if (m_usernameEdit) {
+            m_usernameEdit->setStyleSheet(inputStyle);
+            m_usernameEdit->setFont(ResponsiveLayoutManager::getBodyFont());
+        }
+        if (m_passwordEdit) {
+            m_passwordEdit->setStyleSheet(inputStyle);
+            m_passwordEdit->setFont(ResponsiveLayoutManager::getBodyFont());
+        }
+        if (m_loginButton) {
+            m_loginButton->setStyleSheet(ResponsiveLayoutManager::getButtonStyle(
+                ModernPastelTheme::getAccentBlue(), 
+                ModernPastelTheme::getAccentBlue().lighter(110)));
+            m_loginButton->setFont(ResponsiveLayoutManager::getBodyFont());
+        }
+        if (m_showRegisterButton) {
+            m_showRegisterButton->setStyleSheet(ResponsiveLayoutManager::getButtonStyle(
+                ModernPastelTheme::getAccentGreen(), 
+                ModernPastelTheme::getAccentGreen().lighter(110)));
+            m_showRegisterButton->setFont(ResponsiveLayoutManager::getCaptionFont());
+        }
+        if (m_showPasswordResetButton) {
+            m_showPasswordResetButton->setStyleSheet(ResponsiveLayoutManager::getButtonStyle(
+                ModernPastelTheme::getTextSecondary(), 
+                ModernPastelTheme::getTextSecondary().lighter(110)));
+            m_showPasswordResetButton->setFont(ResponsiveLayoutManager::getCaptionFont());
+        }
 
         // 회원가입 폼 스타일
-        if (m_regUsernameEdit) m_regUsernameEdit->setStyleSheet(inputStyle);
-        if (m_regPasswordEdit) m_regPasswordEdit->setStyleSheet(inputStyle);
-        if (m_regConfirmPasswordEdit) m_regConfirmPasswordEdit->setStyleSheet(inputStyle);
-        if (m_regEmailEdit) m_regEmailEdit->setStyleSheet(inputStyle);
-        if (m_registerButton) m_registerButton->setStyleSheet(getButtonStyle("#e74c3c", "#c0392b"));
-        if (m_backToLoginFromRegisterButton) m_backToLoginFromRegisterButton->setStyleSheet(getButtonStyle("#95a5a6", "#7f8c8d"));
+        if (m_regUsernameEdit) {
+            m_regUsernameEdit->setStyleSheet(inputStyle);
+            m_regUsernameEdit->setFont(ResponsiveLayoutManager::getBodyFont());
+        }
+        if (m_regPasswordEdit) {
+            m_regPasswordEdit->setStyleSheet(inputStyle);
+            m_regPasswordEdit->setFont(ResponsiveLayoutManager::getBodyFont());
+        }
+        if (m_regConfirmPasswordEdit) {
+            m_regConfirmPasswordEdit->setStyleSheet(inputStyle);
+            m_regConfirmPasswordEdit->setFont(ResponsiveLayoutManager::getBodyFont());
+        }
+        if (m_regEmailEdit) {
+            m_regEmailEdit->setStyleSheet(inputStyle);
+            m_regEmailEdit->setFont(ResponsiveLayoutManager::getBodyFont());
+        }
+        if (m_registerButton) {
+            m_registerButton->setStyleSheet(ResponsiveLayoutManager::getButtonStyle(
+                ModernPastelTheme::getAccentOrange(), 
+                ModernPastelTheme::getAccentOrange().lighter(110)));
+            m_registerButton->setFont(ResponsiveLayoutManager::getBodyFont());
+        }
+        if (m_backToLoginFromRegisterButton) {
+            m_backToLoginFromRegisterButton->setStyleSheet(ResponsiveLayoutManager::getButtonStyle(
+                ModernPastelTheme::getTextSecondary(), 
+                ModernPastelTheme::getTextSecondary().lighter(110)));
+            m_backToLoginFromRegisterButton->setFont(ResponsiveLayoutManager::getCaptionFont());
+        }
 
         // 비밀번호 재설정 폼 스타일
-        if (m_resetEmailEdit) m_resetEmailEdit->setStyleSheet(inputStyle);
-        if (m_passwordResetButton) m_passwordResetButton->setStyleSheet(getButtonStyle("#f39c12", "#e67e22"));
-        if (m_backToLoginFromResetButton) m_backToLoginFromResetButton->setStyleSheet(getButtonStyle("#95a5a6", "#7f8c8d"));
+        if (m_resetEmailEdit) {
+            m_resetEmailEdit->setStyleSheet(inputStyle);
+            m_resetEmailEdit->setFont(ResponsiveLayoutManager::getBodyFont());
+        }
+        if (m_passwordResetButton) {
+            m_passwordResetButton->setStyleSheet(ResponsiveLayoutManager::getButtonStyle(
+                ModernPastelTheme::getAccentPurple(), 
+                ModernPastelTheme::getAccentPurple().lighter(110)));
+            m_passwordResetButton->setFont(ResponsiveLayoutManager::getBodyFont());
+        }
+        if (m_backToLoginFromResetButton) {
+            m_backToLoginFromResetButton->setStyleSheet(ResponsiveLayoutManager::getButtonStyle(
+                ModernPastelTheme::getTextSecondary(), 
+                ModernPastelTheme::getTextSecondary().lighter(110)));
+            m_backToLoginFromResetButton->setFont(ResponsiveLayoutManager::getCaptionFont());
+        }
 
-        // 프로그레스 바 스타일
+        // 타이틀과 서브타이틀 스타일 업데이트
+        if (m_titleLabel) {
+            m_titleLabel->setStyleSheet(ResponsiveLayoutManager::getLabelStyle(ModernPastelTheme::getTextPrimary()));
+            m_titleLabel->setFont(ResponsiveLayoutManager::getTitleFont(24));
+        }
+        if (m_subtitleLabel) {
+            m_subtitleLabel->setStyleSheet(ResponsiveLayoutManager::getLabelStyle(ModernPastelTheme::getTextSecondary()));
+            m_subtitleLabel->setFont(ResponsiveLayoutManager::getBodyFont());
+        }
+        
+        // 폼 카드 스타일 업데이트
+        if (m_loginForm) {
+            m_loginForm->setStyleSheet(ResponsiveLayoutManager::getCardStyle());
+        }
+        if (m_registerForm) {
+            m_registerForm->setStyleSheet(ResponsiveLayoutManager::getCardStyle());
+        }
+        if (m_passwordResetForm) {
+            m_passwordResetForm->setStyleSheet(ResponsiveLayoutManager::getCardStyle());
+        }
+
+        // 프로그레스 바 스타일 (현대적 파스텔 색상)
         if (m_progressBar) {
+            QColor progressBg = ModernPastelTheme::getBackgroundSecondary();
+            QColor progressFill = ModernPastelTheme::getAccentBlue();
             m_progressBar->setStyleSheet(
-                "QProgressBar { "
-                "border: none; "
-                "border-radius: 4px; "
-                "background-color: #ecf0f1; "
-                "} "
-                "QProgressBar::chunk { "
-                "background-color: #3498db; "
-                "border-radius: 4px; "
-                "}"
+                QString("QProgressBar { "
+                        "border: none; "
+                        "border-radius: %1px; "
+                        "background-color: %2; "
+                        "} "
+                        "QProgressBar::chunk { "
+                        "background-color: %3; "
+                        "border-radius: %1px; "
+                        "}"
+                ).arg(ResponsiveLayoutManager::getResponsiveSpacing(4))
+                 .arg(progressBg.name())
+                 .arg(progressFill.name())
             );
         }
     }
@@ -569,11 +724,13 @@ namespace Blokus {
         QMainWindow::keyPressEvent(event);
     }
 
+    // 화면 크기 변경 이벤트 처리
     void LoginWindow::resizeEvent(QResizeEvent* event)
     {
         QMainWindow::resizeEvent(event);
-        // 크기 변경 시 필요한 조정 작업
+        updateFormStyles();
     }
+
 
     // 결과 처리 함수들
     void LoginWindow::setLoginResult(bool success, const QString& message)

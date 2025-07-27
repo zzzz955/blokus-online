@@ -23,6 +23,7 @@ set(CLIENT_SOURCES
     "src/Block.cpp"
     "src/QtAdapter.cpp"
     "src/ClientUtils.cpp"
+    "src/ResponsiveUI.cpp"
     "src/NetworkClient.cpp"
 )
 
@@ -37,6 +38,7 @@ set(CLIENT_HEADERS
     "include/QtAdapter.h"
     "include/ClientBlock.h"
     "include/ClientLogic.h"
+    "include/ResponsiveUI.h"
     "include/NetworkClient.h"
 )
 

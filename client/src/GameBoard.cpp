@@ -1,12 +1,15 @@
 ﻿#include "GameBoard.h"
 #include "ClientLogic.h"
 #include "QtAdapter.h"
+#include "ResponsiveUI.h"
 
 #include <QGraphicsRectItem>
 #include <QGraphicsTextItem>
 #include <QApplication>
 #include <QDebug>
 #include <QKeyEvent>
+#include <QScreen>
+#include <QGuiApplication>
 #include <cmath>
 #include <random>
 
@@ -17,7 +20,7 @@ namespace Blokus {
         , m_scene(nullptr)
         , m_boardRect(nullptr)
         , m_readOnly(false)
-        , m_cellSize(DEFAULT_CELL_SIZE)
+        , m_cellSize(calculateResponsiveCellSize())
         , m_hoveredCell({ -1, -1 })
         , m_mousePressed(false)
         , m_hoverTimer(new QTimer(this))
@@ -494,14 +497,6 @@ namespace Blokus {
         return mapFromScene(sceneX, sceneY);
     }
 
-    QColor GameBoard::getPlayerColor(PlayerColor player) const
-    {
-        auto it = m_playerColors.find(player);
-        if (it != m_playerColors.end()) {
-            return it->second;
-        }
-        return m_playerColors.at(PlayerColor::None);
-    }
 
     // ========================================
     // 이벤트 핸들러들
@@ -629,7 +624,9 @@ namespace Blokus {
     void GameBoard::resizeEvent(QResizeEvent* event)
     {
         QGraphicsView::resizeEvent(event);
-        fitBoardToView();
+        
+        // 크기 변경 시 반응형 업데이트
+        updateResponsiveLayout();
     }
 
     void GameBoard::leaveEvent(QEvent* event)
@@ -654,9 +651,11 @@ namespace Blokus {
     void GameBoard::fitBoardToView()
     {
         if (!m_scene || !m_boardRect) return;
-
+        
+        // 보드 전체 영역에 맞게 뷰 조정
         fitInView(m_boardRect, Qt::KeepAspectRatio);
-
+        
+        // 최소/최대 줌 제한
         const qreal currentScale = transform().m11();
         if (currentScale < 0.5) {
             resetTransform();
@@ -953,6 +952,142 @@ namespace Blokus {
         }
         else {
             qDebug() << QString::fromUtf8("랜덤 블록 배치 실패");
+        }
+    }
+
+    // ========================================
+    // 반응형 게임보드 관련 함수들
+    // ========================================
+
+    qreal GameBoard::calculateResponsiveCellSize() const
+    {
+        QSize screenSize = ResponsiveLayoutManager::getScreenSize();
+        ScreenSize currentScreenSize = ResponsiveLayoutManager::getCurrentScreenSize();
+        
+        // 기본 셀 크기 (20x20 보드 기준)
+        qreal baseCellSize = DEFAULT_CELL_SIZE;
+        
+        // 해상도별 스케일링 팩터
+        qreal scaleFactor = ResponsiveLayoutManager::getScaleFactor();
+        
+        // 화면 크기에 따른 추가 조정
+        switch (currentScreenSize) {
+            case ScreenSize::XSmall:
+                baseCellSize = 18.0; // 작은 화면에서 더 작게
+                break;
+            case ScreenSize::Small:
+                baseCellSize = 22.0;
+                break;
+            case ScreenSize::Medium:
+                baseCellSize = 25.0; // 기본값
+                break;
+            case ScreenSize::Large:
+                baseCellSize = 28.0;
+                break;
+            case ScreenSize::XLarge:
+                baseCellSize = 32.0;
+                break;
+        }
+        
+        // 최종 셀 크기 계산 (최소/최대 제한)
+        qreal finalSize = baseCellSize * scaleFactor;
+        return qBound(12.0, finalSize, 50.0); // 12px ~ 50px 제한
+    }
+
+    void GameBoard::updateResponsiveLayout()
+    {
+        // 새로운 셀 크기 계산
+        qreal newCellSize = calculateResponsiveCellSize();
+        
+        if (qAbs(newCellSize - m_cellSize) > 1.0) { // 1px 이상 차이나면 업데이트
+            m_cellSize = newCellSize;
+            
+            // 보드 다시 그리기
+            rebuildBoard();
+            
+            // 뷰포트에 맞게 스케일링
+            fitBoardToView();
+        }
+    }
+
+    void GameBoard::rebuildBoard()
+    {
+        if (!m_scene) return;
+        
+        // 기존 보드 아이템들 제거
+        m_scene->clear();
+        m_gridCells.clear();
+        m_blockItems.clear();
+        
+        // 새로운 크기로 보드 다시 초기화
+        initializeBoard();
+        
+        // 기존 블록들 다시 렌더링 (만약 있다면)
+        redrawAllBlocks();
+    }
+
+
+    void GameBoard::redrawAllBlocks()
+    {
+        // 현재 보드 상태를 기반으로 모든 블록 다시 그리기
+        for (int row = 0; row < BOARD_SIZE; ++row) {
+            for (int col = 0; col < BOARD_SIZE; ++col) {
+                if (m_board[row][col] != PlayerColor::None) {
+                    // 셀 색상 업데이트
+                    drawCellWithColor(Position{row, col}, getPlayerColor(m_board[row][col]));
+                }
+            }
+        }
+    }
+
+    void GameBoard::drawCellWithColor(const Position& pos, const QColor& color)
+    {
+        if (!isValidPosition(pos)) return;
+        
+        // 기존 셀 아이템 찾기 또는 생성
+        QGraphicsRectItem* cellItem = nullptr;
+        
+        // 셀 아이템 찾기 (기존 그리드 셀에서)
+        for (auto* item : m_gridCells) {
+            QGraphicsRectItem* rectItem = item;
+            if (rectItem && rectItem->rect().topLeft() == QPointF(pos.second * m_cellSize, pos.first * m_cellSize)) {
+                cellItem = rectItem;
+                break;
+            }
+        }
+        
+        // 새 셀 아이템 생성
+        if (!cellItem) {
+            cellItem = new QGraphicsRectItem(pos.second * m_cellSize, pos.first * m_cellSize, m_cellSize, m_cellSize);
+            m_scene->addItem(cellItem);
+            m_gridCells.push_back(cellItem);
+        }
+        
+        // 셀 색상 및 스타일 설정
+        cellItem->setBrush(QBrush(color));
+        cellItem->setPen(QPen(color.darker(120), 1));
+    }
+
+    bool GameBoard::isValidPosition(const Position& pos) const
+    {
+        return pos.first >= 0 && pos.first < BOARD_SIZE && 
+               pos.second >= 0 && pos.second < BOARD_SIZE;
+    }
+
+    QColor GameBoard::getPlayerColor(PlayerColor player) const
+    {
+        // 현대적 파스텔 색상 사용
+        switch (player) {
+            case PlayerColor::Blue:
+                return ModernPastelTheme::getPrimaryBlue();
+            case PlayerColor::Yellow:
+                return ModernPastelTheme::getPrimaryYellow();
+            case PlayerColor::Red:
+                return ModernPastelTheme::getPrimaryRed();
+            case PlayerColor::Green:
+                return ModernPastelTheme::getPrimaryGreen();
+            default:
+                return ModernPastelTheme::getBackgroundSecondary();
         }
     }
 

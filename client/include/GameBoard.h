@@ -52,6 +52,15 @@ namespace Blokus {
         // 색상 관리
         QColor getPlayerColor(PlayerColor player) const;
 
+        // 반응형 게임보드 관련
+        qreal calculateResponsiveCellSize() const;
+        void updateResponsiveLayout();
+        void rebuildBoard();
+        void fitBoardToView();
+        void redrawAllBlocks();
+        void drawCellWithColor(const Position& pos, const QColor& color);
+        bool isValidPosition(const Position& pos) const;
+
         // 보드 관리
         void setBoardReadOnly(bool readOnly);
         void resetBoard();
@@ -113,9 +122,6 @@ namespace Blokus {
 
         // 미리보기 관련
         void showCurrentBlockPreview();
-
-        // 뷰 관리
-        void fitBoardToView();
 
         // 테스트/디버깅 함수들
         void addTestBlocks();

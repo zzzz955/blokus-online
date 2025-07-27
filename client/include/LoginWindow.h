@@ -14,6 +14,7 @@
 #include <QTimer>
 #include <QKeyEvent>
 #include <QMessageBox>
+#include "ResponsiveUI.h"
 
 namespace Blokus {
 
@@ -25,20 +26,20 @@ namespace Blokus {
         explicit LoginWindow(QWidget* parent = nullptr);
         ~LoginWindow();
 
-        // ·Î±×ÀÎ °á°ú Ã³¸®
+        // ï¿½Î±ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ Ã³ï¿½ï¿½
         void setLoginResult(bool success, const QString& message);
         void setRegisterResult(bool success, const QString& message);
         void setPasswordResetResult(bool success, const QString& message);
 
     signals:
-        // ·Î±×ÀÎ °ü·Ã ½Ã±×³Î
+        // ï¿½Î±ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ã±×³ï¿½
         void loginRequested(const QString& username, const QString& password);
         void registerRequested(const QString& username, const QString& password, const QString& email);
         void passwordResetRequested(const QString& email);
         void loginSuccessful(const QString& username);
 
     private slots:
-        // UI ÀÌº¥Æ® ÇÚµé·¯
+        // UI ï¿½Ìºï¿½Æ® ï¿½Úµé·¯
         void onLoginClicked();
         void onRegisterClicked();
         void onPasswordResetClicked();
@@ -46,21 +47,21 @@ namespace Blokus {
         void onShowRegisterForm();
         void onShowPasswordResetForm();
 
-        // ÀÔ·Â °ËÁõ
+        // ï¿½Ô·ï¿½ ï¿½ï¿½ï¿½ï¿½
         void onUsernameTextChanged();
         void onPasswordTextChanged();
         void onEmailTextChanged();
 
-        // ·Îµù ¾Ö´Ï¸ÞÀÌ¼Ç
+        // ï¿½Îµï¿½ ï¿½Ö´Ï¸ï¿½ï¿½Ì¼ï¿½
         void updateLoadingAnimation();
 
     protected:
-        // ÀÌº¥Æ® ÇÚµé·¯
+        // ï¿½Ìºï¿½Æ® ï¿½Úµé·¯
         void keyPressEvent(QKeyEvent* event) override;
         void resizeEvent(QResizeEvent* event) override;
 
     private:
-        // UI ±¸¼º ÇÔ¼öµé
+        // UI ï¿½ï¿½ï¿½ï¿½ ï¿½Ô¼ï¿½ï¿½ï¿½
         void setupUI();
         void setupTitleArea();
         void setupLoginForm();
@@ -70,12 +71,12 @@ namespace Blokus {
         void setupStyles();
         void createAnimations();
 
-        // Æû ÀüÈ¯
+        // ï¿½ï¿½ ï¿½ï¿½È¯
         void showLoginForm();
         void showRegisterForm();
         void showPasswordResetForm();
 
-        // À¯Æ¿¸®Æ¼ ÇÔ¼ö
+        // ï¿½ï¿½Æ¿ï¿½ï¿½Æ¼ ï¿½Ô¼ï¿½
         void clearInputs();
         void setFormEnabled(bool enabled);
         void showLoadingState(bool loading);
@@ -84,26 +85,26 @@ namespace Blokus {
         bool validatePasswordResetInput();
         void showMessage(const QString& title, const QString& message, bool isError = false);
 
-        // ½ºÅ¸ÀÏ °ü·Ã
+        // ï¿½ï¿½Å¸ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         void updateFormStyles();
         QString getButtonStyle(const QString& baseColor, const QString& hoverColor) const;
         QString getInputStyle() const;
 
     private:
-        // ¸ÞÀÎ À§Á¬µé
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         QWidget* m_centralWidget;
         QVBoxLayout* m_mainLayout;
 
-        // Å¸ÀÌÆ² ¿µ¿ª
+        // Å¸ï¿½ï¿½Æ² ï¿½ï¿½ï¿½ï¿½
         QWidget* m_titleWidget;
         QLabel* m_titleLabel;
         QLabel* m_subtitleLabel;
 
-        // Æû ÄÁÅ×ÀÌ³Ê
+        // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ì³ï¿½
         QWidget* m_formContainer;
         QVBoxLayout* m_formLayout;
 
-        // ·Î±×ÀÎ Æû
+        // ï¿½Î±ï¿½ï¿½ï¿½ ï¿½ï¿½
         QWidget* m_loginForm;
         QLineEdit* m_usernameEdit;
         QLineEdit* m_passwordEdit;
@@ -111,7 +112,7 @@ namespace Blokus {
         QPushButton* m_showRegisterButton;
         QPushButton* m_showPasswordResetButton;
 
-        // È¸¿ø°¡ÀÔ Æû
+        // È¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½
         QWidget* m_registerForm;
         QLineEdit* m_regUsernameEdit;
         QLineEdit* m_regPasswordEdit;
@@ -120,19 +121,19 @@ namespace Blokus {
         QPushButton* m_registerButton;
         QPushButton* m_backToLoginFromRegisterButton;
 
-        // ºñ¹Ð¹øÈ£ Àç¼³Á¤ Æû
+        // ï¿½ï¿½Ð¹ï¿½È£ ï¿½ç¼³ï¿½ï¿½ ï¿½ï¿½
         QWidget* m_passwordResetForm;
         QLineEdit* m_resetEmailEdit;
         QPushButton* m_passwordResetButton;
         QPushButton* m_backToLoginFromResetButton;
 
-        // ·Îµù ¹× »óÅÂ Ç¥½Ã
+        // ï¿½Îµï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Ç¥ï¿½ï¿½
         QWidget* m_loadingWidget;
         QProgressBar* m_progressBar;
         QLabel* m_loadingLabel;
         QMovie* m_loadingMovie;
 
-        // »óÅÂ
+        // ï¿½ï¿½ï¿½ï¿½
         enum class FormState {
             Login,
             Register,
@@ -141,7 +142,7 @@ namespace Blokus {
         FormState m_currentForm;
         bool m_isLoading;
 
-        // Å¸ÀÌ¸Ó
+        // Å¸ï¿½Ì¸ï¿½
         QTimer* m_animationTimer;
     };
 
