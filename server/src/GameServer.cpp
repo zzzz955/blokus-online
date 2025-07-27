@@ -407,6 +407,20 @@ namespace Blokus::Server {
         
         return lobbyUsers;
     }
+    
+    std::vector<std::shared_ptr<Session>> GameServer::getActualLobbyUsers() const {
+        std::vector<std::shared_ptr<Session>> actualLobbyUsers;
+        
+        std::lock_guard<std::mutex> lock(sessionsMutex_);
+        for (const auto& [sessionId, session] : sessions_) {
+            // 실제로 로비에만 있는 사용자만 포함 (채팅 브로드캐스팅용)
+            if (session && session->isActive() && session->isInLobby()) {
+                actualLobbyUsers.push_back(session);
+            }
+        }
+        
+        return actualLobbyUsers;
+    }
 
     // ========================================
     // 내부 초기화 함수들

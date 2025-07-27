@@ -1591,10 +1591,10 @@ namespace Blokus::Server
             }
 
             std::string chatMessage = "CHAT:" + username + ":" + message;
-            spdlog::info("📢 로비 채팅 브로드캐스트: [{}] {}", username, message);
-
-            // GameServer를 통해 로비의 모든 사용자에게 브로드캐스트
-            auto lobbyUsers = gameServer_->getLobbyUsers();
+            
+            // GameServer를 통해 실제 로비에 있는 사용자에게만 브로드캐스트
+            auto lobbyUsers = gameServer_->getActualLobbyUsers();
+            spdlog::info("📢 로비 채팅 브로드캐스트: [{}] {} -> {}명의 로비 사용자에게", username, message, lobbyUsers.size());
             for (const auto &lobbySession : lobbyUsers)
             {
                 if (lobbySession && lobbySession->isActive())

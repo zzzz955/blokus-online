@@ -79,8 +79,11 @@ namespace Blokus::Server {
         bool withSession(const std::string& sessionId,
             std::function<void(std::shared_ptr<Session>)> action);
         
-        // 로비 사용자 목록 조회 - 로비 브로드캐스팅용
+        // 로비 사용자 목록 조회 - 로비 브로드캐스팅용 (모든 온라인 사용자)
         std::vector<std::shared_ptr<Session>> getLobbyUsers() const;
+        
+        // 실제 로비에만 있는 사용자 조회 - 채팅 브로드캐스팅용
+        std::vector<std::shared_ptr<Session>> getActualLobbyUsers() const;
         
         // 로비 브로드캐스트 메서드들
         void broadcastLobbyUserLeft(const std::string& username);
