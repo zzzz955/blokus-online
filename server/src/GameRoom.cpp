@@ -522,96 +522,7 @@ namespace Blokus {
             }
 
             // 게임 시작 후 첫 번째 플레이어가 블록을 배치할 수 없다면 자동 스킵 체크
-            int autoSkipCount = 0;
-            int maxAutoSkips = m_players.size(); // 최대 플레이어 수만큼만 스킵 허용
-            bool shouldCheckAutoSkip = true;
-            
-            while (shouldCheckAutoSkip && m_state == RoomState::Playing && autoSkipCount < maxAutoSkips) {
-                Common::PlayerColor checkPlayer = m_gameStateManager->getCurrentPlayer();
-                
-                if (m_gameLogic->canPlayerPlaceAnyBlock(checkPlayer)) {
-                    // 현재 플레이어가 블록을 배치할 수 있으면 중단
-                    shouldCheckAutoSkip = false;
-                } else {
-                    autoSkipCount++;
-                    
-                    // 현재 플레이어가 블록을 배치할 수 없으면 자동 스킵
-                    std::string playerName = "";
-                    for (const auto& player : m_players) {
-                        if (player.getColor() == checkPlayer) {
-                            playerName = player.getUsername();
-                            break;
-                        }
-                    }
-                    
-                    spdlog::debug("🔄 게임 시작 후 자동 턴 스킵 {}/{}: {} (색상 {})님이 더 이상 배치할 블록이 없음", 
-                        autoSkipCount, maxAutoSkips, playerName, static_cast<int>(checkPlayer));
-                    
-                    // 자동 턴 스킵 알림 메시지
-                    std::ostringstream skipMsg;
-                    skipMsg << "SYSTEM:" << playerName << "님이 배치할 수 있는 블록이 없어 자동으로 턴이 넘어갑니다.";
-                    broadcastMessageLocked(skipMsg.str());
-                    
-                    // 턴 넘기기
-                    Common::PlayerColor prevPlayer = checkPlayer;
-                    m_gameStateManager->nextTurn();
-                    Common::PlayerColor nextPlayer = m_gameStateManager->getCurrentPlayer();
-                    
-                    spdlog::debug("🔄 게임 시작 후 자동 턴 전환: {} -> {}", static_cast<int>(prevPlayer), static_cast<int>(nextPlayer));
-                    
-                    // 턴 변경 브로드캐스트
-                    if (nextPlayer != prevPlayer) {
-                        broadcastTurnChangeLocked(nextPlayer);
-                    }
-                    
-                    // 게임 상태 브로드캐스트
-                    broadcastGameStateLocked();
-                    
-                    // 모든 플레이어가 한 번씩 스킵되었으면 게임 종료
-                    if (autoSkipCount >= maxAutoSkips) {
-                        spdlog::debug("🏁 게임 시작 직후 모든 활성 플레이어가 스킵됨, 게임 종료 (방 {})", m_roomId);
-                        
-                        // 최종 점수 계산
-                        auto finalScores = m_gameLogic->calculateScores();
-                        
-                        // 승자 결정 (가장 높은 점수를 가진 플레이어)
-                        Common::PlayerColor winner = Common::PlayerColor::None;
-                        int highestScore = -1;
-                        std::vector<Common::PlayerColor> winners; // 동점자 처리
-                        
-                        for (const auto& score : finalScores) {
-                            // 실제 게임에 참여한 플레이어들만 고려
-                            bool isActivePlayer = false;
-                            for (const auto& player : m_players) {
-                                if (player.getColor() == score.first) {
-                                    isActivePlayer = true;
-                                    break;
-                                }
-                            }
-                            
-                            if (isActivePlayer) {
-                                if (score.second > highestScore) {
-                                    highestScore = score.second;
-                                    winners.clear();
-                                    winners.push_back(score.first);
-                                    winner = score.first;
-                                } else if (score.second == highestScore) {
-                                    winners.push_back(score.first);
-                                }
-                            }
-                        }
-                        
-                        // 게임 결과 브로드캐스트
-                        spdlog::debug("🎯 게임 종료 조건 충족: 블록 배치 후 승패 결정 (방 {})", m_roomId);
-                        broadcastGameResultLocked(finalScores, winners);
-                
-                // 게임 결과를 DB에 저장
-                saveGameResultsToDatabase(finalScores, winners);
-                        shouldCheckAutoSkip = false;
-                        break;
-                    }
-                }
-            }
+            processAutoSkipAfterTurnChange("게임 시작");
 
             // 주기적 타임아웃 체크 스레드 시작
             m_stopTimeoutCheck = false;
@@ -1396,101 +1307,7 @@ namespace Blokus {
             broadcastGameStateLocked();
 
             // 새 플레이어가 블록을 배치할 수 없다면 자동 턴 스킵 체크
-            // 단, 뮤텍스를 이미 잡고 있으므로 별도 함수 호출하지 않고 직접 처리
-            int autoSkipCount = 0;
-            int maxAutoSkips = m_players.size(); // 최대 플레이어 수만큼만 스킵 허용
-            bool shouldCheckAutoSkip = true;
-            
-            while (shouldCheckAutoSkip && m_state == RoomState::Playing && autoSkipCount < maxAutoSkips) {
-                Common::PlayerColor checkPlayer = m_gameStateManager->getCurrentPlayer();
-                
-                if (m_gameLogic->canPlayerPlaceAnyBlock(checkPlayer)) {
-                    // 현재 플레이어가 블록을 배치할 수 있으면 중단
-                    shouldCheckAutoSkip = false;
-                } else {
-                    autoSkipCount++;
-                    
-                    // 현재 플레이어가 블록을 배치할 수 없으면 자동 스킵
-                    std::string playerName = "";
-                    for (const auto& player : m_players) {
-                        if (player.getColor() == checkPlayer) {
-                            playerName = player.getUsername();
-                            break;
-                        }
-                    }
-                    
-                    spdlog::debug("🔄 자동 턴 스킵 {}/{}: {} (색상 {})님이 더 이상 배치할 블록이 없음", 
-                        autoSkipCount, maxAutoSkips, playerName, static_cast<int>(checkPlayer));
-                    
-                    // 자동 턴 스킵 알림 메시지
-                    std::ostringstream skipMsg;
-                    skipMsg << "SYSTEM:" << playerName << "님이 배치할 수 있는 블록이 없어 자동으로 턴이 넘어갑니다.";
-                    broadcastMessageLocked(skipMsg.str());
-                    
-                    // 턴 넘기기
-                    Common::PlayerColor prevPlayer = checkPlayer;
-                    m_gameStateManager->nextTurn();
-                    Common::PlayerColor nextPlayer = m_gameStateManager->getCurrentPlayer();
-                    
-                    spdlog::debug("🔄 자동 턴 전환: {} -> {}", static_cast<int>(prevPlayer), static_cast<int>(nextPlayer));
-                    
-                    // 턴 변경 브로드캐스트
-                    if (nextPlayer != prevPlayer) {
-                        broadcastTurnChangeLocked(nextPlayer);
-                    }
-                    
-                    // 게임 상태 브로드캐스트
-                    broadcastGameStateLocked();
-                    
-                    // 모든 플레이어가 한 번씩 스킵되었으면 게임 종료
-                    if (autoSkipCount >= maxAutoSkips) {
-                        spdlog::debug("🏁 모든 활성 플레이어가 스킵됨, 게임 종료 (방 {})", m_roomId);
-                        shouldCheckAutoSkip = false;
-                        break;
-                    }
-                }
-            }
-            
-            // 모든 활성 플레이어가 스킵되었으면 게임 종료 처리
-            if (autoSkipCount >= maxAutoSkips) {
-                spdlog::debug("🏁 게임 종료 조건 충족: 모든 활성 플레이어가 블록 배치 불가 (방 {})", m_roomId);
-                
-                // 최종 점수 계산
-                auto finalScores = m_gameLogic->calculateScores();
-                
-                // 승자 결정 (가장 높은 점수를 가진 플레이어)
-                Common::PlayerColor winner = Common::PlayerColor::None;
-                int highestScore = -1;
-                std::vector<Common::PlayerColor> winners; // 동점자 처리
-                
-                for (const auto& score : finalScores) {
-                    // 실제 게임에 참여한 플레이어들만 고려
-                    bool isActivePlayer = false;
-                    for (const auto& player : m_players) {
-                        if (player.getColor() == score.first) {
-                            isActivePlayer = true;
-                            break;
-                        }
-                    }
-                    
-                    if (isActivePlayer) {
-                        if (score.second > highestScore) {
-                            highestScore = score.second;
-                            winners.clear();
-                            winners.push_back(score.first);
-                            winner = score.first;
-                        } else if (score.second == highestScore) {
-                            winners.push_back(score.first);
-                        }
-                    }
-                }
-                
-                // 게임 결과 브로드캐스트
-                broadcastGameResultLocked(finalScores, winners);
-                
-                // 게임 결과를 DB에 저장
-                saveGameResultsToDatabase(finalScores, winners);
-            }
+            processAutoSkipAfterTurnChange("블록 배치");
 
             // 게임 종료 조건 확인: 모든 플레이어가 더 이상 블록을 배치할 수 없는 경우
             bool gameFinished = m_gameLogic->isGameFinished();
@@ -1567,100 +1384,7 @@ namespace Blokus {
             broadcastGameStateLocked();
             
             // 자동 턴 스킵 체크 (새로운 플레이어도 블록을 배치할 수 없다면)
-            int autoSkipCount = 0;
-            int maxAutoSkips = m_players.size(); // 최대 플레이어 수만큼만 스킵 허용
-            bool shouldCheckAutoSkip = true;
-            
-            while (shouldCheckAutoSkip && m_state == RoomState::Playing && autoSkipCount < maxAutoSkips) {
-                Common::PlayerColor checkPlayer = m_gameStateManager->getCurrentPlayer();
-                
-                if (m_gameLogic->canPlayerPlaceAnyBlock(checkPlayer)) {
-                    // 현재 플레이어가 블록을 배치할 수 있으면 중단
-                    shouldCheckAutoSkip = false;
-                } else {
-                    autoSkipCount++;
-                    
-                    // 현재 플레이어가 블록을 배치할 수 없으면 자동 스킵
-                    std::string playerName = "";
-                    for (const auto& player : m_players) {
-                        if (player.getColor() == checkPlayer) {
-                            playerName = player.getUsername();
-                            break;
-                        }
-                    }
-                    
-                    spdlog::debug("🔄 수동 스킵 후 자동 턴 스킵 {}/{}: {} (색상 {})님이 더 이상 배치할 블록이 없음", 
-                        autoSkipCount, maxAutoSkips, playerName, static_cast<int>(checkPlayer));
-                    
-                    // 자동 턴 스킵 알림 메시지
-                    std::ostringstream skipMsg;
-                    skipMsg << "SYSTEM:" << playerName << "님이 배치할 수 있는 블록이 없어 자동으로 턴이 넘어갑니다.";
-                    broadcastMessageLocked(skipMsg.str());
-                    
-                    // 턴 넘기기
-                    Common::PlayerColor prevPlayer = checkPlayer;
-                    m_gameStateManager->nextTurn();
-                    Common::PlayerColor nextPlayer = m_gameStateManager->getCurrentPlayer();
-                    
-                    spdlog::debug("🔄 자동 턴 전환: {} -> {}", static_cast<int>(prevPlayer), static_cast<int>(nextPlayer));
-                    
-                    // 턴 변경 브로드캐스트
-                    if (nextPlayer != prevPlayer) {
-                        broadcastTurnChangeLocked(nextPlayer);
-                    }
-                    
-                    // 게임 상태 브로드캐스트
-                    broadcastGameStateLocked();
-                    
-                    // 모든 플레이어가 한 번씩 스킵되었으면 게임 종료
-                    if (autoSkipCount >= maxAutoSkips) {
-                        spdlog::debug("🏁 수동 스킵 후 모든 활성 플레이어가 스킵됨, 게임 종료 (방 {})", m_roomId);
-                        shouldCheckAutoSkip = false;
-                        break;
-                    }
-                }
-            }
-
-            // 수동 스킵 후 모든 활성 플레이어가 스킵되었으면 게임 종료 처리
-            if (autoSkipCount >= maxAutoSkips) {
-                spdlog::debug("🏁 수동 스킵 후 게임 종료 조건 충족: 모든 활성 플레이어가 블록 배치 불가 (방 {})", m_roomId);
-                
-                // 최종 점수 계산
-                auto finalScores = m_gameLogic->calculateScores();
-                
-                // 승자 결정 (가장 높은 점수를 가진 플레이어)
-                Common::PlayerColor winner = Common::PlayerColor::None;
-                int highestScore = -1;
-                std::vector<Common::PlayerColor> winners; // 동점자 처리
-                
-                for (const auto& score : finalScores) {
-                    // 실제 게임에 참여한 플레이어들만 고려
-                    bool isActivePlayer = false;
-                    for (const auto& player : m_players) {
-                        if (player.getColor() == score.first) {
-                            isActivePlayer = true;
-                            break;
-                        }
-                    }
-                    
-                    if (isActivePlayer) {
-                        if (score.second > highestScore) {
-                            highestScore = score.second;
-                            winners.clear();
-                            winners.push_back(score.first);
-                            winner = score.first;
-                        } else if (score.second == highestScore) {
-                            winners.push_back(score.first);
-                        }
-                    }
-                }
-                
-                // 게임 결과 브로드캐스트
-                broadcastGameResultLocked(finalScores, winners);
-                
-                // 게임 결과를 DB에 저장
-                saveGameResultsToDatabase(finalScores, winners);
-            }
+            processAutoSkipAfterTurnChange("수동 스킵");
 
             return true;
         }
@@ -1693,6 +1417,88 @@ namespace Blokus {
             
             Common::PlayerColor currentPlayer = m_gameStateManager->getCurrentPlayer();
             return m_gameLogic->canPlayerPlaceAnyBlock(currentPlayer);
+        }
+
+        void GameRoom::processAutoSkipAfterTurnChange(const std::string& skipReason) {
+            // 뮤텍스가 이미 잠겨있다고 가정하고 실행
+            int autoSkipCount = 0;
+            int maxAutoSkips = m_players.size(); // 최대 플레이어 수만큼만 스킵 허용
+            bool shouldCheckAutoSkip = true;
+            
+            while (shouldCheckAutoSkip && m_state == RoomState::Playing && autoSkipCount < maxAutoSkips) {
+                Common::PlayerColor checkPlayer = m_gameStateManager->getCurrentPlayer();
+                
+                if (m_gameLogic->canPlayerPlaceAnyBlock(checkPlayer)) {
+                    // 현재 플레이어가 블록을 배치할 수 있으면 중단
+                    shouldCheckAutoSkip = false;
+                } else {
+                    autoSkipCount++;
+                    
+                    // 현재 플레이어가 블록을 배치할 수 없으면 자동 스킵
+                    std::string playerName = "";
+                    for (const auto& player : m_players) {
+                        if (player.getColor() == checkPlayer) {
+                            playerName = player.getUsername();
+                            break;
+                        }
+                    }
+                    
+                    spdlog::debug("🔄 {} 후 자동 턴 스킵 {}/{}: {} (색상 {})님이 더 이상 배치할 블록이 없음", 
+                        skipReason, autoSkipCount, maxAutoSkips, playerName, static_cast<int>(checkPlayer));
+                    
+                    // 자동 턴 스킵 알림 메시지
+                    std::ostringstream skipMsg;
+                    skipMsg << "SYSTEM:" << playerName << "님이 배치할 수 있는 블록이 없어 자동으로 턴이 넘어갑니다.";
+                    broadcastMessageLocked(skipMsg.str());
+                    
+                    // 턴 넘기기
+                    Common::PlayerColor prevPlayer = checkPlayer;
+                    m_gameStateManager->nextTurn();
+                    Common::PlayerColor nextPlayer = m_gameStateManager->getCurrentPlayer();
+                    
+                    spdlog::debug("🔄 자동 턴 전환: {} -> {}", static_cast<int>(prevPlayer), static_cast<int>(nextPlayer));
+                    
+                    // 턴 변경 브로드캐스트
+                    if (nextPlayer != prevPlayer) {
+                        broadcastTurnChangeLocked(nextPlayer);
+                    }
+                    
+                    // 게임 상태 브로드캐스트
+                    broadcastGameStateLocked();
+                    
+                    // 모든 플레이어가 한 번씩 스킵되었으면 게임 종료
+                    if (autoSkipCount >= maxAutoSkips) {
+                        spdlog::debug("🏁 {} 후 모든 활성 플레이어가 스킵됨, 게임 종료 (방 {})", skipReason, m_roomId);
+                        shouldCheckAutoSkip = false;
+                        break;
+                    }
+                }
+            }
+            
+            // 모든 활성 플레이어가 스킵되었으면 게임 종료 처리
+            if (autoSkipCount >= maxAutoSkips) {
+                spdlog::debug("🏁 {} 후 게임 종료 조건 충족: 모든 활성 플레이어가 블록 배치 불가 (방 {})", skipReason, m_roomId);
+                
+                // 최종 점수 계산
+                auto finalScores = m_gameLogic->calculateScores();
+                
+                // 승자 찾기
+                std::vector<Common::PlayerColor> winners;
+                int maxScore = 0;
+                for (const auto& [color, score] : finalScores) {
+                    if (score > maxScore) {
+                        maxScore = score;
+                        winners.clear();
+                        winners.push_back(color);
+                    } else if (score == maxScore) {
+                        winners.push_back(color);
+                    }
+                }
+                
+                // 게임 결과 브로드캐스트 및 게임 종료
+                broadcastGameResultLocked(finalScores, winners);
+                endGameLocked();
+            }
         }
         
         void GameRoom::saveGameResultsToDatabase(const std::map<Common::PlayerColor, int>& finalScores, 
@@ -1901,6 +1707,9 @@ namespace Blokus {
                 std::lock_guard<std::mutex> lock(m_playersMutex);
                 broadcastTurnChangeLocked(nextPlayer);
                 broadcastGameStateLocked();
+                
+                // 타임아웃 후 자동 스킵 처리 (새로운 플레이어가 블록을 배치할 수 없다면 계속 스킵)
+                processAutoSkipAfterTurnChange("타임아웃");
             }
         }
 

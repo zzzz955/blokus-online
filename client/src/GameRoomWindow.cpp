@@ -2430,9 +2430,6 @@ namespace Blokus {
 
     void GameRoomWindow::startTurnTimer(int timeLimit, int remainingTime)
     {
-        qDebug() << QString::fromUtf8("⏰ [TIMER_DEBUG] startTurnTimer 호출: timeLimit=%1, remainingTime=%2")
-                    .arg(timeLimit).arg(remainingTime);
-        
         m_turnTimeLimit = timeLimit;
         m_remainingTime = (remainingTime > 0) ? remainingTime : timeLimit;
         m_isTimerActive = true;
@@ -2440,24 +2437,17 @@ namespace Blokus {
         // 타이머 패널 표시
         if (m_timerPanel) {
             m_timerPanel->show();
-            qDebug() << QString::fromUtf8("⏰ [TIMER_DEBUG] 타이머 패널 표시됨");
-        } else {
-            qDebug() << QString::fromUtf8("⏰ [TIMER_DEBUG] 경고: 타이머 패널이 null입니다");
         }
 
         // 카운트다운 타이머 시작
         if (m_countdownTimer) {
             m_countdownTimer->start();
-            qDebug() << QString::fromUtf8("⏰ [TIMER_DEBUG] 카운트다운 타이머 시작됨 (간격: %1ms, 활성: %2)")
-                        .arg(m_countdownTimer->interval()).arg(m_countdownTimer->isActive());
-        } else {
-            qDebug() << QString::fromUtf8("⏰ [TIMER_DEBUG] 오류: 카운트다운 타이머가 null입니다");
         }
 
         // 초기 디스플레이 업데이트
         updateTimerDisplay(m_remainingTime);
 
-        qDebug() << QString::fromUtf8("⏰ [TIMER_DEBUG] 턴 타이머 시작 완료: %1초 (활성: %2)").arg(m_remainingTime).arg(m_isTimerActive);
+        qDebug() << QString::fromUtf8("⏰ 턴 타이머 시작: %1초").arg(m_remainingTime);
     }
 
     void GameRoomWindow::stopTurnTimer()
@@ -2516,20 +2506,15 @@ namespace Blokus {
 
     void GameRoomWindow::onCountdownTick()
     {
-        qDebug() << QString::fromUtf8("⏰ [TIMER_DEBUG] onCountdownTick 호출: 활성=%1, 남은시간=%2")
-                    .arg(m_isTimerActive).arg(m_remainingTime);
-        
         if (!m_isTimerActive) {
-            qDebug() << QString::fromUtf8("⏰ [TIMER_DEBUG] 타이머 비활성화 상태로 틱 무시");
             return;
         }
 
         m_remainingTime--;
-        qDebug() << QString::fromUtf8("⏰ [TIMER_DEBUG] 시간 감소: %1초 남음").arg(m_remainingTime);
 
         if (m_remainingTime <= 0) {
             // 시간 초과
-            qDebug() << QString::fromUtf8("⏰ [TIMER_DEBUG] 시간 초과 감지, onTimerTimeout 호출");
+            qDebug() << QString::fromUtf8("⏰ 시간 초과 감지, 타임아웃 처리");
             onTimerTimeout();
         } else {
             // 디스플레이 업데이트
