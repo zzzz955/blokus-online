@@ -156,6 +156,12 @@ namespace Blokus {
         
         // 게임 상태 완전 리셋 (서버에서 GAME_RESET 신호 받았을 때)
         void resetGameState();
+        
+        // 턴 타이머 관리
+        void startTurnTimer(int timeLimit, int remainingTime = -1);
+        void stopTurnTimer();
+        void updateTimerDisplay(int remainingTime);
+        void showTimeoutNotification(const QString& playerName);
 
     signals:
         // 룸 관리 시그널
@@ -181,7 +187,7 @@ namespace Blokus {
         // 게임 상태 동기화 슬롯
         void onGameStateUpdated(const QString& gameStateJson);
         void onBlockPlaced(const QString& playerName, int blockType, int row, int col, int rotation, int flip, int playerColor, int scoreGained);
-        void onTurnChanged(const QString& newPlayerName, int playerColor, int turnNumber);
+        void onTurnChanged(const QString& newPlayerName, int playerColor, int turnNumber, int turnTimeSeconds, int remainingTimeSeconds, bool previousTurnTimedOut);
 
     private slots:
         void onGameStartClicked();
@@ -197,6 +203,10 @@ namespace Blokus {
         void onCellHovered(int row, int col);
         void onBlockPlacedSuccessfully(BlockType blockType, PlayerColor player, int row, int col, int rotation, int flip);
         void onBlockSelected(const Block& block);
+        
+        // 턴 타이머 슬롯
+        void onCountdownTick();
+        void onTimerTimeout();
 
     protected:
         void closeEvent(QCloseEvent* event) override;
@@ -213,6 +223,7 @@ namespace Blokus {
         void setupGameArea();
         void setupChatPanel();
         void setupControlsPanel();
+        void setupTimerPanel();
         void setupStyles();
 
         // UI 업데이트 함수들
@@ -262,6 +273,11 @@ namespace Blokus {
         QLabel* m_roomStatusLabel;
         QLabel* m_currentTurnLabel;
         QPushButton* m_leaveRoomButton;
+        
+        // 턴 타이머 UI 컴포넌트
+        QWidget* m_timerPanel;
+        QLabel* m_timerLabel;
+        QProgressBar* m_timerProgressBar;
 
         // 플레이어 슬롯들
         QWidget* m_playerSlotsPanel;
@@ -292,6 +308,12 @@ namespace Blokus {
         QTimer* m_turnTimer;
         QTimer* m_readyButtonTimeout; // 준비 버튼 타임아웃
         QList<QString> m_chatHistory;
+        
+        // 턴 타이머 상태
+        int m_turnTimeLimit;         // 턴 제한 시간 (초)
+        int m_remainingTime;         // 남은 시간 (초)
+        bool m_isTimerActive;        // 타이머 활성화 상태
+        QTimer* m_countdownTimer;    // 1초마다 UI 업데이트용 타이머
     };
 
 } // namespace Blokus

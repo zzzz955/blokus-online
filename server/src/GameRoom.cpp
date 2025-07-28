@@ -31,12 +31,22 @@ namespace Blokus {
             , m_maxPlayers(Common::MAX_PLAYERS)
             , m_hasCompletedGame(false)
             , m_roomManager(roomManager)
+            , m_turnTimeoutSeconds(30)  // 기본 30초 타임아웃
+            , m_turnTimerActive(false)
+            , m_lastTurnTimedOut(false)
+            , m_stopTimeoutCheck(false)
         {
             m_players.reserve(Common::MAX_PLAYERS);
             spdlog::debug("🏠 방 생성: ID={}, Name='{}', Host={}", m_roomId, m_roomName, m_hostId);
         }
 
         GameRoom::~GameRoom() {
+            // 타임아웃 체크 스레드 종료
+            m_stopTimeoutCheck = true;
+            if (m_timeoutCheckThread.joinable()) {
+                m_timeoutCheckThread.join();
+            }
+            
             // 모든 플레이어에게 방 해체 알림
             broadcastMessage("ROOM_DISBANDED");
             spdlog::debug("🏠 방 소멸: ID={}, Name='{}'", m_roomId, m_roomName);
@@ -603,6 +613,16 @@ namespace Blokus {
                 }
             }
 
+            // 주기적 타임아웃 체크 스레드 시작
+            m_stopTimeoutCheck = false;
+            m_timeoutCheckThread = std::thread(&GameRoom::timeoutCheckLoop, this);
+            spdlog::info("⏰ [TIMER_DEBUG] 주기적 타임아웃 체크 스레드 시작 (방 {})", m_roomId);
+            
+            // 첫 번째 턴 시작 브로드캐스트
+            Common::PlayerColor firstPlayer = m_gameStateManager->getCurrentPlayer();
+            spdlog::info("⏰ [TIMER_DEBUG] 게임 시작 후 첫 번째 턴 브로드캐스트: 플레이어 {}", static_cast<int>(firstPlayer));
+            broadcastTurnChangeLocked(firstPlayer);
+            
             spdlog::debug("🎮 방 {} 게임 시작: {} 플레이어, 턴 순서 설정됨", m_roomId, m_players.size());
             return true;
         }
@@ -617,6 +637,16 @@ namespace Blokus {
             if (m_state != RoomState::Playing) {
                 return false;
             }
+
+            // 턴 타이머 정지 (게임 종료 시)
+            stopTurnTimer();
+            
+            // 주기적 타임아웃 체크 스레드 정지
+            m_stopTimeoutCheck = true;
+            if (m_timeoutCheckThread.joinable()) {
+                m_timeoutCheckThread.join();
+            }
+            spdlog::debug("⏰ 주기적 타임아웃 체크 스레드 정지 (방 {})", m_roomId);
 
             m_state = RoomState::Waiting;
             updateActivity();
@@ -996,13 +1026,21 @@ namespace Blokus {
                 return; // 빈 슬롯 메시지 방지
             }
             
-            // 턴 변경 알림 메시지
+            // 턴 타이머 시작
+            startTurnTimer();
+            
+            // 턴 변경 알림 메시지 (타이머 정보 포함)
             std::ostringstream turnChangeMsg;
             turnChangeMsg << "TURN_CHANGED:{"
                 << "\"newPlayer\":\"" << newPlayerName << "\","
                 << "\"playerColor\":" << static_cast<int>(newPlayer) << ","
-                << "\"turnNumber\":" << m_gameStateManager->getTurnNumber()
+                << "\"turnNumber\":" << m_gameStateManager->getTurnNumber() << ","
+                << "\"turnTimeSeconds\":" << m_turnTimeoutSeconds << ","
+                << "\"remainingTimeSeconds\":" << m_turnTimeoutSeconds << ","
+                << "\"previousTurnTimedOut\":" << (m_lastTurnTimedOut ? "true" : "false")
                 << "}";
+            
+            spdlog::info("⏰ [TIMER_DEBUG] TURN_CHANGED 메시지 생성: {}", turnChangeMsg.str());
             
             broadcastMessageLocked(turnChangeMsg.str());
             
@@ -1302,6 +1340,9 @@ namespace Blokus {
 
             // 성공적으로 배치됨 - 점수 계산
             int scoreGained = Common::BlockFactory::getBlockScore(placement.type);
+            
+            // 턴 타이머 정지 (블록 배치 성공시)
+            stopTurnTimer();
             
             spdlog::debug("✅ 블록 배치 성공 (방 {}, 사용자 {}, 블록 타입: {}, 획득 점수: {})", 
                 m_roomId, userId, static_cast<int>(placement.type), scoreGained);
@@ -1776,6 +1817,137 @@ namespace Blokus {
             } catch (const std::exception& e) {
                 spdlog::error("❌ 게임 결과 DB 저장 중 예외 발생 (방 {}): {}", m_roomId, e.what());
             }
+        }
+
+        // ========================================
+        // 턴 타이머 관리 구현
+        // ========================================
+
+        void GameRoom::startTurnTimer() {
+            if (m_state != RoomState::Playing) {
+                spdlog::warn("⏰ [TIMER_DEBUG] 턴 타이머 시작 실패: 게임 중이 아님 (방 {}, 상태: {})", m_roomId, static_cast<int>(m_state));
+                return; // 게임 중이 아니면 타이머 시작하지 않음
+            }
+
+            m_turnStartTime = std::chrono::steady_clock::now();
+            m_turnTimerActive.store(true);
+            m_lastTurnTimedOut = false;  // 새 턴이므로 타임아웃 플래그 리셋
+            
+            spdlog::info("⏰ [TIMER_DEBUG] 턴 타이머 시작: 방 {}, 제한시간 {}초, 현재 플레이어: {}", 
+                m_roomId, m_turnTimeoutSeconds, static_cast<int>(m_gameStateManager->getCurrentPlayer()));
+        }
+
+        void GameRoom::stopTurnTimer() {
+            m_turnTimerActive.store(false);
+            spdlog::debug("⏰ 턴 타이머 정지: 방 {}", m_roomId);
+        }
+
+        bool GameRoom::checkTurnTimeout() {
+            if (!m_turnTimerActive.load() || m_state != RoomState::Playing) {
+                return false;
+            }
+
+            auto now = std::chrono::steady_clock::now();
+            auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - m_turnStartTime);
+            
+            return elapsed.count() >= m_turnTimeoutSeconds;
+        }
+
+        void GameRoom::handleTurnTimeout() {
+            if (!m_turnTimerActive.load() || m_state != RoomState::Playing) {
+                return;
+            }
+
+            Common::PlayerColor currentPlayer = m_gameStateManager->getCurrentPlayer();
+            
+            // 타임아웃 플래그 설정
+            m_lastTurnTimedOut = true;
+            
+            // 타이머 정지
+            stopTurnTimer();
+            
+            spdlog::info("⏰ 턴 타임아웃: 방 {}, 플레이어 {}", m_roomId, static_cast<int>(currentPlayer));
+            
+            // 타임아웃 알림 메시지 브로드캐스트
+            std::string timedOutPlayerName = "";
+            for (const auto& player : m_players) {
+                if (player.getColor() == currentPlayer) {
+                    timedOutPlayerName = player.getUsername();
+                    break;
+                }
+            }
+            
+            std::ostringstream timeoutMsg;
+            timeoutMsg << "TURN_TIMEOUT:{"
+                << "\"timedOutPlayer\":\"" << timedOutPlayerName << "\","
+                << "\"playerColor\":" << static_cast<int>(currentPlayer)
+                << "}";
+            
+            {
+                std::lock_guard<std::mutex> lock(m_playersMutex);
+                broadcastMessageLocked(timeoutMsg.str());
+                
+                // 시스템 메시지
+                std::ostringstream systemMsg;
+                systemMsg << "SYSTEM:" << timedOutPlayerName << "님의 시간이 초과되어 턴이 넘어갑니다.";
+                broadcastMessageLocked(systemMsg.str());
+            }
+            
+            // 다음 플레이어로 턴 넘기기
+            m_gameStateManager->nextTurn();
+            Common::PlayerColor nextPlayer = m_gameStateManager->getCurrentPlayer();
+            
+            if (nextPlayer != currentPlayer) {
+                std::lock_guard<std::mutex> lock(m_playersMutex);
+                broadcastTurnChangeLocked(nextPlayer);
+                broadcastGameStateLocked();
+            }
+        }
+
+        int GameRoom::getRemainingTurnTime() const {
+            if (!m_turnTimerActive.load() || m_state != RoomState::Playing) {
+                return 0;
+            }
+
+            auto now = std::chrono::steady_clock::now();
+            auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - m_turnStartTime);
+            int remaining = m_turnTimeoutSeconds - static_cast<int>(elapsed.count());
+            
+            return std::max(0, remaining);
+        }
+
+        bool GameRoom::isTurnTimerActive() const {
+            return m_turnTimerActive.load() && m_state == RoomState::Playing;
+        }
+
+        // ========================================
+        // 주기적 타임아웃 체크 스레드 루프
+        // ========================================
+
+        void GameRoom::timeoutCheckLoop() {
+            spdlog::info("⏰ [TIMER_DEBUG] 타임아웃 체크 루프 시작 (방 {})", m_roomId);
+            
+            while (!m_stopTimeoutCheck) {
+                // 5초마다 체크
+                std::this_thread::sleep_for(std::chrono::seconds(5));
+                
+                if (m_stopTimeoutCheck) {
+                    break;
+                }
+                
+                // 게임 중이고 타이머가 활성화된 경우만 체크
+                if (m_state == RoomState::Playing && m_turnTimerActive.load()) {
+                    spdlog::debug("⏰ [TIMER_DEBUG] 타임아웃 체크 중 (방 {}, 타이머 활성: {})", m_roomId, m_turnTimerActive.load());
+                    if (checkTurnTimeout()) {
+                        spdlog::info("⏰ [TIMER_DEBUG] 주기적 체크에서 턴 타임아웃 감지 (방 {})", m_roomId);
+                        handleTurnTimeout();
+                    }
+                } else {
+                    spdlog::debug("⏰ [TIMER_DEBUG] 타임아웃 체크 스킵 (방 {}, 게임 상태: {}, 타이머 활성: {})", 
+                        m_roomId, static_cast<int>(m_state), m_turnTimerActive.load());
+                }
+            }
+            spdlog::info("⏰ [TIMER_DEBUG] 타임아웃 체크 스레드 종료 (방 {})", m_roomId);
         }
 
 

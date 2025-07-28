@@ -145,17 +145,19 @@ message TurnChangedNotification {
   PlayerColor previous_player = 3;
   int32 turn_number = 4;
   
-  // �� �ð� ����
-  int32 turn_time_seconds = 5;
-  google.protobuf.Timestamp turn_started_at = 6;
+  // 턴 시간 정보 (타이머 시스템 강화)
+  int32 turn_time_seconds = 5;           // 턴 제한 시간 (기본 30초)
+  google.protobuf.Timestamp turn_started_at = 6; // 턴 시작 시간
+  int32 remaining_time_seconds = 7;      // 남은 시간 (클라이언트 동기화용)
   
-  // ���� ����
-  int32 moves_made = 7;
-  bool game_nearly_finished = 8; // ������ ���� ����������
+  // 게임 진행 정보
+  int32 moves_made = 8;
+  bool game_nearly_finished = 9; // 게임이 곧 끝날 예정인지
   
-  // ���� �� ����
-  TurnAction previous_action = 9;
-  string previous_action_details = 10;
+  // 이전 턴 정보
+  TurnAction previous_action = 10;
+  string previous_action_details = 11;
+  bool previous_turn_timed_out = 12;     // 이전 턴이 시간 초과로 끝났는지
 }
 
 // ========================================
@@ -366,6 +368,31 @@ message SpectatorNotification {
   string spectator_username = 2;
   bool joined = 3;            // true: ����, false: ����
   int32 total_spectators = 4;
+}
+
+// ========================================
+// Turn Timer System
+// ========================================
+
+message TurnTimerSyncRequest {
+  int32 room_id = 1;
+}
+
+message TurnTimerSyncResponse {
+  Result result = 1;
+  int32 remaining_time_seconds = 2;  // 남은 시간 (초)
+  PlayerColor current_player = 3;     // 현재 플레이어
+  int32 turn_number = 4;             // 턴 번호
+  google.protobuf.Timestamp server_time = 5; // 서버 시간 (동기화용)
+}
+
+message TurnTimeoutNotification {
+  int32 room_id = 1;
+  PlayerColor timed_out_player = 2;   // 시간 초과된 플레이어
+  PlayerColor next_player = 3;        // 다음 플레이어
+  int32 turn_number = 4;              // 새 턴 번호
+  string timeout_reason = 5;          // 타임아웃 사유
+  google.protobuf.Timestamp timeout_at = 6; // 타임아웃 발생 시간
 }
 
 // ========================================

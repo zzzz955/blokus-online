@@ -10,6 +10,8 @@
 #include <memory>
 #include <chrono>
 #include <string>
+#include <thread>
+#include <atomic>
 
 namespace Blokus {
     namespace Server {
@@ -85,6 +87,14 @@ namespace Blokus {
             
             // 자동 턴 스킵 관련
             bool canCurrentPlayerMakeMove() const;
+            
+            // 턴 타이머 관리
+            void startTurnTimer();
+            void stopTurnTimer();
+            bool checkTurnTimeout();
+            void handleTurnTimeout();
+            int getRemainingTurnTime() const;
+            bool isTurnTimerActive() const;
 
             // 게임 로직 접근
             Common::GameLogic* getGameLogic() const { return m_gameLogic.get(); }
@@ -152,6 +162,14 @@ namespace Blokus {
             std::chrono::steady_clock::time_point m_createdTime;
             std::chrono::steady_clock::time_point m_gameStartTime;
             std::chrono::steady_clock::time_point m_lastActivity;
+            
+            // 턴 타이머 관리
+            std::chrono::steady_clock::time_point m_turnStartTime;
+            int m_turnTimeoutSeconds;  // 턴 제한 시간 (기본 30초)
+            std::atomic<bool> m_turnTimerActive;    // 타이머 활성화 상태
+            bool m_lastTurnTimedOut;   // 이전 턴이 시간 초과로 끝났는지
+            std::thread m_timeoutCheckThread; // 주기적 타임아웃 체크용 스레드
+            std::atomic<bool> m_stopTimeoutCheck; // 스레드 종료 플래그
 
             // 방 설정
             bool m_isPrivate;
@@ -181,6 +199,9 @@ namespace Blokus {
 
             // 정리 함수들
             void resetPlayerStates();
+            
+            // 타이머 관련 내부 메서드
+            void timeoutCheckLoop(); // 백그라운드 스레드에서 실행되는 타임아웃 체크 루프
         };
 
         // ========================================
