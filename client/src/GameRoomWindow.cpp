@@ -540,7 +540,7 @@ namespace Blokus {
     {
         m_timerPanel = new QWidget();
         m_timerPanel->setFixedHeight(40);
-        m_timerPanel->hide(); // 게임 시작 전에는 숨김
+        // 패널은 항상 표시, 내부 요소들만 조건부 표시
 
         QHBoxLayout* layout = new QHBoxLayout(m_timerPanel);
         layout->setContentsMargins(10, 5, 10, 5);
@@ -549,6 +549,7 @@ namespace Blokus {
         // 타이머 라벨
         m_timerLabel = new QLabel("턴 시간");
         m_timerLabel->setStyleSheet("font-size: 14px; font-weight: bold; color: #2c3e50;");
+        m_timerLabel->hide(); // 초기에는 숨김
 
         // 진행률 바
         m_timerProgressBar = new QProgressBar();
@@ -565,6 +566,7 @@ namespace Blokus {
             "background-color: #27ae60; border-radius: 8px;"
             "}"
         );
+        m_timerProgressBar->hide(); // 초기에는 숨김
 
         layout->addWidget(m_timerLabel);
         layout->addWidget(m_timerProgressBar, 1);
@@ -1052,9 +1054,10 @@ namespace Blokus {
         updateGameControlsState();
         updateRoomInfoDisplay();
         
-        // 타이머 패널 표시 (게임 시작 시)
-        if (m_timerPanel) {
-            m_timerPanel->show();
+        // 타이머 패널 내부 요소 표시 (게임 시작 시)
+        if (m_timerLabel && m_timerProgressBar) {
+            m_timerLabel->show();
+            m_timerProgressBar->show();
         }
 
         // 시스템 메시지는 서버에서 오는 SYSTEM: 메시지로만 표시 (중복 방지)
@@ -2434,9 +2437,10 @@ namespace Blokus {
         m_remainingTime = (remainingTime > 0) ? remainingTime : timeLimit;
         m_isTimerActive = true;
 
-        // 타이머 패널 표시
-        if (m_timerPanel) {
-            m_timerPanel->show();
+        // 타이머 패널 내부 요소 표시
+        if (m_timerLabel && m_timerProgressBar) {
+            m_timerLabel->show();
+            m_timerProgressBar->show();
         }
 
         // 카운트다운 타이머 시작
@@ -2455,9 +2459,10 @@ namespace Blokus {
         m_isTimerActive = false;
         m_countdownTimer->stop();
 
-        // 타이머 패널 숨김
-        if (m_timerPanel) {
-            m_timerPanel->hide();
+        // 타이머 패널 내부 요소 숨김
+        if (m_timerLabel && m_timerProgressBar) {
+            m_timerLabel->hide();
+            m_timerProgressBar->hide();
         }
 
         qDebug() << QString::fromUtf8("⏰ 턴 타이머 정지");
