@@ -379,6 +379,13 @@ namespace Blokus {
         , m_previousTurn(PlayerColor::None)
         , m_turnTimer(new QTimer(this))
         , m_readyButtonTimeout(new QTimer(this))
+        , m_timerPanel(nullptr)
+        , m_timerLabel(nullptr)
+        , m_timerProgressBar(nullptr)
+        , m_turnTimeLimit(30)
+        , m_remainingTime(0)
+        , m_isTimerActive(false)
+        , m_countdownTimer(new QTimer(this))
     {
         // 게임 매니저 생성
         m_gameManager = new GameStateManager();
@@ -392,6 +399,10 @@ namespace Blokus {
             }
             qDebug() << QString::fromUtf8("준비 상태 변경 타임아웃 - 버튼 재활성화");
         });
+        
+        // 턴 타이머 설정
+        m_countdownTimer->setInterval(1000); // 1초마다 업데이트
+        connect(m_countdownTimer, &QTimer::timeout, this, &GameRoomWindow::onCountdownTick);
 
         setupUI();
         // setupMenuBar();
@@ -453,6 +464,9 @@ namespace Blokus {
         // 상단 룸 정보
         setupRoomInfoPanel();
 
+        // 턴 타이머 패널
+        setupTimerPanel();
+
         // 플레이어 슬롯들 (4개 고정)
         setupPlayerSlotsPanel();
 
@@ -477,6 +491,7 @@ namespace Blokus {
 
         // 메인 레이아웃에 추가
         m_mainLayout->addWidget(m_roomInfoPanel);
+        m_mainLayout->addWidget(m_timerPanel);
         m_mainLayout->addWidget(m_playerSlotsPanel);
         m_mainLayout->addWidget(mainGameArea, 1);
         m_mainLayout->addWidget(m_controlsPanel);
@@ -519,6 +534,40 @@ namespace Blokus {
 
         // 시그널 연결
         connect(m_leaveRoomButton, &QPushButton::clicked, this, &GameRoomWindow::onLeaveRoomClicked);
+    }
+
+    void GameRoomWindow::setupTimerPanel()
+    {
+        m_timerPanel = new QWidget();
+        m_timerPanel->setFixedHeight(40);
+        m_timerPanel->hide(); // 게임 시작 전에는 숨김
+
+        QHBoxLayout* layout = new QHBoxLayout(m_timerPanel);
+        layout->setContentsMargins(10, 5, 10, 5);
+        layout->setSpacing(10);
+
+        // 타이머 라벨
+        m_timerLabel = new QLabel("턴 시간");
+        m_timerLabel->setStyleSheet("font-size: 14px; font-weight: bold; color: #2c3e50;");
+
+        // 진행률 바
+        m_timerProgressBar = new QProgressBar();
+        m_timerProgressBar->setFixedHeight(20);
+        m_timerProgressBar->setMinimum(0);
+        m_timerProgressBar->setMaximum(100);
+        m_timerProgressBar->setValue(100);
+        m_timerProgressBar->setTextVisible(false);
+        m_timerProgressBar->setStyleSheet(
+            "QProgressBar {"
+            "border: 2px solid #bdc3c7; border-radius: 10px; background-color: #ecf0f1;"
+            "}"
+            "QProgressBar::chunk {"
+            "background-color: #27ae60; border-radius: 8px;"
+            "}"
+        );
+
+        layout->addWidget(m_timerLabel);
+        layout->addWidget(m_timerProgressBar, 1);
     }
 
     void GameRoomWindow::setupPlayerSlotsPanel()
@@ -964,6 +1013,7 @@ namespace Blokus {
     void GameRoomWindow::startGame()
     {
         qDebug() << QString::fromUtf8("🎮 게임 시작 - 클래식 모드 초기화 중...");
+        qDebug() << QString::fromUtf8("⏰ [TIMER_DEBUG] 게임 시작: m_isGameStarted = true 설정");
 
         m_isGameStarted = true;
         m_gameManager->startNewGame();
@@ -1001,6 +1051,11 @@ namespace Blokus {
 
         updateGameControlsState();
         updateRoomInfoDisplay();
+        
+        // 타이머 패널 표시 (게임 시작 시)
+        if (m_timerPanel) {
+            m_timerPanel->show();
+        }
 
         // 시스템 메시지는 서버에서 오는 SYSTEM: 메시지로만 표시 (중복 방지)
 
@@ -1014,6 +1069,19 @@ namespace Blokus {
             .arg(Utils::playerColorToString(player))
             .arg(BlockFactory::getBlockName(blockType))
             .arg(row).arg(col).arg(rotation).arg(flip);
+            
+        // 블록 배치 성공 시 타이머 정지 (내 턴인 경우)
+        PlayerColor myPlayerColor = PlayerColor::None;
+        for (const auto& slot : m_roomInfo.playerSlots) {
+            if (slot.username == m_myUsername) {
+                myPlayerColor = slot.color;
+                break;
+            }
+        }
+        
+        if (player == myPlayerColor) {
+            stopTurnTimer();
+        }
 
         // 내 플레이어만 서버에 블록 배치 알림 (중복 방지)
         PlayerColor myColor = m_roomInfo.getMyColor(m_myUsername);
@@ -1167,6 +1235,9 @@ namespace Blokus {
     void GameRoomWindow::resetGameToWaitingState()
     {
         m_isGameStarted = false;
+        
+        // 타이머 정지 (게임 리셋 시)
+        stopTurnTimer();
 
         // 게임 매니저 리셋
         if (m_gameManager) {
@@ -1261,6 +1332,9 @@ namespace Blokus {
     void GameRoomWindow::endGame(const std::map<PlayerColor, int>& finalScores)
     {
         m_isGameStarted = false;
+        
+        // 게임 종료 시 타이머 정지
+        stopTurnTimer();
 
         showGameResults(finalScores);
         updateGameControlsState();
@@ -2299,15 +2373,29 @@ namespace Blokus {
         // 시스템 메시지는 서버에서 오는 SYSTEM: 메시지로만 표시 (중복 방지)
     }
 
-    void GameRoomWindow::onTurnChanged(const QString& newPlayerName, int playerColor, int turnNumber)
+    void GameRoomWindow::onTurnChanged(const QString& newPlayerName, int playerColor, int turnNumber, int turnTimeSeconds, int remainingTimeSeconds, bool previousTurnTimedOut)
     {
-        qDebug() << QString::fromUtf8("턴 변경 알림: %1님의 턴 (색상: %2, 턴: %3)")
-                    .arg(newPlayerName).arg(playerColor).arg(turnNumber);
+        qDebug() << QString::fromUtf8("⏰ [TIMER_DEBUG] onTurnChanged 호출: 플레이어=%1, 색상=%2, 턴=%3, 턴시간=%4초, 남은시간=%5초, 게임시작=%6")
+                    .arg(newPlayerName).arg(playerColor).arg(turnNumber).arg(turnTimeSeconds).arg(remainingTimeSeconds).arg(m_isGameStarted);
         
         // 게임 매니저의 현재 플레이어 업데이트
         if (m_gameManager) {
             PlayerColor newPlayer = static_cast<PlayerColor>(playerColor);
             m_gameManager->getGameLogic().setCurrentPlayer(newPlayer);
+        }
+        
+        // 이전 턴 타임아웃 알림
+        if (previousTurnTimedOut) {
+            addSystemMessage(QString::fromUtf8("이전 플레이어의 시간이 초과되어 턴이 넘어왔습니다."));
+        }
+        
+        // 턴 타이머 시작 (게임이 시작된 상태에서만)
+        if (m_isGameStarted) {
+            qDebug() << QString::fromUtf8("⏰ [TIMER_DEBUG] 타이머 시작 시도: turnTimeSeconds=%1, remainingTimeSeconds=%2")
+                        .arg(turnTimeSeconds).arg(remainingTimeSeconds);
+            startTurnTimer(turnTimeSeconds, remainingTimeSeconds);
+        } else {
+            qDebug() << QString::fromUtf8("⏰ [TIMER_DEBUG] 타이머 시작 스킵: 게임이 시작되지 않음");
         }
         
         // 턴 변경 알림 표시
@@ -2334,6 +2422,115 @@ namespace Blokus {
         
         // 시그널을 통해 AppController로 전달하여 NetworkClient를 통해 서버에 전송
         emit blockPlacementRequested(gameMessage);
+    }
+
+    // ========================================
+    // 턴 타이머 관리 메서드
+    // ========================================
+
+    void GameRoomWindow::startTurnTimer(int timeLimit, int remainingTime)
+    {
+        m_turnTimeLimit = timeLimit;
+        m_remainingTime = (remainingTime > 0) ? remainingTime : timeLimit;
+        m_isTimerActive = true;
+
+        // 타이머 패널 표시
+        if (m_timerPanel) {
+            m_timerPanel->show();
+        }
+
+        // 카운트다운 타이머 시작
+        if (m_countdownTimer) {
+            m_countdownTimer->start();
+        }
+
+        // 초기 디스플레이 업데이트
+        updateTimerDisplay(m_remainingTime);
+
+        qDebug() << QString::fromUtf8("⏰ 턴 타이머 시작: %1초").arg(m_remainingTime);
+    }
+
+    void GameRoomWindow::stopTurnTimer()
+    {
+        m_isTimerActive = false;
+        m_countdownTimer->stop();
+
+        // 타이머 패널 숨김
+        if (m_timerPanel) {
+            m_timerPanel->hide();
+        }
+
+        qDebug() << QString::fromUtf8("⏰ 턴 타이머 정지");
+    }
+
+    void GameRoomWindow::updateTimerDisplay(int remainingTime)
+    {
+        if (!m_timerLabel || !m_timerProgressBar) {
+            return;
+        }
+
+        // 텍스트 업데이트
+        m_timerLabel->setText(QString::fromUtf8("남은 시간: %1초").arg(remainingTime));
+
+        // 진행률 바 업데이트 (백분율)
+        int percentage = (m_turnTimeLimit > 0) ? (remainingTime * 100 / m_turnTimeLimit) : 0;
+        m_timerProgressBar->setValue(percentage);
+
+        // 색상 변경 (시간에 따라)
+        QString progressStyle;
+        if (remainingTime <= 5) {
+            // 5초 이하: 빨간색 (위험)
+            progressStyle = "QProgressBar::chunk { background-color: #e74c3c; border-radius: 8px; }";
+        } else if (remainingTime <= 10) {
+            // 10초 이하: 주황색 (경고)
+            progressStyle = "QProgressBar::chunk { background-color: #f39c12; border-radius: 8px; }";
+        } else if (remainingTime <= 15) {
+            // 15초 이하: 노란색 (주의)
+            progressStyle = "QProgressBar::chunk { background-color: #f1c40f; border-radius: 8px; }";
+        } else {
+            // 그 외: 초록색 (안전)
+            progressStyle = "QProgressBar::chunk { background-color: #27ae60; border-radius: 8px; }";
+        }
+
+        m_timerProgressBar->setStyleSheet(
+            "QProgressBar {"
+            "border: 2px solid #bdc3c7; border-radius: 10px; background-color: #ecf0f1;"
+            "}" + progressStyle
+        );
+    }
+
+    void GameRoomWindow::showTimeoutNotification(const QString& playerName)
+    {
+        addSystemMessage(QString::fromUtf8("%1님의 시간이 초과되어 턴이 넘어갑니다.").arg(playerName));
+    }
+
+    void GameRoomWindow::onCountdownTick()
+    {
+        if (!m_isTimerActive) {
+            return;
+        }
+
+        m_remainingTime--;
+
+        if (m_remainingTime <= 0) {
+            // 시간 초과
+            qDebug() << QString::fromUtf8("⏰ 시간 초과 감지, 타임아웃 처리");
+            onTimerTimeout();
+        } else {
+            // 디스플레이 업데이트
+            updateTimerDisplay(m_remainingTime);
+        }
+    }
+
+    void GameRoomWindow::onTimerTimeout()
+    {
+        // 타이머 정지
+        stopTurnTimer();
+
+        // 시간 초과 메시지
+        addSystemMessage(QString::fromUtf8("시간 초과! 턴이 자동으로 넘어갑니다."));
+
+        qDebug() << QString::fromUtf8("⏰ 턴 타임아웃 발생");
     }
 
 } // namespace Blokus

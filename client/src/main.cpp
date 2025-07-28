@@ -1267,6 +1267,7 @@ private:
                     m_gameRoomWindow, &Blokus::GameRoomWindow::onBlockPlaced);
             connect(m_networkClient, &Blokus::NetworkClient::turnChanged,
                     m_gameRoomWindow, &Blokus::GameRoomWindow::onTurnChanged);
+            qDebug() << QString::fromUtf8("⏰ [TIMER_DEBUG] turnChanged 시그널 연결 완료");
 
             // 게임룸 채팅은 이미 전역적으로 연결되어 있음 (중복 연결 제거)
 

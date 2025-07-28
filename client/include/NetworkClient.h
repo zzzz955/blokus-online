@@ -139,7 +139,8 @@ namespace Blokus {
         // 게임 상태 동기화 시그널
         void gameStateUpdated(const QString& gameStateJson);
         void blockPlaced(const QString& playerName, int blockType, int row, int col, int rotation, int flip, int playerColor, int scoreGained);
-        void turnChanged(const QString& newPlayerName, int playerColor, int turnNumber);
+        void turnChanged(const QString& newPlayerName, int playerColor, int turnNumber, int turnTimeSeconds, int remainingTimeSeconds, bool previousTurnTimedOut);
+        void turnTimeoutOccurred(const QString& timedOutPlayerName, int playerColor);
         
         // 채팅 시그널
         void chatMessageReceived(const QString& username, const QString& message);

@@ -466,7 +466,8 @@ namespace Blokus {
         }
         else if (message.startsWith("GAME_STATE_UPDATE:") || 
                  message.startsWith("BLOCK_PLACED:") || 
-                 message.startsWith("TURN_CHANGED:")) {
+                 message.startsWith("TURN_CHANGED:") ||
+                 message.startsWith("TURN_TIMEOUT:")) {
             processGameStateMessage(message);
         }
         else if (message == "pong") {
@@ -702,22 +703,53 @@ namespace Blokus {
         else if (message.startsWith("TURN_CHANGED:")) {
             QString jsonData = message.mid(13); // "TURN_CHANGED:" 제거
             
-            // JSON 파싱
+            qDebug() << QString::fromUtf8("⏰ [TIMER_DEBUG] TURN_CHANGED 메시지 수신: %1").arg(message);
+            
+            // JSON 파싱 (타이머 정보 포함)
             QRegExp playerRegex("\"newPlayer\":\"([^\"]+)\"");
             QRegExp colorRegex("\"playerColor\":(\\d+)");
             QRegExp turnRegex("\"turnNumber\":(\\d+)");
+            QRegExp turnTimeRegex("\"turnTimeSeconds\":(\\d+)");
+            QRegExp remainingTimeRegex("\"remainingTimeSeconds\":(\\d+)");
+            QRegExp timeoutRegex("\"previousTurnTimedOut\":(true|false)");
             
             QString newPlayerName;
             int playerColor = 0, turnNumber = 0;
+            int turnTimeSeconds = 30, remainingTimeSeconds = 30; // 기본값 30초
+            bool previousTurnTimedOut = false;
             
             if (playerRegex.indexIn(jsonData) != -1) newPlayerName = playerRegex.cap(1);
             if (colorRegex.indexIn(jsonData) != -1) playerColor = colorRegex.cap(1).toInt();
             if (turnRegex.indexIn(jsonData) != -1) turnNumber = turnRegex.cap(1).toInt();
+            if (turnTimeRegex.indexIn(jsonData) != -1) turnTimeSeconds = turnTimeRegex.cap(1).toInt();
+            if (remainingTimeRegex.indexIn(jsonData) != -1) remainingTimeSeconds = remainingTimeRegex.cap(1).toInt();
+            if (timeoutRegex.indexIn(jsonData) != -1) previousTurnTimedOut = (timeoutRegex.cap(1) == "true");
             
-            emit turnChanged(newPlayerName, playerColor, turnNumber);
+            qDebug() << QString::fromUtf8("⏰ [TIMER_DEBUG] 파싱 결과: 플레이어=%1, 턴시간=%2초, 남은시간=%3초")
+                        .arg(newPlayerName).arg(turnTimeSeconds).arg(remainingTimeSeconds);
+            
+            emit turnChanged(newPlayerName, playerColor, turnNumber, turnTimeSeconds, remainingTimeSeconds, previousTurnTimedOut);
             
             qDebug() << QString::fromUtf8("턴 변경 알림: %1님의 턴 (턴 %2)")
                         .arg(newPlayerName).arg(turnNumber);
+        }
+        else if (message.startsWith("TURN_TIMEOUT:")) {
+            QString jsonData = message.mid(13); // "TURN_TIMEOUT:" 제거
+            
+            // JSON 파싱
+            QRegExp playerRegex("\"timedOutPlayer\":\"([^\"]+)\"");
+            QRegExp colorRegex("\"playerColor\":(\\d+)");
+            
+            QString timedOutPlayerName;
+            int playerColor = 0;
+            
+            if (playerRegex.indexIn(jsonData) != -1) timedOutPlayerName = playerRegex.cap(1);
+            if (colorRegex.indexIn(jsonData) != -1) playerColor = colorRegex.cap(1).toInt();
+            
+            emit turnTimeoutOccurred(timedOutPlayerName, playerColor);
+            
+            qDebug() << QString::fromUtf8("턴 타임아웃 알림: %1님 시간 초과")
+                        .arg(timedOutPlayerName);
         }
     }
 
