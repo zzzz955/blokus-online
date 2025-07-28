@@ -951,7 +951,7 @@ namespace Blokus {
                 << "\"previousTurnTimedOut\":" << (m_lastTurnTimedOut ? "true" : "false")
                 << "}";
             
-            spdlog::info("⏰ [TIMER_DEBUG] TURN_CHANGED 메시지 생성: {}", turnChangeMsg.str());
+            spdlog::debug("⏰ [TIMER_DEBUG] TURN_CHANGED 메시지 생성: {}", turnChangeMsg.str());
             
             broadcastMessageLocked(turnChangeMsg.str());
             
@@ -1286,15 +1286,7 @@ namespace Blokus {
                 if (newPlayerName.empty()) {
                     spdlog::warn("⚠️ 턴 변경 실패: 플레이어 색상 {}에 해당하는 플레이어를 찾을 수 없음", static_cast<int>(newPlayer));
                 } else {
-                    // 턴 변경 알림 메시지
-                    std::ostringstream turnChangeMsg;
-                    turnChangeMsg << "TURN_CHANGED:{"
-                        << "\"newPlayer\":\"" << newPlayerName << "\","
-                        << "\"playerColor\":" << static_cast<int>(newPlayer) << ","
-                        << "\"turnNumber\":" << m_gameStateManager->getTurnNumber()
-                        << "}";
-                    
-                    broadcastMessageLocked(turnChangeMsg.str());
+                    broadcastTurnChangeLocked(newPlayer);
                     
                     // 시스템 메시지
                     std::ostringstream turnSystemMsg;
@@ -1311,10 +1303,14 @@ namespace Blokus {
 
             // 게임 종료 조건 확인: 모든 플레이어가 더 이상 블록을 배치할 수 없는 경우
             bool gameFinished = m_gameLogic->isGameFinished();
-            spdlog::debug("🔍 게임 종료 조건 확인: {} (방 {})", gameFinished ? "종료" : "계속", m_roomId);
+            spdlog::info("🔍 [DB_DEBUG] 게임 종료 조건 확인: {} (방 {})", gameFinished ? "종료" : "계속", m_roomId);
+            
+            if (!gameFinished) {
+                spdlog::debug("⏩ [DB_DEBUG] 게임 계속 진행 - DB 저장 없음 (방 {})", m_roomId);
+            }
             
             if (gameFinished) {
-                spdlog::debug("🏁 게임 종료 조건 충족: 모든 플레이어가 블록 배치 불가 (방 {})", m_roomId);
+                spdlog::info("🏁 게임 종료 조건 충족: 모든 플레이어가 블록 배치 불가 (방 {})", m_roomId);
                 
                 // 최종 점수 계산
                 auto finalScores = m_gameLogic->calculateScores();
@@ -1344,7 +1340,10 @@ namespace Blokus {
                 broadcastGameResultLocked(finalScores, winners);
                 
                 // 게임 결과를 DB에 저장
+                spdlog::info("💾 [DB_DEBUG] 게임 결과 DB 저장 시작 - 방 {}, 플레이어 {}명, 승자 {}명", 
+                           m_roomId, finalScores.size(), winners.size());
                 saveGameResultsToDatabase(finalScores, winners);
+                spdlog::info("💾 [DB_DEBUG] 게임 결과 DB 저장 호출 완료 - 방 {}", m_roomId);
                 
                 // 게임 종료 처리는 플레이어 응답 후에 수행하므로 여기서는 하지 않음
             } else if (m_gameStateManager->getGameState() == Common::GameState::Finished) {
@@ -1568,7 +1567,7 @@ namespace Blokus {
                     // DB에 게임 결과 저장 (모든 플레이어)
                     bool success = dbManager->saveGameResults(playerIds, scores, isWinner);
                     if (success) {
-                        spdlog::debug("✅ 방 {} 게임 결과가 DB에 성공적으로 저장되었습니다", m_roomId);
+                        spdlog::info("✅ [DB_DEBUG] 방 {} 게임 결과가 DB에 성공적으로 저장되었습니다", m_roomId);
                         
                         // 게임 완료자에게만 경험치 지급
                         if (!completedPlayerIds.empty()) {
@@ -1614,14 +1613,14 @@ namespace Blokus {
                             spdlog::warn("⚠️ 게임 완료자가 없어 경험치 지급 없음 (방 {})", m_roomId);
                         }
                     } else {
-                        spdlog::error("❌ 방 {} 게임 결과 DB 저장 실패", m_roomId);
+                        spdlog::error("❌ [DB_DEBUG] 방 {} 게임 결과 DB 저장 실패", m_roomId);
                     }
                 } else {
-                    spdlog::warn("⚠️ 저장할 플레이어 데이터가 없습니다 (방 {})", m_roomId);
+                    spdlog::warn("⚠️ [DB_DEBUG] 저장할 플레이어 데이터가 없습니다 (방 {})", m_roomId);
                 }
                 
             } catch (const std::exception& e) {
-                spdlog::error("❌ 게임 결과 DB 저장 중 예외 발생 (방 {}): {}", m_roomId, e.what());
+                spdlog::error("❌ [DB_DEBUG] 게임 결과 DB 저장 중 예외 발생 (방 {}): {}", m_roomId, e.what());
             }
         }
 
@@ -1639,7 +1638,7 @@ namespace Blokus {
             m_turnTimerActive.store(true);
             m_lastTurnTimedOut = false;  // 새 턴이므로 타임아웃 플래그 리셋
             
-            spdlog::info("⏰ [TIMER_DEBUG] 턴 타이머 시작: 방 {}, 제한시간 {}초, 현재 플레이어: {}", 
+            spdlog::debug("⏰ [TIMER_DEBUG] 턴 타이머 시작: 방 {}, 제한시간 {}초, 현재 플레이어: {}", 
                 m_roomId, m_turnTimeoutSeconds, static_cast<int>(m_gameStateManager->getCurrentPlayer()));
         }
 

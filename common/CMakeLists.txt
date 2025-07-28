@@ -25,6 +25,7 @@ target_include_directories(BlokusCommon PUBLIC
 # 라이브러리 링크
 target_link_libraries(BlokusCommon PUBLIC
     BlokusProto
+    spdlog::spdlog
 )
 
 # C++ 표준 설정

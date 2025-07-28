@@ -62,7 +62,6 @@ target_link_libraries(BlokusClient PRIVATE
     Qt5::Gui
     Qt5::Svg
     Qt5::Network
-    spdlog::spdlog
     nlohmann_json::nlohmann_json
 )
 
