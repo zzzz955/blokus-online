@@ -61,9 +61,9 @@ target_link_libraries(BlokusServer PRIVATE
     BlokusCommon
     BlokusProto
     Boost::system
-    libpqxx::pqxx
     OpenSSL::SSL
     OpenSSL::Crypto
+    libpqxx::pqxx
 )
 
 # Windows ����
