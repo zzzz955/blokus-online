@@ -382,7 +382,7 @@ namespace Blokus {
         , m_timerPanel(nullptr)
         , m_timerLabel(nullptr)
         , m_timerProgressBar(nullptr)
-        , m_turnTimeLimit(30)
+        , m_turnTimeLimit(Common::DEFAULT_TURN_TIME)
         , m_remainingTime(0)
         , m_isTimerActive(false)
         , m_countdownTimer(new QTimer(this))
@@ -540,7 +540,7 @@ namespace Blokus {
     {
         m_timerPanel = new QWidget();
         m_timerPanel->setFixedHeight(40);
-        m_timerPanel->hide(); // 게임 시작 전에는 숨김
+        // 패널은 항상 표시, 내부 요소들만 조건부 표시
 
         QHBoxLayout* layout = new QHBoxLayout(m_timerPanel);
         layout->setContentsMargins(10, 5, 10, 5);
@@ -549,6 +549,7 @@ namespace Blokus {
         // 타이머 라벨
         m_timerLabel = new QLabel("턴 시간");
         m_timerLabel->setStyleSheet("font-size: 14px; font-weight: bold; color: #2c3e50;");
+        m_timerLabel->hide(); // 초기에는 숨김
 
         // 진행률 바
         m_timerProgressBar = new QProgressBar();
@@ -565,6 +566,7 @@ namespace Blokus {
             "background-color: #27ae60; border-radius: 8px;"
             "}"
         );
+        m_timerProgressBar->hide(); // 초기에는 숨김
 
         layout->addWidget(m_timerLabel);
         layout->addWidget(m_timerProgressBar, 1);
@@ -619,6 +621,7 @@ namespace Blokus {
         connect(m_gameBoard, &GameBoard::cellClicked, this, &GameRoomWindow::onCellClicked);
         connect(m_gameBoard, &GameBoard::cellHovered, this, &GameRoomWindow::onCellHovered);
         connect(m_gameBoard, &GameBoard::blockPlacedSuccessfully, this, &GameRoomWindow::onBlockPlacedSuccessfully);
+        connect(m_gameBoard, &GameBoard::afkUnblockRequested, this, &GameRoomWindow::onAfkUnblockRequested);
         connect(m_myBlockPalette, &MyBlockPalette::blockSelected, this, &GameRoomWindow::onBlockSelected);
     }
 
@@ -1052,9 +1055,10 @@ namespace Blokus {
         updateGameControlsState();
         updateRoomInfoDisplay();
         
-        // 타이머 패널 표시 (게임 시작 시)
-        if (m_timerPanel) {
-            m_timerPanel->show();
+        // 타이머 패널 내부 요소 표시 (게임 시작 시)
+        if (m_timerLabel && m_timerProgressBar) {
+            m_timerLabel->show();
+            m_timerProgressBar->show();
         }
 
         // 시스템 메시지는 서버에서 오는 SYSTEM: 메시지로만 표시 (중복 방지)
@@ -2434,9 +2438,10 @@ namespace Blokus {
         m_remainingTime = (remainingTime > 0) ? remainingTime : timeLimit;
         m_isTimerActive = true;
 
-        // 타이머 패널 표시
-        if (m_timerPanel) {
-            m_timerPanel->show();
+        // 타이머 패널 내부 요소 표시
+        if (m_timerLabel && m_timerProgressBar) {
+            m_timerLabel->show();
+            m_timerProgressBar->show();
         }
 
         // 카운트다운 타이머 시작
@@ -2455,9 +2460,10 @@ namespace Blokus {
         m_isTimerActive = false;
         m_countdownTimer->stop();
 
-        // 타이머 패널 숨김
-        if (m_timerPanel) {
-            m_timerPanel->hide();
+        // 타이머 패널 내부 요소 숨김
+        if (m_timerLabel && m_timerProgressBar) {
+            m_timerLabel->hide();
+            m_timerProgressBar->hide();
         }
 
         qDebug() << QString::fromUtf8("⏰ 턴 타이머 정지");
@@ -2531,6 +2537,29 @@ namespace Blokus {
         addSystemMessage(QString::fromUtf8("시간 초과! 턴이 자동으로 넘어갑니다."));
 
         qDebug() << QString::fromUtf8("⏰ 턴 타임아웃 발생");
+    }
+
+    // ========================================
+    // AFK 관련 메서드
+    // ========================================
+
+    void GameRoomWindow::onAfkModeActivated(const QString& jsonData)
+    {
+        qDebug() << QString::fromUtf8("🚨 AFK 모드 활성화 알림 수신: %1").arg(jsonData);
+        
+        // GameBoard에 AFK 알림 표시 요청
+        if (m_gameBoard) {
+            m_gameBoard->showAfkNotification(jsonData);
+        }
+    }
+
+    void GameRoomWindow::onAfkUnblockRequested()
+    {
+        qDebug() << QString::fromUtf8("🔓 AFK 해제 요청 신호 수신");
+        
+        // NetworkClient에 AFK 해제 메시지 전송 요청
+        // 이는 main.cpp에서 처리될 예정 (GameBoard -> GameRoomWindow -> main -> NetworkClient)
+        emit afkUnblockRequested();
     }
 
 } // namespace Blokus

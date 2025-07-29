@@ -1,13 +1,13 @@
 cmake_minimum_required(VERSION 3.24)
 
-# MSVC ¼³Á¤
+# MSVC ï¿½ï¿½ï¿½ï¿½
 if(MSVC)
     add_compile_options(/utf-8)
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS UNICODE _UNICODE)
     add_compile_definitions(SPDLOG_WCHAR_TO_UTF8_SUPPORT)
 endif()
 
-# ¼­¹ö ¼Ò½º ÆÄÀÏµé
+# ï¿½ï¿½ï¿½ï¿½ ï¿½Ò½ï¿½ ï¿½ï¿½ï¿½Ïµï¿½
 set(SERVER_SOURCES
     main.cpp
     src/ConfigManager.cpp
@@ -22,7 +22,7 @@ set(SERVER_SOURCES
     src/PlayerInfo.cpp
 )
 
-# ÇÙ½É Çì´õ ÆÄÀÏµé
+# ï¿½Ù½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ïµï¿½
 set(SERVER_HEADERS
     include/ServerTypes.h
     include/GameServer.h
@@ -37,50 +37,48 @@ set(SERVER_HEADERS
     include/PlayerInfo.h
 )
 
-# ½ÇÇà ÆÄÀÏ »ý¼º
+# ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 add_executable(BlokusServer 
     ${SERVER_SOURCES} 
     ${SERVER_HEADERS}
 )
 
-# C++ Ç¥ÁØ ¼³Á¤ (È£È¯¼ºÀ» À§ÇØ 17·Î º¯°æ)
+# C++ Ç¥ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (È£È¯ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ 17ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
 set_property(TARGET BlokusServer PROPERTY CXX_STANDARD 17)
 set_property(TARGET BlokusServer PROPERTY CXX_STANDARD_REQUIRED ON)
 
-# ÀÎÅ¬·çµå µð·ºÅä¸®
+# ï¿½ï¿½Å¬ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ä¸®
 target_include_directories(BlokusServer PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-# PostgreSQL ¹× ±âÅ¸ ¶óÀÌºê·¯¸® Ã£±â
+# PostgreSQL ï¿½ï¿½ ï¿½ï¿½Å¸ ï¿½ï¿½ï¿½Ìºê·¯ï¿½ï¿½ Ã£ï¿½ï¿½
 find_package(libpqxx CONFIG REQUIRED)
 find_package(OpenSSL REQUIRED)
 
-# ¶óÀÌºê·¯¸® ¸µÅ©
+# ï¿½ï¿½ï¿½Ìºê·¯ï¿½ï¿½ ï¿½ï¿½Å©
 target_link_libraries(BlokusServer PRIVATE
     BlokusCommon
     BlokusProto
-    spdlog::spdlog
-    nlohmann_json::nlohmann_json
     Boost::system
     libpqxx::pqxx
     OpenSSL::SSL
     OpenSSL::Crypto
 )
 
-# Windows ¼³Á¤
+# Windows ï¿½ï¿½ï¿½ï¿½
 if(WIN32)
     set_target_properties(BlokusServer PROPERTIES
-        WIN32_EXECUTABLE FALSE  # ÄÜ¼Ö ¾ÖÇÃ¸®ÄÉÀÌ¼Ç
+        WIN32_EXECUTABLE FALSE  # ï¿½Ü¼ï¿½ ï¿½ï¿½ï¿½Ã¸ï¿½ï¿½ï¿½ï¿½Ì¼ï¿½
     )
 endif()
 
-# ÄÄÆÄÀÏ·¯ ÇÃ·¡±×
+# ï¿½ï¿½ï¿½ï¿½ï¿½Ï·ï¿½ ï¿½Ã·ï¿½ï¿½ï¿½
 if(MSVC)
     target_compile_options(BlokusServer PRIVATE 
         /W4 
         /permissive-
-        /Zc:preprocessor  # ÀüÃ³¸®±â È£È¯¼º
+        /Zc:preprocessor  # ï¿½ï¿½Ã³ï¿½ï¿½ï¿½ï¿½ È£È¯ï¿½ï¿½
         /D_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING
     )
     target_compile_definitions(BlokusServer PRIVATE
@@ -90,6 +88,6 @@ if(MSVC)
     )
 endif()
 
-# ¼Ò½º ±×·ì
+# ï¿½Ò½ï¿½ ï¿½×·ï¿½
 source_group("Server\\Headers" FILES ${SERVER_HEADERS})
 source_group("Server\\Sources" FILES ${SERVER_SOURCES})

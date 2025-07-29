@@ -81,6 +81,9 @@ namespace Blokus::Server
         // 기본 기능
         handlers_[MessageType::Chat] = [this](const auto &params)
         { handleChat(params); };
+        
+        // AFK 검증 메시지 처리 (임시로 Chat 타입 재활용)
+        // 실제 메시지는 "AFK_VERIFY" 형태로 전송
 
         // Protobuf 핸들러 등록
         setupProtobufHandlers();
@@ -128,6 +131,16 @@ namespace Blokus::Server
                     spdlog::error("Protobuf 메시지 파싱 실패");
                     sendError("Protobuf 메시지 형식 오류");
                 }
+                return;
+            }
+
+            // AFK 관련 메시지 특별 처리
+            if (rawMessage == "AFK_VERIFY") {
+                handleAfkVerify();
+                return;
+            }
+            if (rawMessage == "AFK_UNBLOCK") {
+                handleAfkUnblock();
                 return;
             }
 
@@ -1880,6 +1893,143 @@ namespace Blokus::Server
         {
             spdlog::error("사용자 정보 요청 처리 중 오류: {}", e.what());
             sendError("사용자 정보 조회 중 오류가 발생했습니다");
+        }
+    }
+
+    // AFK 검증 처리
+    void MessageHandler::handleAfkVerify()
+    {
+        try
+        {
+            spdlog::debug("🔍 AFK 검증 요청: 세션 {}", session_->getSessionId());
+
+            // 세션 상태 검증
+            if (!session_ || !session_->isActive())
+            {
+                sendError("세션이 유효하지 않습니다");
+                return;
+            }
+
+            // 게임 중인지 확인
+            if (!session_->isInGame())
+            {
+                sendError("게임 중이 아닙니다");
+                return;
+            }
+
+            // 방 정보 확인
+            int roomId = session_->getCurrentRoomId();
+            if (roomId <= 0 || !roomManager_)
+            {
+                sendError("방 정보를 찾을 수 없습니다");
+                return;
+            }
+
+            auto room = roomManager_->getRoom(roomId);
+            if (!room)
+            {
+                sendError("방을 찾을 수 없습니다");
+                return;
+            }
+
+            std::string userId = session_->getUserId();
+            std::string username = session_->getUsername();
+
+            // 현재 플레이어 턴인지 확인
+            if (!room->isPlayerTurn(userId))
+            {
+                sendError("현재 당신의 턴이 아닙니다");
+                return;
+            }
+
+            // AFK 검증 가능한지 확인 (차단된 상태인지, 검증 횟수 제한 등)
+            if (!room->canPlayerVerifyAfk(userId))
+            {
+                sendError("AFK 검증을 할 수 없습니다 (검증 횟수 초과 또는 차단되지 않음)");
+                return;
+            }
+
+            // AFK 상태 검증 및 리셋
+            bool success = room->verifyPlayerAfkStatus(userId);
+            
+            if (success)
+            {
+                sendResponse("AFK_VERIFY_SUCCESS");
+                spdlog::info("✅ AFK 검증 성공: {} ({})", username, userId);
+                
+                // 방 내 다른 플레이어들에게 AFK 해제 알림
+                room->broadcastMessage("AFK_STATUS_RESET:" + username, userId);
+            }
+            else
+            {
+                sendError("AFK 검증에 실패했습니다");
+                spdlog::warn("❌ AFK 검증 실패: {} ({})", username, userId);
+            }
+        }
+        catch (const std::exception& e)
+        {
+            spdlog::error("AFK 검증 처리 중 오류: {}", e.what());
+            sendError("AFK 검증 중 오류가 발생했습니다");
+        }
+    }
+
+    // AFK 모드 해제 처리 (모달에서 호출)
+    void MessageHandler::handleAfkUnblock()
+    {
+        try
+        {
+            spdlog::debug("🔓 AFK 모드 해제 요청: 세션 {}", session_->getSessionId());
+
+            // 세션 상태 검증
+            if (!session_ || !session_->isActive())
+            {
+                sendError("세션이 유효하지 않습니다");
+                return;
+            }
+
+            // 게임 중인지 확인
+            if (!session_->isInGame())
+            {
+                sendError("게임 중이 아닙니다");
+                return;
+            }
+
+            // 방 정보 확인
+            int roomId = session_->getCurrentRoomId();
+            if (roomId <= 0 || !roomManager_)
+            {
+                sendError("방 정보를 찾을 수 없습니다");
+                return;
+            }
+
+            auto room = roomManager_->getRoom(roomId);
+            if (!room)
+            {
+                sendError("방을 찾을 수 없습니다");
+                return;
+            }
+
+            std::string userId = session_->getUserId();
+            std::string username = session_->getUsername();
+
+            // AFK 상태 해제 (모달 전용 메서드 사용)
+            bool success = room->unblockPlayerAfkStatus(userId);
+            
+            if (success)
+            {
+                sendResponse("AFK_UNBLOCK_SUCCESS");
+                spdlog::info("🔓 AFK 모드 해제 성공: {} ({})", username, userId);
+            }
+            else
+            {
+                sendError("AFK 모드 해제에 실패했습니다");
+                spdlog::warn("❌ AFK 모드 해제 실패: {} ({})", username, userId);
+            }
+        }
+        catch (const std::exception& e)
+        {
+            spdlog::error("AFK 모드 해제 처리 중 오류: {}", e.what());
+            sendError("AFK 모드 해제 중 오류가 발생했습니다");
         }
     }
 

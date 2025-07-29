@@ -2,6 +2,7 @@
 #include "ClientLogic.h"
 #include "QtAdapter.h"
 #include "ResponsiveUI.h"
+#include "AfkNotificationDialog.h"
 
 #include <QGraphicsRectItem>
 #include <QGraphicsTextItem>
@@ -10,6 +11,9 @@
 #include <QKeyEvent>
 #include <QScreen>
 #include <QGuiApplication>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonParseError>
 #include <cmath>
 #include <random>
 
@@ -29,7 +33,8 @@ namespace Blokus {
         , m_testBlockIndex(0)
         , m_gameLogic(nullptr)
         , m_hasSelectedBlock(false)
-        , m_blockSelected(false)
+        , m_blockSelected(false) 
+        , m_afkDialog(nullptr)
     {
         // 🔥 동적으로 2D 벡터 초기화
         m_board.resize(BOARD_SIZE);
@@ -56,6 +61,12 @@ namespace Blokus {
 
     GameBoard::~GameBoard()
     {
+        // AFK 대화상자 정리
+        if (m_afkDialog) {
+            m_afkDialog->deleteLater();
+            m_afkDialog = nullptr;
+        }
+        
         clearBoard();
     }
 
@@ -1089,6 +1100,80 @@ namespace Blokus {
             default:
                 return ModernPastelTheme::getBackgroundSecondary();
         }
+    }
+
+    // ========================================
+    // AFK 알림 처리
+    // ========================================
+    
+    void GameBoard::showAfkNotification(const QString& jsonData)
+    {
+        // JSON 파싱
+        QJsonParseError parseError;
+        QJsonDocument doc = QJsonDocument::fromJson(jsonData.toUtf8(), &parseError);
+        
+        if (parseError.error != QJsonParseError::NoError) {
+            qDebug() << "AFK 알림 JSON 파싱 오류:" << parseError.errorString();
+            // 기본값으로 폴백
+            showAfkNotification(3, 3);
+            return;
+        }
+        
+        QJsonObject jsonObj = doc.object();
+        
+        // 기존 대화상자가 있으면 닫기
+        if (m_afkDialog) {
+            m_afkDialog->deleteLater();
+            m_afkDialog = nullptr;
+        }
+        
+        // 새 AFK 알림 대화상자 생성
+        m_afkDialog = new Blokus::AfkNotificationDialog(this);
+        m_afkDialog->setAfkInfo(jsonObj);
+        
+        // 시그널 연결
+        connect(m_afkDialog, &Blokus::AfkNotificationDialog::afkUnblockRequested, 
+                this, &GameBoard::afkUnblockRequested);
+        
+        // 모달 대화상자 표시
+        int result = m_afkDialog->exec();
+        
+        // 대화상자 정리
+        if (m_afkDialog) {
+            m_afkDialog->deleteLater();
+            m_afkDialog = nullptr;
+        }
+        
+        // 결과에 따른 처리는 부모 컴포넌트에서 시그널을 통해 처리
+        qDebug() << "AFK 알림 대화상자 결과:" << result;
+    }
+    
+    void GameBoard::showAfkNotification(int timeoutCount, int maxCount)
+    {
+        // 기존 대화상자가 있으면 닫기
+        if (m_afkDialog) {
+            m_afkDialog->deleteLater();
+            m_afkDialog = nullptr;
+        }
+        
+        // 새 AFK 알림 대화상자 생성
+        m_afkDialog = new Blokus::AfkNotificationDialog(this);
+        m_afkDialog->setAfkInfo(timeoutCount, maxCount);
+        
+        // 시그널 연결
+        connect(m_afkDialog, &Blokus::AfkNotificationDialog::afkUnblockRequested, 
+                this, &GameBoard::afkUnblockRequested);
+        
+        // 모달 대화상자 표시
+        int result = m_afkDialog->exec();
+        
+        // 대화상자 정리
+        if (m_afkDialog) {
+            m_afkDialog->deleteLater();
+            m_afkDialog = nullptr;
+        }
+        
+        qDebug() << "AFK 알림 대화상자 결과:" << result;
     }
 
 } // namespace Blokus

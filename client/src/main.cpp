@@ -1269,6 +1269,13 @@ private:
                     m_gameRoomWindow, &Blokus::GameRoomWindow::onTurnChanged);
             qDebug() << QString::fromUtf8("⏰ [TIMER_DEBUG] turnChanged 시그널 연결 완료");
 
+            // AFK 관련 시그널 연결
+            connect(m_networkClient, &Blokus::NetworkClient::afkModeActivated,
+                    m_gameRoomWindow, &Blokus::GameRoomWindow::onAfkModeActivated);
+            connect(m_gameRoomWindow, &Blokus::GameRoomWindow::afkUnblockRequested,
+                    m_networkClient, &Blokus::NetworkClient::sendAfkUnblock);
+            qDebug() << QString::fromUtf8("🚨 AFK 관련 시그널 연결 완료");
+
             // 게임룸 채팅은 이미 전역적으로 연결되어 있음 (중복 연결 제거)
 
             m_gameRoomWindow->show();

@@ -2,6 +2,7 @@
 #include "Block.h"  // Block Ŭ���� ���
 #include "Utils.h"
 #include <algorithm>
+#include <spdlog/spdlog.h>
 
 namespace Blokus {
     namespace Common {
@@ -200,6 +201,7 @@ namespace Blokus {
             // 영구 차단된 플레이어인지 먼저 확인
             auto permanentIt = m_playerBlockedPermanently.find(player);
             if (permanentIt != m_playerBlockedPermanently.end() && permanentIt->second) {
+                spdlog::debug("🚫 [BLOCK_DEBUG] 플레이어 {} 영구 차단 상태로 배치 불가", static_cast<int>(player));
                 return false; // 이미 영구적으로 블록을 배치할 수 없는 상태
             }
 
@@ -285,7 +287,10 @@ namespace Blokus {
             
             // 블록을 배치할 수 없으면 영구 차단 상태로 설정
             if (!result) {
+                spdlog::debug("🔒 [BLOCK_DEBUG] 플레이어 {} 영구 차단 상태로 설정", static_cast<int>(player));
                 m_playerBlockedPermanently[player] = true;
+            } else {
+                spdlog::debug("✅ [BLOCK_DEBUG] 플레이어 {} 블록 배치 가능", static_cast<int>(player));
             }
 
             return result;
@@ -299,13 +304,31 @@ namespace Blokus {
                 PlayerColor::Red, PlayerColor::Green
             };
 
+            std::string playerStatus = "";
+            bool anyCanPlace = false;
+            
             for (PlayerColor player : players) {
-                if (canPlayerPlaceAnyBlock(player)) {
-                    return false;
+                bool canPlace = canPlayerPlaceAnyBlock(player);
+                if (canPlace) {
+                    anyCanPlace = true;
                 }
+                
+                std::string playerName = "Unknown";
+                switch(player) {
+                    case PlayerColor::Blue: playerName = "Blue"; break;
+                    case PlayerColor::Yellow: playerName = "Yellow"; break;
+                    case PlayerColor::Red: playerName = "Red"; break;
+                    case PlayerColor::Green: playerName = "Green"; break;
+                    default: break;
+                }
+                
+                if (!playerStatus.empty()) playerStatus += ", ";
+                playerStatus += playerName + ":" + (canPlace ? "가능" : "불가");
             }
-
-            return true;
+            
+            spdlog::debug("🎯 [GAME_FINISH_DEBUG] 플레이어 배치 상태: {}", playerStatus);
+            
+            return !anyCanPlace;
         }
 
         std::map<PlayerColor, int> GameLogic::calculateScores() const
@@ -529,6 +552,7 @@ namespace Blokus {
         
         void GameLogic::invalidateCache() const
         {
+            spdlog::debug("🔄 [CACHE_DEBUG] 캐시 무효화 - 영구 차단 상태는 유지");
             m_cacheValid = false;
             m_canPlaceAnyBlockCache.clear();
             // 영구 차단 상태는 유지 - 다른 플레이어의 블록 배치로 인해 

@@ -31,12 +31,16 @@ namespace Blokus {
             , m_maxPlayers(Common::MAX_PLAYERS)
             , m_hasCompletedGame(false)
             , m_roomManager(roomManager)
-            , m_turnTimeoutSeconds(30)  // 기본 30초 타임아웃
+            , m_turnTimeoutSeconds(Common::DEFAULT_TURN_TIME)  // 기본 30초 타임아웃
             , m_turnTimerActive(false)
             , m_lastTurnTimedOut(false)
             , m_stopTimeoutCheck(false)
         {
             m_players.reserve(Common::MAX_PLAYERS);
+            
+            // 타임아웃 누적 차단 시스템 초기화 (생성자에서)
+            spdlog::debug("🔄 [TIMEOUT_INIT] 타임아웃 시스템 초기화 (방 {})", m_roomId);
+            
             spdlog::debug("🏠 방 생성: ID={}, Name='{}', Host={}", m_roomId, m_roomName, m_hostId);
         }
 
@@ -594,6 +598,12 @@ namespace Blokus {
             for (auto& player : m_players) {
                 player.resetForNewGame();
             }
+            
+            // 타임아웃 누적 차단 시스템 초기화
+            m_playerTimeoutCounts.clear();
+            m_playerBlockedByTimeout.clear();
+            m_playerAfkVerificationCounts.clear();
+            spdlog::debug("🔄 [TIMEOUT_RESET] 타임아웃 카운터, 차단 상태, AFK 검증 카운터 초기화 (방 {})", m_roomId);
 
             updateActivity();
 
@@ -937,6 +947,27 @@ namespace Blokus {
                 return; // 빈 슬롯 메시지 방지
             }
             
+            // 타임아웃 차단 상태 확인 - 차단된 플레이어면 자동 스킵
+            auto timeoutBlockIt = m_playerBlockedByTimeout.find(newPlayer);
+            if (timeoutBlockIt != m_playerBlockedByTimeout.end() && timeoutBlockIt->second) {
+                spdlog::info("🚫 [TIMEOUT_SKIP] 플레이어 {} 타임아웃 차단 상태로 턴 자동 스킵", static_cast<int>(newPlayer));
+                
+                // 시스템 메시지 브로드캐스트
+                std::ostringstream skipMsg;
+                skipMsg << "SYSTEM:" << newPlayerName << "님은 타임아웃으로 인해 자동으로 턴이 넘어갑니다.";
+                broadcastMessageLocked(skipMsg.str());
+                
+                // 다음 플레이어로 즉시 턴 넘기기 (타이머 없이)
+                m_gameStateManager->nextTurn();
+                Common::PlayerColor nextPlayer = m_gameStateManager->getCurrentPlayer();
+                
+                if (nextPlayer != newPlayer) {
+                    // 재귀 호출로 다음 플레이어 턴 시작
+                    broadcastTurnChangeLocked(nextPlayer);
+                    return; // 현재 턴 처리 종료
+                }
+            }
+            
             // 턴 타이머 시작
             startTurnTimer();
             
@@ -951,7 +982,7 @@ namespace Blokus {
                 << "\"previousTurnTimedOut\":" << (m_lastTurnTimedOut ? "true" : "false")
                 << "}";
             
-            spdlog::info("⏰ [TIMER_DEBUG] TURN_CHANGED 메시지 생성: {}", turnChangeMsg.str());
+            spdlog::debug("⏰ [TIMER_DEBUG] TURN_CHANGED 메시지 생성: {}", turnChangeMsg.str());
             
             broadcastMessageLocked(turnChangeMsg.str());
             
@@ -1286,15 +1317,7 @@ namespace Blokus {
                 if (newPlayerName.empty()) {
                     spdlog::warn("⚠️ 턴 변경 실패: 플레이어 색상 {}에 해당하는 플레이어를 찾을 수 없음", static_cast<int>(newPlayer));
                 } else {
-                    // 턴 변경 알림 메시지
-                    std::ostringstream turnChangeMsg;
-                    turnChangeMsg << "TURN_CHANGED:{"
-                        << "\"newPlayer\":\"" << newPlayerName << "\","
-                        << "\"playerColor\":" << static_cast<int>(newPlayer) << ","
-                        << "\"turnNumber\":" << m_gameStateManager->getTurnNumber()
-                        << "}";
-                    
-                    broadcastMessageLocked(turnChangeMsg.str());
+                    broadcastTurnChangeLocked(newPlayer);
                     
                     // 시스템 메시지
                     std::ostringstream turnSystemMsg;
@@ -1311,10 +1334,13 @@ namespace Blokus {
 
             // 게임 종료 조건 확인: 모든 플레이어가 더 이상 블록을 배치할 수 없는 경우
             bool gameFinished = m_gameLogic->isGameFinished();
-            spdlog::debug("🔍 게임 종료 조건 확인: {} (방 {})", gameFinished ? "종료" : "계속", m_roomId);
+            
+            if (!gameFinished) {
+                spdlog::debug("⏩ [DB_DEBUG] 게임 계속 진행 - DB 저장 없음 (방 {})", m_roomId);
+            }
             
             if (gameFinished) {
-                spdlog::debug("🏁 게임 종료 조건 충족: 모든 플레이어가 블록 배치 불가 (방 {})", m_roomId);
+                spdlog::info("🏁 게임 종료 조건 충족: 모든 플레이어가 블록 배치 불가 (방 {})", m_roomId);
                 
                 // 최종 점수 계산
                 auto finalScores = m_gameLogic->calculateScores();
@@ -1344,7 +1370,10 @@ namespace Blokus {
                 broadcastGameResultLocked(finalScores, winners);
                 
                 // 게임 결과를 DB에 저장
+                spdlog::info("💾 [DB_DEBUG] 게임 결과 DB 저장 시작 - 방 {}, 플레이어 {}명, 승자 {}명", 
+                           m_roomId, finalScores.size(), winners.size());
                 saveGameResultsToDatabase(finalScores, winners);
+                spdlog::info("💾 [DB_DEBUG] 게임 결과 DB 저장 호출 완료 - 방 {}", m_roomId);
                 
                 // 게임 종료 처리는 플레이어 응답 후에 수행하므로 여기서는 하지 않음
             } else if (m_gameStateManager->getGameState() == Common::GameState::Finished) {
@@ -1495,6 +1524,10 @@ namespace Blokus {
                     }
                 }
                 
+                // DB에 게임 결과 저장
+                spdlog::debug("🎯 [DB_SAVE_DEBUG] processAutoSkipAfterTurnChange에서 DB 저장 시도");
+                saveGameResultsToDatabase(finalScores, winners);
+                
                 // 게임 결과 브로드캐스트 및 게임 종료
                 broadcastGameResultLocked(finalScores, winners);
                 endGameLocked();
@@ -1568,7 +1601,7 @@ namespace Blokus {
                     // DB에 게임 결과 저장 (모든 플레이어)
                     bool success = dbManager->saveGameResults(playerIds, scores, isWinner);
                     if (success) {
-                        spdlog::debug("✅ 방 {} 게임 결과가 DB에 성공적으로 저장되었습니다", m_roomId);
+                        spdlog::info("✅ [DB_DEBUG] 방 {} 게임 결과가 DB에 성공적으로 저장되었습니다", m_roomId);
                         
                         // 게임 완료자에게만 경험치 지급
                         if (!completedPlayerIds.empty()) {
@@ -1614,14 +1647,14 @@ namespace Blokus {
                             spdlog::warn("⚠️ 게임 완료자가 없어 경험치 지급 없음 (방 {})", m_roomId);
                         }
                     } else {
-                        spdlog::error("❌ 방 {} 게임 결과 DB 저장 실패", m_roomId);
+                        spdlog::error("❌ [DB_DEBUG] 방 {} 게임 결과 DB 저장 실패", m_roomId);
                     }
                 } else {
-                    spdlog::warn("⚠️ 저장할 플레이어 데이터가 없습니다 (방 {})", m_roomId);
+                    spdlog::warn("⚠️ [DB_DEBUG] 저장할 플레이어 데이터가 없습니다 (방 {})", m_roomId);
                 }
                 
             } catch (const std::exception& e) {
-                spdlog::error("❌ 게임 결과 DB 저장 중 예외 발생 (방 {}): {}", m_roomId, e.what());
+                spdlog::error("❌ [DB_DEBUG] 게임 결과 DB 저장 중 예외 발생 (방 {}): {}", m_roomId, e.what());
             }
         }
 
@@ -1639,7 +1672,7 @@ namespace Blokus {
             m_turnTimerActive.store(true);
             m_lastTurnTimedOut = false;  // 새 턴이므로 타임아웃 플래그 리셋
             
-            spdlog::info("⏰ [TIMER_DEBUG] 턴 타이머 시작: 방 {}, 제한시간 {}초, 현재 플레이어: {}", 
+            spdlog::debug("⏰ [TIMER_DEBUG] 턴 타이머 시작: 방 {}, 제한시간 {}초, 현재 플레이어: {}", 
                 m_roomId, m_turnTimeoutSeconds, static_cast<int>(m_gameStateManager->getCurrentPlayer()));
         }
 
@@ -1674,12 +1707,44 @@ namespace Blokus {
             
             spdlog::info("⏰ 턴 타임아웃: 방 {}, 플레이어 {}", m_roomId, static_cast<int>(currentPlayer));
             
-            // 타임아웃 알림 메시지 브로드캐스트
+            // 타임아웃 카운터 증가 및 차단 상태 확인
+            m_playerTimeoutCounts[currentPlayer]++;
+            int timeoutCount = m_playerTimeoutCounts[currentPlayer];
+            
+            spdlog::info("📊 [TIMEOUT_COUNT] 플레이어 {} 타임아웃 {}회 누적", static_cast<int>(currentPlayer), timeoutCount);
+            
+            // 플레이어 이름 찾기 (한 번만)
             std::string timedOutPlayerName = "";
             for (const auto& player : m_players) {
                 if (player.getColor() == currentPlayer) {
                     timedOutPlayerName = player.getUsername();
                     break;
+                }
+            }
+            
+            bool wasBlocked = false;
+            if (timeoutCount >= TIMEOUT_LIMIT) {
+                m_playerBlockedByTimeout[currentPlayer] = true;
+                wasBlocked = true;
+                spdlog::warn("🚫 [TIMEOUT_BLOCK] 플레이어 {} 타임아웃 {}회 누적으로 차단 상태로 전환", 
+                           static_cast<int>(currentPlayer), timeoutCount);
+                
+                // 🔥 NEW: AFK 모드 전환 알림을 해당 플레이어에게 개별 전송
+                for (const auto& player : m_players) {
+                    if (player.getColor() == currentPlayer) {
+                        std::string userId = player.getUserId();
+                        std::ostringstream afkNotification;
+                        afkNotification << "AFK_MODE_ACTIVATED:{"
+                            << "\"reason\":\"timeout\","
+                            << "\"timeoutCount\":" << timeoutCount << ","
+                            << "\"maxCount\":" << TIMEOUT_LIMIT
+                            << "}";
+                        
+                        sendToPlayer(userId, afkNotification.str());
+                        spdlog::info("📱 [AFK_NOTIFICATION] AFK 모드 전환 알림 전송: {} -> {}", 
+                                   timedOutPlayerName, userId);
+                        break;
+                    }
                 }
             }
             
@@ -1697,6 +1762,14 @@ namespace Blokus {
                 std::ostringstream systemMsg;
                 systemMsg << "SYSTEM:" << timedOutPlayerName << "님의 시간이 초과되어 턴이 넘어갑니다.";
                 broadcastMessageLocked(systemMsg.str());
+                
+                // 차단 상태 전환 알림 메시지
+                if (wasBlocked) {
+                    std::ostringstream blockMsg;
+                    blockMsg << "SYSTEM:" << timedOutPlayerName << "님이 " << TIMEOUT_LIMIT 
+                           << "회 타임아웃으로 인해 자동 턴 스킵 상태가 되었습니다.";
+                    broadcastMessageLocked(blockMsg.str());
+                }
             }
             
             // 다음 플레이어로 턴 넘기기
@@ -1732,6 +1805,180 @@ namespace Blokus {
         // ========================================
         // 주기적 타임아웃 체크 스레드 루프
         // ========================================
+
+        // ========================================
+        // AFK 검증 시스템 구현
+        // ========================================
+
+        bool GameRoom::verifyPlayerAfkStatus(const std::string& userId) {
+            std::lock_guard<std::mutex> lock(m_playersMutex);
+            
+            // 플레이어 찾기
+            PlayerInfo* player = nullptr;
+            for (auto& p : m_players) {
+                if (p.getUserId() == userId) {
+                    player = &p;
+                    break;
+                }
+            }
+            
+            if (!player) {
+                spdlog::warn("⚠️ [AFK_VERIFY] 플레이어를 찾을 수 없음: {}", userId);
+                return false;
+            }
+            
+            Common::PlayerColor playerColor = player->getColor();
+            
+            // 검증 가능 여부 확인
+            if (!canPlayerVerifyAfk(userId)) {
+                spdlog::warn("⚠️ [AFK_VERIFY] AFK 검증 불가능한 상태: {}", userId);
+                return false;
+            }
+            
+            // AFK 검증 카운터 증가
+            m_playerAfkVerificationCounts[playerColor]++;
+            int verificationCount = m_playerAfkVerificationCounts[playerColor];
+            
+            // 타임아웃 상태 리셋
+            m_playerTimeoutCounts[playerColor] = 0;
+            m_playerBlockedByTimeout[playerColor] = false;
+            
+            spdlog::info("✅ [AFK_VERIFY] 플레이어 {} AFK 검증 완료 ({}회째)", userId, verificationCount);
+            spdlog::info("🔄 [AFK_VERIFY] 타임아웃 카운터 리셋, 차단 해제");
+            
+            // 검증 성공 메시지 브로드캐스트
+            std::ostringstream verifyMsg;
+            verifyMsg << "SYSTEM:" << player->getUsername() << "님이 AFK 상태를 해제했습니다. (" 
+                     << verificationCount << "/" << MAX_AFK_VERIFICATIONS << "회 사용)";
+            broadcastMessageLocked(verifyMsg.str());
+            
+            // 게임 상태 브로드캐스트 (UI 업데이트용)
+            broadcastGameStateLocked();
+            
+            return true;
+        }
+
+        bool GameRoom::unblockPlayerAfkStatus(const std::string& userId) {
+            std::lock_guard<std::mutex> lock(m_playersMutex);
+            
+            spdlog::debug("🔓 [AFK_UNBLOCK] AFK 모드 해제 시도: {}", userId);
+            
+            // 게임 중이 아니면 해제 불필요
+            if (m_state != RoomState::Playing) {
+                spdlog::warn("⚠️ [AFK_UNBLOCK] 게임 중이 아님: {}", userId);
+                return false;
+            }
+            
+            // 플레이어 찾기
+            PlayerInfo* player = nullptr;
+            for (auto& p : m_players) {
+                if (p.getUserId() == userId) {
+                    player = &p;
+                    break;
+                }
+            }
+            
+            if (!player) {
+                spdlog::warn("⚠️ [AFK_UNBLOCK] 플레이어를 찾을 수 없음: {}", userId);
+                return false;
+            }
+            
+            Common::PlayerColor playerColor = player->getColor();
+            
+            // 타임아웃으로 차단된 상태인지 확인
+            auto blockedIt = m_playerBlockedByTimeout.find(playerColor);
+            if (blockedIt == m_playerBlockedByTimeout.end() || !blockedIt->second) {
+                spdlog::warn("⚠️ [AFK_UNBLOCK] 차단되지 않은 상태: {} (색상: {})", userId, static_cast<int>(playerColor));
+                return false;
+            }
+            
+            // 검증 횟수 제한 확인
+            auto verifyIt = m_playerAfkVerificationCounts.find(playerColor);
+            int usedCount = (verifyIt != m_playerAfkVerificationCounts.end()) ? verifyIt->second : 0;
+            
+            if (usedCount >= MAX_AFK_VERIFICATIONS) {
+                spdlog::warn("⚠️ [AFK_UNBLOCK] 검증 횟수 초과: {} ({}회 사용)", userId, usedCount);
+                return false;
+            }
+            
+            // AFK 검증 카운터 증가
+            m_playerAfkVerificationCounts[playerColor]++;
+            int verificationCount = m_playerAfkVerificationCounts[playerColor];
+            
+            // 타임아웃 상태 리셋
+            m_playerTimeoutCounts[playerColor] = 0;
+            m_playerBlockedByTimeout[playerColor] = false;
+            
+            spdlog::info("✅ [AFK_UNBLOCK] AFK 모드 해제 성공: {} (검증 {}회 사용)", 
+                        player->getUsername(), verificationCount);
+            
+            // 방 내 다른 플레이어들에게 AFK 해제 알림
+            std::ostringstream resetMsg;
+            resetMsg << "AFK_STATUS_RESET:" << player->getUsername();
+            broadcastMessageLocked(resetMsg.str(), userId);
+            
+            return true;
+        }
+
+        bool GameRoom::canPlayerVerifyAfk(const std::string& userId) const {
+            // 게임 중이 아니면 검증 불필요
+            if (m_state != RoomState::Playing) {
+                return false;
+            }
+            
+            // 플레이어 찾기
+            const PlayerInfo* player = nullptr;
+            for (const auto& p : m_players) {
+                if (p.getUserId() == userId) {
+                    player = &p;
+                    break;
+                }
+            }
+            
+            if (!player) {
+                return false;
+            }
+            
+            Common::PlayerColor playerColor = player->getColor();
+            
+            // 현재 플레이어의 턴인지 확인
+            if (m_gameStateManager->getCurrentPlayer() != playerColor) {
+                return false;
+            }
+            
+            // 타임아웃으로 차단된 상태인지 확인
+            auto blockedIt = m_playerBlockedByTimeout.find(playerColor);
+            if (blockedIt == m_playerBlockedByTimeout.end() || !blockedIt->second) {
+                return false;
+            }
+            
+            // 검증 횟수 제한 확인
+            auto verifyIt = m_playerAfkVerificationCounts.find(playerColor);
+            int usedCount = (verifyIt != m_playerAfkVerificationCounts.end()) ? verifyIt->second : 0;
+            
+            return usedCount < MAX_AFK_VERIFICATIONS;
+        }
+
+        int GameRoom::getPlayerAfkVerificationCount(const std::string& userId) const {
+            std::lock_guard<std::mutex> lock(m_playersMutex);
+            
+            // 플레이어 찾기
+            const PlayerInfo* player = nullptr;
+            for (const auto& p : m_players) {
+                if (p.getUserId() == userId) {
+                    player = &p;
+                    break;
+                }
+            }
+            
+            if (!player) {
+                return -1;
+            }
+            
+            Common::PlayerColor playerColor = player->getColor();
+            auto it = m_playerAfkVerificationCounts.find(playerColor);
+            return (it != m_playerAfkVerificationCounts.end()) ? it->second : 0;
+        }
 
         void GameRoom::timeoutCheckLoop() {
             spdlog::info("⏰ [TIMER_DEBUG] 타임아웃 체크 루프 시작 (방 {})", m_roomId);

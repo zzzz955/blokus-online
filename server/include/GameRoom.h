@@ -96,6 +96,12 @@ namespace Blokus {
             void handleTurnTimeout();
             int getRemainingTurnTime() const;
             bool isTurnTimerActive() const;
+            
+            // AFK 검증 시스템
+            bool verifyPlayerAfkStatus(const std::string& userId);
+            bool unblockPlayerAfkStatus(const std::string& userId);  // 모달에서 호출용 (관대한 검증)
+            bool canPlayerVerifyAfk(const std::string& userId) const;
+            int getPlayerAfkVerificationCount(const std::string& userId) const;
 
             // 게임 로직 접근
             Common::GameLogic* getGameLogic() const { return m_gameLogic.get(); }
@@ -171,6 +177,13 @@ namespace Blokus {
             bool m_lastTurnTimedOut;   // 이전 턴이 시간 초과로 끝났는지
             std::thread m_timeoutCheckThread; // 주기적 타임아웃 체크용 스레드
             std::atomic<bool> m_stopTimeoutCheck; // 스레드 종료 플래그
+            
+            // 타임아웃 누적 차단 시스템
+            static const int TIMEOUT_LIMIT = 3;  // 타임아웃 한계 횟수
+            static const int MAX_AFK_VERIFICATIONS = 2;  // 게임당 최대 AFK 검증 횟수
+            std::map<Common::PlayerColor, int> m_playerTimeoutCounts;  // 플레이어별 타임아웃 횟수
+            std::map<Common::PlayerColor, bool> m_playerBlockedByTimeout;  // 타임아웃으로 인한 차단 상태
+            std::map<Common::PlayerColor, int> m_playerAfkVerificationCounts;  // AFK 검증 사용 횟수
 
             // 방 설정
             bool m_isPrivate;
