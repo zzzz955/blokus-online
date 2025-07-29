@@ -2009,6 +2009,14 @@ namespace Blokus::Server
                 return;
             }
 
+            // 🔥 CRITICAL: 게임 상태 검증 추가 (crash 방지)
+            if (!room->isPlaying())
+            {
+                sendResponse("AFK_UNBLOCK_ERROR:{\"reason\":\"game_not_active\",\"message\":\"게임이 이미 종료되었습니다\"}");
+                spdlog::warn("⚠️ AFK 해제 시도하지만 게임이 종료됨: {} ({})", session_->getUsername(), session_->getUserId());
+                return;
+            }
+
             std::string userId = session_->getUserId();
             std::string username = session_->getUsername();
 

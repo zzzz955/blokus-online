@@ -111,6 +111,13 @@ namespace Blokus {
         void focusInEvent(QFocusEvent* event) override;
         void focusOutEvent(QFocusEvent* event) override;
 
+    public slots:
+        // 게임 상태 변경 처리
+        void onGameEnded();
+        
+        // AFK 에러 처리
+        void onAfkUnblockError(const QString& reason, const QString& message);
+
     private slots:
         void onSceneChanged();
 

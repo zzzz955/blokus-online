@@ -1274,7 +1274,16 @@ private:
                     m_gameRoomWindow, &Blokus::GameRoomWindow::onAfkModeActivated);
             connect(m_gameRoomWindow, &Blokus::GameRoomWindow::afkUnblockRequested,
                     m_networkClient, &Blokus::NetworkClient::sendAfkUnblock);
-            qDebug() << QString::fromUtf8("🚨 AFK 관련 시그널 연결 완료");
+            
+            // 🔥 FIX: 게임 종료 시 AFK 모달 처리 (GameRoomWindow를 통해 중계)
+            connect(m_networkClient, &Blokus::NetworkClient::gameEnded,
+                    m_gameRoomWindow, &Blokus::GameRoomWindow::onGameEndedForAfk);
+            
+            // 🔥 FIX: AFK 해제 에러 처리 (GameRoomWindow를 통해 중계)
+            connect(m_networkClient, &Blokus::NetworkClient::afkUnblockError,
+                    m_gameRoomWindow, &Blokus::GameRoomWindow::onAfkUnblockErrorForAfk);
+            
+            qDebug() << QString::fromUtf8("🚨 AFK 관련 시그널 연결 완료 (게임 종료 & 에러 처리 포함)");
 
             // 게임룸 채팅은 이미 전역적으로 연결되어 있음 (중복 연결 제거)
 

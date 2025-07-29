@@ -54,6 +54,17 @@ namespace Blokus {
          * @brief 나가기 버튼 클릭 핸들러
          */
         void onLeaveGameClicked();
+        
+        /**
+         * @brief 게임 종료 시 호출되는 슬롯
+         * 모달이 열려있을 때 게임이 종료되면 자동으로 상태 변경
+         */
+        void onGameEnded();
+        
+        /**
+         * @brief AFK 해제 에러 처리 (게임이 이미 종료된 경우)
+         */
+        void onAfkUnblockError(const QString& reason, const QString& message);
 
     protected:
         /**
@@ -85,6 +96,9 @@ namespace Blokus {
         QString m_reason;
         int m_timeoutCount;
         int m_maxCount;
+        
+        // 게임 상태 추적
+        bool m_gameEnded;
     };
 
 } // namespace Blokus

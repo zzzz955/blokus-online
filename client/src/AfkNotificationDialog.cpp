@@ -8,6 +8,7 @@
 #include <QDesktopWidget>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QTimer>
 
 namespace Blokus {
 
@@ -23,13 +24,14 @@ namespace Blokus {
         , m_reason("timeout")
         , m_timeoutCount(3)
         , m_maxCount(3)
+        , m_gameEnded(false)
     {
         setupUI();
         setupConnections();
         
-        // 모달 대화상자 설정
-        setModal(true);
-        setWindowFlags(Qt::Dialog | Qt::WindowTitleHint | Qt::CustomizeWindowHint);
+        // 🔥 FIX: 비모달 설정으로 변경 (게임 종료 이벤트 수신 가능)
+        setModal(false);
+        setWindowFlags(Qt::Dialog | Qt::WindowTitleHint | Qt::CustomizeWindowHint | Qt::WindowStaysOnTopHint);
         setAttribute(Qt::WA_DeleteOnClose, false); // 수동으로 삭제 관리
         
         // 중앙 정렬
@@ -220,6 +222,42 @@ namespace Blokus {
         }
         
         QDialog::keyPressEvent(event);
+    }
+
+    void AfkNotificationDialog::onGameEnded()
+    {
+        // 게임이 종료되었음을 표시
+        m_gameEnded = true;
+        
+        // UI 업데이트
+        m_titleLabel->setText("게임 종료됨");
+        m_messageLabel->setText("게임이 종료되었습니다.");
+        m_infoLabel->setText("3초 후 자동으로 닫힙니다.");
+        
+        // 계속하기 버튼 비활성화
+        m_continueButton->setEnabled(false);
+        m_continueButton->setText("게임 종료됨");
+        
+        // 나가기만 활성화
+        m_leaveButton->setText("확인");
+        m_leaveButton->setFocus();
+        
+        // 3초 후 자동 닫기
+        QTimer::singleShot(3000, this, [this]() {
+            this->accept();
+        });
+    }
+
+    void AfkNotificationDialog::onAfkUnblockError(const QString& reason, const QString& message)
+    {
+        if (reason == "game_not_active") {
+            // 게임이 비활성 상태면 게임 종료로 처리
+            onGameEnded();
+        } else {
+            // 기타 에러 처리
+            m_messageLabel->setText(QString("오류: %1").arg(message));
+            m_continueButton->setEnabled(false);
+        }
     }
 
 } // namespace Blokus
