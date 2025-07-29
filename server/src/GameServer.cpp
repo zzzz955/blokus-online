@@ -776,11 +776,23 @@ namespace Blokus::Server {
                 }
                 
                 if (it->second->isTimedOut(timeoutDuration)) {
+                    std::string sessionId = it->first;
+                    
                     if (it->second->isInGame()) {
-                        spdlog::warn("🎮 게임 중 세션 타임아웃 (좀비방 방지): {} ({}분)", it->first, timeoutDuration.count() / 60);
+                        spdlog::warn("🎮 게임 중 세션 타임아웃 (좀비방 방지): {} ({}분)", sessionId, timeoutDuration.count() / 60);
                     } else {
-                        spdlog::info("세션 타임아웃: {} ({}분)", it->first, timeoutDuration.count() / 60);
+                        spdlog::info("세션 타임아웃: {} ({}분)", sessionId, timeoutDuration.count() / 60);
                     }
+                    
+                    // 🔥 개선: Session::stop() 호출로 기존 세션 정리 플로우 재사용
+                    // Session::stop()은 내부에서 notifyDisconnect()를 호출하고
+                    // 이는 onSessionDisconnect() 콜백을 실행하여 다음을 모두 처리함:
+                    // 1. 세션 정보 추출
+                    // 2. 방 나가기 처리 (roomManager_->leaveRoom())  
+                    // 3. 세션 제거 (removeSession())
+                    // 4. 로비 브로드캐스트
+                    spdlog::debug("🔄 [TIMEOUT_CLEANUP] 타임아웃 세션 {} stop() 호출로 정리", sessionId);
+                    
                     it->second->stop();
                     it = sessions_.erase(it);
 
