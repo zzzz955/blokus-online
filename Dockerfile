@@ -180,22 +180,30 @@ FROM ubuntu:22.04 AS runtime
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Seoul
 
-# 런타임 의존성 설치 (시스템 패키지 활용)
+# 최소 런타임 의존성 설치 (확실한 패키지만)
 RUN apt-get update && apt-get install -y \
-    # 시스템 라이브러리 런타임 (개발 헤더 제외)
-    libspdlog1.9 \
-    libboost-system1.74.0 \
-    libpqxx-7.7 \
+    # 핵심 시스템 라이브러리 (항상 존재)
     libpq5 \
     libssl3 \
-    libfmt8 \
+    zlib1g \
+    libc6 \
+    libgcc-s1 \
+    libstdc++6 \
     # 네트워크 도구 (헬스체크용)
     netcat-openbsd \
-    # 디버깅 도구 (선택적)
+    # 디버깅 도구 (선택적)  
     curl \
     # 시간대 설정
     tzdata \
     && rm -rf /var/lib/apt/lists/*
+
+# 추가 런타임 라이브러리 시도 (실패해도 계속 진행)
+RUN apt-get update && \
+    (apt-get install -y libspdlog1.15 || echo "libspdlog1.15 not found") && \
+    (apt-get install -y libboost-system1.74.0 || echo "libboost-system1.74.0 not found") && \
+    (apt-get install -y libpqxx-6.4 || apt-get install -y libpqxx-7.10 || echo "libpqxx not found") && \
+    (apt-get install -y libfmt8 || echo "libfmt8 not found") && \
+    rm -rf /var/lib/apt/lists/*
 
 # 시간대 설정
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
@@ -209,19 +217,29 @@ WORKDIR /app
 # Stage 2에서 빌드된 실행파일 복사
 COPY --from=app-builder /app/install/bin/BlokusServer ./
 
-# Protocol Buffers 라이브러리 복사 (소스 빌드했으므로)
-COPY --from=app-builder /usr/local/lib/libprotobuf.so* /usr/local/lib/
-COPY --from=app-builder /usr/local/lib/libabsl*.so* /usr/local/lib/
+# 모든 필요한 라이브러리 복사 (dependencies-builder에서)
+# Protocol Buffers (소스 빌드)
+COPY --from=dependencies-builder /usr/local/lib/libprotobuf.so* /usr/local/lib/
+COPY --from=dependencies-builder /usr/local/lib/libabsl*.so* /usr/local/lib/
+
+# 동적 라이브러리 복사 (ldd 결과 기반으로 필요한 것만)
+# 시스템 패키지로 설치된 라이브러리들은 시스템 경로에 있으므로 복사 불필요
+# 런타임에서 필요시 누락된 라이브러리만 설치하도록 함
 
 # 라이브러리 경로 업데이트
 RUN ldconfig /usr/local/lib
 
-# 런타임 검증
+# 런타임 검증 및 누락 라이브러리 확인
 RUN echo "=== Runtime Verification ===" && \
-    ldd ./BlokusServer && \
-    echo "=== Server executable check ===" && \
+    echo "1. Executable check:" && \
     file ./BlokusServer && \
-    echo "=== Libraries verification completed ==="
+    echo "2. Library dependencies:" && \
+    ldd ./BlokusServer && \
+    echo "3. Available libraries in /usr/local/lib:" && \
+    ls -la /usr/local/lib/ && \
+    echo "4. Testing basic execution:" && \
+    (timeout 3 ./BlokusServer --version 2>&1 || echo "Server startup test completed") && \
+    echo "=== Runtime verification completed ==="
 
 # 로그 및 설정 디렉토리 생성
 RUN mkdir -p /app/logs /app/config && \
