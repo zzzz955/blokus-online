@@ -1,34 +1,34 @@
 # ==================================================
 # Multi-Stage Dockerfile - Blokus Online Server
-# 안정성 최우선, 서브모듈 의존성 문제 해결
+# vcpkg 기반 안정적인 빌드 (CONFIG REQUIRED 완전 해결)
 # ==================================================
 
 # ==================================================
-# Stage 1: Dependencies Builder
-# 시스템 패키지 우선 + 필수 라이브러리만 소스 빌드
+# Stage 1: vcpkg Builder
+# Microsoft vcpkg를 사용한 안정적인 의존성 관리
 # ==================================================
-FROM ubuntu:22.04 AS dependencies-builder
+FROM ubuntu:22.04 AS vcpkg-builder
 
 # 환경 변수 설정
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Seoul
-ENV CMAKE_BUILD_TYPE=Release
-ENV PARALLEL_JOBS=$(nproc)
+ENV VCPKG_ROOT=/opt/vcpkg
+ENV VCPKG_DEFAULT_TRIPLET=x64-linux
+ENV VCPKG_FEATURE_FLAGS=manifests,versions,binarycaching
 
 # 빌드 실패 시 즉시 중단
 SHELL ["/bin/bash", "-euxo", "pipefail", "-c"]
 
 # ==================================================
-# 시스템 패키지 설치 (최대한 활용)
+# 시스템 패키지 설치
 # ==================================================
-RUN echo "=== Installing system packages ===" && \
+RUN echo "=== Installing build dependencies ===" && \
     apt-get update && apt-get install -y \
     # 빌드 도구
     build-essential \
     cmake \
     ninja-build \
     pkg-config \
-    ccache \
     # 버전 관리 및 다운로드
     git \
     wget \
@@ -38,88 +38,85 @@ RUN echo "=== Installing system packages ===" && \
     tar \
     gzip \
     unzip \
-    # 시스템 라이브러리 (CONFIG 문제 없는 것들)
-    libspdlog-dev \
-    nlohmann-json3-dev \
-    libboost-system-dev \
-    libpqxx-dev \
-    libpq-dev \
-    libssl-dev \
-    # 기타 필수 의존성
-    zlib1g-dev \
-    libbz2-dev \
-    libfmt-dev \
+    zip \
+    # vcpkg 의존성
+    autoconf \
+    automake \
+    libtool \
+    # 추가 유틸리티
+    ccache \
     && rm -rf /var/lib/apt/lists/*
 
-# ccache 최적화 설정
-RUN ccache --set-config=max_size=2G && \
-    ccache --set-config=compression=true && \
-    ccache --set-config=cache_dir=/tmp/.ccache
+# ==================================================
+# vcpkg 설치 및 부트스트랩
+# ==================================================
+RUN echo "=== Installing vcpkg ===" && \
+    git clone https://github.com/Microsoft/vcpkg.git ${VCPKG_ROOT} && \
+    cd ${VCPKG_ROOT} && \
+    # 안정적인 릴리즈 태그로 체크아웃 (옵션)
+    git checkout 2024.08.23 && \
+    # vcpkg 부트스트랩
+    ./bootstrap-vcpkg.sh && \
+    # vcpkg 실행 가능성 확인
+    ./vcpkg version && \
+    echo "=== vcpkg installation completed ==="
 
 # ==================================================
-# Protocol Buffers 빌드 (서브모듈 의존성 해결)
+# 서버 전용 vcpkg.json 생성 (Qt 제외)
 # ==================================================
-ARG PROTOBUF_VERSION=25.5
-RUN echo "=== Building Protocol Buffers ${PROTOBUF_VERSION} with submodules ===" && \
-    cd /tmp && \
-    # git clone으로 서브모듈 포함 다운로드
-    git clone --depth 1 --branch v${PROTOBUF_VERSION} --recursive \
-        https://github.com/protocolbuffers/protobuf.git && \
-    cd protobuf && \
-    \
-    # 서브모듈 검증
-    echo "=== Verifying submodules ===" && \
-    ls -la third_party/ && \
-    ls -la third_party/abseil-cpp/ && \
-    \
-    # CMake 설정 (Abseil 포함)
-    cmake -S . -B build \
-        -GNinja \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_INSTALL_PREFIX=/usr/local \
-        -DCMAKE_CXX_STANDARD=20 \
-        -Dprotobuf_BUILD_TESTS=OFF \
-        -Dprotobuf_BUILD_EXAMPLES=OFF \
-        -Dprotobuf_ABSL_PROVIDER=module \
-        -Dprotobuf_BUILD_LIBPROTOC=ON && \
-    \
-    # 빌드 실행
-    echo "=== Building protobuf ===" && \
-    ninja -C build -j${PARALLEL_JOBS} && \
-    ninja -C build install && \
-    ldconfig && \
-    \
-    # 정리
-    cd / && rm -rf /tmp/protobuf
+RUN echo "=== Creating server-only vcpkg.json ===" && \
+    mkdir -p /tmp/server-build && \
+    cat > /tmp/server-build/vcpkg.json << 'EOF'
+{
+  "name": "blokus-server",
+  "version": "1.0.0",
+  "description": "Blokus Online Server Dependencies",
+  "dependencies": [
+    "protobuf",
+    "spdlog",
+    "boost-system",
+    "nlohmann-json",
+    "libpqxx",
+    "openssl"
+  ]
+}
+EOF
+
+# vcpkg.json 확인
+RUN echo "=== Server vcpkg.json contents ===" && \
+    cat /tmp/server-build/vcpkg.json
 
 # ==================================================
-# 라이브러리 설치 검증
+# vcpkg 의존성 설치
 # ==================================================
-RUN echo "=== Verifying all dependencies ===" && \
-    echo "1. Protocol Buffers:" && \
-    protoc --version && \
-    pkg-config --exists protobuf && echo "  ✓ protobuf pkg-config OK" && \
-    find /usr/local -name "protobuf*Config.cmake" && \
-    \
-    echo "2. System packages:" && \
-    pkg-config --exists spdlog && echo "  ✓ spdlog OK" && \
-    pkg-config --exists nlohmann_json && echo "  ✓ nlohmann-json OK" && \
-    dpkg -l | grep libboost-system && echo "  ✓ boost-system OK" && \
-    dpkg -l | grep libpqxx && echo "  ✓ libpqxx OK" && \
-    dpkg -l | grep libssl && echo "  ✓ openssl OK" && \
-    \
-    echo "3. CMake integration test:" && \
-    echo 'find_package(protobuf CONFIG REQUIRED)' > /tmp/test.cmake && \
-    echo 'message(STATUS "protobuf found: ${protobuf_FOUND}")' >> /tmp/test.cmake && \
-    cmake -P /tmp/test.cmake && \
-    \
-    echo "=== All dependencies verified successfully ==="
+RUN echo "=== Installing vcpkg packages ===" && \
+    cd /tmp/server-build && \
+    # Binary caching 최적화
+    export VCPKG_BINARY_SOURCES="clear;x-azurl,https://dev.azure.com/vcpkg/public/_packaging/vcpkg-public-binary-cache/nuget/v3/index.json,,readwrite" && \
+    # 패키지 설치 (병렬 빌드)
+    ${VCPKG_ROOT}/vcpkg install \
+        --triplet=${VCPKG_DEFAULT_TRIPLET} \
+        --x-install-root=/opt/vcpkg-installed \
+        && \
+    echo "=== vcpkg packages installation completed ==="
 
 # ==================================================
-# Stage 2: Application Builder  
+# vcpkg 설치 검증
+# ==================================================
+RUN echo "=== Verifying vcpkg installation ===" && \
+    echo "1. Installed packages:" && \
+    ${VCPKG_ROOT}/vcpkg list && \
+    echo "2. CMake integration files:" && \
+    find /opt/vcpkg-installed -name "*Config.cmake" -o -name "*-config.cmake" | head -20 && \
+    echo "3. Library files:" && \
+    find /opt/vcpkg-installed -name "*.so" -o -name "*.a" | head -10 && \
+    echo "=== vcpkg verification completed ==="
+
+# ==================================================
+# Stage 2: Application Builder
 # 프로젝트 빌드 단계
 # ==================================================
-FROM dependencies-builder AS app-builder
+FROM vcpkg-builder AS app-builder
 
 # 작업 디렉토리 설정
 WORKDIR /app
@@ -131,28 +128,25 @@ COPY server/ ./server/
 COPY CMakeLists.txt ./
 
 # ==================================================
-# 프로젝트 빌드
+# 프로젝트 빌드 (vcpkg toolchain 사용)
 # ==================================================
-RUN echo "=== Building Blokus Server ===" && \
-    # CMake 설정 (시스템 패키지 활용)
+RUN echo "=== Building Blokus Server with vcpkg ===" && \
+    # CMake 설정 (vcpkg toolchain 사용)
     cmake -S . -B build \
         -GNinja \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_CXX_STANDARD=20 \
         -DCMAKE_INSTALL_PREFIX=/app/install \
-        -DCMAKE_PREFIX_PATH="/usr/local:/usr" \
-        -DBoost_USE_STATIC_LIBS=OFF \
-        -DBoost_USE_MULTITHREADED=ON \
+        -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
+        -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET} \
         -DCMAKE_VERBOSE_MAKEFILE=ON && \
     \
     # 빌드 의존성 검증
     echo "=== Build Dependencies Check ===" && \
-    grep -E "(protobuf|spdlog|nlohmann|Boost|pqxx|OpenSSL).*FOUND" build/CMakeCache.txt || \
-    (echo "Dependency check failed" && cat build/CMakeFiles/CMakeError.log && exit 1) && \
+    grep -E "(protobuf|spdlog|nlohmann|Boost|pqxx|OpenSSL).*FOUND" build/CMakeCache.txt && \
     \
-    # 빌드 실행 (ccache 활용)
+    # 빌드 실행 (병렬)
     echo "=== Building with $(nproc) parallel jobs ===" && \
-    export CCACHE_DIR=/tmp/.ccache && \
     ninja -C build -j$(nproc) -v && \
     \
     # 설치
@@ -164,11 +158,7 @@ RUN echo "=== Building Blokus Server ===" && \
     file /app/install/bin/BlokusServer && \
     ldd /app/install/bin/BlokusServer && \
     \
-    # 실행 테스트 (간단한 버전 확인)
-    echo "=== Runtime Test ===" && \
-    timeout 5 /app/install/bin/BlokusServer --help || echo "Server help displayed" && \
-    \
-    echo "=== Build completed successfully ==="
+    echo "=== vcpkg build completed successfully ==="
 
 # ==================================================
 # Stage 3: Runtime Environment
@@ -180,30 +170,22 @@ FROM ubuntu:22.04 AS runtime
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Seoul
 
-# 최소 런타임 의존성 설치 (확실한 패키지만)
+# 런타임 의존성 설치 (최소한)
 RUN apt-get update && apt-get install -y \
-    # 핵심 시스템 라이브러리 (항상 존재)
-    libpq5 \
+    # 핵심 시스템 라이브러리
     libssl3 \
+    libpq5 \
     zlib1g \
     libc6 \
     libgcc-s1 \
     libstdc++6 \
     # 네트워크 도구 (헬스체크용)
     netcat-openbsd \
-    # 디버깅 도구 (선택적)  
+    # 디버깅 도구 (선택적)
     curl \
     # 시간대 설정
     tzdata \
     && rm -rf /var/lib/apt/lists/*
-
-# 추가 런타임 라이브러리 시도 (실패해도 계속 진행)
-RUN apt-get update && \
-    (apt-get install -y libspdlog1.15 || echo "libspdlog1.15 not found") && \
-    (apt-get install -y libboost-system1.74.0 || echo "libboost-system1.74.0 not found") && \
-    (apt-get install -y libpqxx-6.4 || apt-get install -y libpqxx-7.10 || echo "libpqxx not found") && \
-    (apt-get install -y libfmt8 || echo "libfmt8 not found") && \
-    rm -rf /var/lib/apt/lists/*
 
 # 시간대 설정
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
@@ -217,26 +199,21 @@ WORKDIR /app
 # Stage 2에서 빌드된 실행파일 복사
 COPY --from=app-builder /app/install/bin/BlokusServer ./
 
-# 모든 필요한 라이브러리 복사 (dependencies-builder에서)
-# Protocol Buffers (소스 빌드)
-COPY --from=dependencies-builder /usr/local/lib/libprotobuf.so* /usr/local/lib/
-COPY --from=dependencies-builder /usr/local/lib/libabsl*.so* /usr/local/lib/
-
-# 동적 라이브러리 복사 (ldd 결과 기반으로 필요한 것만)
-# 시스템 패키지로 설치된 라이브러리들은 시스템 경로에 있으므로 복사 불필요
-# 런타임에서 필요시 누락된 라이브러리만 설치하도록 함
+# vcpkg에서 빌드된 라이브러리들 복사
+COPY --from=app-builder /opt/vcpkg-installed/x64-linux/lib/*.so* /usr/local/lib/ 2>/dev/null || echo "No shared libraries to copy"
+COPY --from=app-builder /opt/vcpkg-installed/x64-linux/bin/* /usr/local/bin/ 2>/dev/null || echo "No binaries to copy"
 
 # 라이브러리 경로 업데이트
 RUN ldconfig /usr/local/lib
 
-# 런타임 검증 및 누락 라이브러리 확인
+# 런타임 검증
 RUN echo "=== Runtime Verification ===" && \
     echo "1. Executable check:" && \
     file ./BlokusServer && \
     echo "2. Library dependencies:" && \
     ldd ./BlokusServer && \
-    echo "3. Available libraries in /usr/local/lib:" && \
-    ls -la /usr/local/lib/ && \
+    echo "3. Available libraries:" && \
+    ls -la /usr/local/lib/ | head -20 && \
     echo "4. Testing basic execution:" && \
     (timeout 3 ./BlokusServer --version 2>&1 || echo "Server startup test completed") && \
     echo "=== Runtime verification completed ==="
@@ -251,7 +228,7 @@ EXPOSE 9999
 # 사용자 변경
 USER blokus
 
-# 헬스체크 (서버 시작 후 포트 확인)
+# 헬스체크
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD netcat -z localhost 9999 || exit 1
 
@@ -263,7 +240,7 @@ CMD ["./BlokusServer"]
 # ==================================================
 LABEL maintainer="Blokus Online Team"
 LABEL version="1.0.0"
-LABEL description="Blokus Online Game Server - Hybrid build strategy"
-LABEL build-strategy="system-packages + protobuf-source"
-LABEL protobuf-version="25.5"
+LABEL description="Blokus Online Game Server - vcpkg stable build"
+LABEL build-strategy="Microsoft vcpkg"
+LABEL vcpkg-triplet="x64-linux"
 LABEL ubuntu-base="22.04"

@@ -21,10 +21,10 @@ Makefile
 *.vcxproj*
 *.sln
 
-# ========== vcpkg (Docker에서 불필요) ==========
+# ========== vcpkg (Docker에서 재빌드) ==========
 vcpkg/
 vcpkg_installed/
-vcpkg.json
+# vcpkg.json은 포함 (의존성 정보 필요)
 
 # ========== 클라이언트 코드 (서버 빌드시 불필요) ==========
 client/
