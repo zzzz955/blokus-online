@@ -90,9 +90,11 @@ COPY common/ ./common/
 COPY server/ ./server/
 COPY CMakeLists.txt ./
 
-# 서버 소스 파일 확인
-RUN ls -la server/src/ || echo "server/src/ not found" && \
-    ls -la server/include/ || echo "server/include/ not found"
+# 서버 소스 파일 확인 및 .dockerignore 체크
+RUN echo "=== Checking server directory structure ===" && \
+    find server/ -name "*.cpp" -o -name "*.h" | head -20 && \
+    echo "=== Checking if src files exist ===" && \
+    ls -la server/src/ 2>/dev/null || echo "❌ server/src/ directory missing!"
 
 # ==================================================
 # 프로젝트 빌드 (vcpkg toolchain 사용)
