@@ -48,11 +48,11 @@ namespace Blokus {
     void AfkNotificationDialog::setupUI()
     {
         setWindowTitle("AFK 모드 알림");
-        setFixedSize(400, 250);
+        setFixedSize(400, 300);
         
         // 메인 레이아웃
         m_mainLayout = new QVBoxLayout(this);
-        m_mainLayout->setSpacing(15);
+        m_mainLayout->setSpacing(10);
         m_mainLayout->setContentsMargins(20, 20, 20, 20);
         
         // 제목 라벨
