@@ -200,8 +200,9 @@ WORKDIR /app
 COPY --from=app-builder /app/install/bin/BlokusServer ./
 
 # vcpkg에서 빌드된 라이브러리들 복사
-COPY --from=app-builder /opt/vcpkg-installed/x64-linux/lib/*.so* /usr/local/lib/ 2>/dev/null || echo "No shared libraries to copy"
-COPY --from=app-builder /opt/vcpkg-installed/x64-linux/bin/* /usr/local/bin/ 2>/dev/null || echo "No binaries to copy"
+RUN mkdir -p /usr/local/lib /usr/local/bin
+COPY --from=app-builder /opt/vcpkg-installed/x64-linux/lib/ /usr/local/lib/
+COPY --from=app-builder /opt/vcpkg-installed/x64-linux/bin/ /usr/local/bin/
 
 # 라이브러리 경로 업데이트
 RUN ldconfig /usr/local/lib
