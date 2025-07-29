@@ -2562,6 +2562,26 @@ namespace Blokus {
         emit afkUnblockRequested();
     }
 
+    void GameRoomWindow::onGameEndedForAfk()
+    {
+        qDebug() << QString::fromUtf8("🏁 게임 종료로 인한 AFK 모달 처리");
+        
+        // GameBoard에 게임 종료 알림
+        if (m_gameBoard) {
+            m_gameBoard->onGameEnded();
+        }
+    }
+
+    void GameRoomWindow::onAfkUnblockErrorForAfk(const QString& reason, const QString& message)
+    {
+        qDebug() << QString::fromUtf8("❌ AFK 해제 에러로 인한 모달 처리: %1 - %2").arg(reason, message);
+        
+        // GameBoard에 AFK 에러 알림
+        if (m_gameBoard) {
+            m_gameBoard->onAfkUnblockError(reason, message);
+        }
+    }
+
 } // namespace Blokus
 
 #include "ui/GameRoomWindow.moc"

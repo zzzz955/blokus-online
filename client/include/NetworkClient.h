@@ -5,6 +5,8 @@
 #include <QTimer>
 #include <QString>
 #include <QHostAddress>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <functional>
 #include <unordered_map>
 
@@ -153,6 +155,7 @@ namespace Blokus {
         void afkModeActivated(const QString& jsonData);
         void afkUnblockSuccess();
         void afkStatusReset(const QString& username);
+        void afkUnblockError(const QString& reason, const QString& message);
 
     private slots:
         void onConnected();

@@ -1131,21 +1131,24 @@ namespace Blokus {
         m_afkDialog = new Blokus::AfkNotificationDialog(this);
         m_afkDialog->setAfkInfo(jsonObj);
         
-        // 시그널 연결
+        // 🔥 FIX: 시그널 연결 (AFK 해제 + 게임 종료 + 에러 처리)
         connect(m_afkDialog, &Blokus::AfkNotificationDialog::afkUnblockRequested, 
                 this, &GameBoard::afkUnblockRequested);
         
-        // 모달 대화상자 표시
-        int result = m_afkDialog->exec();
+        // 다이얼로그 닫힐 때 정리
+        connect(m_afkDialog, &QDialog::finished, [this]() {
+            if (m_afkDialog) {
+                m_afkDialog->deleteLater();
+                m_afkDialog = nullptr;
+            }
+        });
         
-        // 대화상자 정리
-        if (m_afkDialog) {
-            m_afkDialog->deleteLater();
-            m_afkDialog = nullptr;
-        }
+        // 🔥 FIX: non-modal로 표시 (exec() 대신 show() 사용)
+        m_afkDialog->show();
+        m_afkDialog->raise();
+        m_afkDialog->activateWindow();
         
-        // 결과에 따른 처리는 부모 컴포넌트에서 시그널을 통해 처리
-        qDebug() << "AFK 알림 대화상자 결과:" << result;
+        qDebug() << "AFK 알림 대화상자 표시 (non-modal)";
     }
     
     void GameBoard::showAfkNotification(int timeoutCount, int maxCount)
@@ -1160,20 +1163,42 @@ namespace Blokus {
         m_afkDialog = new Blokus::AfkNotificationDialog(this);
         m_afkDialog->setAfkInfo(timeoutCount, maxCount);
         
-        // 시그널 연결
+        // 🔥 FIX: 시그널 연결 (AFK 해제 + 게임 종료 + 에러 처리)
         connect(m_afkDialog, &Blokus::AfkNotificationDialog::afkUnblockRequested, 
                 this, &GameBoard::afkUnblockRequested);
         
-        // 모달 대화상자 표시
-        int result = m_afkDialog->exec();
+        // 다이얼로그 닫힐 때 정리
+        connect(m_afkDialog, &QDialog::finished, [this]() {
+            if (m_afkDialog) {
+                m_afkDialog->deleteLater();
+                m_afkDialog = nullptr;
+            }
+        });
         
-        // 대화상자 정리
+        // 🔥 FIX: non-modal로 표시 (exec() 대신 show() 사용)
+        m_afkDialog->show();
+        m_afkDialog->raise();
+        m_afkDialog->activateWindow();
+        
+        qDebug() << "AFK 알림 대화상자 표시 (non-modal)";
+    }
+
+    void GameBoard::onGameEnded()
+    {
+        // AFK 다이얼로그가 열려있으면 게임 종료 처리
         if (m_afkDialog) {
-            m_afkDialog->deleteLater();
-            m_afkDialog = nullptr;
+            m_afkDialog->onGameEnded();
+            qDebug() << "게임 종료로 인한 AFK 다이얼로그 상태 변경";
         }
-        
-        qDebug() << "AFK 알림 대화상자 결과:" << result;
+    }
+
+    void GameBoard::onAfkUnblockError(const QString& reason, const QString& message)
+    {
+        // AFK 다이얼로그가 열려있으면 에러 처리
+        if (m_afkDialog) {
+            m_afkDialog->onAfkUnblockError(reason, message);
+            qDebug() << QString("AFK 해제 에러 처리: %1 - %2").arg(reason, message);
+        }
     }
 
 } // namespace Blokus

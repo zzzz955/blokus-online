@@ -785,6 +785,20 @@ namespace Blokus {
             emit afkStatusReset(username);
             qDebug() << QString::fromUtf8("AFK 상태 리셋 알림: %1").arg(username);
         }
+        else if (message.startsWith("AFK_UNBLOCK_ERROR:")) {
+            QString jsonData = message.mid(18); // "AFK_UNBLOCK_ERROR:" 제거
+            
+            // JSON 파싱
+            QJsonDocument doc = QJsonDocument::fromJson(jsonData.toUtf8());
+            if (doc.isObject()) {
+                QJsonObject obj = doc.object();
+                QString reason = obj["reason"].toString();
+                QString errorMessage = obj["message"].toString();
+                
+                emit afkUnblockError(reason, errorMessage);
+                qDebug() << QString::fromUtf8("AFK 해제 에러: %1 - %2").arg(reason, errorMessage);
+            }
+        }
     }
 
     // ========================================

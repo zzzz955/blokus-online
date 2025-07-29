@@ -195,6 +195,10 @@ namespace Blokus {
         // AFK 관련 슬롯
         void onAfkModeActivated(const QString& jsonData);
         void onAfkUnblockRequested();
+        
+        // AFK 관련 중계 슬롯 (GameBoard로 전달)
+        void onGameEndedForAfk();
+        void onAfkUnblockErrorForAfk(const QString& reason, const QString& message);
 
     private slots:
         void onGameStartClicked();
