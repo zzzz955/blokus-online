@@ -60,7 +60,6 @@ find_package(OpenSSL REQUIRED)
 target_link_libraries(BlokusServer PRIVATE
     BlokusCommon
     BlokusProto
-    nlohmann_json::nlohmann_json
     Boost::system
     libpqxx::pqxx
     OpenSSL::SSL

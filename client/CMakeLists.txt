@@ -62,7 +62,6 @@ target_link_libraries(BlokusClient PRIVATE
     Qt5::Gui
     Qt5::Svg
     Qt5::Network
-    nlohmann_json::nlohmann_json
 )
 
 # Windows 설정

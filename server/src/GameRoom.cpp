@@ -1303,7 +1303,6 @@ namespace Blokus {
 
             // 게임 종료 조건 확인: 모든 플레이어가 더 이상 블록을 배치할 수 없는 경우
             bool gameFinished = m_gameLogic->isGameFinished();
-            spdlog::info("🔍 [DB_DEBUG] 게임 종료 조건 확인: {} (방 {})", gameFinished ? "종료" : "계속", m_roomId);
             
             if (!gameFinished) {
                 spdlog::debug("⏩ [DB_DEBUG] 게임 계속 진행 - DB 저장 없음 (방 {})", m_roomId);
@@ -1493,6 +1492,10 @@ namespace Blokus {
                         winners.push_back(color);
                     }
                 }
+                
+                // DB에 게임 결과 저장
+                spdlog::debug("🎯 [DB_SAVE_DEBUG] processAutoSkipAfterTurnChange에서 DB 저장 시도");
+                saveGameResultsToDatabase(finalScores, winners);
                 
                 // 게임 결과 브로드캐스트 및 게임 종료
                 broadcastGameResultLocked(finalScores, winners);

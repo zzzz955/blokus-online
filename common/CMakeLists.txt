@@ -26,6 +26,7 @@ target_include_directories(BlokusCommon PUBLIC
 target_link_libraries(BlokusCommon PUBLIC
     BlokusProto
     spdlog::spdlog
+    nlohmann_json::nlohmann_json
 )
 
 # C++ 표준 설정
