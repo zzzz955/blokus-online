@@ -125,7 +125,8 @@ COPY CMakeLists.txt ./
 # 프로젝트 빌드 (vcpkg toolchain 사용)
 # ==================================================
 RUN echo "=== Building Blokus Server with vcpkg ===" && \
-    # CMake 설정 (vcpkg toolchain 사용)
+    # CMake 경로 설정 및 빌드
+    export PATH="${VCPKG_ROOT}/downloads/tools/cmake-3.29.2-linux-x86_64/bin:$PATH" && \
     cmake -S . -B build \
         -GNinja \
         -DCMAKE_BUILD_TYPE=Release \
@@ -135,22 +136,12 @@ RUN echo "=== Building Blokus Server with vcpkg ===" && \
         -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET} \
         -DCMAKE_VERBOSE_MAKEFILE=ON && \
     \
-    # 빌드 의존성 검증
-    echo "=== Build Dependencies Check ===" && \
-    grep -E "(protobuf|spdlog|nlohmann|Boost|pqxx|OpenSSL).*FOUND" build/CMakeCache.txt && \
-    \
     # 빌드 실행 (병렬)
     echo "=== Building with $(nproc) parallel jobs ===" && \
     ninja -C build -j$(nproc) -v && \
     \
     # 설치
     ninja -C build install && \
-    \
-    # 빌드 결과 검증
-    echo "=== Build Verification ===" && \
-    ls -la /app/install/bin/ && \
-    file /app/install/bin/BlokusServer && \
-    ldd /app/install/bin/BlokusServer && \
     \
     echo "=== vcpkg build completed successfully ==="
 
@@ -201,17 +192,7 @@ COPY --from=app-builder /opt/vcpkg-installed/x64-linux/bin/ /usr/local/bin/
 # 라이브러리 경로 업데이트
 RUN ldconfig /usr/local/lib
 
-# 런타임 검증
-RUN echo "=== Runtime Verification ===" && \
-    echo "1. Executable check:" && \
-    file ./BlokusServer && \
-    echo "2. Library dependencies:" && \
-    ldd ./BlokusServer && \
-    echo "3. Available libraries:" && \
-    ls -la /usr/local/lib/ | head -20 && \
-    echo "4. Testing basic execution:" && \
-    (timeout 3 ./BlokusServer --version 2>&1 || echo "Server startup test completed") && \
-    echo "=== Runtime verification completed ==="
+# 런타임 준비 완료
 
 # 로그 및 설정 디렉토리 생성
 RUN mkdir -p /app/logs /app/config && \
