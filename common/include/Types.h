@@ -17,7 +17,7 @@ namespace Blokus {
         constexpr int BOARD_SIZE = 20;              // 클래식 모드 (고정)
         constexpr int MAX_PLAYERS = 4;              // 최대 플레이어 수
         constexpr int BLOCKS_PER_PLAYER = 21;       // 플레이어당 블록 수
-        constexpr int DEFAULT_TURN_TIME = 10;       // 기본 턴 제한시간 (30초)
+        constexpr int DEFAULT_TURN_TIME = 5;       // 기본 턴 제한시간 (30초)
 
         // 서버 관련 상수
         constexpr int MAX_CONCURRENT_USERS = 1000;

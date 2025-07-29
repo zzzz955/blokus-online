@@ -188,6 +188,13 @@ namespace Blokus {
 
     void AfkNotificationDialog::onContinueGameClicked()
     {
+        // 🔥 CRITICAL: 게임 종료 상태에서는 AFK 해제 요청 차단
+        if (m_gameEnded) {
+            qDebug() << "게임이 이미 종료되어 AFK 해제 요청을 차단합니다.";
+            accept(); // 그냥 다이얼로그만 닫기
+            return;
+        }
+        
         // AFK 해제 요청 시그널 발생
         emit afkUnblockRequested();
         
@@ -242,8 +249,8 @@ namespace Blokus {
         m_leaveButton->setText("확인");
         m_leaveButton->setFocus();
         
-        // 3초 후 자동 닫기
-        QTimer::singleShot(3000, this, [this]() {
+        // 🔥 CRITICAL: 즉시 닫기 (사용자 실수 클릭 방지)
+        QTimer::singleShot(1000, this, [this]() {
             this->accept();
         });
     }
