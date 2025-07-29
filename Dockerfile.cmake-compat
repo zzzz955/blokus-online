@@ -1,8 +1,7 @@
 # ==================================================
-# Multi-stage Dockerfile for Blokus Server (Qt 제외)
+# CMake 호환성 패치 Dockerfile (임시 해결책)
 # ==================================================
 
-# ========== Build Stage ==========
 FROM ubuntu:22.04 AS builder
 
 # 비대화형 모드 설정
@@ -12,23 +11,14 @@ ENV TZ=Asia/Seoul
 # 시스템 업데이트 및 기본 도구 설치
 RUN apt-get update && apt-get install -y \
     build-essential \
+    cmake \
     git \
     pkg-config \
     ca-certificates \
     tzdata \
     wget \
+    sed \
     && rm -rf /var/lib/apt/lists/*
-
-# CMake 최신 버전 설치 (3.24+)
-RUN apt-get update && apt-get install -y software-properties-common && \
-    wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
-    gpg --dearmor - | tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
-    echo 'deb https://apt.kitware.com/ubuntu/ jammy main' | tee /etc/apt/sources.list.d/kitware.list >/dev/null && \
-    apt-get update && \
-    apt-get install -y cmake && \
-    echo "=== CMake 버전 확인 ===" && \
-    cmake --version && \
-    rm -rf /var/lib/apt/lists/*
 
 # C++ 의존성 설치 (서버 전용, Qt 제외)
 RUN apt-get update && apt-get install -y \
@@ -60,11 +50,20 @@ RUN apt-get update && apt-get install -y \
 # 작업 디렉토리 설정
 WORKDIR /app
 
-# 소스 코드 복사 (캐시 최적화를 위해 순서 조정)
+# 소스 코드 복사
 COPY CMakeLists.txt ./
 COPY proto/ ./proto/
 COPY common/ ./common/
 COPY server/ ./server/
+
+# CMake 버전 요구사항을 임시로 3.22로 변경
+RUN echo "=== CMake 버전 확인 ===" && \
+    cmake --version && \
+    echo "=== CMakeLists.txt 호환성 패치 ===" && \
+    sed -i 's/cmake_minimum_required(VERSION 3.24)/cmake_minimum_required(VERSION 3.22)/' CMakeLists.txt && \
+    sed -i 's/set(CMAKE_CXX_STANDARD 20)/set(CMAKE_CXX_STANDARD 17)/' CMakeLists.txt && \
+    echo "=== 패치된 CMakeLists.txt 확인 ===" && \
+    head -10 CMakeLists.txt
 
 # CMake 설정 단계
 RUN mkdir -p build && cd build && \

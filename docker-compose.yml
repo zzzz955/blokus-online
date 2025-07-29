@@ -46,8 +46,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      # Fallback Dockerfile 사용시 주석 해제
-      # dockerfile: Dockerfile.fallback
+      # CMake 문제 해결 대안들:
+      # dockerfile: Dockerfile.cmake-snap      # CMake 바이너리 직접 설치
+      # dockerfile: Dockerfile.cmake-compat    # CMake 3.22 호환성 패치
+      # dockerfile: Dockerfile.fallback        # vcpkg 사용
     container_name: blokus-server
     restart: unless-stopped
     
