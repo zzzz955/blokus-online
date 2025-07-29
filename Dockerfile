@@ -13,9 +13,11 @@ RUN apt-get update && apt-get install -y \
     software-properties-common \
     pkg-config \
     tzdata \
-    wget && \
-    bison && \
+    wget \
+    bison \
+    flex && \
     rm -rf /var/lib/apt/lists/*
+
 
 # 최신 CMake 설치
 RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc | gpg --dearmor - | \
