@@ -442,6 +442,12 @@ namespace Blokus {
             // 게임 완료 상태 초기화
             m_hasCompletedGame = false;
 
+            // 🔥 CRITICAL: AFK 상태 방어적 초기화 (새 게임 크래시 방지)
+            m_playerTimeoutCounts.clear();
+            m_playerBlockedByTimeout.clear();
+            m_playerAfkVerificationCounts.clear();
+            spdlog::debug("🛡️ [START_GAME_PROTECTION] AFK 상태 방어적 초기화 완료 (방 {})", m_roomId);
+
             // 게임 로직 초기화
             m_gameLogic->clearBoard();
             // 게임 시작 시에는 색깔 재배정하지 않음 (기존 색깔 유지)
@@ -525,20 +531,41 @@ namespace Blokus {
                 broadcastMessageLocked(gameStateJson.str());
             }
 
+            // 🔥 CRITICAL: 기존 타임아웃 체크 스레드 완전 정리 (중복 실행 방지)
+            m_stopTimeoutCheck = true;
+            if (m_timeoutCheckThread.joinable()) {
+                spdlog::debug("⏰ [THREAD_CLEANUP] 기존 타임아웃 스레드 정리 중 (방 {})", m_roomId);
+                m_timeoutCheckThread.join();
+                spdlog::debug("⏰ [THREAD_CLEANUP] 기존 타임아웃 스레드 정리 완료 (방 {})", m_roomId);
+            }
+            
             // 게임 시작 후 첫 번째 플레이어가 블록을 배치할 수 없다면 자동 스킵 체크
             processAutoSkipAfterTurnChange("게임 시작");
-
-            // 주기적 타임아웃 체크 스레드 시작
-            m_stopTimeoutCheck = false;
-            m_timeoutCheckThread = std::thread(&GameRoom::timeoutCheckLoop, this);
-            spdlog::info("⏰ [TIMER_DEBUG] 주기적 타임아웃 체크 스레드 시작 (방 {})", m_roomId);
             
-            // 첫 번째 턴 시작 브로드캐스트
-            Common::PlayerColor firstPlayer = m_gameStateManager->getCurrentPlayer();
-            spdlog::info("⏰ [TIMER_DEBUG] 게임 시작 후 첫 번째 턴 브로드캐스트: 플레이어 {}", static_cast<int>(firstPlayer));
-            broadcastTurnChangeLocked(firstPlayer);
+            // 🔥 CRITICAL: 게임이 여전히 진행 중인 경우에만 타임아웃 스레드 시작
+            if (m_state == RoomState::Playing) {
+                try {
+                    // 주기적 타임아웃 체크 스레드 시작
+                    m_stopTimeoutCheck = false;
+                    m_timeoutCheckThread = std::thread(&GameRoom::timeoutCheckLoop, this);
+                    spdlog::info("⏰ [TIMER_DEBUG] 주기적 타임아웃 체크 스레드 시작 (방 {})", m_roomId);
+                    
+                    // 첫 번째 턴 시작 브로드캐스트
+                    Common::PlayerColor firstPlayer = m_gameStateManager->getCurrentPlayer();
+                    spdlog::info("⏰ [TIMER_DEBUG] 게임 시작 후 첫 번째 턴 브로드캐스트: 플레이어 {}", static_cast<int>(firstPlayer));
+                    broadcastTurnChangeLocked(firstPlayer);
+                    
+                    spdlog::debug("🎮 방 {} 게임 시작: {} 플레이어, 턴 순서 설정됨", m_roomId, m_players.size());
+                } catch (const std::exception& e) {
+                    spdlog::error("❌ [THREAD_CREATE_ERROR] 타임아웃 스레드 생성 실패 (방 {}): {}", m_roomId, e.what());
+                    // 스레드 생성 실패 시 게임을 안전하게 종료
+                    m_state = RoomState::Waiting;
+                    return false;
+                }
+            } else {
+                spdlog::info("🚫 [GAME_AUTO_END] 게임이 시작 직후 자동 종료되어 타임아웃 스레드를 시작하지 않음 (방 {})", m_roomId);
+            }
             
-            spdlog::debug("🎮 방 {} 게임 시작: {} 플레이어, 턴 순서 설정됨", m_roomId, m_players.size());
             return true;
         }
 
@@ -562,6 +589,12 @@ namespace Blokus {
                 m_timeoutCheckThread.join();
             }
             spdlog::debug("⏰ 주기적 타임아웃 체크 스레드 정지 (방 {})", m_roomId);
+
+            // 🔥 CRITICAL: 게임 종료 시 AFK 상태 초기화 (크래시 방지)
+            m_playerTimeoutCounts.clear();
+            m_playerBlockedByTimeout.clear();
+            m_playerAfkVerificationCounts.clear();
+            spdlog::debug("🛡️ [END_GAME_PROTECTION] AFK 상태 초기화 완료 (방 {})", m_roomId);
 
             m_state = RoomState::Waiting;
             updateActivity();
@@ -1504,7 +1537,8 @@ namespace Blokus {
                 }
             }
             
-            // 모든 활성 플레이어가 스킵되었으면 게임 종료 처리
+            // 🔥 CRITICAL: 타임아웃 스레드에서 게임 종료 방지 (데드락 회피)
+            // 모든 활성 플레이어가 스킵되었으면 게임 종료 플래그 설정
             if (autoSkipCount >= maxAutoSkips) {
                 spdlog::debug("🏁 {} 후 게임 종료 조건 충족: 모든 활성 플레이어가 블록 배치 불가 (방 {})", skipReason, m_roomId);
                 
@@ -1528,9 +1562,14 @@ namespace Blokus {
                 spdlog::debug("🎯 [DB_SAVE_DEBUG] processAutoSkipAfterTurnChange에서 DB 저장 시도");
                 saveGameResultsToDatabase(finalScores, winners);
                 
-                // 게임 결과 브로드캐스트 및 게임 종료
+                // 게임 결과 브로드캐스트
                 broadcastGameResultLocked(finalScores, winners);
-                endGameLocked();
+                
+                // 🔥 FIX: 타임아웃 스레드에서는 endGameLocked() 직접 호출하지 않음
+                // 대신 상태만 변경하고 타이머를 중지하여 자연스럽게 종료되도록 함
+                m_state = RoomState::Waiting;
+                m_turnTimerActive = false;
+                spdlog::info("🛡️ [DEADLOCK_PREVENTION] 타임아웃 스레드에서 게임 종료 상태 설정 (방 {})", m_roomId);
             }
         }
         
@@ -1991,16 +2030,29 @@ namespace Blokus {
                     break;
                 }
                 
-                // 게임 중이고 타이머가 활성화된 경우만 체크
-                if (m_state == RoomState::Playing && m_turnTimerActive.load()) {
-                    spdlog::debug("⏰ [TIMER_DEBUG] 타임아웃 체크 중 (방 {}, 타이머 활성: {})", m_roomId, m_turnTimerActive.load());
-                    if (checkTurnTimeout()) {
-                        spdlog::info("⏰ [TIMER_DEBUG] 주기적 체크에서 턴 타임아웃 감지 (방 {})", m_roomId);
-                        handleTurnTimeout();
+                // 🔥 CRITICAL: 예외 처리로 크래시 방지
+                try {
+                    // 게임 중이고 타이머가 활성화된 경우만 체크
+                    if (m_state == RoomState::Playing && m_turnTimerActive.load()) {
+                        spdlog::debug("⏰ [TIMER_DEBUG] 타임아웃 체크 중 (방 {}, 타이머 활성: {})", m_roomId, m_turnTimerActive.load());
+                        if (checkTurnTimeout()) {
+                            spdlog::info("⏰ [TIMER_DEBUG] 주기적 체크에서 턴 타임아웃 감지 (방 {})", m_roomId);
+                            handleTurnTimeout();
+                        }
+                    } else {
+                        spdlog::debug("⏰ [TIMER_DEBUG] 타임아웃 체크 스킵 (방 {}, 게임 상태: {}, 타이머 활성: {})", 
+                            m_roomId, static_cast<int>(m_state), m_turnTimerActive.load());
                     }
-                } else {
-                    spdlog::debug("⏰ [TIMER_DEBUG] 타임아웃 체크 스킵 (방 {}, 게임 상태: {}, 타이머 활성: {})", 
-                        m_roomId, static_cast<int>(m_state), m_turnTimerActive.load());
+                } catch (const std::exception& e) {
+                    spdlog::error("❌ [TIMEOUT_THREAD_ERROR] 타임아웃 체크 중 예외 발생 (방 {}): {}", m_roomId, e.what());
+                    // 예외 발생 시 타이머 중지하고 루프 종료
+                    m_turnTimerActive = false;
+                    m_stopTimeoutCheck = true;
+                } catch (...) {
+                    spdlog::error("❌ [TIMEOUT_THREAD_ERROR] 타임아웃 체크 중 알 수 없는 예외 발생 (방 {})", m_roomId);
+                    // 예외 발생 시 타이머 중지하고 루프 종료
+                    m_turnTimerActive = false;
+                    m_stopTimeoutCheck = true;
                 }
             }
             spdlog::info("⏰ [TIMER_DEBUG] 타임아웃 체크 스레드 종료 (방 {})", m_roomId);
