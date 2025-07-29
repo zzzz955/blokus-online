@@ -108,11 +108,9 @@ RUN echo "=== Installing vcpkg packages ===" && \
 # vcpkg 설치 검증
 # ==================================================
 RUN echo "=== Verifying vcpkg installation ===" && \
-    echo "1. Installed packages:" && \
-    ${VCPKG_ROOT}/vcpkg list && \
-    echo "2. CMake integration files:" && \
+    echo "1. CMake integration files:" && \
     find /opt/vcpkg-installed -name "*Config.cmake" -o -name "*-config.cmake" | head -20 && \
-    echo "3. Library files:" && \
+    echo "2. Library files:" && \
     find /opt/vcpkg-installed -name "*.so" -o -name "*.a" | head -10 && \
     echo "=== vcpkg verification completed ==="
 
