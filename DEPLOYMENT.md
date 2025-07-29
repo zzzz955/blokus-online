@@ -53,9 +53,10 @@ GitHub 저장소의 Settings > Secrets and variables > Actions에서 다음 환�
 
 #### SSH 연결 설정
 ```
-SERVER_HOST=your-server-ip
-SERVER_USER=your-username
-SSH_PRIVATE_KEY=your-private-key-content
+SSH_HOST=your-server-domain-or-ip
+SSH_USER=your-username
+SSH_PORT=22
+SSH_KEY=your-private-key-content
 ```
 
 #### 서버 설정

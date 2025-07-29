@@ -7,13 +7,13 @@ on:
 
 env:
   # Repository에서 환경변수 주입
-  SERVER_HOST: ${{ secrets.SERVER_HOST }}
-  SERVER_USER: ${{ secrets.SERVER_USER }}
-  SERVER_PORT: ${{ secrets.SERVER_PORT }}
-  SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+  SSH_HOST: ${{ secrets.SSH_HOST }}
+  SSH_USER: ${{ secrets.SSH_USER }}
+  SSH_PORT: ${{ secrets.SSH_PORT }}
+  SSH_KEY: ${{ secrets.SSH_KEY }}
   
   # 서버 설정
-  DEPLOY_PATH: /home/${{ secrets.SERVER_USER }}/blokus-online
+  DEPLOY_PATH: /home/${{ secrets.SSH_USER }}/blokus-online
   DOCKER_COMPOSE_FILE: docker-compose.yml
 
 jobs:
@@ -30,21 +30,44 @@ jobs:
     - name: SSH 키 설정
       run: |
         mkdir -p ~/.ssh
-        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -H ${{ env.SERVER_HOST }} >> ~/.ssh/known_hosts
+        ssh-keyscan -p ${{ env.SSH_PORT }} -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
+        
+    - name: 필수 환경변수 체크
+      run: |
+        # 필수 secrets 체크
+        if [ -z "${{ secrets.SSH_HOST }}" ] || [ -z "${{ secrets.SSH_USER }}" ] || [ -z "${{ secrets.SSH_KEY }}" ]; then
+          echo "❌ 필수 SSH 연결 정보가 누락되었습니다!"
+          echo "필요한 Repository Secrets: SSH_HOST, SSH_USER, SSH_KEY, SSH_PORT"
+          exit 1
+        fi
+        
+        if [ -z "${{ secrets.DB_USER }}" ] || [ -z "${{ secrets.DB_PASSWORD }}" ] || [ -z "${{ secrets.DB_NAME }}" ]; then
+          echo "❌ 필수 데이터베이스 정보가 누락되었습니다!"
+          echo "필요한 Repository Secrets: DB_USER, DB_PASSWORD, DB_NAME"
+          exit 1
+        fi
+        
+        if [ -z "${{ secrets.BLOKUS_SERVER_PORT }}" ]; then
+          echo "❌ 서버 포트가 설정되지 않았습니다!"
+          echo "필요한 Repository Secret: BLOKUS_SERVER_PORT"
+          exit 1
+        fi
+        
+        echo "✅ 필수 환경변수 체크 완료"
         
     - name: 서버 연결 테스트
       run: |
-        ssh -i ~/.ssh/id_rsa ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }} "echo '서버 연결 성공!'"
+        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "echo '서버 연결 성공!'"
         
     - name: 서버에 소스코드 배포
       run: |
         # 배포 디렉토리 생성
-        ssh -i ~/.ssh/id_rsa ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }} "mkdir -p ${{ env.DEPLOY_PATH }}"
+        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "mkdir -p ${{ env.DEPLOY_PATH }}"
         
         # Git 저장소 초기화 또는 업데이트
-        ssh -i ~/.ssh/id_rsa ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }} "
+        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
           cd ${{ env.DEPLOY_PATH }} && 
           if [ ! -d .git ]; then
             git clone https://github.com/${{ github.repository }}.git .
@@ -56,8 +79,24 @@ jobs:
         
     - name: 환경변수 파일 생성
       run: |
-        ssh -i ~/.ssh/id_rsa ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }} "
+        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
           cd ${{ env.DEPLOY_PATH }} && \
+          
+          # 환경변수 기본값 설정
+          JWT_SECRET='${{ secrets.JWT_SECRET }}'
+          SESSION_TIMEOUT_HOURS='${{ secrets.SESSION_TIMEOUT_HOURS }}'
+          PASSWORD_SALT_ROUNDS='${{ secrets.PASSWORD_SALT_ROUNDS }}'
+          LOG_LEVEL='${{ secrets.LOG_LEVEL }}'
+          LOG_DIRECTORY='${{ secrets.LOG_DIRECTORY }}'
+          DEBUG_MODE='${{ secrets.DEBUG_MODE }}'
+          ENABLE_SQL_LOGGING='${{ secrets.ENABLE_SQL_LOGGING }}'
+          
+          # JWT 시크릿 자동 생성 (설정되지 않은 경우)
+          if [ -z \"\$JWT_SECRET\" ]; then
+            JWT_SECRET=\$(openssl rand -hex 32)
+            echo '⚠️ JWT_SECRET가 설정되지 않아 자동 생성했습니다. 보안을 위해 Repository Secret에 설정하세요!'
+          fi
+          
           cat > .env << EOF
         # 서버 설정
         SERVER_PORT=${{ secrets.BLOKUS_SERVER_PORT }}
@@ -78,23 +117,23 @@ jobs:
         POSTGRES_PASSWORD=${{ secrets.DB_PASSWORD }}
         
         # 보안 설정
-        JWT_SECRET=${{ secrets.JWT_SECRET }}
-        SESSION_TIMEOUT_HOURS=${{ secrets.SESSION_TIMEOUT_HOURS }}
-        PASSWORD_SALT_ROUNDS=${{ secrets.PASSWORD_SALT_ROUNDS }}
+        JWT_SECRET=\$JWT_SECRET
+        SESSION_TIMEOUT_HOURS=\${SESSION_TIMEOUT_HOURS:-24}
+        PASSWORD_SALT_ROUNDS=\${PASSWORD_SALT_ROUNDS:-12}
         
         # 로깅 설정
-        LOG_LEVEL=${{ secrets.LOG_LEVEL }}
-        LOG_DIRECTORY=${{ secrets.LOG_DIRECTORY }}
+        LOG_LEVEL=\${LOG_LEVEL:-info}
+        LOG_DIRECTORY=\${LOG_DIRECTORY:-/app/logs}
         
         # 개발 설정
-        DEBUG_MODE=${{ secrets.DEBUG_MODE }}
-        ENABLE_SQL_LOGGING=${{ secrets.ENABLE_SQL_LOGGING }}
+        DEBUG_MODE=\${DEBUG_MODE:-false}
+        ENABLE_SQL_LOGGING=\${ENABLE_SQL_LOGGING:-false}
         EOF
         "
         
     - name: 기존 컨테이너 정리
       run: |
-        ssh -i ~/.ssh/id_rsa ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }} "
+        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
           cd ${{ env.DEPLOY_PATH }} && \
           docker-compose down --remove-orphans || true && \
           docker system prune -f || true
@@ -102,7 +141,7 @@ jobs:
         
     - name: Docker 이미지 빌드 및 배포
       run: |
-        ssh -i ~/.ssh/id_rsa ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }} "
+        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
           cd ${{ env.DEPLOY_PATH }} && \
           docker-compose build --no-cache && \
           docker-compose up -d
@@ -111,7 +150,7 @@ jobs:
     - name: 배포 상태 확인
       run: |
         sleep 10  # 컨테이너 시작 대기
-        ssh -i ~/.ssh/id_rsa ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }} "
+        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
           cd ${{ env.DEPLOY_PATH }} && \
           docker-compose ps && \
           docker-compose logs --tail=20 blokus-server && \
@@ -121,7 +160,7 @@ jobs:
         
     - name: 헬스체크
       run: |
-        ssh -i ~/.ssh/id_rsa ${{ env.SERVER_USER }}@${{ env.SERVER_HOST }} "
+        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
           cd ${{ env.DEPLOY_PATH }} && \
           # PostgreSQL 연결 테스트
           docker-compose exec -T postgres psql -U ${{ secrets.DB_USER }} -d ${{ secrets.DB_NAME }} -c 'SELECT version();' && \
@@ -132,7 +171,7 @@ jobs:
       if: always()
       run: |
         if [ "${{ job.status }}" == "success" ]; then
-          echo "✅ 배포 성공! 서버 주소: ${{ env.SERVER_HOST }}:${{ secrets.BLOKUS_SERVER_PORT }}"
+          echo "✅ 배포 성공! 서버 주소: ${{ env.SSH_HOST }}:${{ secrets.BLOKUS_SERVER_PORT }}"
         else
           echo "❌ 배포 실패!"
         fi
