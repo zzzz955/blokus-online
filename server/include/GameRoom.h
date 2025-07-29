@@ -216,6 +216,10 @@ namespace Blokus {
             
             // 타이머 관련 내부 메서드
             void timeoutCheckLoop(); // 백그라운드 스레드에서 실행되는 타임아웃 체크 루프
+            
+            // 리소스 정리 헬퍼 메서드
+            void cleanupTimeoutThread(); // 타임아웃 스레드 안전 정리
+            void cleanupAfkStates(); // AFK 관련 상태 정리
         };
 
         // ========================================
