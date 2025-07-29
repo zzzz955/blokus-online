@@ -15,9 +15,14 @@ RUN apt-get update && apt-get install -y \
     tzdata \
     wget \
     bison \
-    flex && \
+    flex \
+    autoconf \
+    automake \
+    libtool \
+    perl \
+    gettext \
+    gpg && \
     rm -rf /var/lib/apt/lists/*
-
 
 # 최신 CMake 설치
 RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc | gpg --dearmor - | \
