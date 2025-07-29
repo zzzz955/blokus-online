@@ -42,6 +42,9 @@ RUN echo "=== Installing build dependencies ===" && \
     autoconf \
     automake \
     libtool \
+    # PostgreSQL 빌드 의존성 (libpq 빌드용)
+    libpq-dev \
+    postgresql-server-dev-all \
     # 추가 유틸리티
     ccache \
     && rm -rf /var/lib/apt/lists/*
