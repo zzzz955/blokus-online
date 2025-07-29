@@ -125,8 +125,9 @@ COPY CMakeLists.txt ./
 # 프로젝트 빌드 (vcpkg toolchain 사용)
 # ==================================================
 RUN echo "=== Building Blokus Server with vcpkg ===" && \
-    # CMake 경로 설정 및 빌드
-    export PATH="${VCPKG_ROOT}/downloads/tools/cmake-3.29.2-linux-x86_64/bin:$PATH" && \
+    # CMake 경로 자동 찾기 및 설정
+    CMAKE_PATH=$(find ${VCPKG_ROOT}/downloads/tools -name cmake -type f | head -1) && \
+    export PATH="$(dirname $CMAKE_PATH):$PATH" && \
     cmake -S . -B build \
         -GNinja \
         -DCMAKE_BUILD_TYPE=Release \
