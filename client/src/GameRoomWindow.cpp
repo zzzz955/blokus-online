@@ -622,6 +622,7 @@ namespace Blokus {
         connect(m_gameBoard, &GameBoard::cellHovered, this, &GameRoomWindow::onCellHovered);
         connect(m_gameBoard, &GameBoard::blockPlacedSuccessfully, this, &GameRoomWindow::onBlockPlacedSuccessfully);
         connect(m_gameBoard, &GameBoard::afkUnblockRequested, this, &GameRoomWindow::onAfkUnblockRequested);
+        connect(m_gameBoard, &GameBoard::leaveRoomRequested, this, &GameRoomWindow::onLeaveRoomClicked);
         connect(m_myBlockPalette, &MyBlockPalette::blockSelected, this, &GameRoomWindow::onBlockSelected);
     }
 

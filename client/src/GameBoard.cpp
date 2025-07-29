@@ -1131,9 +1131,11 @@ namespace Blokus {
         m_afkDialog = new Blokus::AfkNotificationDialog(this);
         m_afkDialog->setAfkInfo(jsonObj);
         
-        // 🔥 FIX: 시그널 연결 (AFK 해제 + 게임 종료 + 에러 처리)
+        // 🔥 FIX: 시그널 연결 (AFK 해제 + 방 나가기 + 게임 종료 + 에러 처리)
         connect(m_afkDialog, &Blokus::AfkNotificationDialog::afkUnblockRequested, 
                 this, &GameBoard::afkUnblockRequested);
+        connect(m_afkDialog, &Blokus::AfkNotificationDialog::leaveRoomRequested,
+                this, &GameBoard::leaveRoomRequested);
         
         // 다이얼로그 닫힐 때 정리
         connect(m_afkDialog, &QDialog::finished, [this]() {
@@ -1163,9 +1165,11 @@ namespace Blokus {
         m_afkDialog = new Blokus::AfkNotificationDialog(this);
         m_afkDialog->setAfkInfo(timeoutCount, maxCount);
         
-        // 🔥 FIX: 시그널 연결 (AFK 해제 + 게임 종료 + 에러 처리)
+        // 🔥 FIX: 시그널 연결 (AFK 해제 + 방 나가기 + 게임 종료 + 에러 처리)
         connect(m_afkDialog, &Blokus::AfkNotificationDialog::afkUnblockRequested, 
                 this, &GameBoard::afkUnblockRequested);
+        connect(m_afkDialog, &Blokus::AfkNotificationDialog::leaveRoomRequested,
+                this, &GameBoard::leaveRoomRequested);
         
         // 다이얼로그 닫힐 때 정리
         connect(m_afkDialog, &QDialog::finished, [this]() {

@@ -43,6 +43,12 @@ namespace Blokus {
          * 사용자가 "게임 계속하기" 버튼을 클릭했을 때 발생
          */
         void afkUnblockRequested();
+        
+        /**
+         * @brief 방 나가기 요청 시그널
+         * 사용자가 "나가기" 버튼을 클릭했을 때 발생
+         */
+        void leaveRoomRequested();
 
     public slots:
         /**
