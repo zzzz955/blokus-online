@@ -6,6 +6,7 @@
 #include <vector>
 #include <unordered_map>
 #include <mutex>
+#include <optional>
 #include <boost/asio.hpp>
 #include <spdlog/spdlog.h>
 
