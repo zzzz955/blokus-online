@@ -100,6 +100,7 @@ namespace Blokus {
         
         // AFK 관련 시그널
         void afkUnblockRequested();
+        void leaveRoomRequested();
 
     protected:
         void mousePressEvent(QMouseEvent* event) override;

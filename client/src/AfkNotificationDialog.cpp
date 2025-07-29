@@ -204,7 +204,10 @@ namespace Blokus {
 
     void AfkNotificationDialog::onLeaveGameClicked()
     {
-        // 게임 나가기 (reject로 처리)
+        // 🔥 FIX: 실제 방 나가기 시그널 발생
+        emit leaveRoomRequested();
+        
+        // 대화상자 닫기 (reject로 처리)
         reject();
     }
 
