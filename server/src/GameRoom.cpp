@@ -45,11 +45,9 @@ namespace Blokus {
         }
 
         GameRoom::~GameRoom() {
-            // 타임아웃 체크 스레드 종료
-            m_stopTimeoutCheck = true;
-            if (m_timeoutCheckThread.joinable()) {
-                m_timeoutCheckThread.join();
-            }
+            // 🧹 소멸자에서 모든 리소스 정리
+            cleanupTimeoutThread();
+            cleanupAfkStates();
             
             // 모든 플레이어에게 방 해체 알림
             broadcastMessage("ROOM_DISBANDED");
@@ -442,11 +440,11 @@ namespace Blokus {
             // 게임 완료 상태 초기화
             m_hasCompletedGame = false;
 
-            // 🔥 CRITICAL: AFK 상태 방어적 초기화 (새 게임 크래시 방지)
-            m_playerTimeoutCounts.clear();
-            m_playerBlockedByTimeout.clear();
-            m_playerAfkVerificationCounts.clear();
-            spdlog::debug("🛡️ [START_GAME_PROTECTION] AFK 상태 방어적 초기화 완료 (방 {})", m_roomId);
+            // 🔥 DEFENSIVE: AFK 상태 방어적 초기화 (endGameLocked에서 미처리된 경우 대비)
+            if (!m_playerTimeoutCounts.empty() || !m_playerBlockedByTimeout.empty() || !m_playerAfkVerificationCounts.empty()) {
+                spdlog::warn("⚠️ [DEFENSIVE_CLEANUP] 이전 게임의 AFK 상태가 남아있어 정리합니다 (방 {})", m_roomId);
+                cleanupAfkStates();
+            }
 
             // 게임 로직 초기화
             m_gameLogic->clearBoard();
@@ -531,12 +529,10 @@ namespace Blokus {
                 broadcastMessageLocked(gameStateJson.str());
             }
 
-            // 🔥 CRITICAL: 기존 타임아웃 체크 스레드 완전 정리 (중복 실행 방지)
-            m_stopTimeoutCheck = true;
+            // 🔥 DEFENSIVE: 기존 타임아웃 체크 스레드 방어적 정리 (endGameLocked에서 미처리된 경우 대비)
             if (m_timeoutCheckThread.joinable()) {
-                spdlog::debug("⏰ [THREAD_CLEANUP] 기존 타임아웃 스레드 정리 중 (방 {})", m_roomId);
-                m_timeoutCheckThread.join();
-                spdlog::debug("⏰ [THREAD_CLEANUP] 기존 타임아웃 스레드 정리 완료 (방 {})", m_roomId);
+                spdlog::warn("⚠️ [DEFENSIVE_CLEANUP] 이전 타임아웃 스레드가 남아있어 정리합니다 (방 {})", m_roomId);
+                cleanupTimeoutThread();
             }
             
             // 게임 시작 후 첫 번째 플레이어가 블록을 배치할 수 없다면 자동 스킵 체크
@@ -583,18 +579,9 @@ namespace Blokus {
             // 턴 타이머 정지 (게임 종료 시)
             stopTurnTimer();
             
-            // 주기적 타임아웃 체크 스레드 정지
-            m_stopTimeoutCheck = true;
-            if (m_timeoutCheckThread.joinable()) {
-                m_timeoutCheckThread.join();
-            }
-            spdlog::debug("⏰ 주기적 타임아웃 체크 스레드 정지 (방 {})", m_roomId);
-
-            // 🔥 CRITICAL: 게임 종료 시 AFK 상태 초기화 (크래시 방지)
-            m_playerTimeoutCounts.clear();
-            m_playerBlockedByTimeout.clear();
-            m_playerAfkVerificationCounts.clear();
-            spdlog::debug("🛡️ [END_GAME_PROTECTION] AFK 상태 초기화 완료 (방 {})", m_roomId);
+            // 🔥 PRIMARY: 게임 종료 시 모든 리소스 정리 (주 책임)
+            cleanupTimeoutThread();
+            cleanupAfkStates();
 
             m_state = RoomState::Waiting;
             updateActivity();
@@ -632,11 +619,8 @@ namespace Blokus {
                 player.resetForNewGame();
             }
             
-            // 타임아웃 누적 차단 시스템 초기화
-            m_playerTimeoutCounts.clear();
-            m_playerBlockedByTimeout.clear();
-            m_playerAfkVerificationCounts.clear();
-            spdlog::debug("🔄 [TIMEOUT_RESET] 타임아웃 카운터, 차단 상태, AFK 검증 카운터 초기화 (방 {})", m_roomId);
+            // 🔄 SECONDARY: 타임아웃 누적 차단 시스템 초기화 (UI 리셋용)
+            cleanupAfkStates();
 
             updateActivity();
 
@@ -2056,6 +2040,23 @@ namespace Blokus {
                 }
             }
             spdlog::info("⏰ [TIMER_DEBUG] 타임아웃 체크 스레드 종료 (방 {})", m_roomId);
+        }
+
+        void GameRoom::cleanupTimeoutThread() {
+            m_stopTimeoutCheck = true;
+            if (m_timeoutCheckThread.joinable()) {
+                m_timeoutCheckThread.join();
+                spdlog::debug("🧹 [CLEANUP] 타임아웃 스레드 정리 완료 (방 {})", m_roomId);
+            }
+        }
+
+        void GameRoom::cleanupAfkStates() {
+            if (!m_playerTimeoutCounts.empty() || !m_playerBlockedByTimeout.empty() || !m_playerAfkVerificationCounts.empty()) {
+                m_playerTimeoutCounts.clear();
+                m_playerBlockedByTimeout.clear();
+                m_playerAfkVerificationCounts.clear();
+                spdlog::debug("🧹 [CLEANUP] AFK 상태 정리 완료 (방 {})", m_roomId);
+            }
         }
 
 
