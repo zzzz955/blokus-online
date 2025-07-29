@@ -61,10 +61,15 @@ target_link_libraries(BlokusServer PRIVATE
     BlokusCommon
     BlokusProto
     Boost::system
+    libpqxx::pqxx
     OpenSSL::SSL
     OpenSSL::Crypto
-    libpqxx::pqxx
 )
+
+# Linux ���� ���ñ� ���̺귯��
+if(UNIX AND NOT APPLE)
+    target_link_libraries(BlokusServer PRIVATE dl pthread)
+endif()
 
 # Windows ����
 if(WIN32)
