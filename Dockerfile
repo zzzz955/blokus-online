@@ -128,6 +128,23 @@ RUN echo "=== Building Blokus Server with vcpkg ===" && \
     # CMake 경로 자동 찾기 및 설정
     CMAKE_PATH=$(find ${VCPKG_ROOT}/downloads/tools -name cmake -type f | head -1) && \
     export PATH="$(dirname $CMAKE_PATH):$PATH" && \
+    \
+    # vcpkg 설치 디렉토리 확인 및 경로 설정
+    VCPKG_INSTALLED_PATH="/opt/vcpkg-installed/${VCPKG_DEFAULT_TRIPLET}" && \
+    echo "=== vcpkg installation directory structure ===" && \
+    ls -la /opt/vcpkg-installed/ && \
+    ls -la ${VCPKG_INSTALLED_PATH}/ && \
+    ls -la ${VCPKG_INSTALLED_PATH}/share/ && \
+    \
+    # protobuf 설치 확인
+    if [ -d "${VCPKG_INSTALLED_PATH}/share/protobuf" ]; then \
+        echo "✅ Found protobuf config at: ${VCPKG_INSTALLED_PATH}/share/protobuf"; \
+        ls -la ${VCPKG_INSTALLED_PATH}/share/protobuf/; \
+    else \
+        echo "❌ protobuf config not found, checking alternatives..."; \
+        find /opt/vcpkg-installed -name "*protobuf*" -type d; \
+    fi && \
+    \
     cmake -S . -B build \
         -GNinja \
         -DCMAKE_BUILD_TYPE=Release \
@@ -135,6 +152,10 @@ RUN echo "=== Building Blokus Server with vcpkg ===" && \
         -DCMAKE_INSTALL_PREFIX=/app/install \
         -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
         -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET} \
+        -DCMAKE_PREFIX_PATH="${VCPKG_INSTALLED_PATH};${VCPKG_INSTALLED_PATH}/share" \
+        -DVCPKG_INSTALLED_DIR="/opt/vcpkg-installed" \
+        -DProtobuf_DIR="${VCPKG_INSTALLED_PATH}/share/protobuf" \
+        -Dprotobuf_DIR="${VCPKG_INSTALLED_PATH}/share/protobuf" \
         -DCMAKE_VERBOSE_MAKEFILE=ON && \
     \
     # 빌드 실행 (병렬)
