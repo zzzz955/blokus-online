@@ -136,36 +136,19 @@ jobs:
         ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
           cd ${{ env.DEPLOY_PATH }} && \
           docker compose down --remove-orphans || true && \
-          docker system prune -f || true
+          docker image prune -f --filter label=stage=intermediate || true
         "
         
     - name: Docker 이미지 빌드 및 배포
       run: |
         ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
           cd ${{ env.DEPLOY_PATH }} && \
-          docker compose build --no-cache && \
-          docker compose up -d
+          export DOCKER_BUILDKIT=1 && \
+          export COMPOSE_DOCKER_CLI_BUILD=1 && \
+          docker compose build --parallel && \
+          docker compose up -d --wait --wait-timeout 60
         "
         
-    - name: 배포 상태 확인
-      run: |
-        sleep 10  # 컨테이너 시작 대기
-        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
-          cd ${{ env.DEPLOY_PATH }} && \
-          docker compose ps && \
-          docker compose logs --tail=20 blokus-server && \
-          echo '=== 포트 확인 ===' && \
-          netstat -tlnp | grep :${{ secrets.SERVER_PORT }} || echo '서버 포트가 아직 열리지 않았습니다.'
-        "
-        
-    - name: 헬스체크
-      run: |
-        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
-          cd ${{ env.DEPLOY_PATH }} && \
-          # PostgreSQL 연결 테스트
-          docker compose exec -T postgres psql -U ${{ secrets.DB_USER }} -d ${{ secrets.DB_NAME }} -c 'SELECT version();' && \
-          echo 'PostgreSQL 연결 성공!' || echo 'PostgreSQL 연결 실패!'
-        "
         
     - name: 배포 결과 알림
       if: always()
