@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     tzdata \
     wget && \
+    bison && \
     rm -rf /var/lib/apt/lists/*
 
 # 최신 CMake 설치
