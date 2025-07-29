@@ -65,39 +65,13 @@ RUN echo "=== Installing vcpkg ===" && \
     ./vcpkg version && \
     echo "=== vcpkg installation completed ==="
 
-# ==================================================
-# 서버 전용 vcpkg.json 생성 (Qt 제외)
-# ==================================================
-RUN echo "=== Creating server-only vcpkg.json ===" && \
-    mkdir -p /tmp/server-build && \
-    cat > /tmp/server-build/vcpkg.json << 'EOF'
-{
-  "name": "blokus-server",
-  "version": "1.0.0",
-  "description": "Blokus Online Server Dependencies",
-  "dependencies": [
-    "protobuf",
-    "spdlog",
-    "boost-system",
-    "nlohmann-json",
-    "libpqxx",
-    "openssl"
-  ]
-}
-EOF
-
-# vcpkg.json 확인
-RUN echo "=== Server vcpkg.json contents ===" && \
-    cat /tmp/server-build/vcpkg.json
 
 # ==================================================
 # vcpkg 의존성 설치
 # ==================================================
-RUN cd /tmp/server-build && \
-    export VCPKG_BINARY_SOURCES="clear;default,readwrite" && \
-    ${VCPKG_ROOT}/vcpkg install protobuf spdlog boost-system nlohmann-json libpqxx openssl \
-        --triplet=${VCPKG_DEFAULT_TRIPLET} \
-        --x-install-root=/opt/vcpkg-installed
+RUN cd ${VCPKG_ROOT} && \
+    ./vcpkg install protobuf spdlog boost-system nlohmann-json libpqxx openssl \
+        --triplet=${VCPKG_DEFAULT_TRIPLET}
 
 # vcpkg 설치 완료
 
@@ -127,8 +101,7 @@ RUN CMAKE_PATH=$(find ${VCPKG_ROOT}/downloads/tools -name cmake -type f | head -
         -DCMAKE_CXX_STANDARD=20 \
         -DCMAKE_INSTALL_PREFIX=/app/install \
         -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
-        -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET} \
-        -DVCPKG_INSTALLED_DIR=/opt/vcpkg-installed && \
+        -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET} && \
     ninja -C build -j$(nproc) && \
     ninja -C build install
 
