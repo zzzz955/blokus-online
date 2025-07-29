@@ -49,9 +49,9 @@ jobs:
           exit 1
         fi
         
-        if [ -z "${{ secrets.BLOKUS_SERVER_PORT }}" ]; then
+        if [ -z "${{ secrets.SERVER_PORT }}" ]; then
           echo "❌ 서버 포트가 설정되지 않았습니다!"
-          echo "필요한 Repository Secret: BLOKUS_SERVER_PORT"
+          echo "필요한 Repository Secret: SERVER_PORT"
           exit 1
         fi
         
@@ -99,7 +99,7 @@ jobs:
           
           cat > .env << EOF
         # 서버 설정
-        SERVER_PORT=${{ secrets.BLOKUS_SERVER_PORT }}
+        SERVER_PORT=${{ secrets.SERVER_PORT }}
         SERVER_MAX_CLIENTS=${{ secrets.SERVER_MAX_CLIENTS }}
         SERVER_THREAD_POOL_SIZE=${{ secrets.SERVER_THREAD_POOL_SIZE }}
         
@@ -155,7 +155,7 @@ jobs:
           docker-compose ps && \
           docker-compose logs --tail=20 blokus-server && \
           echo '=== 포트 확인 ===' && \
-          netstat -tlnp | grep :${{ secrets.BLOKUS_SERVER_PORT }} || echo '서버 포트가 아직 열리지 않았습니다.'
+          netstat -tlnp | grep :${{ secrets.SERVER_PORT }} || echo '서버 포트가 아직 열리지 않았습니다.'
         "
         
     - name: 헬스체크
@@ -171,7 +171,7 @@ jobs:
       if: always()
       run: |
         if [ "${{ job.status }}" == "success" ]; then
-          echo "✅ 배포 성공! 서버 주소: ${{ env.SSH_HOST }}:${{ secrets.BLOKUS_SERVER_PORT }}"
+          echo "✅ 배포 성공! 서버 주소: ${{ env.SSH_HOST }}:${{ secrets.SERVER_PORT }}"
         else
           echo "❌ 배포 실패!"
         fi
