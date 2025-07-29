@@ -66,11 +66,6 @@ target_link_libraries(BlokusServer PRIVATE
     OpenSSL::Crypto
 )
 
-# Linux ���� ���ñ� ���̺귯��
-if(UNIX AND NOT APPLE)
-    target_link_libraries(BlokusServer PRIVATE dl pthread)
-endif()
-
 # Windows ����
 if(WIN32)
     set_target_properties(BlokusServer PROPERTIES

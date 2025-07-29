@@ -70,7 +70,7 @@ RUN echo "=== Installing vcpkg ===" && \
 # vcpkg 의존성 설치
 # ==================================================
 RUN cd ${VCPKG_ROOT} && \
-    ./vcpkg install protobuf spdlog boost-asio boost-system nlohmann-json libpq[core,openssl] openssl \
+    ./vcpkg install protobuf spdlog boost-asio boost-system nlohmann-json libpqxx openssl \
         --triplet=${VCPKG_DEFAULT_TRIPLET}
 
 # vcpkg 설치 완료
@@ -90,11 +90,11 @@ COPY common/ ./common/
 COPY server/ ./server/
 COPY CMakeLists.txt ./
 
-# 서버 소스 파일 확인 및 .dockerignore 체크
-RUN echo "=== Checking server directory structure ===" && \
-    find server/ -name "*.cpp" -o -name "*.h" | head -20 && \
-    echo "=== Checking if src files exist ===" && \
-    ls -la server/src/ 2>/dev/null || echo "❌ server/src/ directory missing!"
+# vcpkg 설치 확인
+RUN echo "=== Checking vcpkg installations ===" && \
+    ls -la ${VCPKG_ROOT}/installed/x64-linux/share/ | grep -E "(libpq|protobuf|openssl)" && \
+    echo "=== Available packages ===" && \
+    ${VCPKG_ROOT}/vcpkg list
 
 # ==================================================
 # 프로젝트 빌드 (vcpkg toolchain 사용)
