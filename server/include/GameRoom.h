@@ -171,6 +171,11 @@ namespace Blokus {
             bool m_lastTurnTimedOut;   // 이전 턴이 시간 초과로 끝났는지
             std::thread m_timeoutCheckThread; // 주기적 타임아웃 체크용 스레드
             std::atomic<bool> m_stopTimeoutCheck; // 스레드 종료 플래그
+            
+            // 타임아웃 누적 차단 시스템
+            static const int TIMEOUT_LIMIT = 3;  // 타임아웃 한계 횟수
+            std::map<Common::PlayerColor, int> m_playerTimeoutCounts;  // 플레이어별 타임아웃 횟수
+            std::map<Common::PlayerColor, bool> m_playerBlockedByTimeout;  // 타임아웃으로 인한 차단 상태
 
             // 방 설정
             bool m_isPrivate;

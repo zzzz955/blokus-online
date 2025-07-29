@@ -37,6 +37,10 @@ namespace Blokus {
             , m_stopTimeoutCheck(false)
         {
             m_players.reserve(Common::MAX_PLAYERS);
+            
+            // 타임아웃 누적 차단 시스템 초기화 (생성자에서)
+            spdlog::debug("🔄 [TIMEOUT_INIT] 타임아웃 시스템 초기화 (방 {})", m_roomId);
+            
             spdlog::debug("🏠 방 생성: ID={}, Name='{}', Host={}", m_roomId, m_roomName, m_hostId);
         }
 
@@ -594,6 +598,11 @@ namespace Blokus {
             for (auto& player : m_players) {
                 player.resetForNewGame();
             }
+            
+            // 타임아웃 누적 차단 시스템 초기화
+            m_playerTimeoutCounts.clear();
+            m_playerBlockedByTimeout.clear();
+            spdlog::debug("🔄 [TIMEOUT_RESET] 타임아웃 카운터 및 차단 상태 초기화 (방 {})", m_roomId);
 
             updateActivity();
 
@@ -935,6 +944,27 @@ namespace Blokus {
             if (newPlayerName.empty()) {
                 spdlog::warn("⚠️ 턴 변경 실패: 플레이어 색상 {}에 해당하는 플레이어를 찾을 수 없음", static_cast<int>(newPlayer));
                 return; // 빈 슬롯 메시지 방지
+            }
+            
+            // 타임아웃 차단 상태 확인 - 차단된 플레이어면 자동 스킵
+            auto timeoutBlockIt = m_playerBlockedByTimeout.find(newPlayer);
+            if (timeoutBlockIt != m_playerBlockedByTimeout.end() && timeoutBlockIt->second) {
+                spdlog::info("🚫 [TIMEOUT_SKIP] 플레이어 {} 타임아웃 차단 상태로 턴 자동 스킵", static_cast<int>(newPlayer));
+                
+                // 시스템 메시지 브로드캐스트
+                std::ostringstream skipMsg;
+                skipMsg << "SYSTEM:" << newPlayerName << "님은 타임아웃으로 인해 자동으로 턴이 넘어갑니다.";
+                broadcastMessageLocked(skipMsg.str());
+                
+                // 다음 플레이어로 즉시 턴 넘기기 (타이머 없이)
+                m_gameStateManager->nextTurn();
+                Common::PlayerColor nextPlayer = m_gameStateManager->getCurrentPlayer();
+                
+                if (nextPlayer != newPlayer) {
+                    // 재귀 호출로 다음 플레이어 턴 시작
+                    broadcastTurnChangeLocked(nextPlayer);
+                    return; // 현재 턴 처리 종료
+                }
             }
             
             // 턴 타이머 시작
@@ -1676,13 +1706,27 @@ namespace Blokus {
             
             spdlog::info("⏰ 턴 타임아웃: 방 {}, 플레이어 {}", m_roomId, static_cast<int>(currentPlayer));
             
-            // 타임아웃 알림 메시지 브로드캐스트
+            // 타임아웃 카운터 증가 및 차단 상태 확인
+            m_playerTimeoutCounts[currentPlayer]++;
+            int timeoutCount = m_playerTimeoutCounts[currentPlayer];
+            
+            spdlog::info("📊 [TIMEOUT_COUNT] 플레이어 {} 타임아웃 {}회 누적", static_cast<int>(currentPlayer), timeoutCount);
+            
+            // 플레이어 이름 찾기 (한 번만)
             std::string timedOutPlayerName = "";
             for (const auto& player : m_players) {
                 if (player.getColor() == currentPlayer) {
                     timedOutPlayerName = player.getUsername();
                     break;
                 }
+            }
+            
+            bool wasBlocked = false;
+            if (timeoutCount >= TIMEOUT_LIMIT) {
+                m_playerBlockedByTimeout[currentPlayer] = true;
+                wasBlocked = true;
+                spdlog::warn("🚫 [TIMEOUT_BLOCK] 플레이어 {} 타임아웃 {}회 누적으로 차단 상태로 전환", 
+                           static_cast<int>(currentPlayer), timeoutCount);
             }
             
             std::ostringstream timeoutMsg;
@@ -1699,6 +1743,14 @@ namespace Blokus {
                 std::ostringstream systemMsg;
                 systemMsg << "SYSTEM:" << timedOutPlayerName << "님의 시간이 초과되어 턴이 넘어갑니다.";
                 broadcastMessageLocked(systemMsg.str());
+                
+                // 차단 상태 전환 알림 메시지
+                if (wasBlocked) {
+                    std::ostringstream blockMsg;
+                    blockMsg << "SYSTEM:" << timedOutPlayerName << "님이 " << TIMEOUT_LIMIT 
+                           << "회 타임아웃으로 인해 자동 턴 스킵 상태가 되었습니다.";
+                    broadcastMessageLocked(blockMsg.str());
+                }
             }
             
             // 다음 플레이어로 턴 넘기기
