@@ -1,0 +1,106 @@
+# ==================================================
+# .dockerignore - Docker 빌드 최적화 설정
+# ==================================================
+
+# ========== Git 관련 ==========
+.git/
+.gitignore
+.github/
+*.md
+README*
+CHANGELOG*
+LICENSE*
+
+# ========== 빌드 및 캐시 디렉토리 ==========
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.vcxproj*
+*.sln
+
+# ========== vcpkg (Docker에서 불필요) ==========
+vcpkg/
+vcpkg_installed/
+vcpkg.json
+
+# ========== 클라이언트 코드 (서버 빌드시 불필요) ==========
+client/
+
+# ========== 테스트 및 개발 파일 ==========
+test/
+tests/
+*_test.cpp
+test_*.cpp
+run_session_test.bat
+test_session_cleanup.cpp
+
+# ========== IDE 설정 파일 ==========
+.vscode/
+.vs/
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.sln
+CMakeSettings.json
+CMakePresets.json
+
+# ========== 런타임 파일 ==========
+logs/
+*.log
+*.tmp
+*.temp
+
+# ========== 환경 설정 ==========
+.env*
+!.env.example
+
+# ========== OS 관련 ==========
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# ========== 컴파일 결과물 ==========
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+
+# ========== Protocol Buffers 생성 파일 ==========
+proto/*.pb.h
+proto/*.pb.cc
+
+# ========== 기타 개발 도구 ==========
+pkg_init.ps1
+*.bat
+*.ps1
+
+# ========== Docker 관련 ==========
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# ========== 문서 및 예제 ==========
+docs/
+examples/
+screenshots/
+images/
+
+# ========== 패키지 매니저 파일 ==========
+node_modules/
+package*.json
+yarn.lock
+
+# ========== 임시 파일 ==========
+*.tmp
+*.bak
+*.orig
+*~

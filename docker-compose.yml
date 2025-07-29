@@ -1,0 +1,122 @@
+version: '3.8'
+
+services:
+  # ========== PostgreSQL Database ==========
+  postgres:
+    image: postgres:16-alpine
+    container_name: blokus-postgres
+    restart: unless-stopped
+    
+    environment:
+      # .env 파일에서 환경변수 로드
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      TZ: Asia/Seoul
+    
+    volumes:
+      # 데이터베이스 영속성
+      - postgres_data:/var/lib/postgresql/data
+      # 초기 스키마 스크립트 (옵션)
+      - ./sql:/docker-entrypoint-initdb.d:ro
+    
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    
+    networks:
+      - blokus-network
+    
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    
+    # 로그 설정
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ========== Blokus Game Server ==========
+  blokus-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: blokus-server
+    restart: unless-stopped
+    
+    environment:
+      # 서버 설정
+      SERVER_PORT: ${SERVER_PORT:-9999}
+      SERVER_MAX_CLIENTS: ${SERVER_MAX_CLIENTS:-1000}
+      SERVER_THREAD_POOL_SIZE: ${SERVER_THREAD_POOL_SIZE:-4}
+      
+      # 데이터베이스 연결 (postgres 서비스명 사용)
+      DB_HOST: postgres
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
+      
+      # 보안 설정
+      JWT_SECRET: ${JWT_SECRET}
+      SESSION_TIMEOUT_HOURS: ${SESSION_TIMEOUT_HOURS:-24}
+      PASSWORD_SALT_ROUNDS: ${PASSWORD_SALT_ROUNDS:-12}
+      
+      # 로깅 설정
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_DIRECTORY: ${LOG_DIRECTORY:-/app/logs}
+      
+      # 개발 설정
+      DEBUG_MODE: ${DEBUG_MODE:-false}
+      ENABLE_SQL_LOGGING: ${ENABLE_SQL_LOGGING:-false}
+      
+      # 시간대
+      TZ: Asia/Seoul
+    
+    volumes:
+      # 로그 디렉토리 마운트
+      - ./logs:/app/logs
+      # 설정 파일 (옵션)
+      - ./config:/app/config:ro
+    
+    ports:
+      - "${SERVER_PORT:-9999}:${SERVER_PORT:-9999}"
+    
+    networks:
+      - blokus-network
+    
+    depends_on:
+      postgres:
+        condition: service_healthy
+    
+    healthcheck:
+      test: ["CMD", "netcat", "-z", "localhost", "${SERVER_PORT:-9999}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
+    # 로그 설정
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+# ========== 네트워크 설정 ==========
+networks:
+  blokus-network:
+    driver: bridge
+    name: blokus-network
+
+# ========== 볼륨 설정 ==========
+volumes:
+  postgres_data:
+    driver: local
+    name: blokus-postgres-data

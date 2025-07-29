@@ -8,7 +8,7 @@ namespace Blokus {
     namespace Server {
 
         // ========================================
-        // °£´ÜÇÑ È¯°æº¯¼ö ÇïÆÛ ÇÔ¼öµé
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ È¯ï¿½æº¯ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ô¼ï¿½ï¿½ï¿½
         // ========================================
         inline std::string getEnvString(const char* name, const char* defaultValue = "") {
             const char* value = std::getenv(name);
@@ -28,17 +28,17 @@ namespace Blokus {
         }
 
         // ========================================
-        // °£´ÜÇÑ ¼³Á¤ °ü¸®ÀÚ Å¬·¡½º
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Å¬ï¿½ï¿½ï¿½ï¿½
         // ========================================
         class ConfigManager {
         public:
             static void initialize() {
-                // ¼­¹ö ¼³Á¤
+                // ì„œë²„ ì„¤ì •
                 serverPort = getEnvInt("SERVER_PORT", 9999);
                 maxClients = getEnvInt("SERVER_MAX_CLIENTS", 1000);
                 threadPoolSize = getEnvInt("SERVER_THREAD_POOL_SIZE", 4);
 
-                // µ¥ÀÌÅÍº£ÀÌ½º ¼³Á¤
+                // ë°ì´í„°ë² ì´ìŠ¤ ì„¤ì •
                 dbHost = getEnvString("DB_HOST", "localhost");
                 dbPort = getEnvString("DB_PORT", "5432");
                 dbUser = getEnvString("DB_USER", "admin");
@@ -46,25 +46,25 @@ namespace Blokus {
                 dbName = getEnvString("DB_NAME", "blokus_online");
                 dbPoolSize = getEnvInt("DB_POOL_SIZE", 10);
 
-                // PostgreSQL ¿¬°á ¹®ÀÚ¿­ »ı¼º
-                dbConnectionString = "host=" + dbHost + " port=" + dbPort +
-                    " user=" + dbUser + " password=" + dbPassword +
-                    " dbname=" + dbName + " client_encoding=UTF8";
-
-                // º¸¾È ¼³Á¤
+                // ë³´ì•ˆ ì„¤ì •
                 jwtSecret = getEnvString("JWT_SECRET", "dev_secret_change_in_production");
                 sessionTimeoutHours = getEnvInt("SESSION_TIMEOUT_HOURS", 24);
                 passwordSaltRounds = getEnvInt("PASSWORD_SALT_ROUNDS", 12);
 
-                // ·Î±ë ¼³Á¤
+                // ë¡œê¹… ì„¤ì •
                 logLevel = getEnvString("LOG_LEVEL", "info");
                 logDirectory = getEnvString("LOG_DIRECTORY", "logs");
 
-                // °³¹ß ¼³Á¤
+                // ê°œë°œ ì„¤ì •
                 debugMode = getEnvBool("DEBUG_MODE", false);
                 enableSqlLogging = getEnvBool("ENABLE_SQL_LOGGING", false);
 
-                spdlog::info("È¯°æº¯¼ö ºÒ·¯¿À±â ¿Ï·á! ¼­¹ö Æ÷Æ®: {}, DB: {}@{}:{}/{}",
+                // PostgreSQL ì—°ê²° ë¬¸ìì—´ ìƒì„±
+                dbConnectionString = "host=" + dbHost + " port=" + dbPort +
+                    " user=" + dbUser + " password=" + dbPassword +
+                    " dbname=" + dbName + " client_encoding=UTF8";
+
+                spdlog::info("í™˜ê²½ë³€ìˆ˜ ë¶ˆëŸ¬ì˜¤ê¸° ì™„ë£Œ! ì„œë²„ í¬íŠ¸: {}, DB: {}@{}:{}/{}",
                     serverPort, dbUser, dbHost, dbPort, dbName);
 
                 if (debugMode) {
@@ -74,7 +74,7 @@ namespace Blokus {
 
             static bool validate() {
                 if (dbHost.empty() || dbUser.empty() || dbName.empty()) {
-                    spdlog::error("ÇÊ¼ö DB ¼³Á¤ÀÌ ´©¶ôµÇ¾ú½À´Ï´Ù: DB_HOST, DB_USER, DB_NAME");
+                    spdlog::error("ï¿½Ê¼ï¿½ DB ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ç¾ï¿½ï¿½ï¿½ï¿½Ï´ï¿½: DB_HOST, DB_USER, DB_NAME");
                     return false;
                 }
                 return true;
@@ -95,15 +95,15 @@ namespace Blokus {
             }
 
             // ========================================
-            // ¼³Á¤ °ªµé (public static)
+            // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (public static)
             // ========================================
 
-            // ¼­¹ö ¼³Á¤
+            // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             static int serverPort;
             static int maxClients;
             static int threadPoolSize;
 
-            // µ¥ÀÌÅÍº£ÀÌ½º ¼³Á¤
+            // ï¿½ï¿½ï¿½ï¿½ï¿½Íºï¿½ï¿½Ì½ï¿½ ï¿½ï¿½ï¿½ï¿½
             static std::string dbHost;
             static std::string dbPort;
             static std::string dbUser;
@@ -112,16 +112,16 @@ namespace Blokus {
             static std::string dbConnectionString;
             static int dbPoolSize;
 
-            // º¸¾È ¼³Á¤
+            // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             static std::string jwtSecret;
             static int sessionTimeoutHours;
             static int passwordSaltRounds;
 
-            // ·Î±ë ¼³Á¤
+            // ï¿½Î±ï¿½ ï¿½ï¿½ï¿½ï¿½
             static std::string logLevel;
             static std::string logDirectory;
 
-            // °³¹ß ¼³Á¤
+            // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             static bool debugMode;
             static bool enableSqlLogging;
         };

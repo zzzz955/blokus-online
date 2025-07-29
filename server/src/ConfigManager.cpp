@@ -4,35 +4,35 @@ namespace Blokus {
     namespace Server {
 
         // ========================================
-        // Static 변수 정의 (기본값 설정)
+        // Static 변수 정의 (초기값 없음 - initialize()에서 설정)
         // ========================================
 
         // 서버 설정
-        int ConfigManager::serverPort = 7777;
-        int ConfigManager::maxClients = 1000;
-        int ConfigManager::threadPoolSize = 4;
+        int ConfigManager::serverPort;
+        int ConfigManager::maxClients;
+        int ConfigManager::threadPoolSize;
 
         // 데이터베이스 설정
-        std::string ConfigManager::dbHost = "localhost";
-        std::string ConfigManager::dbPort = "5432";
-        std::string ConfigManager::dbUser = "admin";
-        std::string ConfigManager::dbPassword = "admin";
-        std::string ConfigManager::dbName = "blokus_online";
-        std::string ConfigManager::dbConnectionString = "";
-        int ConfigManager::dbPoolSize = 10;
+        std::string ConfigManager::dbHost;
+        std::string ConfigManager::dbPort;
+        std::string ConfigManager::dbUser;
+        std::string ConfigManager::dbPassword;
+        std::string ConfigManager::dbName;
+        std::string ConfigManager::dbConnectionString;
+        int ConfigManager::dbPoolSize;
 
         // 보안 설정
-        std::string ConfigManager::jwtSecret = "dev_secret_change_in_production";
-        int ConfigManager::sessionTimeoutHours = 24;
-        int ConfigManager::passwordSaltRounds = 12;
+        std::string ConfigManager::jwtSecret;
+        int ConfigManager::sessionTimeoutHours;
+        int ConfigManager::passwordSaltRounds;
 
         // 로깅 설정
-        std::string ConfigManager::logLevel = "info";
-        std::string ConfigManager::logDirectory = "logs";
+        std::string ConfigManager::logLevel;
+        std::string ConfigManager::logDirectory;
 
         // 개발 설정
-        bool ConfigManager::debugMode = false;
-        bool ConfigManager::enableSqlLogging = false;
+        bool ConfigManager::debugMode;
+        bool ConfigManager::enableSqlLogging;
 
     } // namespace Server
 } // namespace Blokus
