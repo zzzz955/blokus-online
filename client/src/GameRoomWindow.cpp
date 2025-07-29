@@ -621,6 +621,7 @@ namespace Blokus {
         connect(m_gameBoard, &GameBoard::cellClicked, this, &GameRoomWindow::onCellClicked);
         connect(m_gameBoard, &GameBoard::cellHovered, this, &GameRoomWindow::onCellHovered);
         connect(m_gameBoard, &GameBoard::blockPlacedSuccessfully, this, &GameRoomWindow::onBlockPlacedSuccessfully);
+        connect(m_gameBoard, &GameBoard::afkUnblockRequested, this, &GameRoomWindow::onAfkUnblockRequested);
         connect(m_myBlockPalette, &MyBlockPalette::blockSelected, this, &GameRoomWindow::onBlockSelected);
     }
 
@@ -2536,6 +2537,29 @@ namespace Blokus {
         addSystemMessage(QString::fromUtf8("시간 초과! 턴이 자동으로 넘어갑니다."));
 
         qDebug() << QString::fromUtf8("⏰ 턴 타임아웃 발생");
+    }
+
+    // ========================================
+    // AFK 관련 메서드
+    // ========================================
+
+    void GameRoomWindow::onAfkModeActivated(const QString& jsonData)
+    {
+        qDebug() << QString::fromUtf8("🚨 AFK 모드 활성화 알림 수신: %1").arg(jsonData);
+        
+        // GameBoard에 AFK 알림 표시 요청
+        if (m_gameBoard) {
+            m_gameBoard->showAfkNotification(jsonData);
+        }
+    }
+
+    void GameRoomWindow::onAfkUnblockRequested()
+    {
+        qDebug() << QString::fromUtf8("🔓 AFK 해제 요청 신호 수신");
+        
+        // NetworkClient에 AFK 해제 메시지 전송 요청
+        // 이는 main.cpp에서 처리될 예정 (GameBoard -> GameRoomWindow -> main -> NetworkClient)
+        emit afkUnblockRequested();
     }
 
 } // namespace Blokus

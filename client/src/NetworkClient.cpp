@@ -315,6 +315,17 @@ namespace Blokus {
         emit chatMessageSent();
     }
 
+    void NetworkClient::sendAfkUnblock()
+    {
+        if (!isConnected()) {
+            qWarning() << QString::fromUtf8("AFK 해제 메시지 전송 실패: 서버에 연결되지 않음");
+            return;
+        }
+        
+        sendMessage("AFK_UNBLOCK");
+        qDebug() << QString::fromUtf8("AFK 해제 메시지 전송");
+    }
+
     void NetworkClient::setState(ConnectionState state)
     {
         if (m_state != state) {
@@ -469,6 +480,11 @@ namespace Blokus {
                  message.startsWith("TURN_CHANGED:") ||
                  message.startsWith("TURN_TIMEOUT:")) {
             processGameStateMessage(message);
+        }
+        else if (message.startsWith("AFK_MODE_ACTIVATED:") ||
+                 message.startsWith("AFK_UNBLOCK_SUCCESS") ||
+                 message.startsWith("AFK_STATUS_RESET:")) {
+            processAfkMessage(message);
         }
         else if (message == "pong") {
             // Ping-pong은 특별히 처리하지 않음
@@ -750,6 +766,24 @@ namespace Blokus {
             
             qDebug() << QString::fromUtf8("턴 타임아웃 알림: %1님 시간 초과")
                         .arg(timedOutPlayerName);
+        }
+    }
+
+    void NetworkClient::processAfkMessage(const QString& message)
+    {
+        if (message.startsWith("AFK_MODE_ACTIVATED:")) {
+            QString jsonData = message.mid(19); // "AFK_MODE_ACTIVATED:" 제거
+            emit afkModeActivated(jsonData);
+            qDebug() << QString::fromUtf8("AFK 모드 활성화 알림 수신: %1").arg(jsonData);
+        }
+        else if (message == "AFK_UNBLOCK_SUCCESS") {
+            emit afkUnblockSuccess();
+            qDebug() << QString::fromUtf8("AFK 모드 해제 성공");
+        }
+        else if (message.startsWith("AFK_STATUS_RESET:")) {
+            QString username = message.mid(17); // "AFK_STATUS_RESET:" 제거
+            emit afkStatusReset(username);
+            qDebug() << QString::fromUtf8("AFK 상태 리셋 알림: %1").arg(username);
         }
     }
 

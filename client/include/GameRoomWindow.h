@@ -179,6 +179,9 @@ namespace Blokus {
         
         // 준비 상태 시그널
         void playerReadyChanged(bool ready);
+        
+        // AFK 관련 시그널
+        void afkUnblockRequested();
 
     public slots:
         // UI 이벤트 핸들러
@@ -188,6 +191,10 @@ namespace Blokus {
         void onGameStateUpdated(const QString& gameStateJson);
         void onBlockPlaced(const QString& playerName, int blockType, int row, int col, int rotation, int flip, int playerColor, int scoreGained);
         void onTurnChanged(const QString& newPlayerName, int playerColor, int turnNumber, int turnTimeSeconds, int remainingTimeSeconds, bool previousTurnTimedOut);
+        
+        // AFK 관련 슬롯
+        void onAfkModeActivated(const QString& jsonData);
+        void onAfkUnblockRequested();
 
     private slots:
         void onGameStartClicked();

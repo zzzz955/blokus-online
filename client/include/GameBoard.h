@@ -17,6 +17,11 @@
 #include "ClientBlock.h"
 #include "ClientLogic.h"
 
+// Forward declarations
+namespace Blokus {
+    class AfkNotificationDialog;
+}
+
 namespace Blokus {
 
     class GameBoard : public QGraphicsView
@@ -80,6 +85,10 @@ namespace Blokus {
         void clearSelection();
         void setBlockSelected(bool selected);
 
+        // AFK 알림 처리
+        void showAfkNotification(const QString& jsonData);
+        void showAfkNotification(int timeoutCount, int maxCount);
+
     signals:
         void cellClicked(int row, int col);
         void cellHovered(int row, int col);
@@ -88,6 +97,9 @@ namespace Blokus {
         void blockRotated(const Block& block);
         void blockFlipped(const Block& block);
         void blockPlacedSuccessfully(BlockType blockType, PlayerColor player, int row, int col, int rotation, int flip);
+        
+        // AFK 관련 시그널
+        void afkUnblockRequested();
 
     protected:
         void mousePressEvent(QMouseEvent* event) override;
@@ -172,6 +184,9 @@ namespace Blokus {
         std::map<PlayerColor, QColor> m_playerColors;
 
         bool m_blockSelected;
+        
+        // AFK 알림 대화상자
+        Blokus::AfkNotificationDialog* m_afkDialog;
     };
 
 } // namespace Blokus

@@ -124,6 +124,8 @@ namespace Blokus::Server {
         
         // 사용자 정보 관련 핸들러들
         void handleGetUserStats(const std::vector<std::string>& params);
+        void handleAfkVerify();  // AFK 검증 처리
+        void handleAfkUnblock(); // AFK 모드 해제 처리
 
         // 게임 관련 핸들러들
         void handleGameMove(const std::vector<std::string>& params);

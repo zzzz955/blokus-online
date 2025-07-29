@@ -92,6 +92,9 @@ namespace Blokus {
         // 채팅 관련
         void sendChatMessage(const QString& message);
         void sendChatMessageProtobuf(const QString& message);
+        
+        // AFK 관련
+        void sendAfkUnblock();
 
     signals:
         // 연결 상태 시그널
@@ -145,6 +148,11 @@ namespace Blokus {
         // 채팅 시그널
         void chatMessageReceived(const QString& username, const QString& message);
         void chatMessageSent();
+        
+        // AFK 관련 시그널
+        void afkModeActivated(const QString& jsonData);
+        void afkUnblockSuccess();
+        void afkStatusReset(const QString& username);
 
     private slots:
         void onConnected();
@@ -160,6 +168,7 @@ namespace Blokus {
         void processAuthResponse(const QString& response);
         void processLobbyResponse(const QString& response);
         void processGameStateMessage(const QString& message);
+        void processAfkMessage(const QString& message);
         void processErrorMessage(const QString& error);
         void setupSocket();
         void cleanupSocket();
