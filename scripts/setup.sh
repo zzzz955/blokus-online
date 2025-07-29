@@ -71,24 +71,17 @@ install_docker() {
     fi
 }
 
-# Docker Compose 설치
-install_docker_compose() {
-    log_step "Docker Compose 설치 상태 확인 중..."
+# Docker Compose V2 확인
+check_docker_compose() {
+    log_step "Docker Compose V2 상태 확인 중..."
     
-    if command -v docker-compose &> /dev/null; then
-        log_info "Docker Compose가 이미 설치되어 있습니다."
-        docker-compose --version
+    if docker compose version &> /dev/null; then
+        log_info "Docker Compose V2가 이미 설치되어 있습니다."
+        docker compose version
     else
-        log_info "Docker Compose 설치 중..."
-        
-        # 최신 버전 가져오기
-        COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep -Po '"tag_name": "\K.*\d')
-        
-        # Docker Compose 다운로드 및 설치
-        sudo curl -L "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-        sudo chmod +x /usr/local/bin/docker-compose
-        
-        log_info "Docker Compose 설치 완료"
+        log_error "Docker Compose V2가 설치되지 않았습니다!"
+        log_info "Docker 최신 버전을 설치하면 Compose V2가 기본 포함됩니다."
+        exit 1
     fi
 }
 
@@ -315,8 +308,8 @@ After=docker.service
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=${project_path}
-ExecStart=/usr/local/bin/docker-compose up -d
-ExecStop=/usr/local/bin/docker-compose down
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose down
 TimeoutStartSec=0
 User=$(whoami)
 
@@ -340,13 +333,13 @@ setup_complete() {
     echo "=== 다음 단계 ==="
     echo "1. .env 파일에서 설정 확인 및 수정"
     echo "2. 배포 실행: ./scripts/deploy.sh"
-    echo "3. 로그 확인: docker-compose logs -f"
+    echo "3. 로그 확인: docker compose logs -f"
     echo
     echo "=== 유용한 명령어 ==="
     echo "• 수동 배포: ./scripts/deploy.sh"
-    echo "• 서비스 상태: docker-compose ps"
-    echo "• 컨테이너 중지: docker-compose down"
-    echo "• 로그 확인: docker-compose logs -f blokus-server"
+    echo "• 서비스 상태: docker compose ps"
+    echo "• 컨테이너 중지: docker compose down"
+    echo "• 로그 확인: docker compose logs -f blokus-server"
     echo
 }
 
@@ -363,7 +356,7 @@ main() {
     
     # 설정 단계 실행
     install_docker
-    install_docker_compose
+    check_docker_compose
     create_directories
     create_env_file
     create_init_sql

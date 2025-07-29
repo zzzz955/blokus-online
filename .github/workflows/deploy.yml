@@ -135,7 +135,7 @@ jobs:
       run: |
         ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
           cd ${{ env.DEPLOY_PATH }} && \
-          docker-compose down --remove-orphans || true && \
+          docker compose down --remove-orphans || true && \
           docker system prune -f || true
         "
         
@@ -143,8 +143,8 @@ jobs:
       run: |
         ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
           cd ${{ env.DEPLOY_PATH }} && \
-          docker-compose build --no-cache && \
-          docker-compose up -d
+          docker compose build --no-cache && \
+          docker compose up -d
         "
         
     - name: 배포 상태 확인
@@ -152,8 +152,8 @@ jobs:
         sleep 10  # 컨테이너 시작 대기
         ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
           cd ${{ env.DEPLOY_PATH }} && \
-          docker-compose ps && \
-          docker-compose logs --tail=20 blokus-server && \
+          docker compose ps && \
+          docker compose logs --tail=20 blokus-server && \
           echo '=== 포트 확인 ===' && \
           netstat -tlnp | grep :${{ secrets.SERVER_PORT }} || echo '서버 포트가 아직 열리지 않았습니다.'
         "
@@ -163,7 +163,7 @@ jobs:
         ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
           cd ${{ env.DEPLOY_PATH }} && \
           # PostgreSQL 연결 테스트
-          docker-compose exec -T postgres psql -U ${{ secrets.DB_USER }} -d ${{ secrets.DB_NAME }} -c 'SELECT version();' && \
+          docker compose exec -T postgres psql -U ${{ secrets.DB_USER }} -d ${{ secrets.DB_NAME }} -c 'SELECT version();' && \
           echo 'PostgreSQL 연결 성공!' || echo 'PostgreSQL 연결 실패!'
         "
         

@@ -67,8 +67,8 @@ check_docker() {
         exit 1
     fi
     
-    if ! command -v docker-compose &> /dev/null; then
-        log_error "Docker Compose가 설치되지 않았습니다!"
+    if ! docker compose version &> /dev/null; then
+        log_error "Docker Compose V2가 설치되지 않았습니다!"
         exit 1
     fi
     
@@ -85,13 +85,13 @@ backup_current() {
     log_step "현재 실행 중인 서비스 백업 중..."
     
     # 데이터베이스 백업
-    if docker-compose ps postgres | grep -q "Up"; then
+    if docker compose ps postgres | grep -q "Up"; then
         log_info "PostgreSQL 데이터베이스 백업 중..."
         
         mkdir -p backups
         backup_file="backups/blokus_backup_$(date +%Y%m%d_%H%M%S).sql"
         
-        docker-compose exec -T postgres pg_dump -U ${DB_USER} ${DB_NAME} > "$backup_file"
+        docker compose exec -T postgres pg_dump -U ${DB_USER} ${DB_NAME} > "$backup_file"
         
         if [ $? -eq 0 ]; then
             log_info "데이터베이스 백업 완료: $backup_file"
@@ -105,7 +105,7 @@ backup_current() {
 stop_services() {
     log_step "기존 서비스 중지 중..."
     
-    docker-compose down --remove-orphans
+    docker compose down --remove-orphans
     
     # 사용하지 않는 이미지 정리
     docker image prune -f
@@ -118,10 +118,10 @@ start_services() {
     log_step "새 컨테이너 빌드 및 시작 중..."
     
     # 이미지 빌드 (캐시 없이)
-    docker-compose build --no-cache blokus-server
+    docker compose build --no-cache blokus-server
     
     # 컨테이너 시작
-    docker-compose up -d
+    docker compose up -d
     
     log_info "서비스 시작 완료"
 }
@@ -134,15 +134,15 @@ check_services() {
     sleep 15
     
     # 컨테이너 상태 확인
-    if ! docker-compose ps | grep -q "Up"; then
+    if ! docker compose ps | grep -q "Up"; then
         log_error "일부 서비스가 정상적으로 시작되지 않았습니다!"
-        docker-compose logs --tail=50
+        docker compose logs --tail=50
         exit 1
     fi
     
     # PostgreSQL 연결 테스트
     log_info "PostgreSQL 연결 테스트 중..."
-    docker-compose exec -T postgres pg_isready -U ${DB_USER} -d ${DB_NAME}
+    docker compose exec -T postgres pg_isready -U ${DB_USER} -d ${DB_NAME}
     
     # 서버 포트 확인
     log_info "서버 포트 확인 중..."
@@ -161,9 +161,9 @@ check_services() {
 show_logs() {
     log_step "최근 로그 출력..."
     echo
-    docker-compose logs --tail=20 blokus-server
+    docker compose logs --tail=20 blokus-server
     echo
-    docker-compose logs --tail=10 postgres
+    docker compose logs --tail=10 postgres
 }
 
 # 배포 완료 메시지
@@ -176,10 +176,10 @@ deployment_summary() {
     echo "데이터베이스: PostgreSQL (포트 ${DB_PORT:-5432})"
     echo
     echo "=== 유용한 명령어 ==="
-    echo "• 로그 확인: docker-compose logs -f blokus-server"
-    echo "• 상태 확인: docker-compose ps"
-    echo "• 서비스 중지: docker-compose down"
-    echo "• 서비스 재시작: docker-compose restart"
+    echo "• 로그 확인: docker compose logs -f blokus-server"
+    echo "• 상태 확인: docker compose ps"
+    echo "• 서비스 중지: docker compose down"
+    echo "• 서비스 재시작: docker compose restart"
     echo
 }
 
@@ -192,17 +192,17 @@ rollback() {
         log_step "롤백 수행 중..."
         
         # 현재 컨테이너 중지
-        docker-compose down --remove-orphans
+        docker compose down --remove-orphans
         
         # 최신 백업 복구 (옵션)
         if [ -d "backups" ] && [ "$(ls -A backups/)" ]; then
             latest_backup=$(ls -t backups/*.sql | head -n1)
             log_info "최신 백업 복구 중: $latest_backup"
             
-            docker-compose up -d postgres
+            docker compose up -d postgres
             sleep 10
             
-            docker-compose exec -T postgres psql -U ${DB_USER} -d ${DB_NAME} < "$latest_backup"
+            docker compose exec -T postgres psql -U ${DB_USER} -d ${DB_NAME} < "$latest_backup"
         fi
         
         log_info "롤백 완료"

@@ -127,10 +127,10 @@ cat ~/.ssh/id_rsa
 
 ```bash
 # 컨테이너 상태 확인
-docker-compose ps
+docker compose ps
 
 # 로그 확인
-docker-compose logs -f blokus-server
+docker compose logs -f blokus-server
 
 # 포트 확인
 netstat -tlnp | grep :9999
@@ -159,39 +159,39 @@ GitHub Actions 대신 수동으로 배포하려면:
 
 ```bash
 # 실시간 로그 확인
-docker-compose logs -f blokus-server
+docker compose logs -f blokus-server
 
 # 최근 로그 확인
-docker-compose logs --tail=100 blokus-server
+docker compose logs --tail=100 blokus-server
 
 # PostgreSQL 로그 확인
-docker-compose logs postgres
+docker compose logs postgres
 ```
 
 ### 5.2 데이터베이스 백업/복원
 
 ```bash
 # 백업 생성
-docker-compose exec postgres pg_dump -U blokus_admin blokus_online > backup.sql
+docker compose exec postgres pg_dump -U blokus_admin blokus_online > backup.sql
 
 # 백업 복원
-docker-compose exec -T postgres psql -U blokus_admin blokus_online < backup.sql
+docker compose exec -T postgres psql -U blokus_admin blokus_online < backup.sql
 ```
 
 ### 5.3 서비스 제어
 
 ```bash
 # 서비스 시작
-docker-compose up -d
+docker compose up -d
 
 # 서비스 중지
-docker-compose down
+docker compose down
 
 # 서비스 재시작
-docker-compose restart
+docker compose restart
 
 # 특정 서비스만 재시작
-docker-compose restart blokus-server
+docker compose restart blokus-server
 ```
 
 ### 5.4 시스템 서비스 (설정한 경우)
@@ -231,7 +231,7 @@ df -h
 **컨테이너가 시작되지 않는 경우:**
 ```bash
 # 로그 확인
-docker-compose logs blokus-server
+docker compose logs blokus-server
 
 # 환경변수 확인
 cat .env
@@ -243,10 +243,10 @@ netstat -tlnp | grep :9999
 **데이터베이스 연결 실패:**
 ```bash
 # PostgreSQL 컨테이너 상태 확인
-docker-compose ps postgres
+docker compose ps postgres
 
 # 데이터베이스 연결 테스트
-docker-compose exec postgres pg_isready -U blokus_admin -d blokus_online
+docker compose exec postgres pg_isready -U blokus_admin -d blokus_online
 ```
 
 **빌드 실패:**
@@ -255,7 +255,7 @@ docker-compose exec postgres pg_isready -U blokus_admin -d blokus_online
 docker system prune -f
 
 # 캐시 없이 재빌드
-docker-compose build --no-cache
+docker compose build --no-cache
 ```
 
 ### 7.2 롤백 절차
@@ -264,7 +264,7 @@ docker-compose build --no-cache
 
 ```bash
 # 수동 롤백
-docker-compose down
+docker compose down
 # 백업에서 데이터베이스 복원
 # 이전 버전 체크아웃 후 재배포
 ```
@@ -297,7 +297,7 @@ docker-compose down
 
 문제가 발생하면 다음을 확인하세요:
 1. GitHub Actions 로그
-2. 서버의 docker-compose 로그
+2. 서버의 docker compose 로그
 3. 시스템 로그 (`/var/log/syslog`)
 4. 방화벽 설정 (`ufw status`)
 
