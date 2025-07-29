@@ -54,6 +54,7 @@ COPY common/ ./common/
 COPY server/ ./server/
 
 # CMake 빌드
+WORKDIR /app/server
 RUN mkdir -p build && cd build && \
     cmake .. \
         -DCMAKE_BUILD_TYPE=Release \
