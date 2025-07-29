@@ -2081,6 +2081,10 @@ namespace Blokus {
             spdlog::debug("🎯 [DB_SAVE_DEBUG] terminateGameLocked에서 DB 저장 시도: {}", reason);
             saveGameResultsToDatabase(finalScores, winners);
             
+            // 🔥 FIX: GAME_ENDED 메시지를 먼저 보내서 AFK 모달 닫기
+            broadcastMessageLocked("GAME_ENDED");
+            broadcastMessageLocked("SYSTEM:게임이 종료되었습니다.");
+            
             // 게임 결과 브로드캐스트
             broadcastGameResultLocked(finalScores, winners);
             

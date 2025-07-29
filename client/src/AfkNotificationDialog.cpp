@@ -213,21 +213,36 @@ namespace Blokus {
 
     void AfkNotificationDialog::closeEvent(QCloseEvent* event)
     {
+        // 🔥 FIX: 게임 종료 상태에서는 닫기 허용
+        if (m_gameEnded) {
+            event->accept();
+            return;
+        }
+        
         // ESC나 X 버튼으로 닫기 차단 (명시적 선택 강제)
         event->ignore();
     }
 
     void AfkNotificationDialog::keyPressEvent(QKeyEvent* event)
     {
-        // ESC 키 차단
+        // 🔥 FIX: 게임 종료 상태에서는 ESC 키로 닫기 허용
         if (event->key() == Qt::Key_Escape) {
-            event->ignore();
-            return;
+            if (m_gameEnded) {
+                accept();
+                return;
+            } else {
+                event->ignore();
+                return;
+            }
         }
         
-        // Enter 키는 게임 계속하기로 처리
+        // Enter 키는 게임 계속하기로 처리 (게임 종료 상태가 아니면)
         if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
-            onContinueGameClicked();
+            if (m_gameEnded) {
+                accept(); // 게임 종료 상태에서는 그냥 닫기
+            } else {
+                onContinueGameClicked();
+            }
             return;
         }
         
@@ -252,8 +267,8 @@ namespace Blokus {
         m_leaveButton->setText("확인");
         m_leaveButton->setFocus();
         
-        // 🔥 CRITICAL: 즉시 닫기 (사용자 실수 클릭 방지)
-        QTimer::singleShot(1000, this, [this]() {
+        // 🔥 CRITICAL: 즉시 닫기 (게임 종료 시 모달을 자동으로 닫아 원활한 UX 제공)
+        QTimer::singleShot(100, this, [this]() {
             this->accept();
         });
     }
