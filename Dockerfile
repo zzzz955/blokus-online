@@ -90,6 +90,10 @@ COPY common/ ./common/
 COPY server/ ./server/
 COPY CMakeLists.txt ./
 
+# 서버 소스 파일 확인
+RUN ls -la server/src/ || echo "server/src/ not found" && \
+    ls -la server/include/ || echo "server/include/ not found"
+
 # ==================================================
 # 프로젝트 빌드 (vcpkg toolchain 사용)
 # ==================================================
