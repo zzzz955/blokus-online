@@ -38,12 +38,12 @@ RUN echo '{\
   "name": "blokus-server",\
   "version": "1.0.0",\
   "dependencies": [\
-    "libpqxx",\
-    "openssl",\
-    "boost-system",\
     "protobuf",\
+    "boost-system",\
     "spdlog",\
-    "nlohmann-json"\
+    "nlohmann-json",\
+    "libpqxx",\
+    "openssl"\
   ]\
 }' > vcpkg.json
 
