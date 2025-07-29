@@ -42,6 +42,8 @@ RUN echo "=== Installing build dependencies ===" && \
     autoconf \
     automake \
     libtool \
+    bison \
+    flex \
     # PostgreSQL 빌드 의존성 (libpq 빌드용)
     libpq-dev \
     postgresql-server-dev-all \
