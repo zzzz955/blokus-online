@@ -93,16 +93,11 @@ RUN echo "=== Server vcpkg.json contents ===" && \
 # ==================================================
 # vcpkg 의존성 설치
 # ==================================================
-RUN echo "=== Installing vcpkg packages ===" && \
-    cd /tmp/server-build && \
-    # Binary caching 비활성화 (mono 의존성 제거)
+RUN cd /tmp/server-build && \
     export VCPKG_BINARY_SOURCES="clear;default,readwrite" && \
-    # 패키지 설치 (병렬 빌드)
-    ${VCPKG_ROOT}/vcpkg install \
+    ${VCPKG_ROOT}/vcpkg install protobuf spdlog boost-system nlohmann-json libpqxx openssl \
         --triplet=${VCPKG_DEFAULT_TRIPLET} \
-        --x-install-root=/opt/vcpkg-installed \
-        && \
-    echo "=== vcpkg packages installation completed ==="
+        --x-install-root=/opt/vcpkg-installed
 
 # vcpkg 설치 완료
 
@@ -133,8 +128,8 @@ RUN CMAKE_PATH=$(find ${VCPKG_ROOT}/downloads/tools -name cmake -type f | head -
         -DCMAKE_INSTALL_PREFIX=/app/install \
         -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
         -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET} \
-        -DCMAKE_VERBOSE_MAKEFILE=ON && \
-    ninja -C build -j$(nproc) -v && \
+        -DVCPKG_INSTALLED_DIR=/opt/vcpkg-installed && \
+    ninja -C build -j$(nproc) && \
     ninja -C build install
 
 # ==================================================
