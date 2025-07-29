@@ -70,7 +70,7 @@ RUN echo "=== Installing vcpkg ===" && \
 # vcpkg 의존성 설치
 # ==================================================
 RUN cd ${VCPKG_ROOT} && \
-    ./vcpkg install protobuf spdlog boost-system nlohmann-json libpqxx openssl \
+    ./vcpkg install protobuf spdlog boost-asio boost-system nlohmann-json libpqxx openssl \
         --triplet=${VCPKG_DEFAULT_TRIPLET}
 
 # vcpkg 설치 완료
@@ -108,7 +108,7 @@ RUN CMAKE_PATH=$(find ${VCPKG_ROOT}/downloads/tools -name cmake -type f | head -
         -DCMAKE_INSTALL_PREFIX=/app/install \
         -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
         -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET} && \
-    ninja -C build -j$(nproc) && \
+    ninja -C build -j1 -v && \
     ninja -C build install
 
 # ==================================================
