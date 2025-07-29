@@ -13,7 +13,9 @@ endif()
 
 # 패키지 찾기
 find_package(protobuf CONFIG REQUIRED)
-find_package(Qt5 REQUIRED COMPONENTS Core Widgets Gui Svg Network)
+if(MSVC)
+    find_package(Qt5 REQUIRED COMPONENTS Core Widgets Gui Svg Network)
+endif()
 find_package(spdlog CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 
@@ -23,7 +25,9 @@ find_package(Boost REQUIRED COMPONENTS system)
 # 디렉토리 추가
 add_subdirectory(proto)
 add_subdirectory(common)
-add_subdirectory(client)
+if(MSVC)
+    add_subdirectory(client)
+endif()
 add_subdirectory(server)
 
 # 빌드 정보 출력
