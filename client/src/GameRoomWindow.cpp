@@ -382,7 +382,7 @@ namespace Blokus {
         , m_timerPanel(nullptr)
         , m_timerLabel(nullptr)
         , m_timerProgressBar(nullptr)
-        , m_turnTimeLimit(30)
+        , m_turnTimeLimit(Common::DEFAULT_TURN_TIME)
         , m_remainingTime(0)
         , m_isTimerActive(false)
         , m_countdownTimer(new QTimer(this))

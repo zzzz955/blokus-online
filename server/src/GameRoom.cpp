@@ -31,7 +31,7 @@ namespace Blokus {
             , m_maxPlayers(Common::MAX_PLAYERS)
             , m_hasCompletedGame(false)
             , m_roomManager(roomManager)
-            , m_turnTimeoutSeconds(30)  // 기본 30초 타임아웃
+            , m_turnTimeoutSeconds(Common::DEFAULT_TURN_TIME)  // 기본 30초 타임아웃
             , m_turnTimerActive(false)
             , m_lastTurnTimedOut(false)
             , m_stopTimeoutCheck(false)
