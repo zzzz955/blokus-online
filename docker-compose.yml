@@ -46,6 +46,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # Fallback Dockerfile 사용시 주석 해제
+      # dockerfile: Dockerfile.fallback
     container_name: blokus-server
     restart: unless-stopped
     

@@ -24,18 +24,26 @@ RUN apt-get update && apt-get install -y \
     # PostgreSQL 클라이언트 라이브러리
     libpqxx-dev \
     libpq-dev \
+    postgresql-client \
     # OpenSSL
     libssl-dev \
     # Boost (system만 필요)
     libboost-system-dev \
     libboost-dev \
+    libboost-all-dev \
     # Protocol Buffers
     libprotobuf-dev \
     protobuf-compiler \
-    # JSON 라이브러리
+    libprotoc-dev \
+    # JSON 라이브러리 (fallback 포함)
     nlohmann-json3-dev \
+    libjsoncpp-dev \
     # spdlog (로깅)
     libspdlog-dev \
+    libfmt-dev \
+    # 추가 개발 도구
+    libtool \
+    autoconf \
     && rm -rf /var/lib/apt/lists/*
 
 # 작업 디렉토리 설정
@@ -47,14 +55,27 @@ COPY proto/ ./proto/
 COPY common/ ./common/
 COPY server/ ./server/
 
-# CMake 빌드 (서버만)
+# CMake 설정 단계
 RUN mkdir -p build && cd build && \
+    echo "=== CMake 설정 ===" && \
     cmake .. \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_CXX_STANDARD=17 \
         -DCMAKE_INSTALL_PREFIX=/usr/local \
-        -DBUILD_CLIENT=OFF \
-    && make -j$(nproc) BlokusServer
+        -DCMAKE_VERBOSE_MAKEFILE=ON
+
+# 빌드 타겟 확인 및 빌드
+RUN cd build && \
+    echo "=== 빌드 가능한 타겟 확인 ===" && \
+    make help | head -20 && \
+    echo "=== Proto 라이브러리 빌드 ===" && \
+    make -j$(nproc) BlokusProto && \
+    echo "=== Common 라이브러리 빌드 ===" && \
+    make -j$(nproc) BlokusCommon && \
+    echo "=== 서버 빌드 시작 ===" && \
+    make -j$(nproc) BlokusServer && \
+    echo "=== 빌드 완료, 실행파일 확인 ===" && \
+    ls -la server/ || ls -la ./
 
 # ========== Runtime Stage ==========
 FROM ubuntu:22.04 AS runtime

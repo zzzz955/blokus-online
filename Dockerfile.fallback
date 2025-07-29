@@ -1,0 +1,104 @@
+# ==================================================
+# Fallback Dockerfile (vcpkg 사용)
+# ==================================================
+
+FROM ubuntu:22.04 AS builder
+
+# 비대화형 모드 설정
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Seoul
+
+# 기본 도구 설치
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    curl \
+    zip \
+    unzip \
+    tar \
+    pkg-config \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# vcpkg 설치
+RUN git clone https://github.com/Microsoft/vcpkg.git /vcpkg && \
+    cd /vcpkg && \
+    ./bootstrap-vcpkg.sh
+
+# 환경변수 설정
+ENV VCPKG_ROOT=/vcpkg
+ENV PATH="${VCPKG_ROOT}:${PATH}"
+
+# 작업 디렉토리 설정
+WORKDIR /app
+
+# vcpkg.json 복사 (서버 전용 의존성)
+RUN echo '{\
+  "name": "blokus-server",\
+  "version": "1.0.0",\
+  "dependencies": [\
+    "libpqxx",\
+    "openssl",\
+    "boost-system",\
+    "protobuf",\
+    "spdlog",\
+    "nlohmann-json"\
+  ]\
+}' > vcpkg.json
+
+# 의존성 설치
+RUN vcpkg install --triplet=x64-linux
+
+# 소스 코드 복사
+COPY CMakeLists.txt ./
+COPY proto/ ./proto/
+COPY common/ ./common/
+COPY server/ ./server/
+
+# CMake 빌드 (vcpkg 툴체인 사용)
+RUN mkdir -p build && cd build && \
+    cmake .. \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_TOOLCHAIN_FILE=/vcpkg/scripts/buildsystems/vcpkg.cmake \
+        -DVCPKG_TARGET_TRIPLET=x64-linux && \
+    make -j$(nproc)
+
+# ========== Runtime Stage ==========
+FROM ubuntu:22.04 AS runtime
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Seoul
+
+# 런타임 의존성 설치
+RUN apt-get update && apt-get install -y \
+    libssl3 \
+    curl \
+    netcat \
+    && rm -rf /var/lib/apt/lists/*
+
+# 애플리케이션 사용자 생성
+RUN groupadd -r blokus && useradd -r -g blokus blokus
+RUN mkdir -p /app/logs && chown -R blokus:blokus /app
+
+# 빌드된 실행파일 복사
+COPY --from=builder /app/build/server/BlokusServer /app/ 2>/dev/null || \
+COPY --from=builder /app/build/BlokusServer /app/ 2>/dev/null || \
+echo "BlokusServer not found"
+
+# 권한 설정
+RUN chmod +x /app/BlokusServer 2>/dev/null || true
+RUN chown blokus:blokus /app/BlokusServer 2>/dev/null || true
+
+USER blokus
+WORKDIR /app
+
+EXPOSE 9999
+
+ENV SERVER_PORT=9999 \
+    DB_HOST=postgres \
+    DB_PORT=5432 \
+    LOG_LEVEL=info \
+    LOG_DIRECTORY=/app/logs
+
+CMD ["./BlokusServer"]
