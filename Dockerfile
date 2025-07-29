@@ -90,8 +90,8 @@ RUN echo "=== Server vcpkg.json contents ===" && \
 # ==================================================
 RUN echo "=== Installing vcpkg packages ===" && \
     cd /tmp/server-build && \
-    # Binary caching 최적화
-    export VCPKG_BINARY_SOURCES="clear;x-azurl,https://dev.azure.com/vcpkg/public/_packaging/vcpkg-public-binary-cache/nuget/v3/index.json,,readwrite" && \
+    # Binary caching 최적화  
+    export VCPKG_BINARY_SOURCES="clear;nuget,https://dev.azure.com/vcpkg/public/_packaging/vcpkg-public-binary-cache/nuget/v3/index.json,readwrite" && \
     # 패키지 설치 (병렬 빌드)
     ${VCPKG_ROOT}/vcpkg install \
         --triplet=${VCPKG_DEFAULT_TRIPLET} \
