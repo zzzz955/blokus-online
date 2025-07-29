@@ -949,39 +949,66 @@ namespace Blokus {
         void GameRoom::broadcastTurnChangeLocked(Common::PlayerColor newPlayer) {
             // 뮤텍스가 이미 잠겨있다고 가정하고 실행 (데드락 방지용)
             
-            // 새 플레이어 이름 찾기
-            std::string newPlayerName = "";
-            for (const auto& player : m_players) {
-                if (player.getColor() == newPlayer) {
-                    newPlayerName = player.getUsername();
+            int blockedPlayerCount = 0;
+            int maxPlayers = m_players.size();
+            Common::PlayerColor currentPlayer = newPlayer;
+            
+            // 🔥 FIX: 재귀 대신 루프 사용하여 무한루프 방지
+            while (blockedPlayerCount < maxPlayers && m_state == RoomState::Playing) {
+                // 현재 플레이어 이름 찾기
+                std::string currentPlayerName = "";
+                for (const auto& player : m_players) {
+                    if (player.getColor() == currentPlayer) {
+                        currentPlayerName = player.getUsername();
+                        break;
+                    }
+                }
+                
+                // 플레이어를 찾지 못한 경우 오류 로깅
+                if (currentPlayerName.empty()) {
+                    spdlog::warn("⚠️ 턴 변경 실패: 플레이어 색상 {}에 해당하는 플레이어를 찾을 수 없음", static_cast<int>(currentPlayer));
+                    return; // 빈 슬롯 메시지 방지
+                }
+                
+                // 타임아웃 차단 상태 확인
+                auto timeoutBlockIt = m_playerBlockedByTimeout.find(currentPlayer);
+                if (timeoutBlockIt != m_playerBlockedByTimeout.end() && timeoutBlockIt->second) {
+                    blockedPlayerCount++;
+                    spdlog::info("🚫 [TIMEOUT_SKIP] 플레이어 {} 타임아웃 차단 상태로 턴 자동 스킵 ({}/{})", 
+                               static_cast<int>(currentPlayer), blockedPlayerCount, maxPlayers);
+                    
+                    // 시스템 메시지 브로드캐스트
+                    std::ostringstream skipMsg;
+                    skipMsg << "SYSTEM:" << currentPlayerName << "님은 타임아웃으로 인해 자동으로 턴이 넘어갑니다.";
+                    broadcastMessageLocked(skipMsg.str());
+                    
+                    // 다음 플레이어로 즉시 턴 넘기기 (타이머 없이)
+                    m_gameStateManager->nextTurn();
+                    currentPlayer = m_gameStateManager->getCurrentPlayer();
+                    
+                    // 🔥 CRITICAL: 모든 플레이어가 타임아웃으로 차단된 경우 게임 종료
+                    if (blockedPlayerCount >= maxPlayers) {
+                        spdlog::warn("🏁 [ALL_TIMEOUT_BLOCKED] 모든 플레이어가 타임아웃으로 차단됨, 게임 종료 (방 {})", m_roomId);
+                        terminateGameLocked("모든 플레이어 타임아웃 차단");
+                        return;
+                    }
+                } else {
+                    // 차단되지 않은 플레이어를 찾았으므로 정상적으로 턴 시작
                     break;
                 }
             }
             
-            // 플레이어를 찾지 못한 경우 오류 로깅
-            if (newPlayerName.empty()) {
-                spdlog::warn("⚠️ 턴 변경 실패: 플레이어 색상 {}에 해당하는 플레이어를 찾을 수 없음", static_cast<int>(newPlayer));
-                return; // 빈 슬롯 메시지 방지
+            // 게임이 여전히 진행 중이고 차단되지 않은 플레이어가 있는 경우 정상 턴 처리
+            if (m_state != RoomState::Playing) {
+                return; // 게임이 종료된 경우
             }
             
-            // 타임아웃 차단 상태 확인 - 차단된 플레이어면 자동 스킵
-            auto timeoutBlockIt = m_playerBlockedByTimeout.find(newPlayer);
-            if (timeoutBlockIt != m_playerBlockedByTimeout.end() && timeoutBlockIt->second) {
-                spdlog::info("🚫 [TIMEOUT_SKIP] 플레이어 {} 타임아웃 차단 상태로 턴 자동 스킵", static_cast<int>(newPlayer));
-                
-                // 시스템 메시지 브로드캐스트
-                std::ostringstream skipMsg;
-                skipMsg << "SYSTEM:" << newPlayerName << "님은 타임아웃으로 인해 자동으로 턴이 넘어갑니다.";
-                broadcastMessageLocked(skipMsg.str());
-                
-                // 다음 플레이어로 즉시 턴 넘기기 (타이머 없이)
-                m_gameStateManager->nextTurn();
-                Common::PlayerColor nextPlayer = m_gameStateManager->getCurrentPlayer();
-                
-                if (nextPlayer != newPlayer) {
-                    // 재귀 호출로 다음 플레이어 턴 시작
-                    broadcastTurnChangeLocked(nextPlayer);
-                    return; // 현재 턴 처리 종료
+            // 현재 플레이어 이름 다시 확인 (루프에서 변경되었을 수 있음)
+            std::string newPlayerName = "";
+            for (const auto& player : m_players) {
+                if (player.getColor() == currentPlayer) {
+                    newPlayerName = player.getUsername();
+                    break;
                 }
             }
             
@@ -992,7 +1019,7 @@ namespace Blokus {
             std::ostringstream turnChangeMsg;
             turnChangeMsg << "TURN_CHANGED:{"
                 << "\"newPlayer\":\"" << newPlayerName << "\","
-                << "\"playerColor\":" << static_cast<int>(newPlayer) << ","
+                << "\"playerColor\":" << static_cast<int>(currentPlayer) << ","
                 << "\"turnNumber\":" << m_gameStateManager->getTurnNumber() << ","
                 << "\"turnTimeSeconds\":" << m_turnTimeoutSeconds << ","
                 << "\"remainingTimeSeconds\":" << m_turnTimeoutSeconds << ","
@@ -1009,7 +1036,7 @@ namespace Blokus {
             broadcastMessageLocked(systemMsg.str());
             
             spdlog::debug("🔄 턴 변경 브로드캐스트: 방 {}, 새 플레이어 {} ({})", 
-                m_roomId, newPlayerName, static_cast<int>(newPlayer));
+                m_roomId, newPlayerName, static_cast<int>(currentPlayer));
         }
 
         void GameRoom::broadcastGameResultLocked(const std::map<Common::PlayerColor, int>& finalScores, 
@@ -1521,39 +1548,10 @@ namespace Blokus {
                 }
             }
             
-            // 🔥 CRITICAL: 타임아웃 스레드에서 게임 종료 방지 (데드락 회피)
-            // 모든 활성 플레이어가 스킵되었으면 게임 종료 플래그 설정
+            // 🔥 CRITICAL: 모든 활성 플레이어가 스킵되었으면 게임 종료
             if (autoSkipCount >= maxAutoSkips) {
                 spdlog::debug("🏁 {} 후 게임 종료 조건 충족: 모든 활성 플레이어가 블록 배치 불가 (방 {})", skipReason, m_roomId);
-                
-                // 최종 점수 계산
-                auto finalScores = m_gameLogic->calculateScores();
-                
-                // 승자 찾기
-                std::vector<Common::PlayerColor> winners;
-                int maxScore = 0;
-                for (const auto& [color, score] : finalScores) {
-                    if (score > maxScore) {
-                        maxScore = score;
-                        winners.clear();
-                        winners.push_back(color);
-                    } else if (score == maxScore) {
-                        winners.push_back(color);
-                    }
-                }
-                
-                // DB에 게임 결과 저장
-                spdlog::debug("🎯 [DB_SAVE_DEBUG] processAutoSkipAfterTurnChange에서 DB 저장 시도");
-                saveGameResultsToDatabase(finalScores, winners);
-                
-                // 게임 결과 브로드캐스트
-                broadcastGameResultLocked(finalScores, winners);
-                
-                // 🔥 FIX: 타임아웃 스레드에서는 endGameLocked() 직접 호출하지 않음
-                // 대신 상태만 변경하고 타이머를 중지하여 자연스럽게 종료되도록 함
-                m_state = RoomState::Waiting;
-                m_turnTimerActive = false;
-                spdlog::info("🛡️ [DEADLOCK_PREVENTION] 타임아웃 스레드에서 게임 종료 상태 설정 (방 {})", m_roomId);
+                terminateGameLocked(skipReason + " - 모든 플레이어 블록 배치 불가");
             }
         }
         
@@ -2057,6 +2055,40 @@ namespace Blokus {
                 m_playerAfkVerificationCounts.clear();
                 spdlog::debug("🧹 [CLEANUP] AFK 상태 정리 완료 (방 {})", m_roomId);
             }
+        }
+
+        void GameRoom::terminateGameLocked(const std::string& reason) {
+            // 뮤텍스가 이미 잠겨있다고 가정하고 실행
+            spdlog::info("🏁 게임 종료: {} (방 {})", reason, m_roomId);
+            
+            // 최종 점수 계산
+            auto finalScores = m_gameLogic->calculateScores();
+            
+            // 승자 찾기
+            std::vector<Common::PlayerColor> winners;
+            int maxScore = 0;
+            for (const auto& [color, score] : finalScores) {
+                if (score > maxScore) {
+                    maxScore = score;
+                    winners.clear();
+                    winners.push_back(color);
+                } else if (score == maxScore) {
+                    winners.push_back(color);
+                }
+            }
+            
+            // DB에 게임 결과 저장
+            spdlog::debug("🎯 [DB_SAVE_DEBUG] terminateGameLocked에서 DB 저장 시도: {}", reason);
+            saveGameResultsToDatabase(finalScores, winners);
+            
+            // 게임 결과 브로드캐스트
+            broadcastGameResultLocked(finalScores, winners);
+            
+            // 게임 상태 변경 및 타이머 중지
+            m_state = RoomState::Waiting;
+            m_turnTimerActive = false;
+            
+            spdlog::info("✅ 게임 종료 완료: {} (방 {})", reason, m_roomId);
         }
 
 

@@ -220,6 +220,9 @@ namespace Blokus {
             // 리소스 정리 헬퍼 메서드
             void cleanupTimeoutThread(); // 타임아웃 스레드 안전 정리
             void cleanupAfkStates(); // AFK 관련 상태 정리
+            
+            // 게임 종료 헬퍼 메서드
+            void terminateGameLocked(const std::string& reason); // 게임 종료 처리 (뮤텍스 잠금 상태에서)
         };
 
         // ========================================
