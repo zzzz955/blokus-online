@@ -26,7 +26,6 @@ RUN echo "=== Installing build dependencies ===" && \
     apt-get update && apt-get install -y \
     # 빌드 도구
     build-essential \
-    cmake \
     ninja-build \
     pkg-config \
     # 버전 관리 및 다운로드
