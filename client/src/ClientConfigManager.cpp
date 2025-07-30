@@ -247,8 +247,26 @@ void ClientConfigManager::loadAudioConfig(const QJsonObject& obj) {
 // ===========================================
 
 QString ClientConfigManager::getConfigDirectory() const {
-    // 실행 파일과 같은 위치의 config 폴더
-    return QApplication::applicationDirPath() + "/config";
+    // 여러 경로를 시도해서 설정 파일이 있는 곳을 찾음
+    QStringList possiblePaths = {
+        QApplication::applicationDirPath() + "/config",           // 배포 시 경로
+        QApplication::applicationDirPath() + "/../../../client/config",  // 개발 시 경로 (build/client/Debug -> client/config)
+        QApplication::applicationDirPath() + "/../../client/config",     // 대안 개발 경로
+        QApplication::applicationDirPath() + "/../client/config"         // 또 다른 대안
+    };
+    
+    for (const QString& path : possiblePaths) {
+        QDir dir(path);
+        if (dir.exists() && dir.exists("default.json")) {
+            qDebug() << QString::fromUtf8("설정 디렉토리 발견: %1").arg(path);
+            return QDir::cleanPath(path);
+        }
+    }
+    
+    // 모든 경로에서 찾지 못하면 기본 경로 반환
+    QString defaultPath = QApplication::applicationDirPath() + "/config";
+    qWarning() << QString::fromUtf8("설정 디렉토리를 찾을 수 없음, 기본 경로 사용: %1").arg(defaultPath);
+    return defaultPath;
 }
 
 QString ClientConfigManager::getConfigFilePath() const {

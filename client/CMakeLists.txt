@@ -89,3 +89,28 @@ endif()
 # 소스 그룹
 source_group("Client\\Headers" FILES ${CLIENT_HEADERS})
 source_group("Client\\Sources" FILES ${CLIENT_SOURCES})
+
+# ===========================================
+# 설정 파일 복사
+# ===========================================
+
+# 설정 파일들
+set(CONFIG_FILES
+    "config/default.json"
+    "config/config.json"
+)
+
+# 빌드 시 설정 파일을 출력 디렉토리로 복사
+foreach(CONFIG_FILE ${CONFIG_FILES})
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/${CONFIG_FILE}"
+        "${CMAKE_CURRENT_BINARY_DIR}/${CONFIG_FILE}"
+        COPYONLY
+    )
+endforeach()
+
+# 설치 시에도 설정 파일 복사 (배포 시)
+install(FILES ${CONFIG_FILES}
+    DESTINATION config
+    COMPONENT client_config
+)
