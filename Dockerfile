@@ -169,8 +169,8 @@ EXPOSE 9999
 # 사용자 변경
 USER blokus
 
-# 헬스체크
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+# 헬스체크 (더 관대한 설정)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 \
     CMD netcat -z localhost 9999 || exit 1
 
 # 실행 명령
