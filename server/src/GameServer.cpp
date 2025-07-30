@@ -21,6 +21,7 @@ namespace Blokus::Server {
         : running_(false)
         , ioContext_()
         , acceptor_(ioContext_)
+        , workGuard_(nullptr)
         , heartbeatTimer_(nullptr)
         , cleanupTimer_(nullptr)
     {
@@ -93,6 +94,11 @@ namespace Blokus::Server {
         spdlog::info("GameServer 시작");
         running_.store(true);
 
+        // 🔥 핵심 수정: work_guard 생성으로 ioContext가 계속 실행되도록 보장
+        workGuard_ = std::make_unique<boost::asio::executor_work_guard<boost::asio::io_context::executor_type>>(
+            boost::asio::make_work_guard(ioContext_));
+        spdlog::info("🔧 [DEBUG] work_guard 생성 완료");
+
         // 스레드 풀 생성
         int threadCount = ConfigManager::threadPoolSize;
         spdlog::info("스레드 풀 크기: {}", threadCount);
@@ -156,10 +162,16 @@ namespace Blokus::Server {
             cleanupTimer_->cancel();
         }
 
-        // 5. IO 컨텍스트 종료
+        // 5. work_guard 해제로 ioContext가 자연스럽게 종료되도록 함
+        if (workGuard_) {
+            spdlog::info("🔧 [DEBUG] work_guard 해제");
+            workGuard_.reset();
+        }
+
+        // 6. IO 컨텍스트 종료
         ioContext_.stop();
 
-        // 6. 스레드 풀 정리는 run() 메서드에서 처리됨
+        // 7. 스레드 풀 정리는 run() 메서드에서 처리됨
         // 여기서는 threadPool_ 컨테이너만 정리
         threadPool_.clear();
 

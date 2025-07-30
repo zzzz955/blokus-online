@@ -147,6 +147,9 @@ namespace Blokus::Server {
         boost::asio::io_context ioContext_;
         boost::asio::ip::tcp::acceptor acceptor_;
         std::vector<std::thread> threadPool_;
+        
+        // 🔥 핵심 추가: ioContext를 계속 실행 상태로 유지하는 work_guard
+        std::unique_ptr<boost::asio::executor_work_guard<boost::asio::io_context::executor_type>> workGuard_;
 
         // 타이머들
         std::unique_ptr<boost::asio::steady_timer> heartbeatTimer_;
