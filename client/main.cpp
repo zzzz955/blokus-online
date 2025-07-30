@@ -14,6 +14,7 @@
 #include "GameRoomWindow.h"
 #include "ClientTypes.h"
 #include "NetworkClient.h"
+#include "ClientConfigManager.h"
 
 using namespace Blokus;
 
@@ -23,9 +24,10 @@ class AppController : public QObject
 
 public:
     AppController()
-        : m_loginWindow(nullptr), m_lobbyWindow(nullptr), m_gameRoomWindow(nullptr), m_networkClient(new NetworkClient(this)), m_currentUsername(""), m_currentRoomInfo()
+        : m_loginWindow(nullptr), m_lobbyWindow(nullptr), m_gameRoomWindow(nullptr), m_networkClient(nullptr), m_currentUsername(""), m_currentRoomInfo()
     {
         initializeApplication();
+        initializeConfiguration();
         setupNetworkClient();
     }
 
@@ -36,8 +38,9 @@ public:
 
     void start()
     {
-        // 서버 연결 시도
-        m_networkClient->connectToServer();
+        // 서버 연결 시도 (설정에서 읽은 호스트와 포트 사용)
+        auto& config = ClientConfigManager::instance();
+        m_networkClient->connectToServer(config.getServerHost(), config.getServerPort());
         createLoginWindow();
     }
 
@@ -1086,8 +1089,24 @@ private:
         qDebug() << QString::fromUtf8("=== 블로커스 온라인 초기화 ===");
     }
 
+    void initializeConfiguration()
+    {
+        qDebug() << QString::fromUtf8("=== AppController 설정 로드 ===");
+        
+        // 설정 시스템은 main에서 이미 초기화됨
+        auto& config = ClientConfigManager::instance();
+        
+        qDebug() << QString::fromUtf8("설정 상태 확인:");
+        qDebug() << QString::fromUtf8("  서버: %1:%2").arg(config.getServerHost()).arg(config.getServerPort());
+        qDebug() << QString::fromUtf8("  디버그 모드: %1").arg(config.isDebugMode() ? "활성" : "비활성");
+        qDebug() << QString::fromUtf8("  로그 레벨: %1").arg(config.getLogLevel());
+    }
+
     void setupNetworkClient()
     {
+        // 설정을 사용하여 NetworkClient 생성
+        m_networkClient = new NetworkClient(this);
+        
         // 네트워크 연결 상태 시그널
         connect(m_networkClient, &NetworkClient::connected,
                 this, &AppController::onNetworkConnected);
@@ -1168,6 +1187,12 @@ private:
         qDebug() << QString::fromUtf8("로그인 창 생성");
 
         m_loginWindow = new Blokus::LoginWindow();
+        
+        // 설정에서 창 크기 적용
+        auto& config = ClientConfigManager::instance();
+        const auto& windowConfig = config.getClientConfig().window;
+        m_loginWindow->resize(windowConfig.width, windowConfig.height);
+        m_loginWindow->setMinimumSize(windowConfig.min_width, windowConfig.min_height);
 
         // 로그인 시그널 연결
         connect(m_loginWindow, &Blokus::LoginWindow::loginRequested,
@@ -1193,6 +1218,12 @@ private:
         try
         {
             m_lobbyWindow = new Blokus::LobbyWindow(m_currentUsername);
+            
+            // 설정에서 창 크기 적용
+            auto& config = ClientConfigManager::instance();
+            const auto& windowConfig = config.getClientConfig().window;
+            m_lobbyWindow->resize(windowConfig.width, windowConfig.height);
+            m_lobbyWindow->setMinimumSize(windowConfig.min_width, windowConfig.min_height);
 
             // 로비 시그널 연결
             connect(m_lobbyWindow, &Blokus::LobbyWindow::logoutRequested,
@@ -1247,6 +1278,12 @@ private:
             // 새 게임 룸 창 생성
             m_gameRoomWindow = new Blokus::GameRoomWindow(roomInfo, m_currentUsername);
             m_currentRoomInfo = roomInfo;
+            
+            // 설정에서 창 크기 적용
+            auto& config = ClientConfigManager::instance();
+            const auto& windowConfig = config.getClientConfig().window;
+            m_gameRoomWindow->resize(windowConfig.width, windowConfig.height);
+            m_gameRoomWindow->setMinimumSize(windowConfig.min_width, windowConfig.min_height);
 
             // 게임 룸 시그널 연결
             connect(m_gameRoomWindow, &Blokus::GameRoomWindow::leaveRoomRequested,
@@ -1342,11 +1379,18 @@ int main(int argc, char *argv[])
     app.setApplicationVersion("1.0.0");
     app.setOrganizationName("Blokus Online");
 
-    // 한글 폰트 설정
-    QFont defaultFont("맑은 고딕", 9);
+    // 설정 시스템 초기화
+    auto& config = ClientConfigManager::instance();
+    if (!config.initialize()) {
+        qWarning() << QString::fromUtf8("설정 초기화 실패 - 기본값 사용");
+    }
+
+    // 설정에서 폰트 크기 읽어서 적용
+    int fontSize = config.getClientConfig().ui.font_size;
+    QFont defaultFont("맑은 고딕", fontSize);
     if (!defaultFont.exactMatch())
     {
-        defaultFont = QFont("굴림", 9);
+        defaultFont = QFont("굴림", fontSize);
     }
     app.setFont(defaultFont);
 

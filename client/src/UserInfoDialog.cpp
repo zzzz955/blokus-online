@@ -249,25 +249,25 @@ namespace Blokus {
         QHBoxLayout* layout = new QHBoxLayout(m_buttonWidget);
         layout->setContentsMargins(0, 10, 0, 0);
 
-        m_addFriendButton = new QPushButton(QString::fromUtf8("친구 추가"));
-        m_whisperButton = new QPushButton(QString::fromUtf8("귓속말"));
+        // m_addFriendButton = new QPushButton(QString::fromUtf8("친구 추가"));
+        // m_whisperButton = new QPushButton(QString::fromUtf8("귓속말"));
         m_refreshButton = new QPushButton(QString::fromUtf8("새로고침"));
         m_closeButton = new QPushButton(QString::fromUtf8("닫기"));
 
-        m_addFriendButton->setMinimumHeight(35);
-        m_whisperButton->setMinimumHeight(35);
+        // m_addFriendButton->setMinimumHeight(35);
+        // m_whisperButton->setMinimumHeight(35);
         m_refreshButton->setMinimumHeight(35);
         m_closeButton->setMinimumHeight(35);
 
-        layout->addWidget(m_addFriendButton);
-        layout->addWidget(m_whisperButton);
+        // layout->addWidget(m_addFriendButton);
+        // layout->addWidget(m_whisperButton);
         layout->addStretch();
         layout->addWidget(m_refreshButton);
         layout->addWidget(m_closeButton);
 
         // 시그널 연결
-        connect(m_addFriendButton, &QPushButton::clicked, this, &UserInfoDialog::onAddFriendClicked);
-        connect(m_whisperButton, &QPushButton::clicked, this, &UserInfoDialog::onSendWhisperClicked);
+        // connect(m_addFriendButton, &QPushButton::clicked, this, &UserInfoDialog::onAddFriendClicked);
+        // connect(m_whisperButton, &QPushButton::clicked, this, &UserInfoDialog::onSendWhisperClicked);
         connect(m_refreshButton, &QPushButton::clicked, this, &UserInfoDialog::onRefreshClicked);
         connect(m_closeButton, &QPushButton::clicked, this, &UserInfoDialog::onCloseClicked);
     }
@@ -326,8 +326,8 @@ namespace Blokus {
         
         // 자신의 정보인지 확인하여 버튼 표시 조정
         m_isOwnInfo = (userInfo.username == m_currentUsername);
-        m_addFriendButton->setVisible(!m_isOwnInfo);
-        m_whisperButton->setVisible(!m_isOwnInfo);
+        // m_addFriendButton->setVisible(!m_isOwnInfo);
+        // m_whisperButton->setVisible(!m_isOwnInfo);
     }
 
     void UserInfoDialog::setCurrentUsername(const QString& currentUsername)
@@ -336,8 +336,8 @@ namespace Blokus {
         
         // 버튼 표시 업데이트
         m_isOwnInfo = (m_userInfo.username == m_currentUsername);
-        m_addFriendButton->setVisible(!m_isOwnInfo);
-        m_whisperButton->setVisible(!m_isOwnInfo);
+        // m_addFriendButton->setVisible(!m_isOwnInfo);
+        // m_whisperButton->setVisible(!m_isOwnInfo);
     }
 
     void UserInfoDialog::updateBasicInfoDisplay()

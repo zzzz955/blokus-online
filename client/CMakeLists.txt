@@ -13,7 +13,7 @@ endif()
 
 # 클라이언트 소스 파일들
 set(CLIENT_SOURCES
-    src/main.cpp
+    main.cpp
     "src/GameBoard.cpp"
     "src/GameRoomWindow.cpp"
     "src/ImprovedBlockPalette.cpp"
@@ -26,6 +26,7 @@ set(CLIENT_SOURCES
     "src/ClientUtils.cpp"
     "src/ResponsiveUI.cpp"
     "src/NetworkClient.cpp"
+    "src/ClientConfigManager.cpp"
 )
 
 set(CLIENT_HEADERS
@@ -42,6 +43,7 @@ set(CLIENT_HEADERS
     "include/ClientLogic.h"
     "include/ResponsiveUI.h"
     "include/NetworkClient.h"
+    "include/ClientConfigManager.h"
 )
 
 # 실행 파일 생성
@@ -87,3 +89,19 @@ endif()
 # 소스 그룹
 source_group("Client\\Headers" FILES ${CLIENT_HEADERS})
 source_group("Client\\Sources" FILES ${CLIENT_SOURCES})
+
+# ===========================================
+# 빌드 타입별 설정
+# ===========================================
+
+# 배포 빌드인지 확인
+option(BLOKUS_PRODUCTION_BUILD "Build for production deployment" OFF)
+
+if(BLOKUS_PRODUCTION_BUILD)
+    # 배포용 빌드: 실제 서버 정보 하드코딩
+    target_compile_definitions(BlokusClient PRIVATE BLOKUS_PRODUCTION_BUILD)
+    message(STATUS "Building for PRODUCTION - Using production server")
+else()
+    # 개발용 빌드: 로컬 서버 하드코딩
+    message(STATUS "Building for DEVELOPMENT - Using localhost server")
+endif()
