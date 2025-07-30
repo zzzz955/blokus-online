@@ -62,7 +62,7 @@ int main() {
             return 1;
         }
 
-        // 설정 정보 출력 (영문으로)
+        // 설정 정보 출력
         spdlog::info("[서버 초기화]");
         spdlog::info("  서버 포트: {}", Blokus::Server::ConfigManager::serverPort);
         spdlog::info("  최대 세션: {}", Blokus::Server::ConfigManager::maxClients);
@@ -79,29 +79,6 @@ int main() {
         // 시그널 핸들러 등록 (Ctrl+C 처리)
         std::signal(SIGINT, signalHandler);
         std::signal(SIGTERM, signalHandler);
-
-        // ========================================
-        // 4. 서버 실행 (초기화 포함)
-        // ========================================
-        spdlog::info("========================================");
-
-        // 서버 안내 메시지
-        spdlog::info("Starting Blokus Online Server...");
-        spdlog::info("Port: {}", Blokus::Server::ConfigManager::serverPort);
-        spdlog::info("Max Clients: {}", Blokus::Server::ConfigManager::maxClients);
-        spdlog::info("");
-
-        // 클라이언트 연결 안내
-        spdlog::info("Client test methods:");
-        spdlog::info("  Telnet: telnet localhost {}", Blokus::Server::ConfigManager::serverPort);
-        spdlog::info("  Test commands:");
-        spdlog::info("    - ping");
-        spdlog::info("    - auth:player1:password123");
-        spdlog::info("    - room:list");
-        spdlog::info("    - chat:Hello everyone!");
-        spdlog::info("");
-        spdlog::info("Press Ctrl+C to stop");
-        spdlog::info("========================================");
 
         // run()이 모든 초기화를 수행하고 실행함
         g_server->run();
