@@ -105,11 +105,11 @@ RUN CMAKE_PATH=$(find ${VCPKG_ROOT}/downloads/tools -name cmake -type f | head -
         -GNinja \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_CXX_STANDARD=20 \
-        -DCMAKE_INSTALL_PREFIX=/app/install \
         -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
         -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET} && \
     ninja -C build -j1 -v && \
-    ninja -C build install
+    mkdir -p /app/install/bin && \
+    cp build/server/BlokusServer /app/install/bin/
 
 # ==================================================
 # Stage 3: Runtime Environment
