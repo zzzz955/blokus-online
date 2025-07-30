@@ -54,7 +54,6 @@ target_include_directories(BlokusServer PRIVATE
 
 # PostgreSQL �� ��Ÿ ���̺귯�� ã��
 find_package(libpqxx CONFIG REQUIRED)
-find_package(OpenSSL REQUIRED)
 
 # ���̺귯�� ��ũ
 target_link_libraries(BlokusServer PRIVATE
@@ -62,8 +61,6 @@ target_link_libraries(BlokusServer PRIVATE
     BlokusProto
     Boost::system
     libpqxx::pqxx
-    OpenSSL::SSL
-    OpenSSL::Crypto
 )
 
 # Windows ����
