@@ -53,7 +53,6 @@ namespace Blokus
         // 기본적으로 로그인 폼 표시
         showLoginForm();
 
-        // 200x400 고정 크기 설정 (반응형 완전 제거)
         setWindowTitle(QString::fromUtf8("블로커스 온라인 - 로그인"));
         setFixedSize(400, 600);
 

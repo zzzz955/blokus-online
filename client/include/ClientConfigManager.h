@@ -39,7 +39,7 @@ public:
     struct UIConfig {
         QString theme = "default";
         QString language = "ko";
-        int font_size = 12;
+        int font_size = 9;
         int auto_save_interval_ms = 30000;
     };
     

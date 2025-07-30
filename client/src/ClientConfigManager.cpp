@@ -54,7 +54,7 @@ void ClientConfigManager::loadDefaults() {
     
     client_config_.ui.theme = "default";
     client_config_.ui.language = "ko";
-    client_config_.ui.font_size = 12;
+    client_config_.ui.font_size = 9;
     client_config_.ui.auto_save_interval_ms = 30000;
     
     // 디버그 기본값
