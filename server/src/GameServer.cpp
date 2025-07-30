@@ -159,12 +159,8 @@ namespace Blokus::Server {
         // 5. IO 컨텍스트 종료
         ioContext_.stop();
 
-        // 6. 스레드 풀 정리
-        for (auto& thread : threadPool_) {
-            if (thread.joinable()) {
-                thread.join();
-            }
-        }
+        // 6. 스레드 풀 정리는 run() 메서드에서 처리됨
+        // 여기서는 threadPool_ 컨테이너만 정리
         threadPool_.clear();
 
         spdlog::info("GameServer 종료 완료");
@@ -183,14 +179,20 @@ namespace Blokus::Server {
         spdlog::info("🔧 [DEBUG] start() 완료");
 
         spdlog::info("서버가 실행 중입니다. Ctrl+C로 종료하세요");
-        spdlog::info("🔧 [DEBUG] ioContext_.run() 호출 직전");
+        spdlog::info("🔧 [DEBUG] 메인 스레드에서 대기 중...");
 
+        // 🔥 핵심 수정: 메인 스레드에서 ioContext_.run() 중복 호출 제거
+        // 대신 스레드풀이 종료될 때까지 대기
         try {
-            ioContext_.run();
-            spdlog::info("🔧 [DEBUG] ioContext_.run() 완료됨"); // ⚠️ 이게 바로 찍히면 문제
+            for (auto& thread : threadPool_) {
+                if (thread.joinable()) {
+                    thread.join();
+                }
+            }
+            spdlog::info("🔧 [DEBUG] 모든 스레드 종료 완료");
         }
         catch (const std::exception& e) {
-            spdlog::error("메인 루프 예외: {}", e.what());
+            spdlog::error("스레드 대기 중 예외: {}", e.what());
         }
 
         spdlog::info("🔧 [DEBUG] run() 메서드 종료");
