@@ -91,26 +91,17 @@ source_group("Client\\Headers" FILES ${CLIENT_HEADERS})
 source_group("Client\\Sources" FILES ${CLIENT_SOURCES})
 
 # ===========================================
-# 설정 파일 복사
+# 빌드 타입별 설정
 # ===========================================
 
-# 설정 파일들
-set(CONFIG_FILES
-    "config/default.json"
-    "config/config.json"
-)
+# 배포 빌드인지 확인
+option(BLOKUS_PRODUCTION_BUILD "Build for production deployment" OFF)
 
-# 빌드 시 설정 파일을 출력 디렉토리로 복사
-foreach(CONFIG_FILE ${CONFIG_FILES})
-    configure_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/${CONFIG_FILE}"
-        "${CMAKE_CURRENT_BINARY_DIR}/${CONFIG_FILE}"
-        COPYONLY
-    )
-endforeach()
-
-# 설치 시에도 설정 파일 복사 (배포 시)
-install(FILES ${CONFIG_FILES}
-    DESTINATION config
-    COMPONENT client_config
-)
+if(BLOKUS_PRODUCTION_BUILD)
+    # 배포용 빌드: 실제 서버 정보 하드코딩
+    target_compile_definitions(BlokusClient PRIVATE BLOKUS_PRODUCTION_BUILD)
+    message(STATUS "Building for PRODUCTION - Using production server")
+else()
+    # 개발용 빌드: 로컬 서버 하드코딩
+    message(STATUS "Building for DEVELOPMENT - Using localhost server")
+endif()

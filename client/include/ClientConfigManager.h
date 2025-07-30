@@ -1,13 +1,7 @@
 #pragma once
 
 #include <QString>
-#include <QJsonObject>
-#include <QJsonDocument>
-#include <QFile>
-#include <QDir>
-#include <QStandardPaths>
 #include <QDebug>
-#include <memory>
 
 /**
  * @brief 클라이언트 설정 관리 클래스
@@ -30,10 +24,10 @@ public:
     };
     
     struct WindowConfig {
-        int width = 1400;
-        int height = 900;
-        int min_width = 1000;
-        int min_height = 700;
+        int width = 1280;
+        int height = 800;
+        int min_width = 800;
+        int min_height = 500;
     };
     
     struct GameBoardConfig {
@@ -114,38 +108,15 @@ public:
     bool isDebugMode() const { return debug_config_.enable_console_logs; }
     QString getLogLevel() const { return debug_config_.log_level; }
 
-    // ===========================================
-    // 설정 업데이트 (런타임에서 변경 가능)
-    // ===========================================
-    
-    void updateServerHost(const QString& host);
-    void updateServerPort(int port);
-    void updateDebugMode(bool enabled);
-    
-    /**
-     * @brief 현재 설정을 config.json 파일로 저장합니다
-     * @return 성공 여부
-     */
-    bool saveConfig();
-
 private:
     ClientConfigManager() = default;
     ~ClientConfigManager() = default;
 
     // ===========================================
-    // 내부 로드 함수들
+    // 내부 함수들
     // ===========================================
     
-    bool loadFromFile(const QString& filepath);
     void loadDefaults();
-    void loadServerConfig(const QJsonObject& obj);
-    void loadClientConfig(const QJsonObject& obj);
-    void loadDebugConfig(const QJsonObject& obj);
-    void loadAudioConfig(const QJsonObject& obj);
-    
-    QString getConfigDirectory() const;
-    QString getConfigFilePath() const;
-    QString getDefaultConfigPath() const;
 
 private:
     // 설정 데이터

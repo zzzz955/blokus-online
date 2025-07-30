@@ -197,11 +197,6 @@ settings.ini
 *.config
 .env
 
-# Client configuration files (keep example files)
-client/config/config.json
-!client/config/default.json
-!client/config/config.example.json
-
 # SSL certificates
 *.pem
 *.key
