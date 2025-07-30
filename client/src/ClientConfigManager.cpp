@@ -30,7 +30,7 @@ void ClientConfigManager::loadDefaults() {
     // 서버 설정 (개발/배포 구분)
 #ifdef BLOKUS_PRODUCTION_BUILD
     // 배포용: 실제 서버 정보
-    server_config_.host = "blokus-onlie.mooo.com";  // TODO: 실제 서버 주소로 변경
+    server_config_.host = "blokus-online.mooo.com";  // TODO: 실제 서버 주소로 변경
     server_config_.port = 9999;
 #else
     // 개발용: 로컬 서버
