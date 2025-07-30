@@ -13,7 +13,7 @@ endif()
 
 # 클라이언트 소스 파일들
 set(CLIENT_SOURCES
-    src/main.cpp
+    main.cpp
     "src/GameBoard.cpp"
     "src/GameRoomWindow.cpp"
     "src/ImprovedBlockPalette.cpp"
@@ -26,6 +26,7 @@ set(CLIENT_SOURCES
     "src/ClientUtils.cpp"
     "src/ResponsiveUI.cpp"
     "src/NetworkClient.cpp"
+    "src/ClientConfigManager.cpp"
 )
 
 set(CLIENT_HEADERS
@@ -42,6 +43,7 @@ set(CLIENT_HEADERS
     "include/ClientLogic.h"
     "include/ResponsiveUI.h"
     "include/NetworkClient.h"
+    "include/ClientConfigManager.h"
 )
 
 # 실행 파일 생성

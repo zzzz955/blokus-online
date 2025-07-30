@@ -1,4 +1,5 @@
 #include "NetworkClient.h"
+#include "ClientConfigManager.h"
 #include <QDebug>
 #include <QHostAddress>
 #include <QRegExp>
@@ -20,16 +21,26 @@ namespace Blokus {
         , m_connectionTimer(new QTimer(this))
         , m_reconnectTimer(new QTimer(this))
         , m_state(ConnectionState::Disconnected)
-        , m_serverHost("localhost")
-        , m_serverPort(9999)
         , m_currentSessionToken("")
-        , m_reconnectInterval(5000) // 5초
-        , m_maxReconnectAttempts(3)
         , m_reconnectAttempts(0)
-        , m_connectionTimeout(10000) // 10초
         , m_sequenceId(1)
         , m_protobufEnabled(true)
     {
+        // 설정에서 네트워크 값 로드
+        auto& config = ClientConfigManager::instance();
+        const auto& serverConfig = config.getServerConfig();
+        
+        m_serverHost = serverConfig.host;
+        m_serverPort = serverConfig.port;
+        m_connectionTimeout = serverConfig.timeout_ms;
+        m_maxReconnectAttempts = serverConfig.reconnect_attempts;
+        m_reconnectInterval = serverConfig.reconnect_interval_ms;
+        
+        qDebug() << QString::fromUtf8("NetworkClient 설정 로드:");
+        qDebug() << QString::fromUtf8("  기본 서버: %1:%2").arg(m_serverHost).arg(m_serverPort);
+        qDebug() << QString::fromUtf8("  연결 타임아웃: %1ms").arg(m_connectionTimeout);
+        qDebug() << QString::fromUtf8("  재연결 시도: %1회, 간격: %2ms").arg(m_maxReconnectAttempts).arg(m_reconnectInterval);
+        
         setupSocket();
         setupProtobufHandlers();
         
