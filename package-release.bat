@@ -1,7 +1,7 @@
 @echo off
 echo Creating release package (packaging only, no build)...
 
-set RELEASE_DIR=release-package
+set RELEASE_DIR=BlokusClient-Release-v1.0
 set BUILD_DIR=build\client\Release
 set EXE_NAME=BlokusClient.exe
 
@@ -16,23 +16,48 @@ echo Cleaning release directory...
 if exist %RELEASE_DIR% rmdir /s /q %RELEASE_DIR%
 mkdir %RELEASE_DIR%
 
-echo Copying executable...
-copy "%BUILD_DIR%\%EXE_NAME%" "%RELEASE_DIR%\"
+echo Copying essential files only (optimized)...
+copy "%BUILD_DIR%\BlokusClient.exe" "%RELEASE_DIR%\" 2>nul
+copy "%BUILD_DIR%\Qt5*.dll" "%RELEASE_DIR%\" 2>nul
+copy "%BUILD_DIR%\libprotobuf.dll" "%RELEASE_DIR%\" 2>nul
+copy "%BUILD_DIR%\libssl*.dll" "%RELEASE_DIR%\" 2>nul
+copy "%BUILD_DIR%\libcrypto*.dll" "%RELEASE_DIR%\" 2>nul
+copy "%BUILD_DIR%\*.dll" "%RELEASE_DIR%\" 2>nul
 
-echo Running windeployqt to gather dependencies...
-call "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat"
+echo Creating essential plugin directories...
+mkdir "%RELEASE_DIR%\plugins\platforms" 2>nul
+mkdir "%RELEASE_DIR%\plugins\imageformats" 2>nul
 
-REM Qt deployment tool이 vcpkg에서 설치된 Qt를 찾도록 설정
-set QT_DIR=%CD%\vcpkg_installed\x64-windows\tools\Qt5
-set PATH=%QT_DIR%\bin;%PATH%
+copy "%BUILD_DIR%\plugins\platforms\qwindows.dll" "%RELEASE_DIR%\plugins\platforms\" 2>nul
+copy "%BUILD_DIR%\plugins\imageformats\qico.dll" "%RELEASE_DIR%\plugins\imageformats\" 2>nul
+copy "%BUILD_DIR%\plugins\imageformats\qjpeg.dll" "%RELEASE_DIR%\plugins\imageformats\" 2>nul
 
-REM windeployqt 실행 (Qt DLL과 플러그인 자동 복사)
-windeployqt.exe --release --no-translations --no-system-d3d-compiler --no-opengl-sw "%RELEASE_DIR%\%EXE_NAME%"
+REM 선택적 파일들 (필요시 주석 해제)
+REM copy "%BUILD_DIR%\plugins\imageformats\qgif.dll" "%RELEASE_DIR%\plugins\imageformats\" 2>nul
+REM copy "%BUILD_DIR%\plugins\imageformats\qsvg.dll" "%RELEASE_DIR%\plugins\imageformats\" 2>nul
 
 echo.
 echo Release package created in: %RELEASE_DIR%
 echo Contents:
 dir /b %RELEASE_DIR%
+
 echo.
-echo Ready for distribution!
+echo Creating ZIP archive...
+set ZIP_NAME=BlokusClient-Release-v1.0.zip
+powershell -command "Compress-Archive -Path '%RELEASE_DIR%\*' -DestinationPath '%ZIP_NAME%' -Force"
+
+if exist "%ZIP_NAME%" (
+    echo.
+    echo ✅ ZIP archive created: %ZIP_NAME%
+    for %%F in ("%ZIP_NAME%") do echo Archive size: %%~zF bytes
+    echo.
+    echo 📁 Folder: %RELEASE_DIR%
+    echo 📦 Archive: %ZIP_NAME%
+    echo.
+    echo Ready for distribution!
+) else (
+    echo.
+    echo ❌ Failed to create ZIP archive
+    echo Please check if PowerShell is available
+)
 pause
