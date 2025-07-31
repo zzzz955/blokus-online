@@ -22,6 +22,7 @@ export async function GET() {
         ...latestPatchNote,
         releaseDate: latestPatchNote.releaseDate.toISOString(),
         createdAt: latestPatchNote.createdAt.toISOString(),
+        downloadUrl: latestPatchNote.downloadUrl || undefined,
       },
     };
 

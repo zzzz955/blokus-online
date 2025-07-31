@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
         ...patchNote,
         releaseDate: patchNote.releaseDate.toISOString(),
         createdAt: patchNote.createdAt.toISOString(),
+        downloadUrl: patchNote.downloadUrl || undefined,
       })),
       pagination: {
         page,
