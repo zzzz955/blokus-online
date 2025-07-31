@@ -98,10 +98,13 @@ RUN mkdir -p /app/.next/cache /app/public/uploads && \
     chown -R nextjs:nodejs /app
 
 # Stage 2에서 빌드된 애플리케이션 복사
-COPY --from=app-builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=app-builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=app-builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=app-builder --chown=nextjs:nodejs /app/prisma ./prisma
+
+# 안전한 파일 복사 (존재하는 경우에만)
+RUN --mount=from=app-builder,source=/app,target=/tmp/source \
+    [ -d /tmp/source/public ] && cp -r /tmp/source/public/* /app/public/ || echo "No public files to copy" && \
+    [ -d /tmp/source/prisma ] && cp -r /tmp/source/prisma /app/ || echo "No prisma files to copy"
 
 # package.json에서 실행에 필요한 정보만 복사
 COPY --from=app-builder --chown=nextjs:nodejs /app/package.json ./package.json
