@@ -26,7 +26,8 @@ RUN apk add --no-cache \
 COPY package*.json ./
 
 # 의존성 설치 (production only)
-RUN npm ci --only=production --ignore-scripts && \
+RUN rm -f package-lock.json && \
+    npm install --only=production --ignore-scripts && \
     npm cache clean --force
 
 # ==================================================
@@ -53,7 +54,8 @@ COPY package*.json ./
 COPY . .
 
 # 개발 의존성 포함하여 설치 (build 시 필요)
-RUN npm ci --ignore-scripts
+RUN rm -f package-lock.json && \
+    npm install --ignore-scripts
 
 # Prisma 클라이언트 생성
 RUN npx prisma generate
