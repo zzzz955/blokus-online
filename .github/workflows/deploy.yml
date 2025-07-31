@@ -169,12 +169,24 @@ jobs:
         ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
           cd ${{ env.DEPLOY_PATH }} && \
           
-          # 필수 디렉토리 생성
-          mkdir -p downloads web/uploads logs/nginx certbot/conf certbot/www && \
+          # 디렉토리 단계별 생성 및 권한 체크
+          mkdir -p downloads && echo 'downloads created' && \
+          mkdir -p web/uploads && echo 'web/uploads created' && \
+          mkdir -p certbot/conf certbot/www && echo 'certbot dirs created' && \
           
-          # 권한 설정 (Docker에서 접근 가능하도록)
-          chmod 755 downloads web/uploads logs/nginx && \
-          chmod 755 certbot/conf certbot/www
+          # logs 디렉토리 특별 처리
+          if [ ! -d logs ]; then
+            mkdir -p logs && echo 'logs created'
+          else
+            echo 'logs already exists, checking permissions'
+            sudo chown -R \$USER:\$USER logs 2>/dev/null || echo 'logs ownership change skipped'
+          fi && \
+          
+          mkdir -p logs/nginx && echo 'logs/nginx created' && \
+          
+          # 권한 설정 (존재하는 디렉토리만)
+          chmod 755 downloads web/uploads certbot/conf certbot/www && \
+          chmod 755 logs logs/nginx 2>/dev/null || echo 'logs permission change completed'
         "
           
     - name: 기존 컨테이너 정리
