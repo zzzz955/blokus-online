@@ -60,10 +60,10 @@ RUN rm -f package-lock.json && \
 # Prisma 클라이언트 생성
 RUN npx prisma generate
 
-# Next.js 빌드
-RUN npm run build && \
-    npm prune --production && \
-    npm cache clean --force
+# Next.js 빌드 (단계별 실행으로 디버깅 개선)
+RUN npm run build
+RUN npm prune --production
+RUN npm cache clean --force
 
 # ==================================================
 # Stage 3: Runtime Environment
