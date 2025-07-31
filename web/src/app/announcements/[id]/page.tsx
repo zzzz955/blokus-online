@@ -25,7 +25,7 @@ export default function AnnouncementDetailPage({ params }: AnnouncementDetailPag
     const fetchAnnouncement = async () => {
       try {
         setLoading(true);
-        const response = await api.get(`/api/announcements/${params.id}`);
+        const response = await api.get<Announcement>(`/api/announcements/${params.id}`);
         setAnnouncement(response);
       } catch (error: any) {
         setError(error.message || '공지사항을 불러오는데 실패했습니다.');

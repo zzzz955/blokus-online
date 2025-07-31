@@ -9,7 +9,7 @@ import Button from '@/components/ui/Button';
 import { ArrowLeft, Calendar, Tag, Download, Loader2 } from 'lucide-react';
 import { formatDate } from '@/utils/format';
 import { api } from '@/utils/api';
-import { PatchNote } from '@/types';
+import { PatchNote, PaginatedResponse } from '@/types';
 import ReactMarkdown from 'react-markdown';
 
 interface PatchNoteDetailPageProps {
@@ -27,8 +27,8 @@ export default function PatchNoteDetailPage({ params }: PatchNoteDetailPageProps
       try {
         setLoading(true);
         // 버전으로 패치노트 찾기 (API 엔드포인트는 ID를 사용하므로 실제로는 버전 검색 API가 필요)
-        const response = await api.get(`/api/patch-notes`);
-        const foundPatchNote = response.data.find((p: PatchNote) => p.version === decodeURIComponent(params.version));
+        const response = await api.get<PaginatedResponse<PatchNote>>(`/api/patch-notes`);
+        const foundPatchNote = response.data?.find((p: PatchNote) => p.version === decodeURIComponent(params.version));
         
         if (foundPatchNote) {
           setPatchNote(foundPatchNote);

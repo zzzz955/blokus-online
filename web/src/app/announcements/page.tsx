@@ -8,7 +8,7 @@ import Button from '@/components/ui/Button';
 import { Pin, Calendar, User, ChevronRight, Loader2 } from 'lucide-react';
 import { formatDate } from '@/utils/format';
 import { api } from '@/utils/api';
-import { Announcement } from '@/types';
+import { Announcement, PaginatedResponse } from '@/types';
 
 export default function AnnouncementsPage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -20,8 +20,8 @@ export default function AnnouncementsPage() {
   const fetchAnnouncements = async (page: number = 1) => {
     try {
       setLoading(true);
-      const response = await api.get(`/api/announcements?page=${page}&limit=10`);
-      setAnnouncements(response.data);
+      const response = await api.get<PaginatedResponse<Announcement>>(`/api/announcements?page=${page}&limit=10`);
+      setAnnouncements(response.data || []);
       setTotalPages(response.pagination.totalPages);
       setCurrentPage(page);
     } catch (error: any) {

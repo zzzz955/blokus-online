@@ -8,7 +8,7 @@ import Button from '@/components/ui/Button';
 import { Download, Calendar, Tag, ChevronRight, Loader2 } from 'lucide-react';
 import { formatDate } from '@/utils/format';
 import { api } from '@/utils/api';
-import { PatchNote } from '@/types';
+import { PatchNote, PaginatedResponse } from '@/types';
 
 export default function PatchNotesPage() {
   const [patchNotes, setPatchNotes] = useState<PatchNote[]>([]);
@@ -20,8 +20,8 @@ export default function PatchNotesPage() {
   const fetchPatchNotes = async (page: number = 1) => {
     try {
       setLoading(true);
-      const response = await api.get(`/api/patch-notes?page=${page}&limit=10`);
-      setPatchNotes(response.data);
+      const response = await api.get<PaginatedResponse<PatchNote>>(`/api/patch-notes?page=${page}&limit=10`);
+      setPatchNotes(response.data || []);
       setTotalPages(response.pagination.totalPages);
       setCurrentPage(page);
     } catch (error: any) {
