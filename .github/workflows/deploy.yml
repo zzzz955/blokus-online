@@ -185,8 +185,7 @@ jobs:
       run: |
         ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
           cd ${{ env.DEPLOY_PATH }} && \
-          docker compose down --remove-orphans || true && \
-          docker image prune -f --filter label=stage=intermediate || true
+          docker compose down
         "
         
     - name: Docker 이미지 빌드 및 배포
