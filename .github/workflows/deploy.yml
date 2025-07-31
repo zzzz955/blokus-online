@@ -176,22 +176,6 @@ jobs:
           chmod 755 downloads web/uploads logs/nginx && \
           chmod 755 certbot/conf certbot/www && \
           
-          # 다운로드 디렉토리 안내 파일 생성
-          cat > downloads/README.md << 'EOF'
-# Blokus Online Client Downloads
-This directory is for client download files.
-## Upload Instructions
-1. Upload Windows-built client to this directory
-2. Filename: BlokusClient-latest.zip (latest version)
-3. Served via nginx at domain/downloads/
-## Directory Structure
-- BlokusClient-latest.zip (symlink or latest file)
-- BlokusClient-v1.0.0.zip (version-specific files)
-EOF
-          
-          echo 'Client download directory setup completed'
-        "
-        
     - name: 기존 컨테이너 정리
       run: |
         ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
