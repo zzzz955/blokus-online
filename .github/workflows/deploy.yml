@@ -55,6 +55,19 @@ jobs:
           exit 1
         fi
         
+        # 웹 애플리케이션 환경변수 체크
+        if [ -z "${{ secrets.WEB_APP_URL }}" ]; then
+          echo "❌ 웹 애플리케이션 필수 정보가 누락되었습니다!"
+          echo "필요한 Repository Secrets: WEB_APP_URL"
+          exit 1
+        fi
+        
+        if [ -z "${{ secrets.WEB_ADMIN_USERNAME }}" ] || [ -z "${{ secrets.WEB_ADMIN_PASSWORD }}" ]; then
+          echo "❌ 웹 관리자 계정 정보가 누락되었습니다!"
+          echo "필요한 Repository Secrets: WEB_ADMIN_USERNAME, WEB_ADMIN_PASSWORD"
+          exit 1
+        fi
+        
         echo "✅ 필수 환경변수 체크 완료"
         
     - name: 서버 연결 테스트
@@ -98,12 +111,14 @@ jobs:
           fi
           
           cat > .env << EOF
-        # 서버 설정
+        # =========================
+        # 게임 서버 설정
+        # =========================
         SERVER_PORT=${{ secrets.SERVER_PORT }}
         SERVER_MAX_CLIENTS=${{ secrets.SERVER_MAX_CLIENTS }}
         SERVER_THREAD_POOL_SIZE=${{ secrets.SERVER_THREAD_POOL_SIZE }}
         
-        # 데이터베이스 설정
+        # 데이터베이스 설정 (게임 서버용)
         DB_HOST=postgres
         DB_PORT=${{ secrets.DB_PORT }}
         DB_USER=${{ secrets.DB_USER }}
@@ -128,7 +143,58 @@ jobs:
         # 개발 설정
         DEBUG_MODE=\${DEBUG_MODE:-false}
         ENABLE_SQL_LOGGING=\${ENABLE_SQL_LOGGING:-false}
+        
+        # =========================
+        # 웹 애플리케이션 설정
+        # =========================
+        WEB_PORT=${{ secrets.WEB_PORT }}
+        WEB_APP_URL=${{ secrets.WEB_APP_URL }}
+        WEB_CLIENT_DOWNLOAD_URL=${{ secrets.WEB_CLIENT_DOWNLOAD_URL }}
+        
+        # 웹 데이터베이스 설정 (동일한 PostgreSQL 컨테이너, 다른 DB명)
+        WEB_DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@postgres:5432/blokus_web
+        
+        # 웹 인증 설정
+        WEB_NEXTAUTH_SECRET=${{ secrets.WEB_NEXTAUTH_SECRET }}
+        WEB_JWT_SECRET=${{ secrets.WEB_JWT_SECRET }}
+        
+        # 웹 관리자 계정
+        WEB_ADMIN_USERNAME=${{ secrets.WEB_ADMIN_USERNAME }}
+        WEB_ADMIN_PASSWORD=${{ secrets.WEB_ADMIN_PASSWORD }}
         EOF
+        "
+        
+    - name: 클라이언트 다운로드 디렉토리 설정
+      run: |
+        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
+          cd ${{ env.DEPLOY_PATH }} && \
+          
+          # 필수 디렉토리 생성
+          mkdir -p downloads web/uploads logs/nginx certbot/conf certbot/www && \
+          
+          # 권한 설정 (Docker에서 접근 가능하도록)
+          chmod 755 downloads web/uploads logs/nginx && \
+          chmod 755 certbot/conf certbot/www && \
+          
+          # 다운로드 디렉토리 안내 파일 생성
+          cat > downloads/README.md << 'DOWNLOAD_EOF'
+# Blokus Online Client Downloads
+
+이 디렉토리는 클라이언트 다운로드 파일을 위한 공간입니다.
+
+## 파일 업로드 방법
+1. Windows에서 빌드된 클라이언트를 이 디렉토리에 업로드
+2. 파일명: BlokusClient-latest.zip (최신 버전)
+3. nginx를 통해 https://blokus-online.mooo.com/downloads/ 경로로 제공됩니다.
+
+## 디렉토리 구조
+- BlokusClient-latest.zip (심볼릭 링크 또는 최신 파일)
+- BlokusClient-v1.0.0.zip (버전별 파일)
+- BlokusClient-v1.0.1.zip
+- ...
+DOWNLOAD_EOF
+          
+          echo '✅ 클라이언트 다운로드 디렉토리 설정 완료'
         "
         
     - name: 기존 컨테이너 정리
@@ -154,7 +220,10 @@ jobs:
       if: always()
       run: |
         if [ "${{ job.status }}" == "success" ]; then
-          echo "✅ 배포 성공! 서버 주소: ${{ env.SSH_HOST }}:${{ secrets.SERVER_PORT }}"
+          echo "✅ 배포 성공!"
+          echo "🎮 게임 서버: ${{ secrets.WEB_APP_URL }}:${{ secrets.SERVER_PORT }}"
+          echo "🌐 웹사이트: https://${{ secrets.WEB_APP_URL }}"
+          echo "📁 클라이언트 다운로드 디렉토리: ${{ env.DEPLOY_PATH }}/downloads"
         else
           echo "❌ 배포 실패!"
         fi
