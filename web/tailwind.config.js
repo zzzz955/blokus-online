@@ -11,6 +11,7 @@ module.exports = {
         primary: {
           50: '#f0f9ff',
           100: '#e0f2fe',
+          300: '#7dd3fc',
           400: '#38bdf8',
           500: '#0ea5e9',
           600: '#0284c7',
@@ -63,6 +64,7 @@ module.exports = {
     },
   },
   plugins: [
-    require('@tailwindcss/typography'),
+    // @tailwindcss/typography는 devDependencies에 있지만 production에서 누락될 수 있음
+    // require('@tailwindcss/typography'),
   ],
 };

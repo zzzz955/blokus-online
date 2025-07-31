@@ -3,10 +3,6 @@ const nextConfig = {
   // Docker 배포를 위한 standalone 모드
   output: 'standalone',
   
-  experimental: {
-    appDir: true,
-  },
-  
   images: {
     domains: ['localhost', 'blokus-online.mooo.com'],
   },

@@ -93,7 +93,19 @@
   }
   
   .prose-custom {
-    @apply prose prose-lg max-w-none prose-headings:text-gray-900 prose-p:text-gray-700 prose-a:text-primary-600 prose-strong:text-gray-900;
+    @apply text-lg max-w-none;
+  }
+  .prose-custom h1, .prose-custom h2, .prose-custom h3 {
+    @apply text-gray-900 font-bold mb-4;
+  }
+  .prose-custom p {
+    @apply text-gray-700 mb-4;
+  }
+  .prose-custom a {
+    @apply text-primary-600 hover:text-primary-700;
+  }
+  .prose-custom strong {
+    @apply text-gray-900 font-semibold;
   }
 }
 
@@ -102,8 +114,17 @@
   background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
 }
 
-.dark .prose-custom {
-  @apply prose-invert prose-headings:text-gray-100 prose-p:text-gray-300 prose-a:text-primary-400 prose-strong:text-gray-100;
+.dark .prose-custom h1, .dark .prose-custom h2, .dark .prose-custom h3 {
+  @apply text-gray-100;
+}
+.dark .prose-custom p {
+  @apply text-gray-300;
+}
+.dark .prose-custom a {
+  @apply text-primary-400 hover:text-primary-300;
+}
+.dark .prose-custom strong {
+  @apply text-gray-100;
 }
 
 /* Custom scrollbar */
