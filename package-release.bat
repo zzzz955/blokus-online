@@ -1,7 +1,7 @@
 @echo off
 echo Creating release package (packaging only, no build)...
 
-set RELEASE_DIR=BlokusClient-Release-v1.0
+set RELEASE_DIR=BlokusClient-latest
 set BUILD_DIR=build\client\Release
 set EXE_NAME=BlokusClient.exe
 
@@ -43,7 +43,7 @@ dir /b %RELEASE_DIR%
 
 echo.
 echo Creating ZIP archive...
-set ZIP_NAME=BlokusClient-Release-v1.0.zip
+set ZIP_NAME=BlokusClient-latest.zip
 powershell -command "Compress-Archive -Path '%RELEASE_DIR%\*' -DestinationPath '%ZIP_NAME%' -Force"
 
 if exist "%ZIP_NAME%" (
