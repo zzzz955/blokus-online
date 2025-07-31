@@ -238,7 +238,7 @@ services:
     
     # SSL 인증서 자동 갱신을 위한 크론 작업
     # docker-compose run --rm certbot renew
-    command: certonly --webroot -w /var/www/certbot --force-renewal --email your-email@example.com -d blokus-online.mooo.com --agree-tos
+    command: certonly --webroot -w /var/www/certbot --force-renewal --email zzzzz955@gmail.com -d blokus-online.mooo.com --agree-tos
 
 # ========== 네트워크 설정 ==========
 networks:
