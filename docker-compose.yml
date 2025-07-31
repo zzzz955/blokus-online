@@ -13,8 +13,6 @@ services:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
-      # 웹 애플리케이션용 추가 데이터베이스
-      POSTGRES_MULTIPLE_DATABASES: "blokus_web"
       TZ: Asia/Seoul
     
     volumes:
