@@ -161,6 +161,10 @@ jobs:
         # 웹 관리자 계정
         WEB_ADMIN_USERNAME=${{ secrets.WEB_ADMIN_USERNAME }}
         WEB_ADMIN_PASSWORD=${{ secrets.WEB_ADMIN_PASSWORD }}
+        
+        # SSL/도메인 설정
+        DOMAIN=${{ secrets.DOMAIN }}
+        CERTBOT_EMAIL=${{ secrets.CERTBOT_EMAIL }}
         EOF
         "
         
