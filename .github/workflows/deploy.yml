@@ -38,41 +38,41 @@ jobs:
       run: |
         # 필수 secrets 체크
         if [ -z "${{ secrets.SSH_HOST }}" ] || [ -z "${{ secrets.SSH_USER }}" ] || [ -z "${{ secrets.SSH_KEY }}" ]; then
-          echo "❌ 필수 SSH 연결 정보가 누락되었습니다!"
-          echo "필요한 Repository Secrets: SSH_HOST, SSH_USER, SSH_KEY, SSH_PORT"
+          echo "ERROR: Required SSH connection information is missing!"
+          echo "Required Repository Secrets: SSH_HOST, SSH_USER, SSH_KEY, SSH_PORT"
           exit 1
         fi
         
         if [ -z "${{ secrets.DB_USER }}" ] || [ -z "${{ secrets.DB_PASSWORD }}" ] || [ -z "${{ secrets.DB_NAME }}" ]; then
-          echo "❌ 필수 데이터베이스 정보가 누락되었습니다!"
-          echo "필요한 Repository Secrets: DB_USER, DB_PASSWORD, DB_NAME"
+          echo "ERROR: Required database information is missing!"
+          echo "Required Repository Secrets: DB_USER, DB_PASSWORD, DB_NAME"
           exit 1
         fi
         
         if [ -z "${{ secrets.SERVER_PORT }}" ]; then
-          echo "❌ 서버 포트가 설정되지 않았습니다!"
-          echo "필요한 Repository Secret: SERVER_PORT"
+          echo "ERROR: Server port is not configured!"
+          echo "Required Repository Secret: SERVER_PORT"
           exit 1
         fi
         
         # 웹 애플리케이션 환경변수 체크
         if [ -z "${{ secrets.WEB_APP_URL }}" ]; then
-          echo "❌ 웹 애플리케이션 필수 정보가 누락되었습니다!"
-          echo "필요한 Repository Secrets: WEB_APP_URL"
+          echo "ERROR: Required web application information is missing!"
+          echo "Required Repository Secrets: WEB_APP_URL"
           exit 1
         fi
         
         if [ -z "${{ secrets.WEB_ADMIN_USERNAME }}" ] || [ -z "${{ secrets.WEB_ADMIN_PASSWORD }}" ]; then
-          echo "❌ 웹 관리자 계정 정보가 누락되었습니다!"
-          echo "필요한 Repository Secrets: WEB_ADMIN_USERNAME, WEB_ADMIN_PASSWORD"
+          echo "ERROR: Web admin account information is missing!"
+          echo "Required Repository Secrets: WEB_ADMIN_USERNAME, WEB_ADMIN_PASSWORD"
           exit 1
         fi
         
-        echo "✅ 필수 환경변수 체크 완료"
+        echo "Required environment variables check completed"
         
     - name: 서버 연결 테스트
       run: |
-        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "echo '서버 연결 성공!'"
+        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "echo 'Server connection successful!'"
         
     - name: 서버에 소스코드 배포
       run: |
@@ -107,7 +107,7 @@ jobs:
           # JWT 시크릿 자동 생성 (설정되지 않은 경우)
           if [ -z \"\$JWT_SECRET\" ]; then
             JWT_SECRET=\$(openssl rand -hex 32)
-            echo '⚠️ JWT_SECRET가 설정되지 않아 자동 생성했습니다. 보안을 위해 Repository Secret에 설정하세요!'
+            echo 'WARNING: JWT_SECRET not set, auto-generated. Please set it in Repository Secrets for security!'
           fi
           
           cat > .env << EOF
@@ -177,24 +177,19 @@ jobs:
           chmod 755 certbot/conf certbot/www && \
           
           # 다운로드 디렉토리 안내 파일 생성
-          cat > downloads/README.md << 'DOWNLOAD_EOF'
+          cat > downloads/README.md << 'EOF'
 # Blokus Online Client Downloads
-
-이 디렉토리는 클라이언트 다운로드 파일을 위한 공간입니다.
-
-## 파일 업로드 방법
-1. Windows에서 빌드된 클라이언트를 이 디렉토리에 업로드
-2. 파일명: BlokusClient-latest.zip (최신 버전)
-3. nginx를 통해 https://blokus-online.mooo.com/downloads/ 경로로 제공됩니다.
-
-## 디렉토리 구조
-- BlokusClient-latest.zip (심볼릭 링크 또는 최신 파일)
-- BlokusClient-v1.0.0.zip (버전별 파일)
-- BlokusClient-v1.0.1.zip
-- ...
-DOWNLOAD_EOF
+This directory is for client download files.
+## Upload Instructions
+1. Upload Windows-built client to this directory
+2. Filename: BlokusClient-latest.zip (latest version)
+3. Served via nginx at domain/downloads/
+## Directory Structure
+- BlokusClient-latest.zip (symlink or latest file)
+- BlokusClient-v1.0.0.zip (version-specific files)
+EOF
           
-          echo '✅ 클라이언트 다운로드 디렉토리 설정 완료'
+          echo 'Client download directory setup completed'
         "
         
     - name: 기존 컨테이너 정리
@@ -220,10 +215,10 @@ DOWNLOAD_EOF
       if: always()
       run: |
         if [ "${{ job.status }}" == "success" ]; then
-          echo "✅ 배포 성공!"
-          echo "🎮 게임 서버: ${{ secrets.WEB_APP_URL }}:${{ secrets.SERVER_PORT }}"
-          echo "🌐 웹사이트: https://${{ secrets.WEB_APP_URL }}"
-          echo "📁 클라이언트 다운로드 디렉토리: ${{ env.DEPLOY_PATH }}/downloads"
+          echo "Deployment successful!"
+          echo "Game Server: ${{ secrets.WEB_APP_URL }}:${{ secrets.SERVER_PORT }}"
+          echo "Website: https://${{ secrets.WEB_APP_URL }}"
+          echo "Client Download Directory: ${{ env.DEPLOY_PATH }}/downloads"
         else
-          echo "❌ 배포 실패!"
+          echo "Deployment failed!"
         fi
