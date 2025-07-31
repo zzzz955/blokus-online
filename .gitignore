@@ -139,28 +139,100 @@ vcpkg_installed/
 ports/
 
 # ========================================
-# Node.js (Web Service)
+# Node.js (Web Frontend)
 # ========================================
 
 # Dependencies
-web-service/node_modules/
-web-service/npm-debug.log*
-web-service/yarn-debug.log*
-web-service/yarn-error.log*
+web/node_modules/
+web/npm-debug.log*
+web/yarn-debug.log*
+web/yarn-error.log*
+web/pnpm-debug.log*
 
 # Runtime data
-web-service/pids/
-web-service/*.pid
-web-service/*.seed
-web-service/*.pid.lock
+web/pids/
+web/*.pid
+web/*.seed
+web/*.pid.lock
+
+# Next.js build output
+web/.next/
+web/out/
+
+# Nuxt.js build / generate output
+web/.nuxt
+web/dist
+
+# Gatsby files
+web/.cache/
+web/public
+
+# Vuepress build output
+web/.vuepress/dist
+
+# Serverless directories
+web/.serverless/
+
+# FuseBox cache
+web/.fusebox/
+
+# DynamoDB Local files
+web/.dynamodb/
+
+# TernJS port file
+web/.tern-port
+
+# Stores VSCode versions used for testing VSCode extensions
+web/.vscode-test
 
 # Coverage directory used by tools like istanbul
-web-service/coverage/
+web/coverage/
+web/*.lcov
 
-# Environment variables
-web-service/.env
-web-service/.env.local
-web-service/.env.production
+# nyc test coverage
+web/.nyc_output
+
+# Microbundle cache
+web/.rpt2_cache/
+web/.rts2_cache_cjs/
+web/.rts2_cache_es/
+web/.rts2_cache_umd/
+
+# Optional npm cache directory
+web/.npm
+
+# Optional eslint cache
+web/.eslintcache
+
+# Optional REPL history
+web/.node_repl_history
+
+# Output of 'npm pack'
+web/*.tgz
+
+# Yarn Integrity file
+web/.yarn-integrity
+
+# dotenv environment variables file
+web/.env
+web/.env.local
+web/.env.development.local
+web/.env.test.local
+web/.env.production.local
+
+# Prisma
+web/prisma/dev.db
+web/prisma/dev.db-journal
+web/prisma/migrations/
+
+# Uploads
+web/public/uploads/
+
+# Static generation
+web/.vercel
+
+# Turbo
+web/.turbo
 
 # ========================================
 # Database

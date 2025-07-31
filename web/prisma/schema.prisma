@@ -1,0 +1,70 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Announcement {
+  id          Int      @id @default(autoincrement())
+  title       String
+  content     String   // Markdown content
+  author      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  isPinned    Boolean  @default(false)
+  isPublished Boolean  @default(true)
+
+  @@map("announcements")
+}
+
+model PatchNote {
+  id          Int      @id @default(autoincrement())
+  version     String   @unique
+  title       String
+  content     String   // Markdown content
+  releaseDate DateTime
+  downloadUrl String?
+  createdAt   DateTime @default(now())
+
+  @@map("patch_notes")
+}
+
+model SupportTicket {
+  id         Int                @id @default(autoincrement())
+  email      String
+  subject    String
+  message    String
+  status     SupportTicketStatus @default(PENDING)
+  adminReply String?
+  createdAt  DateTime           @default(now())
+  repliedAt  DateTime?
+
+  @@map("support_tickets")
+}
+
+model AdminUser {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  passwordHash String
+  role         AdminRole @default(ADMIN)
+  createdAt    DateTime @default(now())
+
+  @@map("admin_users")
+}
+
+enum SupportTicketStatus {
+  PENDING
+  ANSWERED
+  CLOSED
+}
+
+enum AdminRole {
+  ADMIN
+  SUPER_ADMIN
+}
