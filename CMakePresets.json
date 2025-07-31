@@ -5,8 +5,16 @@
             "name": "default",
             "displayName": "Default Config",
             "toolchainFile": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
+            "generator": "Visual Studio 17 2022",
+            "architecture": "x64",
+            "binaryDir": "${sourceDir}/build"
+        },
+        {
+            "name": "production",
+            "displayName": "Production Build",
+            "toolchainFile": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug"
+                "BLOKUS_PRODUCTION_BUILD": "ON"
             },
             "generator": "Visual Studio 17 2022",
             "architecture": "x64",
