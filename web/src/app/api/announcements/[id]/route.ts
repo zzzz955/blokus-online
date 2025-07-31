@@ -34,7 +34,11 @@ export async function GET(
 
     const response: ApiResponse<Announcement> = {
       success: true,
-      data: announcement,
+      data: {
+        ...announcement,
+        createdAt: announcement.createdAt.toISOString(),
+        updatedAt: announcement.updatedAt.toISOString(),
+      },
     };
 
     return NextResponse.json(response);

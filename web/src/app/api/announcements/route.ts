@@ -31,7 +31,11 @@ export async function GET(request: NextRequest) {
 
     const response: PaginatedResponse<Announcement> = {
       success: true,
-      data: announcements,
+      data: announcements.map(announcement => ({
+        ...announcement,
+        createdAt: announcement.createdAt.toISOString(),
+        updatedAt: announcement.updatedAt.toISOString(),
+      })),
       pagination: {
         page,
         limit,

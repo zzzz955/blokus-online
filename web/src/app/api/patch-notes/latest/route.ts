@@ -18,7 +18,11 @@ export async function GET() {
 
     const response: ApiResponse<PatchNote> = {
       success: true,
-      data: latestPatchNote,
+      data: {
+        ...latestPatchNote,
+        releaseDate: latestPatchNote.releaseDate.toISOString(),
+        createdAt: latestPatchNote.createdAt.toISOString(),
+      },
     };
 
     return NextResponse.json(response);

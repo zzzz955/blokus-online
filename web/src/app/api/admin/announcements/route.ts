@@ -33,7 +33,11 @@ export async function GET(request: NextRequest) {
 
     const response: PaginatedResponse<Announcement> = {
       success: true,
-      data: announcements,
+      data: announcements.map(announcement => ({
+        ...announcement,
+        createdAt: announcement.createdAt.toISOString(),
+        updatedAt: announcement.updatedAt.toISOString(),
+      })),
       pagination: {
         page,
         limit,
@@ -86,7 +90,11 @@ export async function POST(request: NextRequest) {
 
     const response: ApiResponse<Announcement> = {
       success: true,
-      data: announcement,
+      data: {
+        ...announcement,
+        createdAt: announcement.createdAt.toISOString(),
+        updatedAt: announcement.updatedAt.toISOString(),
+      },
       message: '공지사항이 생성되었습니다.',
     };
 

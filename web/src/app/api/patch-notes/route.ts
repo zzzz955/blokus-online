@@ -21,7 +21,11 @@ export async function GET(request: NextRequest) {
 
     const response: PaginatedResponse<PatchNote> = {
       success: true,
-      data: patchNotes,
+      data: patchNotes.map(patchNote => ({
+        ...patchNote,
+        releaseDate: patchNote.releaseDate.toISOString(),
+        createdAt: patchNote.createdAt.toISOString(),
+      })),
       pagination: {
         page,
         limit,
