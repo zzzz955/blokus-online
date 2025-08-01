@@ -6,8 +6,9 @@
 /**
  * @brief 클라이언트 설정 관리 클래스
  * 
- * JSON 파일 기반으로 클라이언트 설정을 관리합니다.
- * 우선순위: config.json > default.json > 하드코딩된 기본값
+ * 빌드 모드에 따른 하드코딩된 서버 설정을 관리합니다.
+ * Debug 모드: localhost:9999
+ * Release 모드: blokus-online.mooo.com:9999
  */
 class ClientConfigManager {
 public:
@@ -124,5 +125,4 @@ private:
     
     // 내부 함수들
     void loadDefaults();
-    void loadEnvFile();  // .env 파일 로딩
 };

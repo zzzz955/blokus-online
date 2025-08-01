@@ -10,33 +10,6 @@
 #include <functional>
 #include <unordered_map>
 
-// Protobuf forward declarations
-namespace google::protobuf {
-    class Message;
-}
-
-namespace blokus {
-    class MessageWrapper;
-    enum MessageType : int;
-    
-    // Proto message types
-    class AuthRequest;
-    class AuthResponse;
-    class RegisterRequest;
-    class RegisterResponse;
-    class LogoutRequest;
-    class LogoutResponse;
-    class HeartbeatRequest;
-    class HeartbeatResponse;
-    class CreateRoomRequest;
-    class CreateRoomResponse;
-    class JoinRoomRequest;
-    class JoinRoomResponse;
-    class SendChatRequest;
-    class SendChatResponse;
-    class ErrorResponse;
-}
-
 namespace Blokus {
 
     class NetworkClient : public QObject
@@ -60,18 +33,14 @@ namespace Blokus {
         bool isConnected() const;
         ConnectionState getState() const { return m_state; }
 
-        // 메시지 전송 (텍스트 및 Protobuf)
+        // 메시지 전송
         void sendMessage(const QString& message);
-        void sendProtobufMessage(blokus::MessageType type, const google::protobuf::Message& payload);
-        void sendProtobufRequest(blokus::MessageType type, const google::protobuf::Message& payload);
+        void sendBinaryMessage(const QByteArray& data);
         
-        // 인증 관련 (텍스트 및 Protobuf 지원)
+        // 인증 관련
         void login(const QString& username, const QString& password);
-        void loginProtobuf(const QString& username, const QString& password);
         void registerUser(const QString& username, const QString& password);
-        void registerUserProtobuf(const QString& username, const QString& password);
         void logout();
-        void logoutProtobuf();
         void sendHeartbeat();
 
         // 로비 관련
@@ -82,18 +51,13 @@ namespace Blokus {
         
         // 방 관련
         void createRoom(const QString& roomName, bool isPrivate = false, const QString& password = "");
-        void createRoomProtobuf(const QString& roomName, bool isPrivate = false, const QString& password = "");
         void joinRoom(int roomId, const QString& password = "");
-        void joinRoomProtobuf(int roomId, const QString& password = "");
         void leaveRoom();
-        void leaveRoomProtobuf();
         void setPlayerReady(bool ready);
         void startGame();
-        void startGameProtobuf();
         
         // 채팅 관련
         void sendChatMessage(const QString& message);
-        void sendChatMessageProtobuf(const QString& message);
         
         // AFK 관련
         void sendAfkUnblock();
@@ -113,6 +77,10 @@ namespace Blokus {
         // 메시지 시그널
         void messageReceived(const QString& message);
         void errorReceived(const QString& error);
+        
+        // 버전 시그널
+        void versionIncompatible(const QString& serverVersion, const QString& downloadUrl);
+        void versionCheckCompleted(bool compatible);
 
         // 로비 시그널
         void lobbyEntered();
@@ -167,41 +135,18 @@ namespace Blokus {
     private:
         void setState(ConnectionState state);
         void processMessage(const QString& message);
-        void processProtobufMessage(const blokus::MessageWrapper& wrapper);
         void processAuthResponse(const QString& response);
         void processLobbyResponse(const QString& response);
         void processGameStateMessage(const QString& message);
         void processAfkMessage(const QString& message);
         void processErrorMessage(const QString& error);
+        
+        // 버전 관련 메서드
+        void performVersionCheck();
+        void processVersionCheckResponse(const QStringList& params);
         void setupSocket();
         void cleanupSocket();
-        
-        // Protobuf message handlers
-        void setupProtobufHandlers();
-        void handleProtobufAuthResponse(const blokus::MessageWrapper& wrapper);
-        void handleProtobufRegisterResponse(const blokus::MessageWrapper& wrapper);
-        void handleProtobufLogoutResponse(const blokus::MessageWrapper& wrapper);
-        void handleProtobufHeartbeatResponse(const blokus::MessageWrapper& wrapper);
-        void handleProtobufCreateRoomResponse(const blokus::MessageWrapper& wrapper);
-        void handleProtobufJoinRoomResponse(const blokus::MessageWrapper& wrapper);
-        void handleProtobufLeaveRoomResponse(const blokus::MessageWrapper& wrapper);
-        void handleProtobufSendChatResponse(const blokus::MessageWrapper& wrapper);
-        void handleProtobufStartGameResponse(const blokus::MessageWrapper& wrapper);
-        void handleProtobufErrorResponse(const blokus::MessageWrapper& wrapper);
-        
-        // Protobuf notification handlers
-        void handleProtobufChatNotification(const blokus::MessageWrapper& wrapper);
-        void handleProtobufPlayerJoinedNotification(const blokus::MessageWrapper& wrapper);
-        void handleProtobufPlayerLeftNotification(const blokus::MessageWrapper& wrapper);
-        void handleProtobufPlayerReadyNotification(const blokus::MessageWrapper& wrapper);
-        void handleProtobufGameStartedNotification(const blokus::MessageWrapper& wrapper);
-        void handleProtobufGameEndedNotification(const blokus::MessageWrapper& wrapper);
-        
-        // Protobuf utilities
-        template<typename T>
-        bool unpackMessage(const blokus::MessageWrapper& wrapper, T& message);
-        blokus::MessageWrapper createRequestWrapper(blokus::MessageType type, const google::protobuf::Message& payload);
-        
+
         // 재연결 관리
         void startReconnectTimer();
         void stopReconnectTimer();
@@ -223,11 +168,6 @@ namespace Blokus {
         
         // 연결 시간초과 설정
         int m_connectionTimeout;
-        
-        // Protobuf 지원
-        std::unordered_map<int, std::function<void(const blokus::MessageWrapper&)>> m_protobufHandlers;
-        uint32_t m_sequenceId;
-        bool m_protobufEnabled;
     };
 
 } // namespace Blokus

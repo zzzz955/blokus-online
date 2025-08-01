@@ -20,6 +20,7 @@ set(SERVER_SOURCES
     src/AuthenticationService.cpp
     src/ServerTypes.cpp
     src/PlayerInfo.cpp
+    src/VersionManager.cpp
 )
 
 # �ٽ� ��� ���ϵ�
@@ -28,13 +29,13 @@ set(SERVER_HEADERS
     include/GameServer.h
     include/Session.h
     include/MessageHandler.h
-    include/NetworkManager.h
     include/GameRoom.h
     include/RoomManager.h
     include/DatabaseManager.h
     include/ConfigManager.h
     include/AuthenticationService.h
     include/PlayerInfo.h
+    include/VersionManager.h
 )
 
 # ���� ���� ����
@@ -58,7 +59,6 @@ find_package(libpqxx CONFIG REQUIRED)
 # ���̺귯�� ��ũ
 target_link_libraries(BlokusServer PRIVATE
     BlokusCommon
-    BlokusProto
     Boost::system
     libpqxx::pqxx
 )

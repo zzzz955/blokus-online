@@ -4,20 +4,13 @@
 #include "AuthenticationService.h"
 #include "GameServer.h"
 #include "DatabaseManager.h"
+#include "VersionManager.h"
 #include "ServerTypes.h"
 #include <spdlog/spdlog.h>
 #include <sstream>
 #include <algorithm>
 #include <iomanip>
 #include <ctime>
-
-// Protobuf includes
-#include "message_wrapper.pb.h"
-#include "auth.pb.h"
-#include "lobby.pb.h"
-#include "game.pb.h"
-#include "chat.pb.h"
-#include "error.pb.h"
 
 namespace Blokus::Server
 {
@@ -26,8 +19,8 @@ namespace Blokus::Server
     // 생성자 및 소멸자
     // ========================================
 
-    MessageHandler::MessageHandler(Session *session, RoomManager *roomManager, AuthenticationService *authService, DatabaseManager *databaseManager, GameServer *gameServer)
-        : session_(session), roomManager_(roomManager), authService_(authService), databaseManager_(databaseManager), gameServer_(gameServer)
+    MessageHandler::MessageHandler(Session *session, RoomManager *roomManager, AuthenticationService *authService, DatabaseManager *databaseManager, GameServer *gameServer, VersionManager *versionManager)
+        : session_(session), roomManager_(roomManager), authService_(authService), databaseManager_(databaseManager), gameServer_(gameServer), versionManager_(versionManager)
     {
         // 🔥 enum 기반 핸들러 등록
         handlers_[MessageType::Ping] = [this](const auto &params)
@@ -73,6 +66,10 @@ namespace Blokus::Server
         handlers_[MessageType::UserStats] = [this](const auto &params)
         { handleGetUserStats(params); };
 
+        // 버전 관련
+        handlers_[MessageType::VersionCheck] = [this](const auto &params)
+        { handleVersionCheck(params); };
+
         // 게임 관련
         handlers_[MessageType::GameMove] = [this](const auto &params)
         { handleGameMove(params); };
@@ -85,11 +82,8 @@ namespace Blokus::Server
         // AFK 검증 메시지 처리 (임시로 Chat 타입 재활용)
         // 실제 메시지는 "AFK_VERIFY" 형태로 전송
 
-        // Protobuf 핸들러 등록
-        setupProtobufHandlers();
-
-        spdlog::debug("MessageHandler 생성: 세션 {} (핸들러 수: {}, Protobuf 핸들러 수: {})",
-                      session_ ? session_->getSessionId() : "nullptr", handlers_.size(), protobufHandlers_.size());
+        spdlog::debug("MessageHandler 생성: 세션 {} (핸들러 수: {})",
+                      session_ ? session_->getSessionId() : "nullptr", handlers_.size());
     }
 
     MessageHandler::~MessageHandler()
@@ -115,24 +109,6 @@ namespace Blokus::Server
                           session_->getSessionId(),
                           rawMessage.length() > 100 ? rawMessage.substr(0, 100) + "..." : rawMessage, (int)session_->getState());
 
-            // Protobuf 메시지 확인
-            if (rawMessage.size() > 9 && rawMessage.substr(0, 9) == "PROTOBUF:")
-            {
-                // Protobuf 메시지 처리
-                std::string serializedData = rawMessage.substr(9);
-                blokus::MessageWrapper wrapper;
-
-                if (wrapper.ParseFromString(serializedData))
-                {
-                    handleProtobufMessage(wrapper);
-                }
-                else
-                {
-                    spdlog::error("Protobuf 메시지 파싱 실패");
-                    sendError("Protobuf 메시지 형식 오류");
-                }
-                return;
-            }
 
             // AFK 관련 메시지 특별 처리
             if (rawMessage == "AFK_VERIFY") {
@@ -185,7 +161,7 @@ namespace Blokus::Server
         // room:xxx, game:xxx 형태 처리
         if (parts.size() >= 2)
         {
-            if (commandStr == "room" || commandStr == "game" || commandStr == "lobby" || commandStr == "user")
+            if (commandStr == "room" || commandStr == "game" || commandStr == "lobby" || commandStr == "user" || commandStr == "version")
             {
                 commandStr += ":" + parts[1];
                 // 파라미터는 2번째 인덱스부터
@@ -1348,143 +1324,6 @@ namespace Blokus::Server
     }
 
     // ========================================
-    // Protobuf 지원 구현
-    // ========================================
-
-    void MessageHandler::setupProtobufHandlers()
-    {
-        using namespace blokus;
-
-        // 인증 관련 Protobuf 핸들러
-        protobufHandlers_[MESSAGE_TYPE_AUTH_REQUEST] = [this](const auto &wrapper)
-        { handleProtobufAuth(wrapper); };
-        protobufHandlers_[MESSAGE_TYPE_REGISTER_REQUEST] = [this](const auto &wrapper)
-        { handleProtobufRegister(wrapper); };
-        protobufHandlers_[MESSAGE_TYPE_LOGOUT_REQUEST] = [this](const auto &wrapper)
-        { handleProtobufLogout(wrapper); };
-        protobufHandlers_[MESSAGE_TYPE_HEARTBEAT] = [this](const auto &wrapper)
-        { handleProtobufHeartbeat(wrapper); };
-
-        // 로비 관련 Protobuf 핸들러
-        protobufHandlers_[MESSAGE_TYPE_CREATE_ROOM_REQUEST] = [this](const auto &wrapper)
-        { handleProtobufCreateRoom(wrapper); };
-        protobufHandlers_[MESSAGE_TYPE_JOIN_ROOM_REQUEST] = [this](const auto &wrapper)
-        { handleProtobufJoinRoom(wrapper); };
-        protobufHandlers_[MESSAGE_TYPE_LEAVE_ROOM_REQUEST] = [this](const auto &wrapper)
-        { handleProtobufLeaveRoom(wrapper); };
-
-        // 채팅 관련 Protobuf 핸들러
-        protobufHandlers_[MESSAGE_TYPE_SEND_CHAT_REQUEST] = [this](const auto &wrapper)
-        { handleProtobufSendChat(wrapper); };
-
-        // 게임 관련 Protobuf 핸들러
-        protobufHandlers_[MESSAGE_TYPE_PLACE_BLOCK_REQUEST] = [this](const auto &wrapper)
-        { handleProtobufPlaceBlock(wrapper); };
-        protobufHandlers_[MESSAGE_TYPE_START_GAME_REQUEST] = [this](const auto &wrapper)
-        { handleProtobufStartGame(wrapper); };
-
-        spdlog::debug("Protobuf 핸들러 {} 개 등록 완료", protobufHandlers_.size());
-    }
-
-    void MessageHandler::handleProtobufMessage(const blokus::MessageWrapper &wrapper)
-    {
-        if (!session_)
-        {
-            spdlog::error("Session이 null입니다");
-            return;
-        }
-
-        try
-        {
-            spdlog::debug("📨 Protobuf 메시지 수신 ({}): type={}, seq={}",
-                          session_->getSessionId(),
-                          static_cast<int>(wrapper.type()),
-                          wrapper.sequence_id());
-
-            // 핸들러 실행
-            auto it = protobufHandlers_.find(static_cast<int>(wrapper.type()));
-            if (it != protobufHandlers_.end())
-            {
-                it->second(wrapper);
-            }
-            else
-            {
-                spdlog::warn("알 수 없는 Protobuf 메시지 타입: {}", static_cast<int>(wrapper.type()));
-
-                // 에러 응답 전송
-                blokus::ErrorResponse errorResponse;
-                errorResponse.set_result_code(blokus::RESULT_INVALID_REQUEST);
-                errorResponse.set_message("알 수 없는 메시지 타입입니다");
-                sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_ERROR_RESPONSE, errorResponse);
-            }
-        }
-        catch (const std::exception &e)
-        {
-            spdlog::error("Protobuf 메시지 처리 중 예외: {}", e.what());
-
-            // 에러 응답 전송
-            blokus::ErrorResponse errorResponse;
-            errorResponse.set_result_code(blokus::RESULT_SERVER_ERROR);
-            errorResponse.set_message("메시지 처리 중 오류가 발생했습니다");
-            sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_ERROR_RESPONSE, errorResponse);
-        }
-    }
-
-    void MessageHandler::sendProtobufMessage(blokus::MessageType type, const google::protobuf::Message &payload)
-    {
-        if (!session_)
-        {
-            spdlog::error("Session이 null이므로 Protobuf 메시지를 보낼 수 없습니다");
-            return;
-        }
-
-        auto wrapper = createResponseWrapper(0, type, payload);
-
-        // MessageWrapper를 직렬화하여 전송
-        std::string serializedData;
-        if (wrapper.SerializeToString(&serializedData))
-        {
-            // 특수 헤더를 추가하여 Protobuf 메시지임을 나타냄
-            std::string protobufMessage = "PROTOBUF:" + serializedData;
-            session_->sendMessage(protobufMessage);
-
-            spdlog::debug("📤 Protobuf 메시지 전송: type={}, size={} bytes",
-                          static_cast<int>(type), serializedData.size());
-        }
-        else
-        {
-            spdlog::error("Protobuf 메시지 직렬화 실패");
-        }
-    }
-
-    void MessageHandler::sendProtobufResponse(uint32_t sequenceId, blokus::MessageType type, const google::protobuf::Message &payload)
-    {
-        if (!session_)
-        {
-            spdlog::error("Session이 null이므로 Protobuf 응답을 보낼 수 없습니다");
-            return;
-        }
-
-        auto wrapper = createResponseWrapper(sequenceId, type, payload);
-
-        // MessageWrapper를 직렬화하여 전송
-        std::string serializedData;
-        if (wrapper.SerializeToString(&serializedData))
-        {
-            // 특수 헤더를 추가하여 Protobuf 메시지임을 나타냄
-            std::string protobufMessage = "PROTOBUF:" + serializedData;
-            session_->sendMessage(protobufMessage);
-
-            spdlog::debug("📤 Protobuf 응답 전송: type={}, seq={}, size={} bytes",
-                          static_cast<int>(type), sequenceId, serializedData.size());
-        }
-        else
-        {
-            spdlog::error("Protobuf 응답 직렬화 실패");
-        }
-    }
-
-    // ========================================
     // 로비 브로드캐스팅 헬퍼 함수들
     // ========================================
 
@@ -2042,566 +1881,31 @@ namespace Blokus::Server
     }
 
     // ========================================
-    // Protobuf 핸들러 구현
+    // 버전 관련 핸들러
     // ========================================
 
-    void MessageHandler::handleProtobufAuth(const blokus::MessageWrapper &wrapper)
+    void MessageHandler::handleVersionCheck(const std::vector<std::string>& params)
     {
-        blokus::AuthRequest request;
-        if (!unpackMessage(wrapper, request))
-            return;
-
-        if (!authService_)
-        {
-            blokus::ErrorResponse errorResponse;
-            errorResponse.set_result_code(blokus::RESULT_SERVER_ERROR);
-            errorResponse.set_message("인증 서비스를 사용할 수 없습니다");
-            sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_ERROR_RESPONSE, errorResponse);
+        if (params.size() < 1) {
+            sendError("사용법: version:check:클라이언트_버전");
             return;
         }
+        
+        const VersionManager::Version& version = versionManager_->getServerVersion();
+        std::string clientVersion = params[0];
+        spdlog::debug("🔍 버전 체크: 클라이언트={}, 서버={}", clientVersion, version.version);
 
-        auto result = authService_->loginUser(request.username(), request.password());
-
-        blokus::AuthResponse response;
-        blokus::Result *resultMsg = response.mutable_result();
-        resultMsg->set_code(result.success ? blokus::RESULT_SUCCESS : blokus::RESULT_UNKNOWN_ERROR);
-        resultMsg->set_message(result.message);
-
-        if (result.success)
-        {
-            session_->setAuthenticated(result.userId, result.username);
-            response.set_session_token(result.sessionToken);
-
-            // UserInfo 설정
-            blokus::UserInfo *userInfo = response.mutable_user_info();
-            userInfo->set_username(result.username);
-            userInfo->set_level(1); // DB에서 가져와야 함
-            userInfo->set_status(blokus::USER_STATUS_ONLINE);
-
-            spdlog::info("✅ Protobuf 로그인 성공: {}", result.username);
-        }
-        else
-        {
-            spdlog::warn("❌ Protobuf 로그인 실패: {} - {}", request.username(), result.message);
-        }
-
-        sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_AUTH_RESPONSE, response);
-    }
-
-    void MessageHandler::handleProtobufRegister(const blokus::MessageWrapper &wrapper)
-    {
-        blokus::RegisterRequest request;
-        if (!unpackMessage(wrapper, request))
-            return;
-
-        if (!authService_)
-        {
-            blokus::ErrorResponse errorResponse;
-            errorResponse.set_result_code(blokus::RESULT_SERVER_ERROR);
-            errorResponse.set_message("인증 서비스를 사용할 수 없습니다");
-            sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_ERROR_RESPONSE, errorResponse);
-            return;
-        }
-
-        auto result = authService_->registerUser(request.username(), request.password());
-
-        blokus::RegisterResponse response;
-        blokus::Result *resultMsg = response.mutable_result();
-        resultMsg->set_code(result.success ? blokus::RESULT_SUCCESS : blokus::RESULT_UNKNOWN_ERROR);
-        resultMsg->set_message(result.message);
-
-        if (result.success)
-        {
-            response.set_user_id(result.userId);
-            spdlog::info("✅ Protobuf 회원가입 성공: {}", request.username());
-        }
-        else
-        {
-            spdlog::warn("❌ Protobuf 회원가입 실패: {} - {}", request.username(), result.message);
-        }
-
-        sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_REGISTER_RESPONSE, response);
-    }
-
-    void MessageHandler::handleProtobufLogout(const blokus::MessageWrapper &wrapper)
-    {
-        blokus::LogoutRequest request;
-        if (!unpackMessage(wrapper, request))
-            return;
-
-        // 기존 handleLogout 로직을 Protobuf로 변환
-        std::string username = session_->getUsername();
-        session_->setStateToConnected();
-
-        blokus::LogoutResponse response;
-        blokus::Result *result = response.mutable_result();
-        result->set_code(blokus::RESULT_SUCCESS);
-        result->set_message("로그아웃 성공");
-
-        sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_LOGOUT_RESPONSE, response);
-        spdlog::info("Protobuf 로그아웃: {} ({})", username, session_->getSessionId());
-    }
-
-    void MessageHandler::handleProtobufHeartbeat(const blokus::MessageWrapper &wrapper)
-    {
-        blokus::HeartbeatRequest request;
-        if (!unpackMessage(wrapper, request))
-            return;
-
-        blokus::HeartbeatResponse response;
-        response.set_sequence_number(request.sequence_number());
-
-        // ServerInfo 설정
-        if (authService_)
-        {
-            blokus::ServerInfo *serverInfo = response.mutable_server_info();
-            serverInfo->set_online_users(authService_->getActiveSessionCount());
-            serverInfo->set_server_version("1.0.0");
-        }
-
-        sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_HEARTBEAT, response);
-    }
-
-    void MessageHandler::handleProtobufCreateRoom(const blokus::MessageWrapper &wrapper)
-    {
-        blokus::CreateRoomRequest request;
-        if (!unpackMessage(wrapper, request))
-            return;
-
-        if (!roomManager_)
-        {
-            blokus::ErrorResponse errorResponse;
-            errorResponse.set_result_code(blokus::RESULT_SERVER_ERROR);
-            errorResponse.set_message("방 관리자가 초기화되지 않았습니다");
-            sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_ERROR_RESPONSE, errorResponse);
-            return;
-        }
-
-        try
-        {
-            std::string userId = session_->getUserId();
-            std::string username = session_->getUsername();
-            std::string roomName = request.room_name();
-            bool isPrivate = request.is_private();
-            std::string password = request.password();
-
-            spdlog::info("🏠 Protobuf 방 생성 요청: {} (비공개: {})", roomName, isPrivate);
-
-            int roomId = roomManager_->createRoom(userId, username, roomName, isPrivate, password);
-
-            blokus::CreateRoomResponse response;
-            blokus::Result *result = response.mutable_result();
-
-            if (roomId > 0)
-            {
-                result->set_code(blokus::RESULT_SUCCESS);
-                result->set_message("방이 성공적으로 생성되었습니다");
-
-                // RoomInfo 설정
-                blokus::RoomInfo *roomInfo = response.mutable_room_info();
-                roomInfo->set_room_id(roomId);
-                roomInfo->set_room_name(roomName);
-                roomInfo->set_host_username(session_->getUsername());
-                roomInfo->set_is_private(isPrivate);
-                roomInfo->set_max_players(4);
-                roomInfo->set_current_players(1);
-                roomInfo->set_game_mode(blokus::GAME_MODE_CLASSIC);
-
-                spdlog::info("✅ Protobuf 방 생성 성공: {} (ID: {})", roomName, roomId);
-            }
-            else
-            {
-                result->set_code(blokus::RESULT_UNKNOWN_ERROR);
-                result->set_message("방 생성에 실패했습니다");
-                spdlog::warn("❌ Protobuf 방 생성 실패: roomId = {}", roomId);
-            }
-
-            sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_CREATE_ROOM_RESPONSE, response);
-        }
-        catch (const std::exception &e)
-        {
-            blokus::ErrorResponse errorResponse;
-            errorResponse.set_result_code(blokus::RESULT_SERVER_ERROR);
-            errorResponse.set_message("방 생성 중 오류가 발생했습니다");
-            sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_ERROR_RESPONSE, errorResponse);
-            spdlog::error("Protobuf 방 생성 처리 중 예외: {}", e.what());
+        // 버전 호환성 체크
+        bool compatible = version.isCompatibleWith(clientVersion);
+        
+        if (compatible) {
+            sendTextMessage("version:ok");
+            spdlog::info("✅ 버전 호환: {} <-> {}", clientVersion, ConfigManager::serverVersion);
+        } else {
+            std::string response = "version:mismatch:" + versionManager_->getDownloadURL();
+            sendTextMessage(response);
+            spdlog::warn("❌ 버전 불일치: 클라이언트={}, 서버={}, 리다이렉트={}",
+                        clientVersion, ConfigManager::serverVersion, versionManager_->getDownloadURL());
         }
     }
-
-    void MessageHandler::handleProtobufJoinRoom(const blokus::MessageWrapper &wrapper)
-    {
-        blokus::JoinRoomRequest request;
-        if (!unpackMessage(wrapper, request))
-            return;
-
-        if (!roomManager_)
-        {
-            blokus::ErrorResponse errorResponse;
-            errorResponse.set_result_code(blokus::RESULT_SERVER_ERROR);
-            errorResponse.set_message("방 관리자가 초기화되지 않았습니다");
-            sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_ERROR_RESPONSE, errorResponse);
-            return;
-        }
-
-        try
-        {
-            std::string userId = session_->getUserId();
-            std::string username = session_->getUsername();
-            int roomId = request.room_id();
-            std::string password = request.password();
-
-            spdlog::info("🚪 Protobuf 방 참여 요청: {} -> 방 {}", userId, roomId);
-
-            bool joinSuccess = roomManager_->joinRoom(roomId, session_->shared_from_this(), userId, username, password);
-
-            blokus::JoinRoomResponse response;
-            blokus::Result *result = response.mutable_result();
-
-            if (joinSuccess)
-            {
-                result->set_code(blokus::RESULT_SUCCESS);
-                result->set_message("방에 성공적으로 참여했습니다");
-
-                // 방 정보 가져오기
-                auto room = roomManager_->getRoom(roomId);
-                if (room)
-                {
-                    blokus::RoomInfo *roomInfo = response.mutable_room_info();
-                    roomInfo->set_room_id(roomId);
-                    roomInfo->set_room_name(room->getRoomName());
-                    roomInfo->set_host_username(room->getHostName());
-                    roomInfo->set_is_private(room->isPrivate());
-                    roomInfo->set_max_players(room->getMaxPlayers());
-                    roomInfo->set_current_players(room->getPlayerCount());
-                    roomInfo->set_game_mode(blokus::GAME_MODE_CLASSIC);
-
-                    // 플레이어 색상 할당
-                    auto player = room->getPlayer(userId);
-                    if (player)
-                    {
-                        response.set_assigned_color(static_cast<blokus::PlayerColor>(player->getColor()));
-                    }
-                }
-
-                spdlog::info("✅ Protobuf 방 참여 성공: {} -> 방 {}", userId, roomId);
-            }
-            else
-            {
-                result->set_code(blokus::RESULT_UNKNOWN_ERROR);
-                result->set_message("방 참여에 실패했습니다");
-                spdlog::warn("❌ Protobuf 방 참여 실패: {} -> 방 {}", userId, roomId);
-            }
-
-            sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_JOIN_ROOM_RESPONSE, response);
-        }
-        catch (const std::exception &e)
-        {
-            blokus::ErrorResponse errorResponse;
-            errorResponse.set_result_code(blokus::RESULT_SERVER_ERROR);
-            errorResponse.set_message("방 참여 중 오류가 발생했습니다");
-            sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_ERROR_RESPONSE, errorResponse);
-            spdlog::error("Protobuf 방 참여 처리 중 예외: {}", e.what());
-        }
-    }
-
-    void MessageHandler::handleProtobufLeaveRoom(const blokus::MessageWrapper &wrapper)
-    {
-        blokus::LeaveRoomRequest request;
-        if (!unpackMessage(wrapper, request))
-            return;
-
-        if (!roomManager_)
-        {
-            blokus::ErrorResponse errorResponse;
-            errorResponse.set_result_code(blokus::RESULT_SERVER_ERROR);
-            errorResponse.set_message("방 관리자가 초기화되지 않았습니다");
-            sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_ERROR_RESPONSE, errorResponse);
-            return;
-        }
-
-        try
-        {
-            std::string userId = session_->getUserId();
-            int roomId = session_->getCurrentRoomId();
-
-            spdlog::info("🚪 Protobuf 방 나가기 요청: {} -> 방 {}", userId, roomId);
-
-            bool success = roomManager_->leaveRoom(roomId, userId);
-
-            blokus::LeaveRoomResponse response;
-            blokus::Result *result = response.mutable_result();
-
-            if (success)
-            {
-                session_->setStateToLobby(true);  // 방에서 나와서 로비로 이동
-                result->set_code(blokus::RESULT_SUCCESS);
-                result->set_message("방을 성공적으로 나갔습니다");
-                spdlog::info("✅ Protobuf 방 나가기 성공: {} -> 방 {}", userId, roomId);
-            }
-            else
-            {
-                result->set_code(blokus::RESULT_UNKNOWN_ERROR);
-                result->set_message("방 나가기에 실패했습니다");
-                spdlog::warn("❌ Protobuf 방 나가기 실패: {} -> 방 {}", userId, roomId);
-            }
-
-            sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_LEAVE_ROOM_RESPONSE, response);
-        }
-        catch (const std::exception &e)
-        {
-            blokus::ErrorResponse errorResponse;
-            errorResponse.set_result_code(blokus::RESULT_SERVER_ERROR);
-            errorResponse.set_message("방 나가기 중 오류가 발생했습니다");
-            sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_ERROR_RESPONSE, errorResponse);
-            spdlog::error("Protobuf 방 나가기 처리 중 예외: {}", e.what());
-        }
-    }
-
-    void MessageHandler::handleProtobufSendChat(const blokus::MessageWrapper &wrapper)
-    {
-        blokus::SendChatRequest request;
-        if (!unpackMessage(wrapper, request))
-            return;
-
-        if (!session_->isConnected())
-        {
-            blokus::ErrorResponse errorResponse;
-            errorResponse.set_result_code(blokus::RESULT_AUTHENTICATION_REQUIRED);
-            errorResponse.set_message("채팅은 로그인 후 이용 가능합니다");
-            sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_ERROR_RESPONSE, errorResponse);
-            return;
-        }
-
-        if (request.content().empty())
-        {
-            blokus::ErrorResponse errorResponse;
-            errorResponse.set_result_code(blokus::RESULT_INVALID_REQUEST);
-            errorResponse.set_message("메시지 내용이 필요합니다");
-            sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_ERROR_RESPONSE, errorResponse);
-            return;
-        }
-
-        try
-        {
-            std::string username = session_->getUsername();
-            std::string message = request.content();
-
-            spdlog::info("💬 Protobuf 채팅 메시지: [{}] {}", username, message);
-
-            // 채팅 메시지 브로드캐스팅
-            if (session_->isInLobby())
-            {
-                broadcastLobbyChatMessage(username, message);
-            }
-            else if (session_->isInRoom() || session_->isInGame())
-            {
-                broadcastRoomChatMessage(username, message);
-            }
-
-            // 성공 응답
-            blokus::SendChatResponse response;
-            blokus::Result *result = response.mutable_result();
-            result->set_code(blokus::RESULT_SUCCESS);
-            result->set_message("채팅 메시지가 전송되었습니다");
-
-            sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_SEND_CHAT_RESPONSE, response);
-            spdlog::debug("✅ Protobuf 채팅 메시지 전송 성공: [{}] {}", username, message);
-        }
-        catch (const std::exception &e)
-        {
-            blokus::ErrorResponse errorResponse;
-            errorResponse.set_result_code(blokus::RESULT_SERVER_ERROR);
-            errorResponse.set_message("채팅 메시지 전송에 실패했습니다");
-            sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_ERROR_RESPONSE, errorResponse);
-            spdlog::error("Protobuf 채팅 메시지 처리 중 예외: {}", e.what());
-        }
-    }
-
-    void MessageHandler::handleProtobufPlaceBlock(const blokus::MessageWrapper &wrapper)
-    {
-        blokus::PlaceBlockRequest request;
-        if (!unpackMessage(wrapper, request))
-            return;
-
-        if (!session_->canMakeGameMove())
-        {
-            blokus::ErrorResponse errorResponse;
-            errorResponse.set_result_code(blokus::RESULT_GAME_NOT_IN_PROGRESS);
-            errorResponse.set_message("현재 상태에서는 게임 이동을 할 수 없습니다");
-            sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_ERROR_RESPONSE, errorResponse);
-            return;
-        }
-
-        if (!roomManager_)
-        {
-            blokus::ErrorResponse errorResponse;
-            errorResponse.set_result_code(blokus::RESULT_SERVER_ERROR);
-            errorResponse.set_message("방 관리자가 초기화되지 않았습니다");
-            sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_ERROR_RESPONSE, errorResponse);
-            return;
-        }
-
-        try
-        {
-            std::string userId = session_->getUserId();
-            int roomId = session_->getCurrentRoomId();
-
-            auto room = roomManager_->getRoom(roomId);
-            if (!room || !room->isPlaying())
-            {
-                blokus::ErrorResponse errorResponse;
-                errorResponse.set_result_code(blokus::RESULT_GAME_NOT_IN_PROGRESS);
-                errorResponse.set_message("게임이 진행 중이 아닙니다");
-                sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_ERROR_RESPONSE, errorResponse);
-                return;
-            }
-
-            // 블록 배치 정보 생성
-            Common::BlockPlacement placement;
-            placement.type = static_cast<Common::BlockType>(request.block_placement().type());
-            placement.position = {request.block_placement().position().row(), request.block_placement().position().col()};
-            placement.rotation = static_cast<Common::Rotation>(request.block_placement().rotation());
-            placement.flip = static_cast<Common::FlipState>(request.block_placement().flip());
-
-            // 플레이어 색상 설정
-            auto *player = room->getPlayer(userId);
-            if (!player)
-            {
-                blokus::ErrorResponse errorResponse;
-                errorResponse.set_result_code(blokus::RESULT_PLAYER_NOT_FOUND);
-                errorResponse.set_message("플레이어 정보를 찾을 수 없습니다");
-                sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_ERROR_RESPONSE, errorResponse);
-                return;
-            }
-            placement.player = player->getColor();
-
-            spdlog::info("🎮 Protobuf 블록 배치 요청: {} 방 {}, 위치: ({},{}), 타입: {}",
-                         userId, roomId, placement.position.first, placement.position.second, static_cast<int>(placement.type));
-
-            // 블록 배치 시도
-            bool success = room->handleBlockPlacement(userId, placement);
-
-            blokus::PlaceBlockResponse response;
-            blokus::Result *result = response.mutable_result();
-
-            if (success)
-            {
-                result->set_code(blokus::RESULT_SUCCESS);
-                result->set_message("블록이 성공적으로 배치되었습니다");
-                spdlog::info("✅ Protobuf 블록 배치 성공: {} 방 {}, 위치: ({},{})",
-                             userId, roomId, placement.position.first, placement.position.second);
-            }
-            else
-            {
-                result->set_code(blokus::RESULT_INVALID_MOVE);
-                result->set_message("블록 배치에 실패했습니다");
-                spdlog::warn("❌ Protobuf 블록 배치 실패: {} 방 {}, 위치: ({},{})",
-                             userId, roomId, placement.position.first, placement.position.second);
-            }
-
-            sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_PLACE_BLOCK_RESPONSE, response);
-        }
-        catch (const std::exception &e)
-        {
-            blokus::ErrorResponse errorResponse;
-            errorResponse.set_result_code(blokus::RESULT_SERVER_ERROR);
-            errorResponse.set_message("블록 배치 중 오류가 발생했습니다");
-            sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_ERROR_RESPONSE, errorResponse);
-            spdlog::error("Protobuf 블록 배치 처리 중 예외: {}", e.what());
-        }
-    }
-
-    void MessageHandler::handleProtobufStartGame(const blokus::MessageWrapper &wrapper)
-    {
-        blokus::StartGameRequest request;
-        if (!unpackMessage(wrapper, request))
-            return;
-
-        if (!roomManager_)
-        {
-            blokus::ErrorResponse errorResponse;
-            errorResponse.set_result_code(blokus::RESULT_SERVER_ERROR);
-            errorResponse.set_message("방 관리자가 초기화되지 않았습니다");
-            sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_ERROR_RESPONSE, errorResponse);
-            return;
-        }
-
-        try
-        {
-            std::string userId = session_->getUserId();
-            int roomId = session_->getCurrentRoomId();
-
-            spdlog::info("🎮 Protobuf 게임 시작 요청: {} -> 방 {}", userId, roomId);
-
-            auto room = roomManager_->getRoom(roomId);
-            if (!room)
-            {
-                blokus::ErrorResponse errorResponse;
-                errorResponse.set_result_code(blokus::RESULT_ROOM_NOT_FOUND);
-                errorResponse.set_message("방을 찾을 수 없습니다");
-                sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_ERROR_RESPONSE, errorResponse);
-                return;
-            }
-
-            bool success = room->startGame();
-
-            blokus::StartGameResponse response;
-            blokus::Result *result = response.mutable_result();
-
-            if (success)
-            {
-                result->set_code(blokus::RESULT_SUCCESS);
-                result->set_message("게임이 시작되었습니다");
-                spdlog::info("✅ Protobuf 게임 시작 성공: 방 {}", roomId);
-            }
-            else
-            {
-                result->set_code(blokus::RESULT_UNKNOWN_ERROR);
-                result->set_message("게임 시작에 실패했습니다");
-                spdlog::warn("❌ Protobuf 게임 시작 실패: 방 {}", roomId);
-            }
-
-            sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_START_GAME_RESPONSE, response);
-        }
-        catch (const std::exception &e)
-        {
-            blokus::ErrorResponse errorResponse;
-            errorResponse.set_result_code(blokus::RESULT_SERVER_ERROR);
-            errorResponse.set_message("게임 시작 중 오류가 발생했습니다");
-            sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_ERROR_RESPONSE, errorResponse);
-            spdlog::error("Protobuf 게임 시작 처리 중 예외: {}", e.what());
-        }
-    }
-
-    // ========================================
-    // Protobuf 유틸리티 함수들
-    // ========================================
-
-    template <typename T>
-    bool MessageHandler::unpackMessage(const blokus::MessageWrapper &wrapper, T &message)
-    {
-        if (!wrapper.payload().UnpackTo(&message))
-        {
-            spdlog::error("Protobuf 메시지 언팩 실패: type={}", static_cast<int>(wrapper.type()));
-
-            blokus::ErrorResponse errorResponse;
-            errorResponse.set_result_code(blokus::RESULT_INVALID_REQUEST);
-            errorResponse.set_message("메시지 형식이 올바르지 않습니다");
-            sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_ERROR_RESPONSE, errorResponse);
-            return false;
-        }
-        return true;
-    }
-
-    blokus::MessageWrapper MessageHandler::createResponseWrapper(uint32_t sequenceId, blokus::MessageType type, const google::protobuf::Message &payload)
-    {
-        blokus::MessageWrapper wrapper;
-        wrapper.set_type(type);
-        wrapper.set_sequence_id(sequenceId);
-        wrapper.mutable_payload()->PackFrom(payload);
-        wrapper.set_client_version("server-1.0.0");
-
-        return wrapper;
-    }
-
 } // namespace Blokus::Server

@@ -112,6 +112,9 @@ namespace Blokus {
             // 유저 관련 (600-699)
             UserStats = 600,
 
+            // 버전 관련 (700-799)
+            VersionCheck = 700,
+
             // ���� ���� (900-999)
             Error = 900
         };

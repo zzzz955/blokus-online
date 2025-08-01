@@ -18,11 +18,11 @@
 // 전방 선언
 namespace Blokus::Server {
     class Session;
-    class NetworkManager;
     class DatabaseManager;
     class RoomManager;
     class AuthenticationService;
     class MessageHandler;
+    class VersionManager;
 
     struct AuthResult;
     struct RegisterResult;
@@ -45,6 +45,9 @@ namespace Blokus::Server {
         static int getServerPort() { return ConfigManager::serverPort; }
         static int getMaxClients() { return ConfigManager::maxClients; }
         static int getThreadPoolSize() { return ConfigManager::threadPoolSize; }
+        
+        // VersionManager 접근자
+        VersionManager* getVersionManager() const { return versionManager_.get(); }
 
         // ========================================
         // 인증 관련 편의 함수들
@@ -159,9 +162,7 @@ namespace Blokus::Server {
         std::shared_ptr<DatabaseManager> databaseManager_;
         std::unique_ptr<RoomManager> roomManager_;
         std::unique_ptr<AuthenticationService> authService_;
-
-        // 매니저들 (향후 구현 예정)
-        //std::unique_ptr<NetworkManager> networkManager_;
+        std::unique_ptr<VersionManager> versionManager_;
 
         // 세션 관리
         std::unordered_map<std::string, std::shared_ptr<Session>> sessions_;

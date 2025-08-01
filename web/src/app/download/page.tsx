@@ -84,7 +84,7 @@ export default function DownloadPage() {
               게임 다운로드
             </h1>
             <p className="text-xl text-blue-200 max-w-2xl mx-auto">
-              블로쿠스 온라인 클라이언트를 다운로드하고 친구들과 함께 게임을 즐겨보세요!
+              블로커스 온라인 클라이언트를 다운로드하고 친구들과 함께 게임을 즐겨보세요!
             </p>
           </div>
 

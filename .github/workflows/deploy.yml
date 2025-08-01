@@ -117,6 +117,8 @@ jobs:
         SERVER_PORT=${{ secrets.SERVER_PORT }}
         SERVER_MAX_CLIENTS=${{ secrets.SERVER_MAX_CLIENTS }}
         SERVER_THREAD_POOL_SIZE=${{ secrets.SERVER_THREAD_POOL_SIZE }}
+        BLOKUS_SERVER_VERSION=${{ secrets.BLOKUS_SERVER_VERSION }}
+        BLOKUS_DOWNLOAD_URL=${{ secrets.BLOKUS_DOWNLOAD_URL }}
         
         # 데이터베이스 설정 (게임 서버용)
         DB_HOST=postgres
