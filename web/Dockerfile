@@ -101,11 +101,11 @@ RUN mkdir -p /app/.next/cache /app/public/uploads && \
 COPY --from=app-builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=app-builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# public 폴더 직접 복사 (다운로드 파일 포함)
-COPY --from=app-builder --chown=nextjs:nodejs /app/public /app/public
+# public 폴더와 파일들 강제 복사
+COPY --chown=nextjs:nodejs ./public /app/public
 
-# prisma 폴더 복사 (존재하는 경우에만)
-COPY --from=app-builder --chown=nextjs:nodejs /app/prisma /app/prisma
+# prisma 폴더 복사
+COPY --chown=nextjs:nodejs ./prisma /app/prisma
 
 # package.json에서 실행에 필요한 정보만 복사
 COPY --from=app-builder --chown=nextjs:nodejs /app/package.json ./package.json
