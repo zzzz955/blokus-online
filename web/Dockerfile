@@ -101,10 +101,11 @@ RUN mkdir -p /app/.next/cache /app/public/uploads && \
 COPY --from=app-builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=app-builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# 안전한 파일 복사 (존재하는 경우에만)
-RUN --mount=from=app-builder,source=/app,target=/tmp/source \
-    [ -d /tmp/source/public ] && cp -r /tmp/source/public/* /app/public/ || echo "No public files to copy" && \
-    [ -d /tmp/source/prisma ] && cp -r /tmp/source/prisma /app/ || echo "No prisma files to copy"
+# public 폴더 직접 복사 (다운로드 파일 포함)
+COPY --from=app-builder --chown=nextjs:nodejs /app/public /app/public
+
+# prisma 폴더 복사 (존재하는 경우에만)
+COPY --from=app-builder --chown=nextjs:nodejs /app/prisma /app/prisma
 
 # package.json에서 실행에 필요한 정보만 복사
 COPY --from=app-builder --chown=nextjs:nodejs /app/package.json ./package.json
