@@ -32,11 +32,11 @@ async function getVersionInfo(): Promise<ClientVersion> {
     const downloadAsset = data.assets?.[0]; // 첫 번째 첨부 파일 기준
     const downloadUrl = downloadAsset?.browser_download_url || '';
     const fileSize = downloadAsset?.size || 0;
-    const changelog = (data.body || '')
-      .split('\n')
+    const bodyLines: string[] = (data.body || '').split('\n');
+    const changelog = bodyLines
       .map(line => line.trim())
       .filter(line => line.startsWith('- '))
-      .map(line => line.slice(2)); // "- " 제거
+      .map(line => line.slice(2));
 
     return {
       version,
