@@ -325,6 +325,7 @@ Testing/
 
 # Release builds
 release/
+releases/
 dist/
 *.msi
 *.dmg

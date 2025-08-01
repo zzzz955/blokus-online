@@ -225,7 +225,7 @@ services:
   certbot:
     image: certbot/certbot
     container_name: blokus-certbot
-    restart: unless-stopped
+    # restart: unless-stopped
     
     volumes:
       - ./certbot/conf:/etc/letsencrypt
