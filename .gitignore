@@ -166,16 +166,6 @@ web/dist
 # Gatsby files
 web/.cache/
 web/public/*
-!web/public/downloads/
-
-# ========================================
-# Downloads Exception (for web deployment)
-# ========================================
-
-# Allow downloads directory for client distribution
-!web/public/downloads/
-!web/public/downloads/BlokusClient-latest.zip
-!web/public/downloads/version.json
 
 # Vuepress build output
 web/.vuepress/dist
@@ -295,11 +285,8 @@ settings.ini
 *.tmp
 *.temp
 
-# Archive files (except client downloads)  
+# Archive files
 *.zip
-!web/public/downloads/
-!web/public/downloads/*.zip
-!web/public/downloads/BlokusClient-latest.zip
 *.rar
 *.7z
 *.tar.gz

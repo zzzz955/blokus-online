@@ -23,7 +23,6 @@ export async function GET(request: NextRequest) {
       body: JSON.stringify({
         ip,
         userAgent,
-        fileSize: 0, // GitHub에서 직접 다운로드하므로 크기 정보 없음
         source: 'github-redirect'
       })
     }).catch(error => {
