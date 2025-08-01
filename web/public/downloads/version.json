@@ -1,0 +1,11 @@
+﻿{
+    "releaseDate":  "2025-08-01T11:06:24.329Z",
+    "fileSize":  15670931,
+    "version":  "1.0.0",
+    "downloadUrl":  "/api/download/client",
+    "changelog":  [
+                      "Version 1.0.0 released",
+                      "Latest features and bug fixes",
+                      "Improved stability and performance"
+                  ]
+}
