@@ -18,8 +18,8 @@ interface DownloadLog {
 }
 
 // 다운로드 통계 파일 경로
-const STATS_FILE_PATH = path.join(process.cwd(), 'public', 'downloads', 'download-stats.json');
-const LOGS_FILE_PATH = path.join(process.cwd(), 'public', 'downloads', 'download-logs.json');
+const STATS_FILE_PATH = path.join(process.cwd(), 'data', 'download-stats.json');
+const LOGS_FILE_PATH = path.join(process.cwd(), 'data', 'download-logs.json');
 
 // 기본 통계 데이터 생성
 function createDefaultStats(): DownloadStats {
