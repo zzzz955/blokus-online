@@ -66,6 +66,16 @@ if [ "$DEPLOY_NGINX" = true ]; then
     echo "✅ Nginx restarted"
 fi
 
+# SSL 인증서 확인 (첫 배포 시)
+DOMAIN="blokus-online.mooo.com"
+if [ ! -f "./certbot/conf/live/$DOMAIN/fullchain.pem" ]; then
+    echo ""
+    echo "🔐 SSL certificate not found. Setting up SSL..."
+    echo "⚠️  SSL setup requires manual action:"
+    echo "   Run: bash ./scripts/init-ssl.sh"
+    echo "   (Make sure to update EMAIL in the script first)"
+fi
+
 echo ""
 echo "🎉 Deployment completed!"
 echo "📊 Service Status:"
