@@ -5,11 +5,8 @@
 #include <algorithm>
 #include <spdlog/spdlog.h>
 
-using namespace Blokus::Server;
-
-namespace blokus
+namespace Blokus::Server
 {
-
     // VersionManager constructor
     VersionManager::VersionManager()
     {

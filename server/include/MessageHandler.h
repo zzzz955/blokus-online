@@ -11,48 +11,6 @@
 // 기존 정의 사용
 #include "ServerTypes.h"
 
-// Protobuf 전방 선언 (blokus 네임스페이스)
-namespace google::protobuf {
-    class Message;
-}
-
-namespace blokus {
-    class MessageWrapper;     // message_wrapper.proto에서 생성
-    enum MessageType : int;   // message_wrapper.proto에서 생성
-    
-    // Proto 메시지 타입들
-    class AuthRequest;
-    class AuthResponse;
-    class RegisterRequest;
-    class RegisterResponse;
-    class LogoutRequest;
-    class LogoutResponse;
-    class HeartbeatRequest;
-    class HeartbeatResponse;
-    class CreateRoomRequest;
-    class CreateRoomResponse;
-    class JoinRoomRequest;
-    class JoinRoomResponse;
-    class LeaveRoomRequest;
-    class LeaveRoomResponse;
-    class SendChatRequest;
-    class SendChatResponse;
-    class PlaceBlockRequest;
-    class PlaceBlockResponse;
-    class StartGameRequest;
-    class StartGameResponse;
-    class GameStartedNotification;
-    class GameEndedNotification;
-    class ErrorResponse;
-    
-    // Version management messages
-    class GetVersionInfoRequest;
-    class VersionInfoResponse;
-    class VersionCheckRequest;
-    class VersionCheckResponse;
-    class UpdateRequiredNotification;
-}
-
 namespace Blokus::Server {
 
     // 전방 선언 (순환 참조 방지)
@@ -61,40 +19,26 @@ namespace Blokus::Server {
     class RoomManager;
     class DatabaseManager;
     class GameServer;
+    class VersionManager;
 
     // 🔥 채팅 브로드캐스트용 콜백만 유지
     using ChatCallback = std::function<void(const std::string& sessionId, const std::string& message)>;
 
-    // 🗑️ 제거된 콜백 타입들 (더 이상 사용 안함):
-    // using AuthCallback = ...
-    // using RegisterCallback = ...
-    // using RoomCallback = ...
-
     // 단순화된 메시지 핸들러 클래스 (직접 처리 방식)
     class MessageHandler {
     public:
-        explicit MessageHandler(Session* session, RoomManager* roomManager = nullptr, AuthenticationService* authService = nullptr, DatabaseManager* databaseManager_ = nullptr, GameServer* gameServer = nullptr);
+        explicit MessageHandler(Session* session, RoomManager* roomManager = nullptr, AuthenticationService* authService = nullptr, DatabaseManager* databaseManager_ = nullptr, GameServer* gameServer = nullptr, VersionManager* versionManager = nullptr);
         ~MessageHandler();
 
-        // 메시지 처리 (텍스트 및 Protobuf 지원)
+        // 메시지 처리
         void handleMessage(const std::string& rawMessage);
-        void handleProtobufMessage(const blokus::MessageWrapper& wrapper);
 
         // 🔥 채팅 콜백만 유지 (브로드캐스트 필요)
         void setChatCallback(ChatCallback callback) { chatCallback_ = callback; }
 
-        // 🗑️ 제거된 콜백 설정 함수들:
-        // void setAuthCallback(AuthCallback callback);
-        // void setRegisterCallback(RegisterCallback callback);
-        // void setRoomCallback(RoomCallback callback);
-
         // 응답 전송 (현재: 텍스트 기반)
         void sendTextMessage(const std::string& message);
         void sendError(const std::string& errorMessage);
-
-        // Protobuf 메시지 전송
-        void sendProtobufMessage(blokus::MessageType type, const google::protobuf::Message& payload);
-        void sendProtobufResponse(uint32_t sequenceId, blokus::MessageType type, const google::protobuf::Message& payload);
 
     private:
         // enum 기반 핸들러 테이블
@@ -134,9 +78,11 @@ namespace Blokus::Server {
         void handleAfkVerify();  // AFK 검증 처리
         void handleAfkUnblock(); // AFK 모드 해제 처리
 
+        // 버전 관련 핸들러들
+        void handleVersionCheck(const std::vector<std::string>& params);
+
         // 게임 관련 핸들러들
         void handleGameMove(const std::vector<std::string>& params);
-        // handleGameResultResponse 제거됨 - 즉시 초기화 방식으로 변경
 
         // 기본 핸들러들
         void handlePing(const std::vector<std::string>& params);
@@ -165,39 +111,10 @@ namespace Blokus::Server {
         AuthenticationService* authService_;  // AuthService 참조
         DatabaseManager* databaseManager_;
         GameServer* gameServer_;  // GameServer 참조
-
-        // 시퀀스 관리
-        uint32_t sequenceId_{ 0 };
-        uint32_t lastReceivedSequence_{ 0 };
-        
-        // Protobuf 지원 플래그
-        bool protobufEnabled_{ true };
+        VersionManager* versionManager_;
 
         // 🔥 채팅 콜백만 유지
         ChatCallback chatCallback_;
-
-        // Protobuf 메시지 핸들러들
-        std::unordered_map<int, std::function<void(const blokus::MessageWrapper&)>> protobufHandlers_;
-        
-        // Protobuf 핸들러 함수들
-        void handleProtobufAuth(const blokus::MessageWrapper& wrapper);
-        void handleProtobufRegister(const blokus::MessageWrapper& wrapper);
-        void handleProtobufLogout(const blokus::MessageWrapper& wrapper);
-        void handleProtobufHeartbeat(const blokus::MessageWrapper& wrapper);
-        void handleProtobufCreateRoom(const blokus::MessageWrapper& wrapper);
-        void handleProtobufJoinRoom(const blokus::MessageWrapper& wrapper);
-        void handleProtobufLeaveRoom(const blokus::MessageWrapper& wrapper);
-        void handleProtobufSendChat(const blokus::MessageWrapper& wrapper);
-        void handleProtobufPlaceBlock(const blokus::MessageWrapper& wrapper);
-        void handleProtobufStartGame(const blokus::MessageWrapper& wrapper);
-        void handleProtobufGetVersionInfo(const blokus::MessageWrapper& wrapper);
-        void handleProtobufVersionCheck(const blokus::MessageWrapper& wrapper);
-        
-        // Protobuf 유틸리티 함수들
-        void setupProtobufHandlers();
-        template<typename T>
-        bool unpackMessage(const blokus::MessageWrapper& wrapper, T& message);
-        blokus::MessageWrapper createResponseWrapper(uint32_t sequenceId, blokus::MessageType type, const google::protobuf::Message& payload);
     };
 
 } // namespace Blokus::Server

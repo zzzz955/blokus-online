@@ -9,15 +9,6 @@
 #include <QMessageBox>
 #include <ctime>
 
-// Protobuf includes
-#include "message_wrapper.pb.h"
-#include "auth.pb.h"
-#include "lobby.pb.h"
-#include "game.pb.h"
-#include "chat.pb.h"
-#include "error.pb.h"
-#include "version.pb.h"
-
 namespace Blokus {
 
     NetworkClient::NetworkClient(QObject* parent)
@@ -28,8 +19,6 @@ namespace Blokus {
         , m_state(ConnectionState::Disconnected)
         , m_currentSessionToken("")
         , m_reconnectAttempts(0)
-        , m_sequenceId(1)
-        , m_protobufEnabled(true)
     {
         // 설정에서 네트워크 값 로드
         auto& config = ClientConfigManager::instance();
@@ -47,7 +36,6 @@ namespace Blokus {
         qDebug() << QString::fromUtf8("  재연결 시도: %1회, 간격: %2ms").arg(m_maxReconnectAttempts).arg(m_reconnectInterval);
         
         setupSocket();
-        setupProtobufHandlers();
         
         // 연결 타임아웃 타이머 설정
         m_connectionTimer->setSingleShot(true);
@@ -478,21 +466,6 @@ namespace Blokus {
     {
         emit messageReceived(message);
         
-        // Protobuf 메시지 확인
-        if (message.startsWith("PROTOBUF:")) {
-            QString serializedData = message.mid(9); // "PROTOBUF:" 제거
-            QByteArray binaryData = QByteArray::fromStdString(serializedData.toStdString());
-            
-            blokus::MessageWrapper wrapper;
-            if (wrapper.ParseFromArray(binaryData.data(), binaryData.size())) {
-                processProtobufMessage(wrapper);
-            } else {
-                qDebug() << QString::fromUtf8("❌ Protobuf 메시지 파싱 실패");
-                emit errorReceived(QString::fromUtf8("Protobuf 메시지 형식 오류"));
-            }
-            return;
-        }
-        
         // 기존 텍스트 기반 메시지 처리
         if (message.startsWith("ERROR:")) {
             QString error = message.mid(6); // "ERROR:" 제거
@@ -519,6 +492,12 @@ namespace Blokus {
                  message.startsWith("AFK_UNBLOCK_SUCCESS") ||
                  message.startsWith("AFK_STATUS_RESET:")) {
             processAfkMessage(message);
+        }
+        else if (message.startsWith("version:")) {
+            QStringList parts = message.split(":");
+            if (parts.size() >= 2) {
+                processVersionCheckResponse(parts);
+            }
         }
         else if (message == "pong") {
             // Ping-pong은 특별히 처리하지 않음
@@ -836,496 +815,6 @@ namespace Blokus {
     }
 
     // ========================================
-    // Protobuf 지원 구현
-    // ========================================
-    
-    void NetworkClient::setupProtobufHandlers()
-    {
-        using namespace blokus;
-        
-        // 인증 관련 Protobuf 핸들러
-        m_protobufHandlers[MESSAGE_TYPE_AUTH_RESPONSE] = [this](const auto& wrapper) { handleProtobufAuthResponse(wrapper); };
-        m_protobufHandlers[MESSAGE_TYPE_REGISTER_RESPONSE] = [this](const auto& wrapper) { handleProtobufRegisterResponse(wrapper); };
-        m_protobufHandlers[MESSAGE_TYPE_LOGOUT_RESPONSE] = [this](const auto& wrapper) { handleProtobufLogoutResponse(wrapper); };
-        m_protobufHandlers[MESSAGE_TYPE_HEARTBEAT] = [this](const auto& wrapper) { handleProtobufHeartbeatResponse(wrapper); };
-        
-        // 로비/방 관련 Protobuf 핸들러
-        m_protobufHandlers[MESSAGE_TYPE_CREATE_ROOM_RESPONSE] = [this](const auto& wrapper) { handleProtobufCreateRoomResponse(wrapper); };
-        m_protobufHandlers[MESSAGE_TYPE_JOIN_ROOM_RESPONSE] = [this](const auto& wrapper) { handleProtobufJoinRoomResponse(wrapper); };
-        m_protobufHandlers[MESSAGE_TYPE_LEAVE_ROOM_RESPONSE] = [this](const auto& wrapper) { handleProtobufLeaveRoomResponse(wrapper); };
-        m_protobufHandlers[MESSAGE_TYPE_START_GAME_RESPONSE] = [this](const auto& wrapper) { handleProtobufStartGameResponse(wrapper); };
-        
-        // 채팅 관련 Protobuf 핸들러
-        m_protobufHandlers[MESSAGE_TYPE_SEND_CHAT_RESPONSE] = [this](const auto& wrapper) { handleProtobufSendChatResponse(wrapper); };
-        m_protobufHandlers[MESSAGE_TYPE_CHAT_NOTIFICATION] = [this](const auto& wrapper) { handleProtobufChatNotification(wrapper); };
-        
-        // 게임 알림 Protobuf 핸들러
-        m_protobufHandlers[MESSAGE_TYPE_PLAYER_JOINED_NOTIFICATION] = [this](const auto& wrapper) { handleProtobufPlayerJoinedNotification(wrapper); };
-        m_protobufHandlers[MESSAGE_TYPE_PLAYER_LEFT_NOTIFICATION] = [this](const auto& wrapper) { handleProtobufPlayerLeftNotification(wrapper); };
-        m_protobufHandlers[MESSAGE_TYPE_PLAYER_READY_NOTIFICATION] = [this](const auto& wrapper) { handleProtobufPlayerReadyNotification(wrapper); };
-        m_protobufHandlers[MESSAGE_TYPE_GAME_STARTED_NOTIFICATION] = [this](const auto& wrapper) { handleProtobufGameStartedNotification(wrapper); };
-        m_protobufHandlers[MESSAGE_TYPE_GAME_ENDED_NOTIFICATION] = [this](const auto& wrapper) { handleProtobufGameEndedNotification(wrapper); };
-        
-        // 에러 핸들러
-        m_protobufHandlers[MESSAGE_TYPE_ERROR_RESPONSE] = [this](const auto& wrapper) { handleProtobufErrorResponse(wrapper); };
-        
-        qDebug() << QString::fromUtf8("✅ Protobuf 핸들러 %1개 등록 완료").arg(m_protobufHandlers.size());
-    }
-    
-    void NetworkClient::processProtobufMessage(const blokus::MessageWrapper& wrapper)
-    {
-        try
-        {
-            qDebug() << QString::fromUtf8("📨 Protobuf 메시지 수신: type=%1, seq=%2")
-                        .arg(static_cast<int>(wrapper.type()))
-                        .arg(wrapper.sequence_id());
-            
-            // 핸들러 실행
-            auto it = m_protobufHandlers.find(static_cast<int>(wrapper.type()));
-            if (it != m_protobufHandlers.end())
-            {
-                it->second(wrapper);
-            }
-            else
-            {
-                qDebug() << QString::fromUtf8("⚠️ 알 수 없는 Protobuf 메시지 타입: %1")
-                            .arg(static_cast<int>(wrapper.type()));
-            }
-        }
-        catch (const std::exception& e)
-        {
-            qDebug() << QString::fromUtf8("❌ Protobuf 메시지 처리 중 예외: %1").arg(e.what());
-            emit errorReceived(QString::fromUtf8("Protobuf 메시지 처리 오류"));
-        }
-    }
-    
-    void NetworkClient::sendProtobufMessage(blokus::MessageType type, const google::protobuf::Message& payload)
-    {
-        if (!m_socket || !isConnected()) {
-            qDebug() << QString::fromUtf8("❌ 연결되지 않아 Protobuf 메시지를 보낼 수 없음");
-            return;
-        }
-        
-        auto wrapper = createRequestWrapper(type, payload);
-        
-        // MessageWrapper를 직렬화하여 전송
-        std::string serializedData;
-        if (wrapper.SerializeToString(&serializedData))
-        {
-            // 길이 프리픽스 방식: "PROTOBUF_LEN:size:data\n"
-            QByteArray protobufHeader = "PROTOBUF_LEN:";
-            QByteArray lengthStr = QByteArray::number(serializedData.size());
-            QByteArray separator = ":";
-            QByteArray binaryData = QByteArray::fromStdString(serializedData);
-            QByteArray fullMessage = protobufHeader + lengthStr + separator + binaryData + "\n";
-            
-            sendBinaryMessage(fullMessage);
-            
-            qDebug() << QString::fromUtf8("📤 Protobuf 메시지 전송 (길이 프리픽스): type=%1, size=%2 bytes")
-                        .arg(static_cast<int>(type))
-                        .arg(serializedData.size());
-        }
-        else
-        {
-            qDebug() << QString::fromUtf8("❌ Protobuf 메시지 직렬화 실패");
-        }
-    }
-    
-    void NetworkClient::sendProtobufRequest(blokus::MessageType type, const google::protobuf::Message& payload)
-    {
-        sendProtobufMessage(type, payload);
-    }
-    
-    // ========================================
-    // Protobuf 인증 메소드들
-    // ========================================
-    
-    void NetworkClient::loginProtobuf(const QString& username, const QString& password)
-    {
-        qDebug() << QString::fromUtf8("🔐 Protobuf 로그인 시도: %1").arg(username);
-        
-        blokus::AuthRequest request;
-        request.set_method(blokus::AUTH_METHOD_USERNAME_PASSWORD);
-        request.set_username(username.toStdString());
-        request.set_password(password.toStdString());
-        request.set_client_version("client-1.0.0");
-        request.set_platform("Windows");
-        
-        sendProtobufRequest(blokus::MESSAGE_TYPE_AUTH_REQUEST, request);
-    }
-    
-    void NetworkClient::registerUserProtobuf(const QString& username, const QString& password)
-    {
-        qDebug() << QString::fromUtf8("📝 Protobuf 회원가입 시도: %1").arg(username);
-        
-        blokus::RegisterRequest request;
-        request.set_username(username.toStdString());
-        request.set_password(password.toStdString());
-        request.set_client_version("client-1.0.0");
-        request.set_platform("Windows");
-        request.set_terms_accepted(true);
-        request.set_privacy_accepted(true);
-        
-        sendProtobufRequest(blokus::MESSAGE_TYPE_REGISTER_REQUEST, request);
-    }
-    
-    void NetworkClient::logoutProtobuf()
-    {
-        qDebug() << QString::fromUtf8("🚪 Protobuf 로그아웃 요청");
-        
-        blokus::LogoutRequest request;
-        request.set_session_token(m_currentSessionToken.toStdString());
-        request.set_reason("user_logout");
-        
-        sendProtobufRequest(blokus::MESSAGE_TYPE_LOGOUT_REQUEST, request);
-    }
-    
-    void NetworkClient::sendHeartbeat()
-    {
-        if (!isConnected()) return;
-        
-        blokus::HeartbeatRequest request;
-        request.set_sequence_number(m_sequenceId++);
-        request.set_cpu_usage(0.0f);
-        request.set_memory_usage_mb(100);
-        request.set_fps(60);
-        request.set_is_window_focused(true);
-        
-        sendProtobufMessage(blokus::MESSAGE_TYPE_HEARTBEAT, request);
-    }
-    
-    // ========================================
-    // Protobuf 방 관리 메소드들
-    // ========================================
-    
-    void NetworkClient::createRoomProtobuf(const QString& roomName, bool isPrivate, const QString& password)
-    {
-        qDebug() << QString::fromUtf8("🏠 Protobuf 방 생성 시도: %1").arg(roomName);
-        
-        blokus::CreateRoomRequest request;
-        request.set_room_name(roomName.toStdString());
-        request.set_is_private(isPrivate);
-        if (isPrivate && !password.isEmpty()) {
-            request.set_password(password.toStdString());
-        }
-        request.set_max_players(4);
-        request.set_game_mode("classic");
-        
-        sendProtobufRequest(blokus::MESSAGE_TYPE_CREATE_ROOM_REQUEST, request);
-    }
-    
-    void NetworkClient::joinRoomProtobuf(int roomId, const QString& password)
-    {
-        qDebug() << QString::fromUtf8("🚪 Protobuf 방 참여 시도: %1").arg(roomId);
-        
-        blokus::JoinRoomRequest request;
-        request.set_room_id(roomId);
-        if (!password.isEmpty()) {
-            request.set_password(password.toStdString());
-        }
-        
-        sendProtobufRequest(blokus::MESSAGE_TYPE_JOIN_ROOM_REQUEST, request);
-    }
-    
-    void NetworkClient::leaveRoomProtobuf()
-    {
-        qDebug() << QString::fromUtf8("🚪 Protobuf 방 나가기 요청");
-        
-        blokus::LeaveRoomRequest request;
-        request.set_reason("user_leave");
-        
-        sendProtobufRequest(blokus::MESSAGE_TYPE_LEAVE_ROOM_REQUEST, request);
-    }
-    
-    void NetworkClient::startGameProtobuf()
-    {
-        qDebug() << QString::fromUtf8("🎮 Protobuf 게임 시작 요청");
-        
-        blokus::StartGameRequest request;
-        request.set_force_start(false);
-        
-        sendProtobufRequest(blokus::MESSAGE_TYPE_START_GAME_REQUEST, request);
-    }
-    
-    void NetworkClient::sendChatMessageProtobuf(const QString& message)
-    {
-        qDebug() << QString::fromUtf8("💬 Protobuf 채팅 메시지 전송: %1").arg(message);
-        
-        blokus::SendChatRequest request;
-        request.set_content(message.toStdString());
-        request.set_type(blokus::CHAT_TYPE_PUBLIC);
-        request.set_scope(blokus::CHAT_SCOPE_ROOM);
-        
-        sendProtobufRequest(blokus::MESSAGE_TYPE_SEND_CHAT_REQUEST, request);
-    }
-    
-    // ========================================
-    // Protobuf 핸들러 구현
-    // ========================================
-    
-    void NetworkClient::handleProtobufAuthResponse(const blokus::MessageWrapper& wrapper)
-    {
-        blokus::AuthResponse response;
-        if (!unpackMessage(wrapper, response)) return;
-        
-        bool success = (response.result().code() == blokus::RESULT_SUCCESS);
-        QString message = QString::fromStdString(response.result().message());
-        QString sessionToken = QString::fromStdString(response.session_token());
-        
-        if (success) {
-            m_currentSessionToken = sessionToken;
-            setState(ConnectionState::Authenticated);
-            qDebug() << QString::fromUtf8("✅ Protobuf 로그인 성공: %1")
-                        .arg(QString::fromStdString(response.user_info().username()));
-        } else {
-            qDebug() << QString::fromUtf8("❌ Protobuf 로그인 실패: %1").arg(message);
-        }
-        
-        emit loginResult(success, message, sessionToken);
-    }
-    
-    void NetworkClient::handleProtobufRegisterResponse(const blokus::MessageWrapper& wrapper)
-    {
-        blokus::RegisterResponse response;
-        if (!unpackMessage(wrapper, response)) return;
-        
-        bool success = (response.result().code() == blokus::RESULT_SUCCESS);
-        QString message = QString::fromStdString(response.result().message());
-        
-        qDebug() << QString::fromUtf8("📝 Protobuf 회원가입 결과: %1 - %2")
-                    .arg(success ? "성공" : "실패").arg(message);
-        
-        emit registerResult(success, message);
-    }
-    
-    void NetworkClient::handleProtobufLogoutResponse(const blokus::MessageWrapper& wrapper)
-    {
-        blokus::LogoutResponse response;
-        if (!unpackMessage(wrapper, response)) return;
-        
-        bool success = (response.result().code() == blokus::RESULT_SUCCESS);
-        m_currentSessionToken.clear();
-        setState(ConnectionState::Connected);
-        
-        qDebug() << QString::fromUtf8("🚪 Protobuf 로그아웃 완료");
-        emit logoutResult(success);
-    }
-    
-    void NetworkClient::handleProtobufHeartbeatResponse(const blokus::MessageWrapper& wrapper)
-    {
-        blokus::HeartbeatResponse response;
-        if (!unpackMessage(wrapper, response)) return;
-        
-        // 하트비트 응답 처리 (필요시 추가 로직)
-        qDebug() << QString::fromUtf8("💓 Heartbeat 응답 수신: seq=%1").arg(response.sequence_number());
-    }
-    
-    void NetworkClient::handleProtobufCreateRoomResponse(const blokus::MessageWrapper& wrapper)
-    {
-        blokus::CreateRoomResponse response;
-        if (!unpackMessage(wrapper, response)) return;
-        
-        bool success = (response.result().code() == blokus::RESULT_SUCCESS);
-        QString message = QString::fromStdString(response.result().message());
-        
-        if (success) {
-            int roomId = response.room_info().room_id();
-            QString roomName = QString::fromStdString(response.room_info().room_name());
-            
-            qDebug() << QString::fromUtf8("✅ Protobuf 방 생성 성공: %1 (ID: %2)").arg(roomName).arg(roomId);
-            emit roomCreated(roomId, roomName);
-        } else {
-            qDebug() << QString::fromUtf8("❌ Protobuf 방 생성 실패: %1").arg(message);
-            emit roomError(message);
-        }
-    }
-    
-    void NetworkClient::handleProtobufJoinRoomResponse(const blokus::MessageWrapper& wrapper)
-    {
-        blokus::JoinRoomResponse response;
-        if (!unpackMessage(wrapper, response)) return;
-        
-        bool success = (response.result().code() == blokus::RESULT_SUCCESS);
-        QString message = QString::fromStdString(response.result().message());
-        
-        if (success) {
-            int roomId = response.room_info().room_id();
-            QString roomName = QString::fromStdString(response.room_info().room_name());
-            
-            qDebug() << QString::fromUtf8("✅ Protobuf 방 참여 성공: %1 (ID: %2)").arg(roomName).arg(roomId);
-            emit roomJoined(roomId, roomName);
-        } else {
-            qDebug() << QString::fromUtf8("❌ Protobuf 방 참여 실패: %1").arg(message);
-            emit roomError(message);
-        }
-    }
-    
-    void NetworkClient::handleProtobufLeaveRoomResponse(const blokus::MessageWrapper& wrapper)
-    {
-        blokus::LeaveRoomResponse response;
-        if (!unpackMessage(wrapper, response)) return;
-        
-        bool success = (response.result().code() == blokus::RESULT_SUCCESS);
-        
-        if (success) {
-            qDebug() << QString::fromUtf8("✅ Protobuf 방 나가기 성공");
-            emit roomLeft();
-        } else {
-            qDebug() << QString::fromUtf8("❌ Protobuf 방 나가기 실패");
-        }
-    }
-    
-    void NetworkClient::handleProtobufSendChatResponse(const blokus::MessageWrapper& wrapper)
-    {
-        blokus::SendChatResponse response;
-        if (!unpackMessage(wrapper, response)) return;
-        
-        bool success = (response.result().code() == blokus::RESULT_SUCCESS);
-        
-        if (success) {
-            qDebug() << QString::fromUtf8("✅ Protobuf 채팅 메시지 전송 성공");
-            emit chatMessageSent();
-        } else {
-            QString message = QString::fromStdString(response.result().message());
-            qDebug() << QString::fromUtf8("❌ Protobuf 채팅 메시지 전송 실패: %1").arg(message);
-            emit errorReceived(message);
-        }
-    }
-    
-    void NetworkClient::handleProtobufStartGameResponse(const blokus::MessageWrapper& wrapper)
-    {
-        blokus::StartGameResponse response;
-        if (!unpackMessage(wrapper, response)) return;
-        
-        bool success = (response.result().code() == blokus::RESULT_SUCCESS);
-        QString message = QString::fromStdString(response.result().message());
-        
-        if (success) {
-            qDebug() << QString::fromUtf8("✅ Protobuf 게임 시작 성공");
-            // 게임 시작은 별도의 notification으로 처리됨
-        } else {
-            qDebug() << QString::fromUtf8("❌ Protobuf 게임 시작 실패: %1").arg(message);
-            emit roomError(message);
-        }
-    }
-    
-    void NetworkClient::handleProtobufErrorResponse(const blokus::MessageWrapper& wrapper)
-    {
-        blokus::ErrorResponse response;
-        if (!unpackMessage(wrapper, response)) return;
-        
-        QString errorMessage = QString::fromStdString(response.message());
-        
-        qDebug() << QString::fromUtf8("❌ Protobuf 에러 응답: %1").arg(errorMessage);
-        emit errorReceived(errorMessage);
-    }
-    
-    // ========================================
-    // Protobuf 유틸리티 함수들
-    // ========================================
-    
-    template<typename T>
-    bool NetworkClient::unpackMessage(const blokus::MessageWrapper& wrapper, T& message)
-    {
-        if (!wrapper.payload().UnpackTo(&message))
-        {
-            qDebug() << QString::fromUtf8("❌ Protobuf 메시지 언팩 실패: type=%1")
-                        .arg(static_cast<int>(wrapper.type()));
-            return false;
-        }
-        return true;
-    }
-    
-    blokus::MessageWrapper NetworkClient::createRequestWrapper(blokus::MessageType type, const google::protobuf::Message& payload)
-    {
-        blokus::MessageWrapper wrapper;
-        wrapper.set_type(type);
-        wrapper.set_sequence_id(m_sequenceId++);
-        wrapper.mutable_payload()->PackFrom(payload);
-        wrapper.set_client_version("client-1.0.0");
-        
-        return wrapper;
-    }
-    
-    // ========================================
-    // Protobuf 알림 핸들러들
-    // ========================================
-    
-    void NetworkClient::handleProtobufChatNotification(const blokus::MessageWrapper& wrapper)
-    {
-        blokus::ChatNotification notification;
-        if (!unpackMessage(wrapper, notification)) return;
-        
-        QString username = QString::fromStdString(notification.message().sender_username());
-        QString message = QString::fromStdString(notification.message().content());
-        
-        qDebug() << QString::fromUtf8("💬 Protobuf 채팅 알림 수신: %1: %2").arg(username).arg(message);
-        emit chatMessageReceived(username, message);
-    }
-    
-    void NetworkClient::handleProtobufPlayerJoinedNotification(const blokus::MessageWrapper& wrapper)
-    {
-        blokus::PlayerJoinedNotification notification;
-        if (!unpackMessage(wrapper, notification)) return;
-        
-        QString username = QString::fromStdString(notification.username());
-        
-        qDebug() << QString::fromUtf8("👤 Protobuf 플레이어 참여 알림 수신: %1").arg(username);
-        emit playerJoined(username);
-    }
-    
-    void NetworkClient::handleProtobufPlayerLeftNotification(const blokus::MessageWrapper& wrapper)
-    {
-        blokus::PlayerLeftNotification notification;
-        if (!unpackMessage(wrapper, notification)) return;
-        
-        QString username = QString::fromStdString(notification.username());
-        
-        qDebug() << QString::fromUtf8("👤 Protobuf 플레이어 퇴장 알림 수신: %1").arg(username);
-        emit playerLeft(username);
-    }
-    
-    void NetworkClient::handleProtobufPlayerReadyNotification(const blokus::MessageWrapper& wrapper)
-    {
-        blokus::PlayerReadyNotification notification;
-        if (!unpackMessage(wrapper, notification)) return;
-        
-        QString username = QString::fromStdString(notification.username());
-        bool ready = notification.ready();
-        
-        qDebug() << QString::fromUtf8("👤 Protobuf 플레이어 준비 상태 알림 수신: %1 -> %2").arg(username).arg(ready ? "준비완료" : "대기중");
-        emit playerReady(username, ready);
-    }
-    
-    void NetworkClient::handleProtobufGameStartedNotification(const blokus::MessageWrapper& wrapper)
-    {
-        blokus::GameStartedNotification notification;
-        if (!unpackMessage(wrapper, notification)) return;
-        
-        qDebug() << QString::fromUtf8("🎮 Protobuf 게임 시작 알림 수신");
-        emit gameStarted();
-    }
-    
-    void NetworkClient::handleProtobufGameEndedNotification(const blokus::MessageWrapper& wrapper)
-    {
-        blokus::GameEndedNotification notification;
-        if (!unpackMessage(wrapper, notification)) return;
-        
-        qDebug() << QString::fromUtf8("🎮 Protobuf 게임 종료 알림 수신");
-        emit gameEnded();
-        
-        // 게임 결과 전달 
-        QString resultJson = QString::fromStdString(notification.DebugString());
-        emit gameResult(resultJson);
-        
-        // 승자 정보가 있는 경우
-        if (!notification.winner().empty()) {
-            QString winner = QString::fromStdString(notification.winner());
-            qDebug() << QString::fromUtf8("🏆 게임 승자: %1").arg(winner);
-        }
-    }
-
-    // ========================================
     // 버전 관련 메서드들
     // ========================================
     
@@ -1334,40 +823,55 @@ namespace Blokus {
         qDebug() << QString::fromUtf8("🔍 서버 버전 호환성 검사 시작 - 클라이언트 버전: %1")
                     .arg(QString::fromStdString(Blokus::Client::ClientVersion::getVersion()));
         
-        // 버전 확인 요청 생성
-        blokus::VersionCheckRequest request;
-        request.set_client_version(Blokus::Client::ClientVersion::getVersion());
-        request.set_platform("Windows");
-        request.set_build_number("1"); // 필요시 빌드 번호 추가
-        
-        sendProtobufMessage(blokus::MESSAGE_TYPE_VERSION_CHECK_REQUEST, request);
+        // 버전 확인 요청 (텍스트 기반)
+        QString versionMessage = QString("version:check:%1\n")
+                                .arg(QString::fromStdString(Blokus::Client::ClientVersion::getVersion()));
+        sendMessage(versionMessage);
     }
     
-    void NetworkClient::processVersionCheckResponse(const blokus::VersionCheckResponse& response)
+    void NetworkClient::processVersionCheckResponse(const QStringList& params)
     {
-        qDebug() << QString::fromUtf8("📋 버전 호환성 검사 결과 - 호환: %1, 메시지: %2")
-                    .arg(response.compatible() ? "O" : "X")
-                    .arg(QString::fromStdString(response.message()));
+        // params[0] = "version", params[1] = "ok" or "mismatch", params[2] = downloadUrl (if mismatch)
         
-        if (!response.compatible()) {
+        if (params.size() < 2) {
+            qDebug() << QString::fromUtf8("❌ 버전 응답 형식 오류: %1").arg(params.join(":"));
+            return;
+        }
+        
+        QString status = params[1];
+        
+        qDebug() << QString::fromUtf8("📋 버전 호환성 검사 결과 - 상태: %1")
+                    .arg(status);
+        
+        if (status == "ok") {
+            // 버전 호환 - 정상 연결 완료
+            qDebug() << QString::fromUtf8("✅ 버전 호환성 확인 완료 - 서버 연결 성공");
+            emit versionCheckCompleted(true);
+            emit connected(); // 이제 진짜 연결 완료 시그널 발송
+        } 
+        else if (status == "mismatch") {
             // 버전 불호환 - 다운로드 페이지로 리다이렉트
-            QString downloadUrl = QString::fromStdString(response.download_url());
-            QString serverVersion = QString::fromStdString(response.min_required_version());
+            QString downloadUrl;
+            if (params.size() >= 3) {
+                downloadUrl = params[2];
+            } else {
+                downloadUrl = "https://blokus-online.mooo.com/download"; // 기본값
+            }
             
-            emit versionIncompatible(serverVersion, downloadUrl);
+            emit versionIncompatible("", downloadUrl);
             
             // 다운로드 확인 다이얼로그 표시
             QMessageBox msgBox;
             msgBox.setWindowTitle(QString::fromUtf8("클라이언트 업데이트 필요"));
             msgBox.setText(QString::fromUtf8("서버와 호환되지 않는 클라이언트 버전입니다."));
-            msgBox.setInformativeText(QString::fromUtf8("클라이언트: %1\n메시지: %2\n\n최신 버전을 다운로드하시겠습니까?")
-                                     .arg(QString::fromStdString(Blokus::Client::ClientVersion::getVersion()))
-                                     .arg(QString::fromStdString(response.message())));
+            msgBox.setInformativeText(QString::fromUtf8("클라이언트: %1\n\n최신 버전을 다운로드하시겠습니까?")
+                                     .arg(QString::fromStdString(Blokus::Client::ClientVersion::getVersion())));
             msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
             msgBox.setDefaultButton(QMessageBox::Yes);
             
             if (msgBox.exec() == QMessageBox::Yes) {
                 // 다운로드 페이지 열기
+                qDebug() << QString::fromUtf8("🌐 다운로드 페이지 열기: %1").arg(downloadUrl);
                 QDesktopServices::openUrl(QUrl(downloadUrl));
             }
             
@@ -1376,37 +880,7 @@ namespace Blokus {
             
             emit versionCheckCompleted(false);
         } else {
-            // 버전 호환 - 정상 연결 완료
-            qDebug() << QString::fromUtf8("✅ 버전 호환성 확인 완료 - 서버 연결 성공");
-            emit versionCheckCompleted(true);
-            emit connected(); // 이제 진짜 연결 완료 시그널 발송
+            qDebug() << QString::fromUtf8("❌ 알 수 없는 버전 응답: %1").arg(status);
         }
     }
-    
-    void NetworkClient::processUpdateRequiredNotification(const blokus::UpdateRequiredNotification& notification)
-    {
-        qDebug() << QString::fromUtf8("🔄 서버에서 업데이트 알림 수신");
-        
-        QString currentVersion = QString::fromStdString(notification.current_client_version());
-        QString requiredVersion = QString::fromStdString(notification.required_version());
-        QString downloadUrl = QString::fromStdString(notification.download_url());
-        
-        // 강제 업데이트인 경우
-        if (notification.force_update()) {
-            QMessageBox msgBox;
-            msgBox.setWindowTitle(QString::fromUtf8("필수 업데이트"));
-            msgBox.setText(QString::fromUtf8("서버가 업데이트되어 현재 클라이언트로는 접속할 수 없습니다."));
-            msgBox.setInformativeText(QString::fromUtf8("현재 버전: %1\n필요 버전: %2\n\n최신 버전을 다운로드해 주세요.")
-                                     .arg(currentVersion).arg(requiredVersion));
-            msgBox.setStandardButtons(QMessageBox::Ok);
-            msgBox.exec();
-            
-            // 다운로드 페이지 열기
-            QDesktopServices::openUrl(QUrl(downloadUrl));
-            
-            // 연결 종료
-            disconnect();
-        }
-    }
-
 } // namespace Blokus

@@ -65,7 +65,6 @@ namespace Blokus {
                 gitCommit = getEnvString("BLOKUS_GIT_COMMIT", "unknown");
                 gitBranch = getEnvString("BLOKUS_GIT_BRANCH", "main");
                 isProduction = getEnvBool("BLOKUS_PRODUCTION", false);
-                
                 downloadUrl = getEnvString("BLOKUS_DOWNLOAD_URL", "https://blokus-online.mooo.com/download");
 
                 // PostgreSQL 연결 문자열 생성

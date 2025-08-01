@@ -29,7 +29,6 @@ set(SERVER_HEADERS
     include/GameServer.h
     include/Session.h
     include/MessageHandler.h
-    include/NetworkManager.h
     include/GameRoom.h
     include/RoomManager.h
     include/DatabaseManager.h
@@ -60,7 +59,6 @@ find_package(libpqxx CONFIG REQUIRED)
 # ���̺귯�� ��ũ
 target_link_libraries(BlokusServer PRIVATE
     BlokusCommon
-    BlokusProto
     Boost::system
     libpqxx::pqxx
 )

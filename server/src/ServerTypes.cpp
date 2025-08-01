@@ -67,7 +67,10 @@ namespace Blokus
                 {"chat", MessageType::Chat},
 
                 // 유저 관련
-                {"user:stats", MessageType::UserStats}};
+                {"user:stats", MessageType::UserStats},
+
+                // 버전 관련
+                {"version:check", MessageType::VersionCheck}};
 
             auto it = typeMap.find(clean);
             return (it != typeMap.end()) ? it->second : MessageType::Unknown;
@@ -120,6 +123,10 @@ namespace Blokus
                 return "game:result";
             case MessageType::Chat:
                 return "chat";
+            case MessageType::UserStats:
+                return "user:stats";
+            case MessageType::VersionCheck:
+                return "version:check";
             default:
                 return "unknown";
             }
