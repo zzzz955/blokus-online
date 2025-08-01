@@ -29,13 +29,8 @@ public:
     
     struct CompatibilityInfo {
         bool compatible;
-        bool updateRequired;
-        bool updateRecommended;
-        bool forceUpdate;
-        std::string minRequiredVersion;
         std::string message;
         std::string downloadUrl;
-        uint32_t gracePeriodHours;
     };
     
     // Constructor - takes configuration from ConfigManager
@@ -54,10 +49,7 @@ public:
     
 private:
     Version serverVersion_;
-    std::string minRequiredClientVersion_;
     std::string downloadUrl_;
-    bool forceUpdateEnabled_;
-    uint32_t gracePeriodHours_;
     
     // Helper methods
     void initializeServerVersion();

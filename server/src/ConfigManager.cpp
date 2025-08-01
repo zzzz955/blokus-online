@@ -41,10 +41,7 @@ namespace Blokus {
         std::string ConfigManager::gitBranch;
         bool ConfigManager::isProduction;
         
-        std::string ConfigManager::minClientVersion;
         std::string ConfigManager::downloadUrl;
-        bool ConfigManager::forceUpdate;
-        int ConfigManager::updateGracePeriodHours;
 
     } // namespace Server
 } // namespace Blokus

@@ -1,8 +1,12 @@
 #include "NetworkClient.h"
 #include "ClientConfigManager.h"
+#include "ClientVersion.h"
 #include <QDebug>
 #include <QHostAddress>
 #include <QRegExp>
+#include <QDesktopServices>
+#include <QUrl>
+#include <QMessageBox>
 #include <ctime>
 
 // Protobuf includes
@@ -12,6 +16,7 @@
 #include "game.pb.h"
 #include "chat.pb.h"
 #include "error.pb.h"
+#include "version.pb.h"
 
 namespace Blokus {
 
@@ -158,6 +163,22 @@ namespace Blokus {
             qWarning() << QString::fromUtf8("메시지 전송 불완전: %1 bytes written of %2").arg(written).arg(data.size());
         } else {
             qDebug() << QString::fromUtf8("메시지 전송: %1").arg(message);
+        }
+    }
+
+    void NetworkClient::sendBinaryMessage(const QByteArray& data)
+    {
+        if (!isConnected() || !m_socket) {
+            qWarning() << QString::fromUtf8("서버에 연결되지 않음 - 바이너리 메시지 전송 실패");
+            return;
+        }
+        
+        qint64 written = m_socket->write(data);
+        
+        if (written != data.size()) {
+            qWarning() << QString::fromUtf8("바이너리 메시지 전송 불완전: %1 bytes written of %2").arg(written).arg(data.size());
+        } else {
+            qDebug() << QString::fromUtf8("바이너리 메시지 전송: %1 bytes").arg(data.size());
         }
     }
 
@@ -360,7 +381,9 @@ namespace Blokus {
         m_connectionTimer->stop();
         m_reconnectAttempts = 0;
         setState(ConnectionState::Connected);
-        emit connected();
+        
+        // 연결 성공 후 즉시 버전 검사 수행
+        performVersionCheck();
     }
 
     void NetworkClient::onDisconnected()
@@ -889,11 +912,16 @@ namespace Blokus {
         std::string serializedData;
         if (wrapper.SerializeToString(&serializedData))
         {
-            // 특수 헤더를 추가하여 Protobuf 메시지임을 나타냄
-            QString protobufMessage = "PROTOBUF:" + QString::fromStdString(serializedData);
-            sendMessage(protobufMessage);
+            // 길이 프리픽스 방식: "PROTOBUF_LEN:size:data\n"
+            QByteArray protobufHeader = "PROTOBUF_LEN:";
+            QByteArray lengthStr = QByteArray::number(serializedData.size());
+            QByteArray separator = ":";
+            QByteArray binaryData = QByteArray::fromStdString(serializedData);
+            QByteArray fullMessage = protobufHeader + lengthStr + separator + binaryData + "\n";
             
-            qDebug() << QString::fromUtf8("📤 Protobuf 메시지 전송: type=%1, size=%2 bytes")
+            sendBinaryMessage(fullMessage);
+            
+            qDebug() << QString::fromUtf8("📤 Protobuf 메시지 전송 (길이 프리픽스): type=%1, size=%2 bytes")
                         .arg(static_cast<int>(type))
                         .arg(serializedData.size());
         }
@@ -1294,6 +1322,90 @@ namespace Blokus {
         if (!notification.winner().empty()) {
             QString winner = QString::fromStdString(notification.winner());
             qDebug() << QString::fromUtf8("🏆 게임 승자: %1").arg(winner);
+        }
+    }
+
+    // ========================================
+    // 버전 관련 메서드들
+    // ========================================
+    
+    void NetworkClient::performVersionCheck()
+    {
+        qDebug() << QString::fromUtf8("🔍 서버 버전 호환성 검사 시작 - 클라이언트 버전: %1")
+                    .arg(QString::fromStdString(Blokus::Client::ClientVersion::getVersion()));
+        
+        // 버전 확인 요청 생성
+        blokus::VersionCheckRequest request;
+        request.set_client_version(Blokus::Client::ClientVersion::getVersion());
+        request.set_platform("Windows");
+        request.set_build_number("1"); // 필요시 빌드 번호 추가
+        
+        sendProtobufMessage(blokus::MESSAGE_TYPE_VERSION_CHECK_REQUEST, request);
+    }
+    
+    void NetworkClient::processVersionCheckResponse(const blokus::VersionCheckResponse& response)
+    {
+        qDebug() << QString::fromUtf8("📋 버전 호환성 검사 결과 - 호환: %1, 메시지: %2")
+                    .arg(response.compatible() ? "O" : "X")
+                    .arg(QString::fromStdString(response.message()));
+        
+        if (!response.compatible()) {
+            // 버전 불호환 - 다운로드 페이지로 리다이렉트
+            QString downloadUrl = QString::fromStdString(response.download_url());
+            QString serverVersion = QString::fromStdString(response.min_required_version());
+            
+            emit versionIncompatible(serverVersion, downloadUrl);
+            
+            // 다운로드 확인 다이얼로그 표시
+            QMessageBox msgBox;
+            msgBox.setWindowTitle(QString::fromUtf8("클라이언트 업데이트 필요"));
+            msgBox.setText(QString::fromUtf8("서버와 호환되지 않는 클라이언트 버전입니다."));
+            msgBox.setInformativeText(QString::fromUtf8("클라이언트: %1\n메시지: %2\n\n최신 버전을 다운로드하시겠습니까?")
+                                     .arg(QString::fromStdString(Blokus::Client::ClientVersion::getVersion()))
+                                     .arg(QString::fromStdString(response.message())));
+            msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+            msgBox.setDefaultButton(QMessageBox::Yes);
+            
+            if (msgBox.exec() == QMessageBox::Yes) {
+                // 다운로드 페이지 열기
+                QDesktopServices::openUrl(QUrl(downloadUrl));
+            }
+            
+            // 연결 종료
+            disconnect();
+            
+            emit versionCheckCompleted(false);
+        } else {
+            // 버전 호환 - 정상 연결 완료
+            qDebug() << QString::fromUtf8("✅ 버전 호환성 확인 완료 - 서버 연결 성공");
+            emit versionCheckCompleted(true);
+            emit connected(); // 이제 진짜 연결 완료 시그널 발송
+        }
+    }
+    
+    void NetworkClient::processUpdateRequiredNotification(const blokus::UpdateRequiredNotification& notification)
+    {
+        qDebug() << QString::fromUtf8("🔄 서버에서 업데이트 알림 수신");
+        
+        QString currentVersion = QString::fromStdString(notification.current_client_version());
+        QString requiredVersion = QString::fromStdString(notification.required_version());
+        QString downloadUrl = QString::fromStdString(notification.download_url());
+        
+        // 강제 업데이트인 경우
+        if (notification.force_update()) {
+            QMessageBox msgBox;
+            msgBox.setWindowTitle(QString::fromUtf8("필수 업데이트"));
+            msgBox.setText(QString::fromUtf8("서버가 업데이트되어 현재 클라이언트로는 접속할 수 없습니다."));
+            msgBox.setInformativeText(QString::fromUtf8("현재 버전: %1\n필요 버전: %2\n\n최신 버전을 다운로드해 주세요.")
+                                     .arg(currentVersion).arg(requiredVersion));
+            msgBox.setStandardButtons(QMessageBox::Ok);
+            msgBox.exec();
+            
+            // 다운로드 페이지 열기
+            QDesktopServices::openUrl(QUrl(downloadUrl));
+            
+            // 연결 종료
+            disconnect();
         }
     }
 

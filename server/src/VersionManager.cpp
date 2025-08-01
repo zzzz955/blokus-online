@@ -16,8 +16,8 @@ namespace blokus
         initializeServerVersion();
         loadCompatibilitySettings();
 
-        spdlog::info("VersionManager 초기화 완료 - 서버 버전: {}, 최소 클라이언트 버전: {}",
-                     serverVersion_.version, minRequiredClientVersion_);
+        spdlog::info("VersionManager 초기화 완료 - 서버 버전: {}, 다운로드 URL: {}",
+                     serverVersion_.version, downloadUrl_);
     }
 
     // Version constructor
@@ -64,26 +64,25 @@ namespace blokus
     // Load compatibility settings from ConfigManager
     void VersionManager::loadCompatibilitySettings()
     {
-        minRequiredClientVersion_ = ConfigManager::minClientVersion;
         downloadUrl_ = ConfigManager::downloadUrl;
-        forceUpdateEnabled_ = ConfigManager::forceUpdate;
-        gracePeriodHours_ = ConfigManager::updateGracePeriodHours;
     }
 
     bool VersionManager::Version::isCompatibleWith(const std::string &clientVersion) const
     {
-        // Simple version compatibility check
-        // For now, require exact major version match
+        // Server-Client version compatibility check
+        // Rule: Server X.Y.Z is compatible with Client X.Y.0~X.Y.9
         auto serverParts = VersionManager::parseVersion(version);
         auto clientParts = VersionManager::parseVersion(clientVersion);
 
-        if (serverParts.empty() || clientParts.empty())
+        if (serverParts.size() < 2 || clientParts.size() < 2)
         {
             return false;
         }
 
-        // Major version must match
-        return serverParts[0] == clientParts[0];
+        // Major and Minor versions must match exactly
+        // Server 1.0.0 supports Client 1.0.0~1.0.9
+        // Server 1.1.0 supports Client 1.1.0~1.1.9
+        return (serverParts[0] == clientParts[0]) && (serverParts[1] == clientParts[1]);
     }
 
     int VersionManager::Version::compare(const std::string &otherVersion) const
@@ -110,50 +109,25 @@ namespace blokus
     VersionManager::CompatibilityInfo VersionManager::checkCompatibility(
         const std::string &clientVersion, const std::string &platform) const
     {
-
         CompatibilityInfo info;
-        info.minRequiredVersion = minRequiredClientVersion_;
         info.downloadUrl = downloadUrl_;
-        info.gracePeriodHours = gracePeriodHours_;
-        info.forceUpdate = forceUpdateEnabled_;
 
-        // Check if client version meets minimum requirement
-        bool meetsMinimum = isVersionNewer(clientVersion, minRequiredClientVersion_) ||
-                            (clientVersion == minRequiredClientVersion_);
-
-        // Check server compatibility
-        bool serverCompatible = serverVersion_.isCompatibleWith(clientVersion);
-
-        info.compatible = meetsMinimum && serverCompatible;
-        info.updateRequired = !meetsMinimum;
-
-        // Check if newer version is available (recommend update)
-        info.updateRecommended = serverVersion_.compare(clientVersion) > 0;
+        // Check server-client compatibility (Major.Minor versions must match)
+        info.compatible = serverVersion_.isCompatibleWith(clientVersion);
 
         // Generate appropriate message
         if (!info.compatible)
         {
-            if (!meetsMinimum)
-            {
-                info.message = "클라이언트 버전이 너무 낮습니다. 최소 " +
-                               minRequiredClientVersion_ + " 버전이 필요합니다.";
-            }
-            else
-            {
-                info.message = "서버와 호환되지 않는 클라이언트 버전입니다.";
-            }
-        }
-        else if (info.updateRecommended)
-        {
-            info.message = "새로운 클라이언트 버전이 있습니다. 업데이트를 권장합니다.";
+            info.message = "서버 버전(" + serverVersion_.version + ")과 호환되지 않는 클라이언트 버전(" + 
+                          clientVersion + ")입니다. 최신 클라이언트를 다운로드해 주세요.";
         }
         else
         {
-            info.message = "클라이언트가 최신 버전입니다.";
+            info.message = "클라이언트 버전이 서버와 호환됩니다.";
         }
 
-        spdlog::debug("Version check - Client: {}, Compatible: {}, Update Required: {}",
-                      clientVersion, info.compatible, info.updateRequired);
+        spdlog::debug("버전 호환성 확인 - 서버: {}, 클라이언트: {}, 호환: {}",
+                      serverVersion_.version, clientVersion, info.compatible);
 
         return info;
     }

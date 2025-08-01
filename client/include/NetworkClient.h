@@ -35,6 +35,13 @@ namespace blokus {
     class SendChatRequest;
     class SendChatResponse;
     class ErrorResponse;
+    
+    // Version management messages
+    class GetVersionInfoRequest;
+    class VersionInfoResponse;
+    class VersionCheckRequest;
+    class VersionCheckResponse;
+    class UpdateRequiredNotification;
 }
 
 namespace Blokus {
@@ -62,6 +69,7 @@ namespace Blokus {
 
         // 메시지 전송 (텍스트 및 Protobuf)
         void sendMessage(const QString& message);
+        void sendBinaryMessage(const QByteArray& data);
         void sendProtobufMessage(blokus::MessageType type, const google::protobuf::Message& payload);
         void sendProtobufRequest(blokus::MessageType type, const google::protobuf::Message& payload);
         
@@ -113,6 +121,10 @@ namespace Blokus {
         // 메시지 시그널
         void messageReceived(const QString& message);
         void errorReceived(const QString& error);
+        
+        // 버전 시그널
+        void versionIncompatible(const QString& serverVersion, const QString& downloadUrl);
+        void versionCheckCompleted(bool compatible);
 
         // 로비 시그널
         void lobbyEntered();
@@ -173,6 +185,11 @@ namespace Blokus {
         void processGameStateMessage(const QString& message);
         void processAfkMessage(const QString& message);
         void processErrorMessage(const QString& error);
+        
+        // 버전 관련 메서드
+        void performVersionCheck();
+        void processVersionCheckResponse(const blokus::VersionCheckResponse& response);
+        void processUpdateRequiredNotification(const blokus::UpdateRequiredNotification& notification);
         void setupSocket();
         void cleanupSocket();
         

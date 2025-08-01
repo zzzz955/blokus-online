@@ -27,6 +27,7 @@ set(CLIENT_SOURCES
     "src/ResponsiveUI.cpp"
     "src/NetworkClient.cpp"
     "src/ClientConfigManager.cpp"
+    "src/ClientVersion.cpp"
 )
 
 set(CLIENT_HEADERS
@@ -44,6 +45,7 @@ set(CLIENT_HEADERS
     "include/ResponsiveUI.h"
     "include/NetworkClient.h"
     "include/ClientConfigManager.h"
+    "include/ClientVersion.h"
 )
 
 # 실행 파일 생성

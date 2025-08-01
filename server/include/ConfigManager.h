@@ -66,10 +66,7 @@ namespace Blokus {
                 gitBranch = getEnvString("BLOKUS_GIT_BRANCH", "main");
                 isProduction = getEnvBool("BLOKUS_PRODUCTION", false);
                 
-                minClientVersion = getEnvString("BLOKUS_MIN_CLIENT_VERSION", "1.0.0");
-                downloadUrl = getEnvString("BLOKUS_DOWNLOAD_URL", "https://github.com/zzzz955/blokus-online/releases/latest");
-                forceUpdate = getEnvBool("BLOKUS_FORCE_UPDATE", false);
-                updateGracePeriodHours = getEnvInt("BLOKUS_UPDATE_GRACE_PERIOD_HOURS", 24);
+                downloadUrl = getEnvString("BLOKUS_DOWNLOAD_URL", "https://blokus-online.mooo.com/download");
 
                 // PostgreSQL 연결 문자열 생성
                 dbConnectionString = "host=" + dbHost + " port=" + dbPort +
@@ -144,10 +141,7 @@ namespace Blokus {
             static std::string gitBranch;
             static bool isProduction;
             
-            static std::string minClientVersion;
             static std::string downloadUrl;
-            static bool forceUpdate;
-            static int updateGracePeriodHours;
         };
 
     } // namespace Server

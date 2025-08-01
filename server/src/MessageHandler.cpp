@@ -118,7 +118,52 @@ namespace Blokus::Server
                           session_->getSessionId(),
                           rawMessage.length() > 100 ? rawMessage.substr(0, 100) + "..." : rawMessage, (int)session_->getState());
 
-            // Protobuf 메시지 확인
+            // Protobuf 메시지 확인 (길이 프리픽스 방식)
+            if (rawMessage.size() > 13 && rawMessage.substr(0, 13) == "PROTOBUF_LEN:")
+            {
+                // "PROTOBUF_LEN:size:data" 형식 파싱
+                size_t firstColon = rawMessage.find(':', 13); // "PROTOBUF_LEN:" 이후의 첫 번째 ':'
+                if (firstColon != std::string::npos)
+                {
+                    std::string lengthStr = rawMessage.substr(13, firstColon - 13);
+                    size_t dataLength = 0;
+                    try {
+                        dataLength = std::stoull(lengthStr);
+                    } catch (const std::exception&) {
+                        spdlog::error("Protobuf 길이 파싱 실패: {}", lengthStr);
+                        sendError("Protobuf 메시지 길이 형식 오류");
+                        return;
+                    }
+                    
+                    std::string serializedData = rawMessage.substr(firstColon + 1);
+                    if (serializedData.size() == dataLength)
+                    {
+                        blokus::MessageWrapper wrapper;
+                        if (wrapper.ParseFromString(serializedData))
+                        {
+                            handleProtobufMessage(wrapper);
+                        }
+                        else
+                        {
+                            spdlog::error("Protobuf 메시지 파싱 실패 (길이: {})", dataLength);
+                            sendError("Protobuf 메시지 형식 오류");
+                        }
+                    }
+                    else
+                    {
+                        spdlog::error("Protobuf 데이터 길이 불일치: 예상={}, 실제={}", dataLength, serializedData.size());
+                        sendError("Protobuf 메시지 길이 불일치");
+                    }
+                }
+                else
+                {
+                    spdlog::error("Protobuf 길이 프리픽스 형식 오류");
+                    sendError("Protobuf 메시지 헤더 형식 오류");
+                }
+                return;
+            }
+            
+            // 기존 PROTOBUF: 방식 지원 (하위 호환성)
             if (rawMessage.size() > 9 && rawMessage.substr(0, 9) == "PROTOBUF:")
             {
                 // Protobuf 메시지 처리
@@ -131,7 +176,7 @@ namespace Blokus::Server
                 }
                 else
                 {
-                    spdlog::error("Protobuf 메시지 파싱 실패");
+                    spdlog::error("Protobuf 메시지 파싱 실패 (기존 방식)");
                     sendError("Protobuf 메시지 형식 오류");
                 }
                 return;
@@ -2625,13 +2670,11 @@ namespace Blokus::Server
 
             // 호환성 정보 설정
             auto* compatibilityInfo = response.mutable_compatibility();
-            compatibilityInfo->set_min_client_version(compatibility.minRequiredVersion);
             compatibilityInfo->set_current_server_version(serverVersion.version);
             compatibilityInfo->set_compatible(compatibility.compatible);
             compatibilityInfo->set_update_required_message(compatibility.message);
             compatibilityInfo->set_download_url(compatibility.downloadUrl);
 
-            response.set_update_available(compatibility.updateRecommended);
             response.set_latest_client_version(serverVersion.version);
             response.set_download_url(compatibility.downloadUrl);
             response.add_update_notes("최신 서버와 호환되는 클라이언트 버전");
@@ -2676,35 +2719,29 @@ namespace Blokus::Server
 
             blokus::VersionCheckResponse response;
             response.set_compatible(compatibility.compatible);
-            response.set_min_required_version(compatibility.minRequiredVersion);
-            response.set_update_required(compatibility.updateRequired);
-            response.set_update_recommended(compatibility.updateRecommended);
             response.set_message(compatibility.message);
             response.set_download_url(compatibility.downloadUrl);
-            response.set_force_update(compatibility.forceUpdate);
 
             sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_VERSION_CHECK_RESPONSE, response);
 
             // 호환되지 않는 클라이언트인 경우 추가 알림
-            if (!compatibility.compatible && compatibility.forceUpdate)
+            if (!compatibility.compatible)
             {
                 // 업데이트 필수 알림 전송
                 blokus::UpdateRequiredNotification notification;
                 notification.set_current_client_version(request.client_version());
-                notification.set_required_version(compatibility.minRequiredVersion);
                 notification.set_download_url(compatibility.downloadUrl);
                 notification.add_update_features("최신 서버와 호환성 개선");
                 notification.set_force_update(true);
-                notification.set_grace_period_hours(compatibility.gracePeriodHours);
 
                 sendProtobufMessage(blokus::MESSAGE_TYPE_UPDATE_REQUIRED_NOTIFICATION, notification);
                 
-                spdlog::warn("🔄 강제 업데이트 알림 전송: 클라이언트={}, 필요 버전={}", 
-                             request.client_version(), compatibility.minRequiredVersion);
+                spdlog::warn("🔄 강제 업데이트 알림 전송: 클라이언트 버전={}", 
+                             request.client_version());
             }
 
-            spdlog::info("✅ 버전 확인 응답 전송: 클라이언트={}, 호환성={}, 업데이트 필요={}", 
-                         request.client_version(), compatibility.compatible, compatibility.updateRequired);
+            spdlog::info("✅ 버전 확인 응답 전송: 클라이언트={}, 호환성={}", 
+                         request.client_version(), compatibility.compatible);
         }
         catch (const std::exception& e)
         {
