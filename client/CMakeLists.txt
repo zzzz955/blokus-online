@@ -111,9 +111,10 @@ source_group("Client\\Headers" FILES ${CLIENT_HEADERS})
 source_group("Client\\Sources" FILES ${CLIENT_SOURCES})
 
 # ===========================================
-# 환경변수 기반 설정
+# 서버 설정 (빌드 모드별 하드코딩)
 # ===========================================
 
-message(STATUS "Server configuration now uses environment variables:")
-message(STATUS "  BLOKUS_SERVER_HOST (default: localhost)")
-message(STATUS "  BLOKUS_SERVER_PORT (default: 9999)")
+message(STATUS "Server configuration:")
+message(STATUS "  Debug 모드: localhost:9999")
+message(STATUS "  Release 모드: blokus-online.mooo.com:9999")
+message(STATUS "  설정 방식: 빌드 모드별 하드코딩 (_DEBUG 매크로 사용)")
