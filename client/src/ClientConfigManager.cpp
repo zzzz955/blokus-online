@@ -27,16 +27,33 @@ void ClientConfigManager::reload() {
 }
 
 void ClientConfigManager::loadDefaults() {
-    // 서버 설정 (개발/배포 구분)
-#ifdef BLOKUS_PRODUCTION_BUILD
-    // 배포용: 실제 서버 정보
-    server_config_.host = "blokus-online.mooo.com";  // TODO: 실제 서버 주소로 변경
-    server_config_.port = 9999;
-#else
-    // 개발용: 로컬 서버
-    server_config_.host = "localhost";
-    server_config_.port = 9999;
-#endif
+    // 서버 설정 (환경변수 기반)
+    // BLOKUS_SERVER_HOST 환경변수가 있으면 사용, 없으면 기본값 (localhost)
+    QString envHost = qgetenv("BLOKUS_SERVER_HOST");
+    QString envPort = qgetenv("BLOKUS_SERVER_PORT");
+    
+    if (!envHost.isEmpty()) {
+        server_config_.host = envHost;
+        qDebug() << QString::fromUtf8("환경변수에서 서버 호스트 설정: %1").arg(envHost);
+    } else {
+        server_config_.host = "localhost";  // 기본값: 로컬 서버
+        qDebug() << QString::fromUtf8("기본 서버 호스트 사용: localhost");
+    }
+    
+    if (!envPort.isEmpty()) {
+        bool ok;
+        int port = envPort.toInt(&ok);
+        if (ok && port > 0 && port <= 65535) {
+            server_config_.port = port;
+            qDebug() << QString::fromUtf8("환경변수에서 서버 포트 설정: %1").arg(port);
+        } else {
+            server_config_.port = 9999;  // 잘못된 포트 값일 경우 기본값
+            qDebug() << QString::fromUtf8("잘못된 포트 값, 기본 포트 사용: 9999");
+        }
+    } else {
+        server_config_.port = 9999;  // 기본값: 9999 포트
+        qDebug() << QString::fromUtf8("기본 서버 포트 사용: 9999");
+    }
     
     server_config_.timeout_ms = 5000;
     server_config_.reconnect_attempts = 3;

@@ -2,8 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 
+interface ReleaseInfo {
+  version: string;
+  filename: string;
+  archivePath?: string;
+  releaseInfo?: any;
+  githubUrl: string;
+}
+
 // 로컬 releases 디렉토리에서 최신 버전 정보 읽기
-function getLatestRelease() {
+function getLatestRelease(): ReleaseInfo {
   try {
     const releasesDir = path.join(process.cwd(), '..', 'releases');
     const latestDir = path.join(releasesDir, 'latest');
@@ -19,7 +27,8 @@ function getLatestRelease() {
             version: releaseInfo.version,
             filename: `BlokusClient-v${releaseInfo.version}.zip`,
             archivePath,
-            releaseInfo
+            releaseInfo,
+            githubUrl: `https://github.com/zzzz955/blokus-online/releases/download/v${releaseInfo.version}/BlokusClient-v${releaseInfo.version}.zip`
           };
         }
       }

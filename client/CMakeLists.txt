@@ -70,14 +70,17 @@ target_link_libraries(BlokusClient PRIVATE
 
 # Windows 설정
 if(WIN32)
-    set_target_properties(BlokusClient PROPERTIES
-        WIN32_EXECUTABLE TRUE
-    )
-    
+    # 디버그 빌드에서만 콘솔 창 표시
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
         set_target_properties(BlokusClient PROPERTIES
-            LINK_FLAGS "/SUBSYSTEM:CONSOLE"
+            WIN32_EXECUTABLE FALSE  # 콘솔 애플리케이션으로 설정
         )
+        message(STATUS "Debug build: Console window enabled")
+    else()
+        set_target_properties(BlokusClient PROPERTIES
+            WIN32_EXECUTABLE TRUE   # Windows 애플리케이션으로 설정 (콘솔 창 숨김)
+        )
+        message(STATUS "Release build: Console window disabled")
     endif()
 endif()
 
@@ -91,17 +94,9 @@ source_group("Client\\Headers" FILES ${CLIENT_HEADERS})
 source_group("Client\\Sources" FILES ${CLIENT_SOURCES})
 
 # ===========================================
-# 빌드 타입별 설정
+# 환경변수 기반 설정
 # ===========================================
 
-# 배포 빌드인지 확인
-option(BLOKUS_PRODUCTION_BUILD "Build for production deployment" OFF)
-
-if(BLOKUS_PRODUCTION_BUILD)
-    # 배포용 빌드: 실제 서버 정보 하드코딩
-    target_compile_definitions(BlokusClient PRIVATE BLOKUS_PRODUCTION_BUILD)
-    message(STATUS "Building for PRODUCTION - Using production server")
-else()
-    # 개발용 빌드: 로컬 서버 하드코딩
-    message(STATUS "Building for DEVELOPMENT - Using localhost server")
-endif()
+message(STATUS "Server configuration now uses environment variables:")
+message(STATUS "  BLOKUS_SERVER_HOST (default: localhost)")
+message(STATUS "  BLOKUS_SERVER_PORT (default: 9999)")
