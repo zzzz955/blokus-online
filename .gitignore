@@ -165,7 +165,8 @@ web/dist
 
 # Gatsby files
 web/.cache/
-web/public
+web/public/*
+!web/public/downloads/
 
 # ========================================
 # Downloads Exception (for web deployment)
