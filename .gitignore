@@ -167,6 +167,15 @@ web/dist
 web/.cache/
 web/public
 
+# ========================================
+# Downloads Exception (for web deployment)
+# ========================================
+
+# Allow downloads directory for client distribution
+!web/public/downloads/
+!web/public/downloads/BlokusClient-latest.zip
+!web/public/downloads/version.json
+
 # Vuepress build output
 web/.vuepress/dist
 
@@ -285,8 +294,9 @@ settings.ini
 *.tmp
 *.temp
 
-# Archive files
+# Archive files (except client downloads)
 *.zip
+!web/public/downloads/*.zip
 *.rar
 *.7z
 *.tar.gz
