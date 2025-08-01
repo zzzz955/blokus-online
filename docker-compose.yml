@@ -153,8 +153,6 @@ services:
     volumes:
       # 업로드된 파일 영속성
       - ./web/uploads:/app/public/uploads
-      # 클라이언트 다운로드 파일
-      - ./downloads:/app/public/downloads:ro
     
     # 포트는 nginx를 통해서만 접근하므로 외부 노출 불필요
     # ports:
