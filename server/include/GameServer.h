@@ -15,6 +15,11 @@
 #include "ConfigManager.h"
 #include "Types.h"
 
+// 전방 선언 (blokus 네임스페이스)
+namespace blokus {
+    class VersionManager;
+}
+
 // 전방 선언
 namespace Blokus::Server {
     class Session;
@@ -45,6 +50,9 @@ namespace Blokus::Server {
         static int getServerPort() { return ConfigManager::serverPort; }
         static int getMaxClients() { return ConfigManager::maxClients; }
         static int getThreadPoolSize() { return ConfigManager::threadPoolSize; }
+        
+        // VersionManager 접근자
+        blokus::VersionManager* getVersionManager() const { return versionManager_.get(); }
 
         // ========================================
         // 인증 관련 편의 함수들
@@ -159,6 +167,7 @@ namespace Blokus::Server {
         std::shared_ptr<DatabaseManager> databaseManager_;
         std::unique_ptr<RoomManager> roomManager_;
         std::unique_ptr<AuthenticationService> authService_;
+        std::unique_ptr<blokus::VersionManager> versionManager_;
 
         // 매니저들 (향후 구현 예정)
         //std::unique_ptr<NetworkManager> networkManager_;

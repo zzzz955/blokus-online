@@ -59,6 +59,18 @@ namespace Blokus {
                 debugMode = getEnvBool("DEBUG_MODE", false);
                 enableSqlLogging = getEnvBool("ENABLE_SQL_LOGGING", false);
 
+                // 버전 관리 설정
+                serverVersion = getEnvString("BLOKUS_SERVER_VERSION", "1.0.0");
+                buildDate = getEnvString("BLOKUS_BUILD_DATE", __DATE__ " " __TIME__);
+                gitCommit = getEnvString("BLOKUS_GIT_COMMIT", "unknown");
+                gitBranch = getEnvString("BLOKUS_GIT_BRANCH", "main");
+                isProduction = getEnvBool("BLOKUS_PRODUCTION", false);
+                
+                minClientVersion = getEnvString("BLOKUS_MIN_CLIENT_VERSION", "1.0.0");
+                downloadUrl = getEnvString("BLOKUS_DOWNLOAD_URL", "https://github.com/zzzz955/blokus-online/releases/latest");
+                forceUpdate = getEnvBool("BLOKUS_FORCE_UPDATE", false);
+                updateGracePeriodHours = getEnvInt("BLOKUS_UPDATE_GRACE_PERIOD_HOURS", 24);
+
                 // PostgreSQL 연결 문자열 생성
                 dbConnectionString = "host=" + dbHost + " port=" + dbPort +
                     " user=" + dbUser + " password=" + dbPassword +
@@ -124,6 +136,18 @@ namespace Blokus {
             // ���� ����
             static bool debugMode;
             static bool enableSqlLogging;
+
+            // 버전 관리 설정
+            static std::string serverVersion;
+            static std::string buildDate;
+            static std::string gitCommit;
+            static std::string gitBranch;
+            static bool isProduction;
+            
+            static std::string minClientVersion;
+            static std::string downloadUrl;
+            static bool forceUpdate;
+            static int updateGracePeriodHours;
         };
 
     } // namespace Server

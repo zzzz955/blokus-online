@@ -34,5 +34,17 @@ namespace Blokus {
         bool ConfigManager::debugMode;
         bool ConfigManager::enableSqlLogging;
 
+        // 버전 관리 설정
+        std::string ConfigManager::serverVersion;
+        std::string ConfigManager::buildDate;
+        std::string ConfigManager::gitCommit;
+        std::string ConfigManager::gitBranch;
+        bool ConfigManager::isProduction;
+        
+        std::string ConfigManager::minClientVersion;
+        std::string ConfigManager::downloadUrl;
+        bool ConfigManager::forceUpdate;
+        int ConfigManager::updateGracePeriodHours;
+
     } // namespace Server
 } // namespace Blokus

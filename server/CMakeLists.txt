@@ -20,6 +20,7 @@ set(SERVER_SOURCES
     src/AuthenticationService.cpp
     src/ServerTypes.cpp
     src/PlayerInfo.cpp
+    src/VersionManager.cpp
 )
 
 # �ٽ� ��� ���ϵ�
@@ -35,6 +36,7 @@ set(SERVER_HEADERS
     include/ConfigManager.h
     include/AuthenticationService.h
     include/PlayerInfo.h
+    include/VersionManager.h
 )
 
 # ���� ���� ����

@@ -10,8 +10,118 @@ interface ClientVersion {
   changelog?: string[];
 }
 
-// 버전 정보를 releases 디렉토리에서 읽거나 기본값 반환
+// 서버 컨테이너에서 버전 정보를 조회하거나 환경변수/releases 디렉토리에서 읽기
 async function getVersionInfo(): Promise<ClientVersion> {
+  try {
+    // 1. 먼저 서버 컨테이너에서 버전 정보 조회 시도
+    const serverVersion = await getServerVersionInfo();
+    if (serverVersion) {
+      return serverVersion;
+    }
+
+    // 2. 환경변수에서 버전 정보 읽기
+    const envVersion = await getVersionFromEnvironment();
+    if (envVersion) {
+      return envVersion;
+    }
+
+    // 3. releases 디렉토리에서 읽기 (기존 로직)
+    const releasesVersion = await getVersionFromReleases();
+    if (releasesVersion) {
+      return releasesVersion;
+    }
+
+    // 4. 최종 fallback
+    return getDefaultVersion();
+  } catch (error) {
+    console.error('버전 정보 조회 실패:', error);
+    return getDefaultVersion();
+  }
+}
+
+// 서버 컨테이너에서 버전 정보 조회
+async function getServerVersionInfo(): Promise<ClientVersion | null> {
+  try {
+    const serverHost = process.env.BLOKUS_SERVER_HOST || 'blokus-server';
+    const serverPort = process.env.BLOKUS_SERVER_ADMIN_PORT || '9998';
+    const serverUrl = `http://${serverHost}:${serverPort}/version`;
+    
+    console.log(`서버 버전 정보 조회 시도: ${serverUrl}`);
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5초 타임아웃
+    
+    const response = await fetch(serverUrl, {
+      method: 'GET',
+      signal: controller.signal,
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'blokus-web-service'
+      }
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (response.ok) {
+      const serverData = await response.json();
+      console.log('서버에서 버전 정보 조회 성공:', serverData);
+      
+      return {
+        version: serverData.version || "1.0.0",
+        releaseDate: serverData.buildDate || new Date().toISOString(),
+        downloadUrl: "/api/download/client",
+        fileSize: parseInt(process.env.BLOKUS_CLIENT_FILE_SIZE || "15670931"),
+        changelog: [
+          `서버 버전 ${serverData.version}과 호환`,
+          "최신 멀티플레이어 기능 지원",
+          ...(serverData.features || [])
+        ]
+      };
+    }
+    
+    console.warn(`서버 응답 오류: ${response.status} ${response.statusText}`);
+    return null;
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      console.warn('서버 버전 조회 타임아웃');
+    } else {
+      console.warn('서버 버전 조회 실패:', error.message);
+    }
+    return null;
+  }
+}
+
+// 환경변수에서 버전 정보 읽기
+async function getVersionFromEnvironment(): Promise<ClientVersion | null> {
+  try {
+    const version = process.env.BLOKUS_CLIENT_VERSION;
+    const buildDate = process.env.BLOKUS_BUILD_DATE;
+    const fileSize = process.env.BLOKUS_CLIENT_FILE_SIZE;
+    
+    if (version) {
+      console.log('환경변수에서 버전 정보 조회:', version);
+      return {
+        version,
+        releaseDate: buildDate || new Date().toISOString(),
+        downloadUrl: "/api/download/client",
+        fileSize: parseInt(fileSize || "15670931"),
+        changelog: [
+          `버전 ${version} 릴리즈`,
+          "환경변수 기반 버전 관리",
+          "컨테이너 환경 최적화"
+        ]
+      };
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('환경변수 버전 정보 읽기 실패:', error);
+    return null;
+  }
+}
+
+// releases 디렉토리에서 버전 정보 읽기 (기존 로직)
+async function getVersionFromReleases(): Promise<ClientVersion | null> {
   try {
     const releasesDir = path.join(process.cwd(), '..', 'releases');
     
@@ -22,7 +132,8 @@ async function getVersionInfo(): Promise<ClientVersion> {
       const releases = JSON.parse(releasesData);
       
       if (releases && releases.length > 0) {
-        const latestRelease = releases[0]; // 첫 번째가 최신 버전
+        const latestRelease = releases[0];
+        console.log('releases.json에서 버전 정보 조회:', latestRelease.version);
         return {
           version: latestRelease.version,
           releaseDate: latestRelease.releaseDate,
@@ -41,6 +152,7 @@ async function getVersionInfo(): Promise<ClientVersion> {
       const releaseData = await fs.readFile(releaseInfoPath, 'utf-8');
       const releaseInfo = JSON.parse(releaseData);
       
+      console.log('release-info.json에서 버전 정보 조회:', releaseInfo.version);
       return {
         version: releaseInfo.version,
         releaseDate: releaseInfo.releaseDate,
@@ -50,36 +162,27 @@ async function getVersionInfo(): Promise<ClientVersion> {
       };
     }
     
-    // fallback to default
-    return {
-      version: "1.0.0",
-      releaseDate: new Date().toISOString(),
-      downloadUrl: "/api/download/client",
-      fileSize: 15670931,
-      changelog: [
-        "초기 릴리즈",
-        "멀티플레이어 블로쿠스 게임 지원",
-        "실시간 채팅 기능",
-        "사용자 통계 및 순위 시스템"
-      ]
-    };
+    return null;
   } catch (error) {
-    console.error('릴리즈 정보 읽기 실패:', error);
-    
-    // fallback to default
-    return {
-      version: "1.0.0",
-      releaseDate: new Date().toISOString(),
-      downloadUrl: "/api/download/client",
-      fileSize: 15670931,
-      changelog: [
-        "초기 릴리즈",
-        "멀티플레이어 블로쿠스 게임 지원",
-        "실시간 채팅 기능",
-        "사용자 통계 및 순위 시스템"
-      ]
-    };
+    console.warn('releases 디렉토리 버전 정보 읽기 실패:', error);
+    return null;
   }
+}
+
+// 기본 버전 정보 반환
+function getDefaultVersion(): ClientVersion {
+  return {
+    version: "1.0.0",
+    releaseDate: new Date().toISOString(),
+    downloadUrl: "/api/download/client",
+    fileSize: 15670931,
+    changelog: [
+      "초기 릴리즈",
+      "멀티플레이어 블로쿠스 게임 지원",
+      "실시간 채팅 기능",
+      "사용자 통계 및 순위 시스템"
+    ]
+  };
 }
 
 export async function GET(request: NextRequest) {

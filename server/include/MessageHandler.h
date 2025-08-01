@@ -44,6 +44,13 @@ namespace blokus {
     class GameStartedNotification;
     class GameEndedNotification;
     class ErrorResponse;
+    
+    // Version management messages
+    class GetVersionInfoRequest;
+    class VersionInfoResponse;
+    class VersionCheckRequest;
+    class VersionCheckResponse;
+    class UpdateRequiredNotification;
 }
 
 namespace Blokus::Server {
@@ -183,6 +190,8 @@ namespace Blokus::Server {
         void handleProtobufSendChat(const blokus::MessageWrapper& wrapper);
         void handleProtobufPlaceBlock(const blokus::MessageWrapper& wrapper);
         void handleProtobufStartGame(const blokus::MessageWrapper& wrapper);
+        void handleProtobufGetVersionInfo(const blokus::MessageWrapper& wrapper);
+        void handleProtobufVersionCheck(const blokus::MessageWrapper& wrapper);
         
         // Protobuf 유틸리티 함수들
         void setupProtobufHandlers();

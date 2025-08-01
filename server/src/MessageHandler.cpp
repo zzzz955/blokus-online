@@ -4,6 +4,7 @@
 #include "AuthenticationService.h"
 #include "GameServer.h"
 #include "DatabaseManager.h"
+#include "VersionManager.h"
 #include "ServerTypes.h"
 #include <spdlog/spdlog.h>
 #include <sstream>
@@ -18,6 +19,8 @@
 #include "game.pb.h"
 #include "chat.pb.h"
 #include "error.pb.h"
+#include "version.pb.h"
+#include "common_ext.pb.h"
 
 namespace Blokus::Server
 {
@@ -1383,6 +1386,12 @@ namespace Blokus::Server
         protobufHandlers_[MESSAGE_TYPE_START_GAME_REQUEST] = [this](const auto &wrapper)
         { handleProtobufStartGame(wrapper); };
 
+        // 버전 관련 Protobuf 핸들러
+        protobufHandlers_[MESSAGE_TYPE_GET_VERSION_INFO_REQUEST] = [this](const auto &wrapper)
+        { handleProtobufGetVersionInfo(wrapper); };
+        protobufHandlers_[MESSAGE_TYPE_VERSION_CHECK_REQUEST] = [this](const auto &wrapper)
+        { handleProtobufVersionCheck(wrapper); };
+
         spdlog::debug("Protobuf 핸들러 {} 개 등록 완료", protobufHandlers_.size());
     }
 
@@ -2570,6 +2579,140 @@ namespace Blokus::Server
             errorResponse.set_message("게임 시작 중 오류가 발생했습니다");
             sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_ERROR_RESPONSE, errorResponse);
             spdlog::error("Protobuf 게임 시작 처리 중 예외: {}", e.what());
+        }
+    }
+
+    // ========================================
+    // 버전 관련 Protobuf 핸들러들
+    // ========================================
+
+    void MessageHandler::handleProtobufGetVersionInfo(const blokus::MessageWrapper& wrapper)
+    {
+        try
+        {
+            blokus::GetVersionInfoRequest request;
+            if (!unpackMessage(wrapper, request))
+            {
+                return;
+            }
+
+            spdlog::debug("🔍 Protobuf 버전 정보 요청: 세션={}, 클라이언트 버전={}", 
+                          session_->getSessionId(), request.client_version());
+
+            auto* versionManager = gameServer_->getVersionManager();
+            if (!versionManager) {
+                blokus::ErrorResponse errorResponse;
+                errorResponse.set_result_code(blokus::RESULT_SERVER_ERROR);
+                errorResponse.set_message("버전 관리 서비스를 사용할 수 없습니다");
+                sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_ERROR_RESPONSE, errorResponse);
+                return;
+            }
+            const auto& serverVersion = versionManager->getServerVersion();
+            auto compatibility = versionManager->checkCompatibility(request.client_version(), request.platform());
+
+            blokus::VersionInfoResponse response;
+            
+            // 서버 버전 정보 설정
+            auto* serverVersionInfo = response.mutable_server_version();
+            serverVersionInfo->set_version(serverVersion.version);
+            serverVersionInfo->set_build_date(serverVersion.buildDate);
+            serverVersionInfo->set_git_commit(serverVersion.gitCommit);
+            serverVersionInfo->set_is_production(serverVersion.isProduction);
+            for (const auto& feature : serverVersion.features)
+            {
+                serverVersionInfo->add_features(feature);
+            }
+
+            // 호환성 정보 설정
+            auto* compatibilityInfo = response.mutable_compatibility();
+            compatibilityInfo->set_min_client_version(compatibility.minRequiredVersion);
+            compatibilityInfo->set_current_server_version(serverVersion.version);
+            compatibilityInfo->set_compatible(compatibility.compatible);
+            compatibilityInfo->set_update_required_message(compatibility.message);
+            compatibilityInfo->set_download_url(compatibility.downloadUrl);
+
+            response.set_update_available(compatibility.updateRecommended);
+            response.set_latest_client_version(serverVersion.version);
+            response.set_download_url(compatibility.downloadUrl);
+            response.add_update_notes("최신 서버와 호환되는 클라이언트 버전");
+
+            sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_VERSION_INFO_RESPONSE, response);
+            
+            spdlog::info("✅ 버전 정보 응답 전송: 클라이언트={}, 서버={}, 호환성={}", 
+                         request.client_version(), serverVersion.version, compatibility.compatible);
+        }
+        catch (const std::exception& e)
+        {
+            blokus::ErrorResponse errorResponse;
+            errorResponse.set_result_code(blokus::RESULT_SERVER_ERROR);
+            errorResponse.set_message("버전 정보 조회 중 오류가 발생했습니다");
+            sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_ERROR_RESPONSE, errorResponse);
+            spdlog::error("버전 정보 처리 중 예외: {}", e.what());
+        }
+    }
+
+    void MessageHandler::handleProtobufVersionCheck(const blokus::MessageWrapper& wrapper)
+    {
+        try
+        {
+            blokus::VersionCheckRequest request;
+            if (!unpackMessage(wrapper, request))
+            {
+                return;
+            }
+
+            spdlog::debug("🔍 Protobuf 버전 확인 요청: 세션={}, 클라이언트 버전={}", 
+                          session_->getSessionId(), request.client_version());
+
+            auto* versionManager = gameServer_->getVersionManager();
+            if (!versionManager) {
+                blokus::ErrorResponse errorResponse;
+                errorResponse.set_result_code(blokus::RESULT_SERVER_ERROR);
+                errorResponse.set_message("버전 관리 서비스를 사용할 수 없습니다");
+                sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_ERROR_RESPONSE, errorResponse);
+                return;
+            }
+            auto compatibility = versionManager->checkCompatibility(request.client_version(), request.platform());
+
+            blokus::VersionCheckResponse response;
+            response.set_compatible(compatibility.compatible);
+            response.set_min_required_version(compatibility.minRequiredVersion);
+            response.set_update_required(compatibility.updateRequired);
+            response.set_update_recommended(compatibility.updateRecommended);
+            response.set_message(compatibility.message);
+            response.set_download_url(compatibility.downloadUrl);
+            response.set_force_update(compatibility.forceUpdate);
+
+            sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_VERSION_CHECK_RESPONSE, response);
+
+            // 호환되지 않는 클라이언트인 경우 추가 알림
+            if (!compatibility.compatible && compatibility.forceUpdate)
+            {
+                // 업데이트 필수 알림 전송
+                blokus::UpdateRequiredNotification notification;
+                notification.set_current_client_version(request.client_version());
+                notification.set_required_version(compatibility.minRequiredVersion);
+                notification.set_download_url(compatibility.downloadUrl);
+                notification.add_update_features("최신 서버와 호환성 개선");
+                notification.set_force_update(true);
+                notification.set_grace_period_hours(compatibility.gracePeriodHours);
+
+                sendProtobufMessage(blokus::MESSAGE_TYPE_UPDATE_REQUIRED_NOTIFICATION, notification);
+                
+                spdlog::warn("🔄 강제 업데이트 알림 전송: 클라이언트={}, 필요 버전={}", 
+                             request.client_version(), compatibility.minRequiredVersion);
+            }
+
+            spdlog::info("✅ 버전 확인 응답 전송: 클라이언트={}, 호환성={}, 업데이트 필요={}", 
+                         request.client_version(), compatibility.compatible, compatibility.updateRequired);
+        }
+        catch (const std::exception& e)
+        {
+            blokus::ErrorResponse errorResponse;
+            errorResponse.set_result_code(blokus::RESULT_SERVER_ERROR);
+            errorResponse.set_message("버전 확인 중 오류가 발생했습니다");
+            sendProtobufResponse(wrapper.sequence_id(), blokus::MESSAGE_TYPE_ERROR_RESPONSE, errorResponse);
+            spdlog::error("버전 확인 처리 중 예외: {}", e.what());
         }
     }
 

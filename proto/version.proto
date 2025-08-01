@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package blokus;
+
+import "google/protobuf/timestamp.proto";
+import "common_ext.proto";
+
+// ========================================
+// Version Management Messages
+// ========================================
+
+// Request server version information
+message GetVersionInfoRequest {
+  string client_version = 1;
+  string platform = 2;  // "Windows", "Android", "iOS"
+}
+
+// Server version information response
+message VersionInfoResponse {
+  VersionInfo server_version = 1;
+  VersionCompatibility compatibility = 2;
+  bool update_available = 3;
+  string latest_client_version = 4;
+  string download_url = 5;
+  repeated string update_notes = 6;
+}
+
+// Version compatibility check request
+message VersionCheckRequest {
+  string client_version = 1;
+  string platform = 2;
+  string build_number = 3;
+}
+
+// Version compatibility check response
+message VersionCheckResponse {
+  bool compatible = 1;
+  string min_required_version = 2;
+  bool update_required = 3;
+  bool update_recommended = 4;
+  string message = 5;
+  string download_url = 6;
+  bool force_update = 7;  // Block access until update
+}
+
+// Update notification to client
+message UpdateRequiredNotification {
+  string current_client_version = 1;
+  string required_version = 2;
+  string download_url = 3;
+  repeated string update_features = 4;
+  bool force_update = 5;  // Block access
+  uint32 grace_period_hours = 6;  // Hours until forced
+}
+
+// Build information embedded in version
+message BuildInfo {
+  string version = 1;
+  string build_date = 2;
+  string git_commit = 3;
+  string git_branch = 4;
+  bool is_production = 5;
+  string build_number = 6;
+  string compiler_version = 7;
+  repeated string features = 8;
+}

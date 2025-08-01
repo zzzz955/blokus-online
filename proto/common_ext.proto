@@ -54,3 +54,21 @@ message ClientDevice {
   int32 screen_height = 6;
   bool is_mobile = 7;
 }
+
+// Version information
+message VersionInfo {
+  string version = 1;
+  string build_date = 2;
+  string git_commit = 3;
+  bool is_production = 4;
+  repeated string features = 5;   // Supported features
+}
+
+// Version compatibility check
+message VersionCompatibility {
+  string min_client_version = 1;
+  string current_server_version = 2;
+  bool compatible = 3;
+  string update_required_message = 4;
+  string download_url = 5;
+}
