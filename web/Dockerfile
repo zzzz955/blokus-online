@@ -94,14 +94,14 @@ RUN addgroup --system --gid 1001 nodejs && \
 WORKDIR /app
 
 # 필요한 디렉토리 생성
-RUN mkdir -p /app/.next/cache /app/public/uploads && \
+RUN mkdir -p /app/.next/cache /app/public && \
     chown -R nextjs:nodejs /app
 
 # Stage 2에서 빌드된 애플리케이션 복사
 COPY --from=app-builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=app-builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# public 폴더와 파일들 강제 복사
+# public 폴더 복사
 COPY --chown=nextjs:nodejs ./public /app/public
 
 # prisma 폴더 복사
