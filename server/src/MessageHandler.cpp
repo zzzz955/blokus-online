@@ -1896,7 +1896,7 @@ namespace Blokus::Server
         spdlog::debug("🔍 버전 체크: 클라이언트={}, 서버={}", clientVersion, version.version);
 
         // 버전 호환성 체크
-        bool compatible = versionManager_->isVersionNewer(version.version, clientVersion);
+        bool compatible = version.isCompatibleWith(clientVersion);
         
         if (compatible) {
             sendTextMessage("version:ok");
