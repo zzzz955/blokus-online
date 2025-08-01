@@ -112,12 +112,6 @@ private:
     ClientConfigManager() = default;
     ~ClientConfigManager() = default;
 
-    // ===========================================
-    // 내부 함수들
-    // ===========================================
-    
-    void loadDefaults();
-
 private:
     // 설정 데이터
     ServerConfig server_config_;
@@ -127,4 +121,8 @@ private:
     
     // 초기화 상태
     bool initialized_ = false;
+    
+    // 내부 함수들
+    void loadDefaults();
+    void loadEnvFile();  // .env 파일 로딩
 };

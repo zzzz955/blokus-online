@@ -70,17 +70,34 @@ target_link_libraries(BlokusClient PRIVATE
 
 # Windows 설정
 if(WIN32)
-    # 디버그 빌드에서만 콘솔 창 표시
-    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    # 빌드 타입 디버깅
+    message(STATUS "Current CMAKE_BUILD_TYPE: '${CMAKE_BUILD_TYPE}'")
+    message(STATUS "Debug flag check: '$<CONFIG:Debug>'")
+    
+    # 디버그 모드에서만 콘솔 표시
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR 
+       CMAKE_BUILD_TYPE STREQUAL "DEBUG" OR
+       "${CMAKE_BUILD_TYPE}" MATCHES "Debug")
+        
+        message(STATUS "==> Debug build detected: Console window ENABLED")
         set_target_properties(BlokusClient PROPERTIES
             WIN32_EXECUTABLE FALSE  # 콘솔 애플리케이션으로 설정
         )
-        message(STATUS "Debug build: Console window enabled")
+        
+        # 추가 디버그 링커 플래그 및 매크로 정의
+        if(MSVC)
+            set_target_properties(BlokusClient PROPERTIES
+                LINK_FLAGS "/SUBSYSTEM:CONSOLE"
+            )
+            # 디버그 매크로 정의
+            target_compile_definitions(BlokusClient PRIVATE DEBUG _DEBUG)
+        endif()
+        
     else()
+        message(STATUS "==> Release build detected: Console window DISABLED")
         set_target_properties(BlokusClient PROPERTIES
-            WIN32_EXECUTABLE TRUE   # Windows 애플리케이션으로 설정 (콘솔 창 숨김)
+            WIN32_EXECUTABLE TRUE   # Windows 애플리케이션으로 설정
         )
-        message(STATUS "Release build: Console window disabled")
     endif()
 endif()
 

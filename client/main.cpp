@@ -9,6 +9,13 @@
 #include <QPushButton>
 #include <QThread>
 
+#ifdef _WIN32
+#include <Windows.h>
+#include <io.h>
+#include <fcntl.h>
+#include <iostream>
+#endif
+
 #include "LoginWindow.h"
 #include "LobbyWindow.h"
 #include "GameRoomWindow.h"
@@ -1373,6 +1380,37 @@ private:
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
+
+#ifdef _WIN32
+    // Windows에서 디버그 모드일 때 콘솔 창 강제 할당
+    #if defined(_DEBUG) || defined(DEBUG)
+        // 콘솔이 이미 할당되어 있지 않다면 새로 할당
+        if (GetConsoleWindow() == NULL) {
+            if (AllocConsole()) {
+                FILE* pCout;
+                FILE* pCerr;
+                FILE* pCin;
+                
+                freopen_s(&pCout, "CONOUT$", "w", stdout);
+                freopen_s(&pCerr, "CONOUT$", "w", stderr);
+                freopen_s(&pCin, "CONIN$", "r", stdin);
+                
+                // 콘솔 창 제목 설정
+                SetConsoleTitleA("Blokus Client Debug Console");
+                
+                // C++ iostream도 콘솔로 리다이렉트
+                std::ios::sync_with_stdio(true);
+                std::wcout.clear();
+                std::cout.clear();
+                std::wcerr.clear();
+                std::cerr.clear();
+                std::wcin.clear();
+                std::cin.clear();
+            }
+        }
+        qDebug() << "=== 디버그 콘솔 활성화됨 ===";
+    #endif
+#endif
 
     // 애플리케이션 설정
     app.setApplicationName(QString::fromUtf8("블로커스 온라인"));
