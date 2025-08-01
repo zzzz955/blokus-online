@@ -824,7 +824,7 @@ namespace Blokus {
                     .arg(QString::fromStdString(Blokus::Client::ClientVersion::getVersion()));
         
         // 버전 확인 요청 (텍스트 기반)
-        QString versionMessage = QString("version:check:%1\n")
+        QString versionMessage = QString("version:check:%1")
                                 .arg(QString::fromStdString(Blokus::Client::ClientVersion::getVersion()));
         sendMessage(versionMessage);
     }
