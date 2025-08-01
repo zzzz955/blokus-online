@@ -7,6 +7,7 @@
 #include <QDesktopServices>
 #include <QUrl>
 #include <QMessageBox>
+#include <QApplication>
 #include <ctime>
 
 namespace Blokus {
@@ -494,9 +495,21 @@ namespace Blokus {
             processAfkMessage(message);
         }
         else if (message.startsWith("version:")) {
-            QStringList parts = message.split(":");
-            if (parts.size() >= 2) {
+            // 버전 메시지 특별 처리 (URL의 ":"때문에 split 제한)
+            if (message.startsWith("version:ok")) {
+                QStringList parts = {"version", "ok"};
                 processVersionCheckResponse(parts);
+            } else if (message.startsWith("version:mismatch:")) {
+                // "version:mismatch:" 이후의 모든 내용을 URL로 처리
+                QString urlPart = message.mid(17); // "version:mismatch:" 제거
+                QStringList parts = {"version", "mismatch", urlPart};
+                processVersionCheckResponse(parts);
+            } else {
+                // 기타 버전 메시지
+                QStringList parts = message.split(":");
+                if (parts.size() >= 2) {
+                    processVersionCheckResponse(parts);
+                }
             }
         }
         else if (message == "pong") {
@@ -831,7 +844,11 @@ namespace Blokus {
     
     void NetworkClient::processVersionCheckResponse(const QStringList& params)
     {
-        // params[0] = "version", params[1] = "ok" or "mismatch", params[2] = downloadUrl (if mismatch)
+        // params[0] = "version", params[1] = "ok" or "mismatch", params[2+] = downloadUrl parts (if mismatch)
+        
+        qDebug() << QString::fromUtf8("🔍 버전 응답 파싱: 파라미터 수=%1, 내용=[%2]")
+                    .arg(params.size())
+                    .arg(params.join(", "));
         
         if (params.size() < 2) {
             qDebug() << QString::fromUtf8("❌ 버전 응답 형식 오류: %1").arg(params.join(":"));
@@ -853,10 +870,12 @@ namespace Blokus {
             // 버전 불호환 - 다운로드 페이지로 리다이렉트
             QString downloadUrl;
             if (params.size() >= 3) {
-                downloadUrl = params[2];
+                downloadUrl = params[2]; // 이제 완전한 URL이 들어있음
             } else {
                 downloadUrl = "https://blokus-online.mooo.com/download"; // 기본값
             }
+            
+            qDebug() << QString::fromUtf8("❌ 버전 불일치 감지 - 다운로드 URL: %1").arg(downloadUrl);
             
             emit versionIncompatible("", downloadUrl);
             
@@ -864,19 +883,40 @@ namespace Blokus {
             QMessageBox msgBox;
             msgBox.setWindowTitle(QString::fromUtf8("클라이언트 업데이트 필요"));
             msgBox.setText(QString::fromUtf8("서버와 호환되지 않는 클라이언트 버전입니다."));
-            msgBox.setInformativeText(QString::fromUtf8("클라이언트: %1\n\n최신 버전을 다운로드하시겠습니까?")
-                                     .arg(QString::fromStdString(Blokus::Client::ClientVersion::getVersion())));
+            msgBox.setInformativeText(QString::fromUtf8("클라이언트: %1\n다운로드 URL: %2\n\n최신 버전을 다운로드하시겠습니까?")
+                                     .arg(QString::fromStdString(Blokus::Client::ClientVersion::getVersion()))
+                                     .arg(downloadUrl));
             msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
             msgBox.setDefaultButton(QMessageBox::Yes);
             
             if (msgBox.exec() == QMessageBox::Yes) {
                 // 다운로드 페이지 열기
-                qDebug() << QString::fromUtf8("🌐 다운로드 페이지 열기: %1").arg(downloadUrl);
-                QDesktopServices::openUrl(QUrl(downloadUrl));
+                qDebug() << QString::fromUtf8("🌐 다운로드 페이지 열기 시도: %1").arg(downloadUrl);
+                
+                bool urlOpened = QDesktopServices::openUrl(QUrl(downloadUrl));
+                if (urlOpened) {
+                    qDebug() << QString::fromUtf8("✅ 다운로드 페이지 열기 성공");
+                } else {
+                    qDebug() << QString::fromUtf8("❌ 다운로드 페이지 열기 실패");
+                    
+                    // 수동으로 URL 표시
+                    QMessageBox urlBox;
+                    urlBox.setWindowTitle(QString::fromUtf8("수동 다운로드"));
+                    urlBox.setText(QString::fromUtf8("브라우저 열기에 실패했습니다."));
+                    urlBox.setInformativeText(QString::fromUtf8("다음 URL을 수동으로 열어주세요:\n%1").arg(downloadUrl));
+                    urlBox.exec();
+                }
+                
+                // 클라이언트 종료
+                qDebug() << QString::fromUtf8("🔚 업데이트를 위해 클라이언트 종료");
+                QApplication::quit();
+            } else {
+                qDebug() << QString::fromUtf8("❌ 사용자가 업데이트를 거부 - 클라이언트 종료");
+                // 연결 종료
+                disconnect();
+                // 클라이언트 종료
+                QApplication::quit();
             }
-            
-            // 연결 종료
-            disconnect();
             
             emit versionCheckCompleted(false);
         } else {

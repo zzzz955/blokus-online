@@ -10,7 +10,7 @@ namespace Client {
 class ClientVersion {
 public:
     // 클라이언트 버전 상수 (하드코딩)
-    static constexpr const char* VERSION = "1.0.0";
+    static constexpr const char* VERSION = "1.1.0";
     static constexpr const char* BUILD_DATE = __DATE__ " " __TIME__;
     
     // 버전 정보 반환
