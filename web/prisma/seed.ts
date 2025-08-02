@@ -16,7 +16,7 @@ async function main() {
     update: {},
     create: {
       username: adminUsername,
-      passwordHash: hashedPassword,
+      password_hash: hashedPassword,
       role: 'SUPER_ADMIN',
     },
   });

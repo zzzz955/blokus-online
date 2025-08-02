@@ -20,7 +20,7 @@ export async function GET(
     const announcement = await prisma.announcement.findUnique({
       where: {
         id,
-        isPublished: true,
+        is_published: true,
       },
     });
 
@@ -36,8 +36,10 @@ export async function GET(
       success: true,
       data: {
         ...announcement,
-        createdAt: announcement.createdAt.toISOString(),
-        updatedAt: announcement.updatedAt.toISOString(),
+        createdAt: announcement.created_at.toISOString(),
+        updatedAt: announcement.updated_at.toISOString(),
+        isPinned: announcement.is_pinned,
+        isPublished: announcement.is_published,
       },
     };
 

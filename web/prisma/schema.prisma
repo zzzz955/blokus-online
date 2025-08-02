@@ -11,49 +11,49 @@ datasource db {
 }
 
 model Announcement {
-  id          Int      @id @default(autoincrement())
-  title       String
-  content     String   // Markdown content
-  author      String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  isPinned    Boolean  @default(false)
-  isPublished Boolean  @default(true)
+  id           Int      @id @default(autoincrement())
+  title        String
+  content      String   // Markdown content
+  author       String
+  created_at   DateTime @default(now()) @map("created_at")
+  updated_at   DateTime @updatedAt @map("updated_at")
+  is_pinned    Boolean  @default(false) @map("is_pinned")
+  is_published Boolean  @default(true) @map("is_published")
 
   @@map("announcements")
 }
 
 model PatchNote {
-  id          Int      @id @default(autoincrement())
-  version     String   @unique
-  title       String
-  content     String   // Markdown content
-  releaseDate DateTime
-  downloadUrl String?
-  createdAt   DateTime @default(now())
+  id           Int      @id @default(autoincrement())
+  version      String   @unique
+  title        String
+  content      String   // Markdown content
+  release_date DateTime @map("release_date")
+  download_url String?  @map("download_url")
+  created_at   DateTime @default(now()) @map("created_at")
 
   @@map("patch_notes")
 }
 
 model SupportTicket {
-  id         Int                @id @default(autoincrement())
-  email      String
-  subject    String
-  message    String
-  status     SupportTicketStatus @default(PENDING)
-  adminReply String?
-  createdAt  DateTime           @default(now())
-  repliedAt  DateTime?
+  id           Int                 @id @default(autoincrement())
+  email        String
+  subject      String
+  message      String
+  status       SupportTicketStatus @default(PENDING)
+  admin_reply  String?             @map("admin_reply")
+  created_at   DateTime            @default(now()) @map("created_at")
+  replied_at   DateTime?           @map("replied_at")
 
   @@map("support_tickets")
 }
 
 model AdminUser {
-  id           Int      @id @default(autoincrement())
-  username     String   @unique
-  passwordHash String
-  role         AdminRole @default(ADMIN)
-  createdAt    DateTime @default(now())
+  id            Int       @id @default(autoincrement())
+  username      String    @unique
+  password_hash String    @map("password_hash")
+  role          AdminRole @default(ADMIN)
+  created_at    DateTime  @default(now()) @map("created_at")
 
   @@map("admin_users")
 }

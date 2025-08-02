@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { ApiResponse, PaginatedResponse, PatchNote } from '@/types';
 
+// Force dynamic rendering for this API route
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -12,7 +15,7 @@ export async function GET(request: NextRequest) {
 
     const [patchNotes, total] = await Promise.all([
       prisma.patchNote.findMany({
-        orderBy: { releaseDate: 'desc' },
+        orderBy: { release_date: 'desc' },
         skip,
         take: limit,
       }),
@@ -23,9 +26,9 @@ export async function GET(request: NextRequest) {
       success: true,
       data: patchNotes.map(patchNote => ({
         ...patchNote,
-        releaseDate: patchNote.releaseDate.toISOString(),
-        createdAt: patchNote.createdAt.toISOString(),
-        downloadUrl: patchNote.downloadUrl || undefined,
+        releaseDate: patchNote.release_date.toISOString(),
+        createdAt: patchNote.created_at.toISOString(),
+        downloadUrl: patchNote.download_url || undefined,
       })),
       pagination: {
         page,
