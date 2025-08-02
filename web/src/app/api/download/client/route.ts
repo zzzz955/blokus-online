@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { fetchGitHubRelease, getVersionInfo, type GitHubRelease } from '@/lib/github-release';
 
 interface ReleaseInfo {
   version: string;
@@ -10,45 +11,11 @@ interface ReleaseInfo {
   githubUrl: string;
 }
 
-interface GitHubRelease {
-  tag_name: string;
-  name: string;
-  published_at: string;
-  assets: Array<{
-    name: string;
-    browser_download_url: string;
-    size: number;
-  }>;
-}
-
 // 메모리 캐시
 let releaseCache: { data: ReleaseInfo | null; timestamp: number } = { data: null, timestamp: 0 };
 const CACHE_DURATION = 5 * 60 * 1000; // 5분
 
-// GitHub API를 통해 최신 릴리즈 정보 가져오기
-async function fetchGitHubRelease(version?: string): Promise<GitHubRelease | null> {
-  try {
-    const repoUrl = 'https://api.github.com/repos/zzzz955/blokus-online/releases';
-    const url = version ? `${repoUrl}/tags/${version}` : `${repoUrl}/latest`;
-    
-    const response = await fetch(url, {
-      headers: {
-        'Accept': 'application/vnd.github.v3+json',
-        'User-Agent': 'blokus-online-web'
-      }
-    });
-    
-    if (!response.ok) {
-      console.warn(`GitHub API 호출 실패: ${response.status} ${response.statusText}`);
-      return null;
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error('GitHub API 호출 오류:', error);
-    return null;
-  }
-}
+// 공통 함수 사용 (fetchGitHubRelease는 이제 lib에서 import)
 
 // 환경변수에서 클라이언트 버전 가져오기
 function getClientVersion(): string {
@@ -64,7 +31,7 @@ function getCachedRelease(): ReleaseInfo | null {
   return null;
 }
 
-// 최신 릴리즈 정보 가져오기 (캐시 + GitHub API + 로컬 파일)
+// 통합된 릴리즈 정보 가져오기 (공통 함수 활용)
 async function getLatestRelease(): Promise<ReleaseInfo> {
   try {
     // 1. 캐시 확인
@@ -74,66 +41,39 @@ async function getLatestRelease(): Promise<ReleaseInfo> {
       return cached;
     }
 
-    // 2. 환경변수에서 클라이언트 버전 가져오기
-    const clientVersion = getClientVersion();
-    const version = clientVersion.startsWith('v') ? clientVersion.slice(1) : clientVersion;
-    
-    console.log(`환경변수 CLIENT_VERSION: ${clientVersion}`);
+    // 2. 통합된 버전 정보 가져오기 (버전 API와 동일한 로직)
+    const versionInfo = await getVersionInfo();
+    console.log(`통합 API에서 버전 정보 확인됨: v${versionInfo.version}`);
 
     // 3. 로컬 파일 확인
     const releasesDir = path.join(process.cwd(), '..', 'releases');
     const latestDir = path.join(releasesDir, 'latest');
-    let localReleaseInfo: any = null;
     let archivePath: string | undefined;
 
     if (fs.existsSync(latestDir)) {
-      const releaseInfoPath = path.join(latestDir, 'release-info.json');
-      if (fs.existsSync(releaseInfoPath)) {
-        localReleaseInfo = JSON.parse(fs.readFileSync(releaseInfoPath, 'utf8'));
-        const localArchivePath = path.join(latestDir, `BlokusClient-v${version}.zip`);
-        if (fs.existsSync(localArchivePath)) {
-          archivePath = localArchivePath;
-          console.log(`로컬 파일 발견: ${archivePath}`);
-        }
+      const localArchivePath = path.join(latestDir, `BlokusClient-v${versionInfo.version}.zip`);
+      if (fs.existsSync(localArchivePath)) {
+        archivePath = localArchivePath;
+        console.log(`로컬 파일 발견: ${archivePath}`);
       }
     }
 
-    // 4. GitHub API로 릴리즈 검증
-    const githubRelease = await fetchGitHubRelease(clientVersion);
-    let releaseInfo: any = {};
-
-    if (githubRelease) {
-      console.log(`GitHub 릴리즈 확인됨: ${githubRelease.tag_name}`);
-      releaseInfo = {
-        version: githubRelease.tag_name.startsWith('v') ? githubRelease.tag_name.slice(1) : githubRelease.tag_name,
-        releaseDate: githubRelease.published_at,
-        signed: false,
-        fileSize: githubRelease.assets.find(asset => 
-          asset.name.includes('BlokusClient') && asset.name.endsWith('.zip')
-        )?.size || null,
-        changelog: [githubRelease.name || '최신 버전 릴리즈']
-      };
-    } else {
-      console.warn(`GitHub에서 릴리즈 ${clientVersion}를 찾을 수 없음, 환경변수 버전 사용`);
-      releaseInfo = localReleaseInfo || {
-        version: version,
-        releaseDate: null,
-        signed: false,
-        fileSize: null,
-        changelog: ['환경변수 기반 릴리즈']
-      };
-    }
-
-    // 5. 최종 릴리즈 정보 생성
+    // 4. 최종 릴리즈 정보 생성
     const result: ReleaseInfo = {
-      version: releaseInfo.version,
-      filename: `BlokusClient-v${releaseInfo.version}.zip`,
+      version: versionInfo.version,
+      filename: `BlokusClient-v${versionInfo.version}.zip`,
       archivePath,
-      releaseInfo,
-      githubUrl: `https://github.com/zzzz955/blokus-online/releases/download/v${releaseInfo.version}/BlokusClient-v${releaseInfo.version}.zip`
+      releaseInfo: {
+        version: versionInfo.version,
+        releaseDate: versionInfo.releaseDate,
+        signed: false,
+        fileSize: versionInfo.fileSize,
+        changelog: versionInfo.changelog
+      },
+      githubUrl: versionInfo.downloadUrl || `https://github.com/zzzz955/blokus-online/releases/download/v${versionInfo.version}/BlokusClient-v${versionInfo.version}.zip`
     };
 
-    // 6. 캐시 업데이트
+    // 5. 캐시 업데이트
     releaseCache = {
       data: result,
       timestamp: Date.now()
@@ -145,7 +85,7 @@ async function getLatestRelease(): Promise<ReleaseInfo> {
   } catch (error) {
     console.error('릴리즈 정보 가져오기 실패:', error);
     
-    // fallback
+    // fallback - 환경변수 사용
     const fallbackVersion = getClientVersion().replace('v', '');
     return {
       version: fallbackVersion,
