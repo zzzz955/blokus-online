@@ -98,13 +98,23 @@ export function verifyAdminToken(token: string): AdminSession | null {
  */
 export function getAdminFromRequest(request: NextRequest): AdminSession | null {
   try {
-    const authHeader = request.headers.get('authorization');
+    let token: string | null = null;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // 1. Authorization 헤더에서 토큰 확인
+    const authHeader = request.headers.get('authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7); // "Bearer " 제거
+    }
+
+    // 2. Authorization 헤더가 없으면 쿠키에서 토큰 확인
+    if (!token) {
+      token = request.cookies.get('admin-token')?.value || null;
+    }
+
+    if (!token) {
       return null;
     }
 
-    const token = authHeader.substring(7); // "Bearer " 제거
     return verifyAdminToken(token);
   } catch (error) {
     console.error('요청에서 관리자 정보 추출 실패:', error);
