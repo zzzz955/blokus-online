@@ -40,7 +40,7 @@ export async function authenticateAdmin(username: string, password: string) {
       return null;
     }
 
-    const isValid = await verifyPassword(password, admin.passwordHash);
+    const isValid = await verifyPassword(password, admin.password_hash);
     if (!isValid) {
       return null;
     }
@@ -62,7 +62,7 @@ export async function createAdminUser(username: string, password: string, role: 
   return prisma.adminUser.create({
     data: {
       username,
-      passwordHash: hashedPassword,
+      password_hash: hashedPassword,
       role,
     },
   });

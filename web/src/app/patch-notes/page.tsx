@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Layout from '@/components/layout/Layout';
 import Card, { CardContent } from '@/components/ui/Card';
@@ -16,18 +16,23 @@ export default function PatchNotesPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const isLoadingRef = useRef(false);
 
   const fetchPatchNotes = async (page: number = 1) => {
+    if (isLoadingRef.current) return; // 중복 호출 방지
+    
     try {
+      isLoadingRef.current = true;
       setLoading(true);
-      const response = await api.get<PaginatedResponse<PatchNote>>(`/api/patch-notes?page=${page}&limit=10`);
+      const response = await api.getFull<PatchNote[]>(`/api/patch-notes?page=${page}&limit=10`);
       setPatchNotes(response.data || []);
-      setTotalPages(response.pagination.totalPages);
+      setTotalPages(response.pagination?.totalPages || 1);
       setCurrentPage(page);
     } catch (error: any) {
       setError(error.message || '패치 노트를 불러오는데 실패했습니다.');
     } finally {
       setLoading(false);
+      isLoadingRef.current = false;
     }
   };
 

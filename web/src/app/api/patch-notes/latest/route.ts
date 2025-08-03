@@ -5,7 +5,7 @@ import { ApiResponse, PatchNote } from '@/types';
 export async function GET() {
   try {
     const latestPatchNote = await prisma.patchNote.findFirst({
-      orderBy: { releaseDate: 'desc' },
+      orderBy: { release_date: 'desc' },
     });
 
     if (!latestPatchNote) {
@@ -20,9 +20,9 @@ export async function GET() {
       success: true,
       data: {
         ...latestPatchNote,
-        releaseDate: latestPatchNote.releaseDate.toISOString(),
-        createdAt: latestPatchNote.createdAt.toISOString(),
-        downloadUrl: latestPatchNote.downloadUrl || undefined,
+        releaseDate: latestPatchNote.release_date.toISOString(),
+        createdAt: latestPatchNote.created_at.toISOString(),
+        downloadUrl: latestPatchNote.download_url || undefined,
       },
     };
 

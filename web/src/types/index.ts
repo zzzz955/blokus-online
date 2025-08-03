@@ -7,6 +7,11 @@ export interface Announcement {
   updatedAt: string;
   isPinned: boolean;
   isPublished: boolean;
+  // 데이터베이스 필드 (스네이크케이스)
+  created_at?: Date;
+  updated_at?: Date;
+  is_pinned?: boolean;
+  is_published?: boolean;
 }
 
 export interface PatchNote {
@@ -17,6 +22,10 @@ export interface PatchNote {
   releaseDate: string;
   downloadUrl?: string;
   createdAt: string;
+  // 데이터베이스 필드 (스네이크케이스)
+  release_date?: Date;
+  download_url?: string | null;
+  created_at?: Date;
 }
 
 export interface SupportTicket {

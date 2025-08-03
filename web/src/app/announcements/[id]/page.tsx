@@ -86,7 +86,7 @@ export default function AnnouncementDetailPage({ params }: AnnouncementDetailPag
             <Button
               variant="ghost"
               onClick={() => router.back()}
-              className="flex items-center space-x-2 text-gray-400 hover:text-white"
+              className="flex items-center space-x-2 text-gray-400 hover:text-black"
             >
               <ArrowLeft className="w-4 h-4" />
               <span>공지사항 목록으로</span>
@@ -144,22 +144,22 @@ export default function AnnouncementDetailPage({ params }: AnnouncementDetailPag
                       <h3 className="text-lg font-semibold text-white mb-2 mt-4">{children}</h3>
                     ),
                     p: ({ children }) => (
-                      <p className="text-gray-300 mb-4 leading-relaxed">{children}</p>
+                      <p className="text-white mb-4 leading-relaxed">{children}</p>
                     ),
                     ul: ({ children }) => (
-                      <ul className="list-disc list-inside text-gray-300 mb-4 space-y-2">{children}</ul>
+                      <ul className="list-disc list-inside text-white mb-4 space-y-2">{children}</ul>
                     ),
                     ol: ({ children }) => (
-                      <ol className="list-decimal list-inside text-gray-300 mb-4 space-y-2">{children}</ol>
+                      <ol className="list-decimal list-inside text-white mb-4 space-y-2">{children}</ol>
                     ),
                     li: ({ children }) => (
-                      <li className="text-gray-300">{children}</li>
+                      <li className="text-white">{children}</li>
                     ),
                     strong: ({ children }) => (
                       <strong className="text-white font-semibold">{children}</strong>
                     ),
                     em: ({ children }) => (
-                      <em className="text-gray-200 italic">{children}</em>
+                      <em className="text-white italic">{children}</em>
                     ),
                     code: ({ children }) => (
                       <code className="bg-gray-800 text-primary-400 px-2 py-1 rounded text-sm">
@@ -172,7 +172,7 @@ export default function AnnouncementDetailPage({ params }: AnnouncementDetailPag
                       </pre>
                     ),
                     blockquote: ({ children }) => (
-                      <blockquote className="border-l-4 border-primary-500 pl-4 italic text-gray-300 mb-4">
+                      <blockquote className="border-l-4 border-primary-500 pl-4 italic text-white mb-4">
                         {children}
                       </blockquote>
                     ),
@@ -199,7 +199,7 @@ export default function AnnouncementDetailPage({ params }: AnnouncementDetailPag
             <Button
               variant="outline"
               onClick={() => router.push('/announcements')}
-              className="flex items-center space-x-2"
+              className="flex items-center space-x-2 text-gray-400 hover:text-black"
             >
               <ArrowLeft className="w-4 h-4" />
               <span>목록으로</span>

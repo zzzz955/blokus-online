@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { ApiResponse, PaginatedResponse, Announcement } from '@/types';
 
+// Force dynamic rendering for this API route
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -12,16 +15,16 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit;
     
     const where = {
-      isPublished: true,
-      ...(pinned && { isPinned: true }),
+      is_published: true,
+      ...(pinned && { is_pinned: true }),
     };
 
     const [announcements, total] = await Promise.all([
       prisma.announcement.findMany({
         where,
         orderBy: [
-          { isPinned: 'desc' },
-          { createdAt: 'desc' },
+          { is_pinned: 'desc' },
+          { created_at: 'desc' },
         ],
         skip,
         take: limit,
@@ -33,8 +36,10 @@ export async function GET(request: NextRequest) {
       success: true,
       data: announcements.map(announcement => ({
         ...announcement,
-        createdAt: announcement.createdAt.toISOString(),
-        updatedAt: announcement.updatedAt.toISOString(),
+        createdAt: announcement.created_at.toISOString(),
+        updatedAt: announcement.updated_at.toISOString(),
+        isPinned: announcement.is_pinned,
+        isPublished: announcement.is_published,
       })),
       pagination: {
         page,
