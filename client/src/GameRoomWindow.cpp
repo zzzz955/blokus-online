@@ -1266,8 +1266,6 @@ namespace Blokus {
         updateGameControlsState();
         updateRoomInfoDisplay();
 
-        addSystemMessage(QString::fromUtf8("🔄 게임이 초기화되었습니다. 새 게임을 시작할 수 있습니다."));
-
         qDebug() << QString::fromUtf8("게임 대기 상태로 초기화됨");
     }
 

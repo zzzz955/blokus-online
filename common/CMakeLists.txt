@@ -27,7 +27,6 @@ find_package(OpenSSL CONFIG REQUIRED)
 
 # 라이브러리 링크
 target_link_libraries(BlokusCommon PUBLIC
-    BlokusProto
     spdlog::spdlog
     nlohmann_json::nlohmann_json
     OpenSSL::SSL
