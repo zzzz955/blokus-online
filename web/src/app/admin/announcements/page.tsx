@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { adminFetch } from '@/lib/admin-auth';
 
 interface Announcement {
   id: number;
@@ -48,7 +49,7 @@ export default function AdminAnnouncementsPage() {
 
   const fetchAnnouncements = async () => {
     try {
-      const response = await fetch('/api/admin/announcements');
+      const response = await adminFetch('/api/admin/announcements');
       const data = await response.json();
       
       if (data.success) {
@@ -76,7 +77,7 @@ export default function AdminAnnouncementsPage() {
       
       const method = editingId ? 'PUT' : 'POST';
 
-      const response = await fetch(url, {
+      const response = await adminFetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json'
@@ -123,7 +124,7 @@ export default function AdminAnnouncementsPage() {
     }
 
     try {
-      const response = await fetch(`/api/admin/announcements?id=${id}`, {
+      const response = await adminFetch(`/api/admin/announcements?id=${id}`, {
         method: 'DELETE'
       });
 

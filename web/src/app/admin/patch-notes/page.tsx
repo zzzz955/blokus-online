@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { adminFetch } from '@/lib/admin-auth';
 
 interface PatchNote {
   id: number;
@@ -49,7 +50,7 @@ export default function AdminPatchNotesPage() {
 
   const fetchPatchNotes = async () => {
     try {
-      const response = await fetch('/api/admin/patch-notes');
+      const response = await adminFetch('/api/admin/patch-notes');
       const data = await response.json();
       
       if (data.success) {
@@ -83,7 +84,7 @@ export default function AdminPatchNotesPage() {
         download_url: form.download_url || undefined
       };
 
-      const response = await fetch(url, {
+      const response = await adminFetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json'
@@ -132,7 +133,7 @@ export default function AdminPatchNotesPage() {
     }
 
     try {
-      const response = await fetch(`/api/admin/patch-notes?id=${id}`, {
+      const response = await adminFetch(`/api/admin/patch-notes?id=${id}`, {
         method: 'DELETE'
       });
 

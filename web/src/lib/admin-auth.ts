@@ -9,6 +9,8 @@ export interface AdminSession {
   id: number;
   username: string;
   role: 'ADMIN' | 'SUPER_ADMIN';
+  iat?: number;
+  exp?: number;
 }
 
 export interface AdminLoginRequest {
@@ -19,6 +21,7 @@ export interface AdminLoginRequest {
 export interface AdminLoginResponse {
   success: boolean;
   token?: string;
+  refreshToken?: string;
   admin?: AdminSession;
   error?: string;
 }
@@ -59,15 +62,22 @@ export async function authenticateAdmin(credentials: AdminLoginRequest): Promise
       role: adminUser.role
     };
 
-    const token = jwt.sign(
+    const accessToken = jwt.sign(
       adminSession,
       process.env.JWT_SECRET || 'fallback-secret',
-      { expiresIn: '24h' }
+      { expiresIn: '15m' } // Access token은 15분으로 단축
+    );
+
+    const refreshToken = jwt.sign(
+      { id: adminSession.id, username: adminSession.username },
+      process.env.JWT_REFRESH_SECRET || 'fallback-refresh-secret',
+      { expiresIn: '7d' } // Refresh token은 7일
     );
 
     return {
       success: true,
-      token,
+      token: accessToken,
+      refreshToken,
       admin: adminSession
     };
 
@@ -90,6 +100,63 @@ export function verifyAdminToken(token: string): AdminSession | null {
   } catch (error) {
     console.error('토큰 검증 실패:', error);
     return null;
+  }
+}
+
+/**
+ * Refresh Token 검증
+ */
+export function verifyRefreshToken(refreshToken: string): { id: number; username: string } | null {
+  try {
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET || 'fallback-refresh-secret') as { id: number; username: string };
+    return decoded;
+  } catch (error) {
+    console.error('Refresh 토큰 검증 실패:', error);
+    return null;
+  }
+}
+
+/**
+ * 새로운 Access Token 생성
+ */
+export async function generateNewAccessToken(refreshTokenPayload: { id: number; username: string }): Promise<AdminLoginResponse> {
+  try {
+    // 관리자 사용자 조회 (refresh token이 유효한지 재확인)
+    const adminUser = await prisma.adminUser.findUnique({
+      where: { id: refreshTokenPayload.id }
+    });
+
+    if (!adminUser) {
+      return {
+        success: false,
+        error: '존재하지 않는 관리자 계정입니다.'
+      };
+    }
+
+    const adminSession: AdminSession = {
+      id: adminUser.id,
+      username: adminUser.username,
+      role: adminUser.role
+    };
+
+    const newAccessToken = jwt.sign(
+      adminSession,
+      process.env.JWT_SECRET || 'fallback-secret',
+      { expiresIn: '15m' }
+    );
+
+    return {
+      success: true,
+      token: newAccessToken,
+      admin: adminSession
+    };
+
+  } catch (error) {
+    console.error('새 토큰 생성 오류:', error);
+    return {
+      success: false,
+      error: '토큰 갱신에 실패했습니다.'
+    };
   }
 }
 
@@ -120,6 +187,64 @@ export function getAdminFromRequest(request: NextRequest): AdminSession | null {
     console.error('요청에서 관리자 정보 추출 실패:', error);
     return null;
   }
+}
+
+/**
+ * 토큰 만료 체크 및 자동 갱신 (클라이언트 사이드용)
+ */
+export async function refreshTokenIfNeeded(): Promise<boolean> {
+  try {
+    const response = await fetch('/api/admin/auth/refresh', {
+      method: 'POST',
+      credentials: 'include'
+    });
+
+    const data = await response.json();
+    
+    if (data.success) {
+      // 관리자 정보를 로컬스토리지에 업데이트
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('admin', JSON.stringify(data.data.user));
+      }
+      return true;
+    } else {
+      // Refresh 실패 시 로그아웃 처리
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('admin');
+        window.location.href = '/admin/login';
+      }
+      return false;
+    }
+  } catch (error) {
+    console.error('토큰 갱신 실패:', error);
+    return false;
+  }
+}
+
+/**
+ * API 요청 시 자동 토큰 갱신을 포함한 fetch wrapper
+ */
+export async function adminFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  // 첫 번째 시도
+  let response = await fetch(url, {
+    ...options,
+    credentials: 'include'
+  });
+
+  // 401 에러 (Unauthorized)인 경우 토큰 갱신 시도
+  if (response.status === 401) {
+    const refreshed = await refreshTokenIfNeeded();
+    
+    if (refreshed) {
+      // 토큰이 갱신되었으면 다시 시도
+      response = await fetch(url, {
+        ...options,
+        credentials: 'include'
+      });
+    }
+  }
+
+  return response;
 }
 
 /**

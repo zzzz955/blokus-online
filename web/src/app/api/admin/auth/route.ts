@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateAdmin, createAdminUser, type AdminLoginRequest } from '@/lib/admin-auth';
+import { authenticateAdmin, createAdminUser, verifyRefreshToken, generateNewAccessToken, type AdminLoginRequest } from '@/lib/admin-auth';
 
 /**
  * 관리자 로그인 API
@@ -35,6 +35,13 @@ export async function POST(request: NextRequest) {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
+        maxAge: 15 * 60, // 15 minutes
+      });
+
+      res.cookies.set('admin-refresh-token', result.refreshToken!, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
         maxAge: 7 * 24 * 60 * 60, // 7 days
       });
 
@@ -66,6 +73,7 @@ export async function DELETE() {
     });
     
     res.cookies.delete('admin-token');
+    res.cookies.delete('admin-refresh-token');
     return res;
   } catch (error) {
     console.error('관리자 로그아웃 API 오류:', error);
