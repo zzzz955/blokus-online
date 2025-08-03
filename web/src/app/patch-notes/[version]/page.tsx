@@ -26,15 +26,8 @@ export default function PatchNoteDetailPage({ params }: PatchNoteDetailPageProps
     const fetchPatchNote = async () => {
       try {
         setLoading(true);
-        // 버전으로 패치노트 찾기 (API 엔드포인트는 ID를 사용하므로 실제로는 버전 검색 API가 필요)
-        const response = await api.get<PaginatedResponse<PatchNote>>(`/api/patch-notes`);
-        const foundPatchNote = response.data?.find((p: PatchNote) => p.version === decodeURIComponent(params.version));
-        
-        if (foundPatchNote) {
-          setPatchNote(foundPatchNote);
-        } else {
-          setError('패치 노트를 찾을 수 없습니다.');
-        }
+        const patchNoteData = await api.get<PatchNote>(`/api/patch-notes/${encodeURIComponent(params.version)}`);
+        setPatchNote(patchNoteData);
       } catch (error: any) {
         setError(error.message || '패치 노트를 불러오는데 실패했습니다.');
       } finally {

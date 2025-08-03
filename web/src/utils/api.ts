@@ -35,9 +35,36 @@ export async function apiRequest<T = any>(
   return data.data as T;
 }
 
+export async function apiRequestFull<T = any>(
+  url: string,
+  options: RequestInit = {}
+): Promise<ApiResponse<T>> {
+  const response = await fetch(url, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+    ...options,
+  });
+
+  const data: ApiResponse<T> = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new ApiError(
+      data.error || 'Unknown error occurred',
+      response.status
+    );
+  }
+
+  return data;
+}
+
 export const api = {
   get: <T>(url: string, options?: RequestInit) =>
     apiRequest<T>(url, { method: 'GET', ...options }),
+  
+  getFull: <T>(url: string, options?: RequestInit) =>
+    apiRequestFull<T>(url, { method: 'GET', ...options }),
   
   post: <T>(url: string, body?: any, options?: RequestInit) =>
     apiRequest<T>(url, {
