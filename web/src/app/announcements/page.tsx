@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Layout from '@/components/layout/Layout';
 import Card, { CardContent } from '@/components/ui/Card';
@@ -16,13 +16,9 @@ export default function AnnouncementsPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const isLoadingRef = useRef(false);
 
   const fetchAnnouncements = async (page: number = 1) => {
-    if (isLoadingRef.current) return; // 중복 호출 방지
-    
     try {
-      isLoadingRef.current = true;
       setLoading(true);
       const response = await api.getFull<Announcement[]>(`/api/announcements?page=${page}&limit=10`);
       setAnnouncements(response.data || []);
@@ -32,7 +28,6 @@ export default function AnnouncementsPage() {
       setError(error.message || '공지사항을 불러오는데 실패했습니다.');
     } finally {
       setLoading(false);
-      isLoadingRef.current = false;
     }
   };
 

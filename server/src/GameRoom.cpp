@@ -1480,15 +1480,6 @@ namespace Blokus {
             return m_gameStateManager->getTurnOrder();
         }
 
-        bool GameRoom::canCurrentPlayerMakeMove() const {
-            if (m_state != RoomState::Playing) {
-                return false;
-            }
-            
-            Common::PlayerColor currentPlayer = m_gameStateManager->getCurrentPlayer();
-            return m_gameLogic->canPlayerPlaceAnyBlock(currentPlayer);
-        }
-
         void GameRoom::processAutoSkipAfterTurnChange(const std::string& skipReason) {
             // 뮤텍스가 이미 잠겨있다고 가정하고 실행
             int autoSkipCount = 0;
@@ -1515,6 +1506,13 @@ namespace Blokus {
                     
                     spdlog::debug("🔄 {} 후 자동 턴 스킵 {}/{}: {} (색상 {})님이 더 이상 배치할 블록이 없음", 
                         skipReason, autoSkipCount, maxAutoSkips, playerName, static_cast<int>(checkPlayer));
+                    
+                    // 자동 턴 스킵 알림 메시지 (최초 1번만)
+                    if (m_gameStateManager->getGameLogic().needsBlockedNotification(checkPlayer)) {
+                        std::ostringstream skipMsg;
+                        skipMsg << "SYSTEM:" << playerName << "님이 배치할 수 있는 블록이 없어 자동으로 턴이 넘어갑니다.";
+                        broadcastMessageLocked(skipMsg.str());
+                    }
                     
                     // 턴 넘기기
                     Common::PlayerColor prevPlayer = checkPlayer;
