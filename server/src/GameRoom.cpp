@@ -969,13 +969,8 @@ namespace Blokus {
                 auto timeoutBlockIt = m_playerBlockedByTimeout.find(currentPlayer);
                 if (timeoutBlockIt != m_playerBlockedByTimeout.end() && timeoutBlockIt->second) {
                     blockedPlayerCount++;
-                    spdlog::info("🚫 [TIMEOUT_SKIP] 플레이어 {} 타임아웃 차단 상태로 턴 자동 스킵 ({}/{})", 
+                    spdlog::debug("🚫 [TIMEOUT_SKIP] 플레이어 {} 타임아웃 차단 상태로 턴 자동 스킵 ({}/{})", 
                                static_cast<int>(currentPlayer), blockedPlayerCount, maxPlayers);
-                    
-                    // 시스템 메시지 브로드캐스트
-                    std::ostringstream skipMsg;
-                    skipMsg << "SYSTEM:" << currentPlayerName << "님은 타임아웃으로 인해 자동으로 턴이 넘어갑니다.";
-                    broadcastMessageLocked(skipMsg.str());
                     
                     // 다음 플레이어로 즉시 턴 넘기기 (타이머 없이)
                     m_gameStateManager->nextTurn();
@@ -2043,7 +2038,7 @@ namespace Blokus {
                 m_playerTimeoutCounts.clear();
                 m_playerBlockedByTimeout.clear();
                 m_playerAfkVerificationCounts.clear();
-                spdlog::debug("🧹 [CLEANUP] AFK 상태 정리 완료 (방 {})", m_roomId);
+                spdlog::debug("🧹 [CLEANUP] AFK 상태 및 타임아웃 알림 상태 정리 완료 (방 {})", m_roomId);
             }
         }
 

@@ -2532,9 +2532,6 @@ namespace Blokus {
         // 타이머 정지
         stopTurnTimer();
 
-        // 시간 초과 메시지
-        addSystemMessage(QString::fromUtf8("시간 초과! 턴이 자동으로 넘어갑니다."));
-
         qDebug() << QString::fromUtf8("⏰ 턴 타임아웃 발생");
     }
 
