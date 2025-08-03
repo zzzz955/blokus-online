@@ -153,22 +153,22 @@ export default function PatchNoteDetailPage({ params }: PatchNoteDetailPageProps
                       <h3 className="text-lg font-semibold text-white mb-2 mt-4">{children}</h3>
                     ),
                     p: ({ children }) => (
-                      <p className="text-gray-300 mb-4 leading-relaxed">{children}</p>
+                      <p className="text-white mb-4 leading-relaxed">{children}</p>
                     ),
                     ul: ({ children }) => (
-                      <ul className="list-disc list-inside text-gray-300 mb-4 space-y-2">{children}</ul>
+                      <ul className="list-disc list-inside text-white mb-4 space-y-2">{children}</ul>
                     ),
                     ol: ({ children }) => (
-                      <ol className="list-decimal list-inside text-gray-300 mb-4 space-y-2">{children}</ol>
+                      <ol className="list-decimal list-inside text-white mb-4 space-y-2">{children}</ol>
                     ),
                     li: ({ children }) => (
-                      <li className="text-gray-300">{children}</li>
+                      <li className="text-white">{children}</li>
                     ),
                     strong: ({ children }) => (
                       <strong className="text-white font-semibold">{children}</strong>
                     ),
                     em: ({ children }) => (
-                      <em className="text-gray-200 italic">{children}</em>
+                      <em className="text-white italic">{children}</em>
                     ),
                     code: ({ children }) => (
                       <code className="bg-gray-800 text-primary-400 px-2 py-1 rounded text-sm">
@@ -181,7 +181,7 @@ export default function PatchNoteDetailPage({ params }: PatchNoteDetailPageProps
                       </pre>
                     ),
                     blockquote: ({ children }) => (
-                      <blockquote className="border-l-4 border-primary-500 pl-4 italic text-gray-300 mb-4">
+                      <blockquote className="border-l-4 border-primary-500 pl-4 italic text-white mb-4">
                         {children}
                       </blockquote>
                     ),
@@ -207,7 +207,7 @@ export default function PatchNoteDetailPage({ params }: PatchNoteDetailPageProps
                   <h3 className="text-lg font-semibold text-white mb-2">
                     이 버전 다운로드
                   </h3>
-                  <p className="text-gray-300 mb-4">
+                  <p className="text-white mb-4">
                     블로커스 온라인 v{patchNote.version}을 다운로드하여 최신 기능을 경험해보세요.
                   </p>
                   <Link href={patchNote.downloadUrl}>

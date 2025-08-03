@@ -207,7 +207,7 @@ export default function AdminAnnouncementsPage() {
                   type="text"
                   value={form.title}
                   onChange={(e) => setForm(prev => ({ ...prev, title: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border text-black border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   required
                   maxLength={200}
                 />
@@ -221,7 +221,7 @@ export default function AdminAnnouncementsPage() {
                   value={form.content}
                   onChange={(e) => setForm(prev => ({ ...prev, content: e.target.value }))}
                   rows={10}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border text-black border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   required
                 />
               </div>
