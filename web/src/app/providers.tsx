@@ -1,6 +1,7 @@
 'use client';
 
 import { ReactNode } from 'react';
+import { SessionProvider } from 'next-auth/react';
 
 interface ProvidersProps {
   children: ReactNode;
@@ -8,8 +9,10 @@ interface ProvidersProps {
 
 export function Providers({ children }: ProvidersProps) {
   return (
-    <div className="min-h-screen bg-background">
-      {children}
-    </div>
+    <SessionProvider>
+      <div className="min-h-screen bg-background">
+        {children}
+      </div>
+    </SessionProvider>
   );
 }

@@ -2,12 +2,18 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Menu, X, Download } from 'lucide-react';
+import { Menu, X, Download, User, LogIn } from 'lucide-react';
+import { useSession, signOut } from 'next-auth/react';
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { data: session, status } = useSession();
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
+  
+  const handleSignOut = async () => {
+    await signOut({ callbackUrl: '/' });
+  };
 
   const navigation = [
     { name: '홈', href: '/' },
@@ -42,8 +48,43 @@ export default function Header() {
             ))}
           </nav>
 
-          {/* 다운로드 버튼 */}
+          {/* 로그인/사용자 영역 */}
           <div className="hidden md:flex items-center space-x-4">
+            {status === 'loading' ? (
+              <div className="w-8 h-8 animate-pulse bg-gray-600 rounded-full"></div>
+            ) : session?.user ? (
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2 text-white">
+                  <User size={18} />
+                  <span className="text-sm">
+                    {session.user.name || session.user.email}
+                  </span>
+                </div>
+                <button
+                  onClick={handleSignOut}
+                  className="text-gray-300 hover:text-white text-sm px-3 py-1 rounded transition-colors"
+                >
+                  로그아웃
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center space-x-3">
+                <Link
+                  href="/auth/signin"
+                  className="text-gray-300 hover:text-white flex items-center space-x-1 px-3 py-2 text-sm font-medium transition-colors duration-200"
+                >
+                  <LogIn size={16} />
+                  <span>회원가입/로그인</span>
+                </Link>
+                <Link
+                  href="/auth/reset-password"
+                  className="text-gray-400 hover:text-gray-300 text-xs px-2 py-1 transition-colors"
+                >
+                  비밀번호 재설정
+                </Link>
+              </div>
+            )}
+            
             <Link
               href="/download"
               className="btn-primary flex items-center space-x-2"
@@ -78,6 +119,48 @@ export default function Header() {
                   {item.name}
                 </Link>
               ))}
+              
+              {/* 모바일 로그인/사용자 영역 */}
+              <div className="pt-2 border-t border-gray-600">
+                {session?.user ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2 text-white px-3 py-2">
+                      <User size={16} />
+                      <span className="text-sm">
+                        {session.user.name || session.user.email}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setIsMenuOpen(false);
+                        handleSignOut();
+                      }}
+                      className="text-gray-300 hover:text-white block px-3 py-2 text-base font-medium transition-colors duration-200 w-full text-left"
+                    >
+                      로그아웃
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Link
+                      href="/auth/signin"
+                      className="text-gray-300 hover:text-white flex items-center space-x-2 px-3 py-2 text-base font-medium transition-colors duration-200"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <LogIn size={16} />
+                      <span>회원가입/로그인</span>
+                    </Link>
+                    <Link
+                      href="/auth/reset-password"
+                      className="text-gray-400 hover:text-gray-300 block px-3 py-1 text-sm transition-colors"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      비밀번호 재설정
+                    </Link>
+                  </div>
+                )}
+              </div>
+              
               <div className="pt-2">
                 <Link
                   href="/download"

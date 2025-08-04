@@ -1,5 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// Blokus Online - 통합 데이터베이스 스키마
+// OAuth 회원가입 + 필수 ID/PW 로그인 지원
 
 generator client {
   provider = "prisma-client-js"
@@ -9,6 +9,85 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+// ========================================
+// 게임 사용자 테이블 (OAuth + 필수 ID/PW)
+// ========================================
+
+model User {
+  user_id      Int      @id @default(autoincrement()) @map("user_id")
+  
+  // 필수 로그인 정보 (모든 사용자)
+  username     String   @unique @db.VarChar(20)
+  password_hash String  @map("password_hash") @db.VarChar(255)
+  
+  // OAuth 연동 정보 (선택사항, 계정 복구용)
+  email        String?  @unique @db.VarChar(100)
+  oauth_provider String? @map("oauth_provider") @db.VarChar(20)
+  oauth_id     String?  @map("oauth_id") @db.VarChar(100)
+  
+  // 사용자 프로필
+  display_name String?  @map("display_name") @db.VarChar(30)
+  avatar_url   String?  @map("avatar_url")
+  
+  // 계정 상태
+  is_active    Boolean  @default(true) @map("is_active")
+  
+  // 시간 정보
+  created_at   DateTime @default(now()) @map("created_at")
+  last_login_at DateTime? @map("last_login_at")
+  updated_at   DateTime @updatedAt @map("updated_at")
+  
+  // 관계
+  user_stats     UserStats?
+  testimonials   Testimonial[]
+  support_tickets SupportTicket[]
+  
+  @@map("users")
+}
+
+model UserStats {
+  user_id        Int @id @map("user_id")
+  
+  total_games    Int @default(0) @map("total_games")
+  wins           Int @default(0)
+  losses         Int @default(0)
+  draws          Int @default(0)
+  
+  best_score     Int @default(0) @map("best_score")
+  total_score    BigInt @default(0) @map("total_score")
+  
+  longest_win_streak  Int @default(0) @map("longest_win_streak")
+  current_win_streak  Int @default(0) @map("current_win_streak")
+  
+  level          Int @default(1)
+  experience_points Int @default(0) @map("experience_points")
+  
+  last_played    DateTime? @map("last_played")
+  updated_at     DateTime @updatedAt @map("updated_at")
+  
+  // 관계
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  
+  @@map("user_stats")
+}
+
+model UserFriend {
+  friendship_id     Int @id @default(autoincrement()) @map("friendship_id")
+  requester_user_id Int @map("requester_user_id")
+  addressee_user_id Int @map("addressee_user_id")
+  
+  status       String    @default("pending") @db.VarChar(20)
+  requested_at DateTime  @default(now()) @map("requested_at")
+  responded_at DateTime? @map("responded_at")
+  
+  @@unique([requester_user_id, addressee_user_id])
+  @@map("user_friends")
+}
+
+// ========================================
+// 웹사이트 테이블들
+// ========================================
 
 model Announcement {
   id           Int      @id @default(autoincrement())
@@ -37,6 +116,7 @@ model PatchNote {
 
 model SupportTicket {
   id           Int                 @id @default(autoincrement())
+  user_id      Int?                @map("user_id") // 로그인 사용자 연결
   email        String
   subject      String
   message      String
@@ -44,6 +124,9 @@ model SupportTicket {
   admin_reply  String?             @map("admin_reply")
   created_at   DateTime            @default(now()) @map("created_at")
   replied_at   DateTime?           @map("replied_at")
+  
+  // 관계
+  user User? @relation(fields: [user_id], references: [user_id], onDelete: SetNull)
 
   @@map("support_tickets")
 }
@@ -60,12 +143,16 @@ model AdminUser {
 
 model Testimonial {
   id           Int      @id @default(autoincrement())
-  name         String
+  user_id      Int?     @map("user_id") // 게임 사용자 연결
+  name         String   // 표시명 (username 또는 display_name)
   rating       Int
   comment      String?
   created_at   DateTime @default(now()) @map("created_at")
   is_pinned    Boolean  @default(false) @map("is_pinned")
   is_published Boolean  @default(true) @map("is_published")
+  
+  // 관계
+  user User? @relation(fields: [user_id], references: [user_id], onDelete: SetNull)
 
   @@map("testimonials")
 }
