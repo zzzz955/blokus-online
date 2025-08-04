@@ -2534,10 +2534,7 @@ namespace Blokus {
         } else {
             // 카운트다운 사운드 관리 (5초 이하일 때)
             if (m_remainingTime <= 5 && m_remainingTime > 0) {
-                // 내 턴일 때만 카운트다운 사운드 재생
-                if (m_roomInfo.isMyTurn(m_myUsername, m_gameManager ? m_gameManager->getGameLogic().getCurrentPlayer() : PlayerColor::NONE)) {
-                    SoundManager::getInstance().startCountdown(m_remainingTime);
-                }
+                SoundManager::getInstance().startCountdown(m_remainingTime);
             }
             
             // 디스플레이 업데이트

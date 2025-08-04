@@ -29,6 +29,7 @@ set(CLIENT_SOURCES
     "src/ClientConfigManager.cpp"
     "src/ClientVersion.cpp"
     "src/SoundManager.cpp"
+    "resource.qrc"
 )
 
 set(CLIENT_HEADERS
@@ -113,6 +114,21 @@ endif()
 # 소스 그룹
 source_group("Client\\Headers" FILES ${CLIENT_HEADERS})
 source_group("Client\\Sources" FILES ${CLIENT_SOURCES})
+
+# 리소스 파일 복사
+add_custom_command(TARGET BlokusClient POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:BlokusClient>/resource
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/resource/my_turn.wav
+        $<TARGET_FILE_DIR:BlokusClient>/resource/my_turn.wav
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/resource/time_out.wav
+        $<TARGET_FILE_DIR:BlokusClient>/resource/time_out.wav
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/resource/countdown.wav
+        $<TARGET_FILE_DIR:BlokusClient>/resource/countdown.wav
+    COMMENT "Copying sound resource files to output directory"
+)
 
 # ===========================================
 # 서버 설정 (빌드 모드별 하드코딩)

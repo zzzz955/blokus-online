@@ -29,6 +29,10 @@ public:
     // 음소거
     void setMuted(bool muted);
     bool isMuted() const;
+    
+    // 진단 및 테스트
+    void diagnoseMultimedia();
+    void testSimpleSound();
 
 private slots:
     void onCountdownTimer();
