@@ -37,41 +37,51 @@ jobs:
         # 이전 커밋과 현재 커밋 간 변경된 파일 목록 가져오기
         if [ "${{ github.event_name }}" = "push" ]; then
           if [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
-            # 새로운 브랜치인 경우 모든 파일을 변경된 것으로 간주
-            CHANGED_FILES=$(git ls-files)
+            # 새로운 브랜치인 경우 HEAD와 HEAD~1 비교
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD || git ls-files)
           else
             CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
           fi
         else
-          # workflow_dispatch의 경우 모든 서비스 빌드
-          CHANGED_FILES=$(git ls-files)
+          # workflow_dispatch의 경우 수동 빌드 플래그 설정
+          MANUAL_BUILD=true
+          CHANGED_FILES=""
         fi
         
         echo "Changed files:"
         echo "$CHANGED_FILES"
+        echo "--- End of changed files ---"
         
         # 게임 서버 관련 변경사항 체크
         GAME_SERVER_CHANGED=false
-        if echo "$CHANGED_FILES" | grep -E '^(server/|client/|common/|proto/|CMakeLists\.txt|vcpkg\.json)'; then
+        GAME_SERVER_FILES=$(echo "$CHANGED_FILES" | grep -E '^(server/|client/|common/|proto/|CMakeLists\.txt|vcpkg\.json)' || true)
+        if [ ! -z "$GAME_SERVER_FILES" ]; then
           GAME_SERVER_CHANGED=true
+          echo "Game server files changed: $GAME_SERVER_FILES"
         fi
         
         # 웹 애플리케이션 관련 변경사항 체크
         WEB_CHANGED=false
-        if echo "$CHANGED_FILES" | grep -E '^web/'; then
+        WEB_FILES=$(echo "$CHANGED_FILES" | grep -E '^web/' || true)
+        if [ ! -z "$WEB_FILES" ]; then
           WEB_CHANGED=true
+          echo "Web files changed: $WEB_FILES"
         fi
         
         # 인프라 관련 변경사항 체크
         INFRASTRUCTURE_CHANGED=false
-        if echo "$CHANGED_FILES" | grep -E '^(docker-compose\.yml|\.github/|\.env\.example)'; then
+        INFRA_FILES=$(echo "$CHANGED_FILES" | grep -E '^(docker-compose\.yml|\.github/|\.env\.example)' || true)
+        if [ ! -z "$INFRA_FILES" ]; then
           INFRASTRUCTURE_CHANGED=true
+          echo "Infrastructure files changed: $INFRA_FILES"
         fi
         
-        # 인프라 변경이 있으면 모든 서비스 재빌드
-        if [ "$INFRASTRUCTURE_CHANGED" = "true" ]; then
+        # 수동 빌드이거나 인프라 변경이 있으면 모든 서비스 재빌드
+        if [ "$MANUAL_BUILD" = "true" ] || [ "$INFRASTRUCTURE_CHANGED" = "true" ]; then
           GAME_SERVER_CHANGED=true
           WEB_CHANGED=true
+          INFRASTRUCTURE_CHANGED=true
+          echo "Manual build or infrastructure change detected - building all services"
         fi
         
         echo "game-server=$GAME_SERVER_CHANGED" >> $GITHUB_OUTPUT
@@ -137,8 +147,8 @@ jobs:
           ENABLE_SQL_LOGGING='${{ secrets.ENABLE_SQL_LOGGING }}'
           
           # JWT 시크릿 자동 생성 (설정되지 않은 경우)
-          if [ -z \\\"\\\$JWT_SECRET\\\" ]; then
-            JWT_SECRET=\\\$(openssl rand -hex 32)
+          if [ -z \"\$JWT_SECRET\" ]; then
+            JWT_SECRET=\$(openssl rand -hex 32)
             echo 'WARNING: JWT_SECRET not set, auto-generated. Please set it in Repository Secrets for security!'
           fi
           
@@ -166,17 +176,17 @@ jobs:
         POSTGRES_PASSWORD=${{ secrets.DB_PASSWORD }}
         
         # 보안 설정
-        JWT_SECRET=\\\$JWT_SECRET
-        SESSION_TIMEOUT_HOURS=\\\${SESSION_TIMEOUT_HOURS:-24}
-        PASSWORD_SALT_ROUNDS=\\\${PASSWORD_SALT_ROUNDS:-12}
+        JWT_SECRET=\$JWT_SECRET
+        SESSION_TIMEOUT_HOURS=\${SESSION_TIMEOUT_HOURS:-24}
+        PASSWORD_SALT_ROUNDS=\${PASSWORD_SALT_ROUNDS:-12}
         
         # 로깅 설정
-        LOG_LEVEL=\\\${LOG_LEVEL:-info}
-        LOG_DIRECTORY=\\\${LOG_DIRECTORY:-/app/logs}
+        LOG_LEVEL=\${LOG_LEVEL:-info}
+        LOG_DIRECTORY=\${LOG_DIRECTORY:-/app/logs}
         
         # 개발 설정
-        DEBUG_MODE=\\\${DEBUG_MODE:-false}
-        ENABLE_SQL_LOGGING=\\\${ENABLE_SQL_LOGGING:-false}
+        DEBUG_MODE=\${DEBUG_MODE:-false}
+        ENABLE_SQL_LOGGING=\${ENABLE_SQL_LOGGING:-false}
         
         # =========================
         # 웹 애플리케이션 설정
