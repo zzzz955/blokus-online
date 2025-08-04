@@ -9,6 +9,16 @@ set(CMAKE_AUTOUIC ON)
 if(MSVC)
     add_compile_options(/utf-8)
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS UNICODE _UNICODE)
+    
+    # 일단 정적 링킹 비활성화 (라이브러리 충돌 해결을 위해)
+    # Visual C++ Runtime 정적 링킹 (VCRUNTIME140_1.dll 종속성 제거)
+    # set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    
+    # 또는 컴파일/링크 플래그로 설정
+    # add_compile_options(
+    #     $<$<CONFIG:Debug>:/MTd>      # Debug: 정적 링킹
+    #     $<$<CONFIG:Release>:/MT>     # Release: 정적 링킹
+    # )
 endif()
 
 # 클라이언트 소스 파일들
@@ -28,6 +38,8 @@ set(CLIENT_SOURCES
     "src/NetworkClient.cpp"
     "src/ClientConfigManager.cpp"
     "src/ClientVersion.cpp"
+    "src/SoundManager.cpp"
+    "resource.qrc"
 )
 
 set(CLIENT_HEADERS
@@ -46,6 +58,7 @@ set(CLIENT_HEADERS
     "include/NetworkClient.h"
     "include/ClientConfigManager.h"
     "include/ClientVersion.h"
+    "include/SoundManager.h"
 )
 
 # 실행 파일 생성
@@ -67,6 +80,7 @@ target_link_libraries(BlokusClient PRIVATE
     Qt5::Gui
     Qt5::Svg
     Qt5::Network
+    Qt5::Multimedia
 )
 
 # Windows 설정
@@ -110,6 +124,60 @@ endif()
 # 소스 그룹
 source_group("Client\\Headers" FILES ${CLIENT_HEADERS})
 source_group("Client\\Sources" FILES ${CLIENT_SOURCES})
+
+# 리소스 파일 복사
+add_custom_command(TARGET BlokusClient POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:BlokusClient>/resource
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/resource/my_turn.wav
+        $<TARGET_FILE_DIR:BlokusClient>/resource/my_turn.wav
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/resource/time_out.wav
+        $<TARGET_FILE_DIR:BlokusClient>/resource/time_out.wav
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/resource/countdown.wav
+        $<TARGET_FILE_DIR:BlokusClient>/resource/countdown.wav
+    COMMENT "Copying sound resource files to output directory"
+)
+
+# Visual C++ Redistributable DLL 복사 (정적 링킹 대신 사용하는 경우)
+if(MSVC)
+    # Visual Studio 설치 경로에서 런타임 DLL 찾기
+    find_file(VCRUNTIME140_DLL 
+        NAMES vcruntime140.dll
+        PATHS 
+            "C:/Program Files (x86)/Microsoft Visual Studio/2019/*/VC/Redist/MSVC/*/x64/Microsoft.VC142.CRT/"
+            "C:/Program Files (x86)/Microsoft Visual Studio/2022/*/VC/Redist/MSVC/*/x64/Microsoft.VC142.CRT/"
+            "C:/Program Files/Microsoft Visual Studio/2019/*/VC/Redist/MSVC/*/x64/Microsoft.VC142.CRT/"
+            "C:/Program Files/Microsoft Visual Studio/2022/*/VC/Redist/MSVC/*/x64/Microsoft.VC142.CRT/"
+        NO_DEFAULT_PATH
+    )
+    
+    find_file(VCRUNTIME140_1_DLL 
+        NAMES vcruntime140_1.dll
+        PATHS 
+            "C:/Program Files (x86)/Microsoft Visual Studio/2019/*/VC/Redist/MSVC/*/x64/Microsoft.VC142.CRT/"
+            "C:/Program Files (x86)/Microsoft Visual Studio/2022/*/VC/Redist/MSVC/*/x64/Microsoft.VC142.CRT/"
+            "C:/Program Files/Microsoft Visual Studio/2019/*/VC/Redist/MSVC/*/x64/Microsoft.VC142.CRT/"
+            "C:/Program Files/Microsoft Visual Studio/2022/*/VC/Redist/MSVC/*/x64/Microsoft.VC142.CRT/"
+        NO_DEFAULT_PATH
+    )
+    
+    if(VCRUNTIME140_DLL AND VCRUNTIME140_1_DLL)
+        add_custom_command(TARGET BlokusClient POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${VCRUNTIME140_DLL}
+                $<TARGET_FILE_DIR:BlokusClient>/vcruntime140.dll
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${VCRUNTIME140_1_DLL}
+                $<TARGET_FILE_DIR:BlokusClient>/vcruntime140_1.dll
+            COMMENT "Copying Visual C++ Runtime DLLs"
+        )
+        message(STATUS "Found and will copy Visual C++ Runtime DLLs")
+    else()
+        message(WARNING "Visual C++ Runtime DLLs not found. Consider using static linking.")
+    endif()
+endif()
 
 # ===========================================
 # 서버 설정 (빌드 모드별 하드코딩)

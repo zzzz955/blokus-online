@@ -763,9 +763,6 @@ namespace Blokus {
                 return;
             }
             
-            // 구조화된 메시지와 시스템 메시지 모두 전송
-            broadcastMessageLocked("PLAYER_JOINED:" + username);
-            
             std::ostringstream oss;
             oss << username << "님이 입장하셨습니다. 현재 인원 : " << m_players.size() << "명";
             broadcastMessageLocked("SYSTEM:" + oss.str());
@@ -773,9 +770,6 @@ namespace Blokus {
 
         void GameRoom::broadcastPlayerLeft(const std::string& username) {
             std::lock_guard<std::mutex> lock(m_playersMutex);
-            
-            // 구조화된 메시지와 시스템 메시지 모두 전송
-            broadcastMessageLocked("PLAYER_LEFT:" + username);
             
             std::ostringstream oss;
             oss << username << "님이 퇴장하셨습니다. 현재 인원 : " << m_players.size() << "명";
@@ -932,10 +926,11 @@ namespace Blokus {
             broadcastMessageLocked(blockPlacementMsg.str());
             
             // 시스템 메시지로도 알림
-            std::ostringstream systemMsg;
-            std::string blockName = Common::BlockFactory::getBlockName(placement.type);
-            systemMsg << "SYSTEM:" << playerName << "님이 " << blockName << " 블록을 배치했습니다. (점수: +" << scoreGained << ")";
-            broadcastMessageLocked(systemMsg.str());
+            // 250804 : 시스템 메시지가 너무 많아서 주석 처리
+            // std::ostringstream systemMsg;
+            // std::string blockName = Common::BlockFactory::getBlockName(placement.type);
+            // systemMsg << "SYSTEM:" << playerName << "님이 " << blockName << " 블록을 배치했습니다. (점수: +" << scoreGained << ")";
+            // broadcastMessageLocked(systemMsg.str());
             
             spdlog::debug("📦 블록 배치 브로드캐스트: 방 {}, 플레이어 {}, 블록 타입 {}", 
                 m_roomId, playerName, static_cast<int>(placement.type));
@@ -974,13 +969,8 @@ namespace Blokus {
                 auto timeoutBlockIt = m_playerBlockedByTimeout.find(currentPlayer);
                 if (timeoutBlockIt != m_playerBlockedByTimeout.end() && timeoutBlockIt->second) {
                     blockedPlayerCount++;
-                    spdlog::info("🚫 [TIMEOUT_SKIP] 플레이어 {} 타임아웃 차단 상태로 턴 자동 스킵 ({}/{})", 
+                    spdlog::debug("🚫 [TIMEOUT_SKIP] 플레이어 {} 타임아웃 차단 상태로 턴 자동 스킵 ({}/{})", 
                                static_cast<int>(currentPlayer), blockedPlayerCount, maxPlayers);
-                    
-                    // 시스템 메시지 브로드캐스트
-                    std::ostringstream skipMsg;
-                    skipMsg << "SYSTEM:" << currentPlayerName << "님은 타임아웃으로 인해 자동으로 턴이 넘어갑니다.";
-                    broadcastMessageLocked(skipMsg.str());
                     
                     // 다음 플레이어로 즉시 턴 넘기기 (타이머 없이)
                     m_gameStateManager->nextTurn();
@@ -1031,9 +1021,10 @@ namespace Blokus {
             broadcastMessageLocked(turnChangeMsg.str());
             
             // 시스템 메시지
-            std::ostringstream systemMsg;
-            systemMsg << "SYSTEM:" << newPlayerName << "님의 턴입니다.";
-            broadcastMessageLocked(systemMsg.str());
+            // 250804 : 시스템 메시지가 너무 많아서 주석 처리
+            // std::ostringstream systemMsg;
+            // systemMsg << "SYSTEM:" << newPlayerName << "님의 턴입니다.";
+            // broadcastMessageLocked(systemMsg.str());
             
             spdlog::debug("🔄 턴 변경 브로드캐스트: 방 {}, 새 플레이어 {} ({})", 
                 m_roomId, newPlayerName, static_cast<int>(currentPlayer));
@@ -1364,9 +1355,10 @@ namespace Blokus {
                     broadcastTurnChangeLocked(newPlayer);
                     
                     // 시스템 메시지
-                    std::ostringstream turnSystemMsg;
-                    turnSystemMsg << "SYSTEM:" << newPlayerName << "님의 턴입니다.";
-                    broadcastMessageLocked(turnSystemMsg.str());
+                    // 250804 : 시스템 메시지가 너무 많아서 주석 처리
+                    // std::ostringstream turnSystemMsg;
+                    // turnSystemMsg << "SYSTEM:" << newPlayerName << "님의 턴입니다.";
+                    // broadcastMessageLocked(turnSystemMsg.str());
                 }
             }
 
@@ -1483,15 +1475,6 @@ namespace Blokus {
             return m_gameStateManager->getTurnOrder();
         }
 
-        bool GameRoom::canCurrentPlayerMakeMove() const {
-            if (m_state != RoomState::Playing) {
-                return false;
-            }
-            
-            Common::PlayerColor currentPlayer = m_gameStateManager->getCurrentPlayer();
-            return m_gameLogic->canPlayerPlaceAnyBlock(currentPlayer);
-        }
-
         void GameRoom::processAutoSkipAfterTurnChange(const std::string& skipReason) {
             // 뮤텍스가 이미 잠겨있다고 가정하고 실행
             int autoSkipCount = 0;
@@ -1519,10 +1502,12 @@ namespace Blokus {
                     spdlog::debug("🔄 {} 후 자동 턴 스킵 {}/{}: {} (색상 {})님이 더 이상 배치할 블록이 없음", 
                         skipReason, autoSkipCount, maxAutoSkips, playerName, static_cast<int>(checkPlayer));
                     
-                    // 자동 턴 스킵 알림 메시지
-                    std::ostringstream skipMsg;
-                    skipMsg << "SYSTEM:" << playerName << "님이 배치할 수 있는 블록이 없어 자동으로 턴이 넘어갑니다.";
-                    broadcastMessageLocked(skipMsg.str());
+                    // 자동 턴 스킵 알림 메시지 (최초 1번만)
+                    if (m_gameStateManager->getGameLogic().needsBlockedNotification(checkPlayer)) {
+                        std::ostringstream skipMsg;
+                        skipMsg << "SYSTEM:" << playerName << "님이 배치할 수 있는 블록이 없어 자동으로 턴이 넘어갑니다.";
+                        broadcastMessageLocked(skipMsg.str());
+                    }
                     
                     // 턴 넘기기
                     Common::PlayerColor prevPlayer = checkPlayer;
@@ -2053,7 +2038,7 @@ namespace Blokus {
                 m_playerTimeoutCounts.clear();
                 m_playerBlockedByTimeout.clear();
                 m_playerAfkVerificationCounts.clear();
-                spdlog::debug("🧹 [CLEANUP] AFK 상태 정리 완료 (방 {})", m_roomId);
+                spdlog::debug("🧹 [CLEANUP] AFK 상태 및 타임아웃 알림 상태 정리 완료 (방 {})", m_roomId);
             }
         }
 
@@ -2083,7 +2068,6 @@ namespace Blokus {
             
             // 🔥 FIX: GAME_ENDED 메시지를 먼저 보내서 AFK 모달 닫기
             broadcastMessageLocked("GAME_ENDED");
-            broadcastMessageLocked("SYSTEM:게임이 종료되었습니다.");
             
             // 게임 결과 브로드캐스트
             broadcastGameResultLocked(finalScores, winners);

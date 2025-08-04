@@ -26,6 +26,7 @@
 #include "GameBoard.h"
 #include "ClientLogic.h"
 #include "ClientTypes.h"
+#include "SoundManager.h"
 
 namespace Blokus {
 

@@ -1,11 +1,13 @@
 #include "GameLogic.h"
-#include "Block.h"  // Block Ŭ���� ���
+#include "Block.h" // Block Ŭ���� ���
 #include "Utils.h"
 #include <algorithm>
 #include <spdlog/spdlog.h>
 
-namespace Blokus {
-    namespace Common {
+namespace Blokus
+{
+    namespace Common
+    {
 
         // ========================================
         // GameLogic ����
@@ -30,8 +32,10 @@ namespace Blokus {
 
         void GameLogic::clearBoard()
         {
-            for (int row = 0; row < BOARD_SIZE; ++row) {
-                for (int col = 0; col < BOARD_SIZE; ++col) {
+            for (int row = 0; row < BOARD_SIZE; ++row)
+            {
+                for (int col = 0; col < BOARD_SIZE; ++col)
+                {
                     m_board[row][col] = PlayerColor::None;
                 }
             }
@@ -40,42 +44,48 @@ namespace Blokus {
             m_usedBlocks.clear();
             m_playerOccupiedCells.clear();
 
-            for (auto& pair : m_hasPlacedFirstBlock) {
+            for (auto &pair : m_hasPlacedFirstBlock)
+            {
                 pair.second = false;
             }
-            
+
             // 캐시 무효화
             invalidateCache();
-            
+
             // 보드 초기화 시에만 영구 차단 캐시 초기화
             m_playerBlockedPermanently.clear();
+            m_playerBlockedNotified.clear();
         }
 
-        PlayerColor GameLogic::getCellOwner(const Position& pos) const
+        PlayerColor GameLogic::getCellOwner(const Position &pos) const
         {
-            if (!isPositionValid(pos)) return PlayerColor::None;
+            if (!isPositionValid(pos))
+                return PlayerColor::None;
             return m_board[pos.first][pos.second];
         }
 
-        bool GameLogic::isCellOccupied(const Position& pos) const
+        bool GameLogic::isCellOccupied(const Position &pos) const
         {
             return getCellOwner(pos) != PlayerColor::None;
         }
 
-        bool GameLogic::canPlaceBlock(const BlockPlacement& placement) const
+        bool GameLogic::canPlaceBlock(const BlockPlacement &placement) const
         {
             // 1. �⺻ ��ȿ�� �˻� (���� ���, �浹)
-            if (hasCollision(placement)) {
+            if (hasCollision(placement))
+            {
                 return false;
             }
 
             // 2. ������ �̹� ���Ǿ����� Ȯ��
-            if (isBlockUsed(placement.player, placement.type)) {
+            if (isBlockUsed(placement.player, placement.type))
+            {
                 return false;
             }
 
             // 3. ù ��° �������� Ȯ��
-            if (!hasPlayerPlacedFirstBlock(placement.player)) {
+            if (!hasPlayerPlacedFirstBlock(placement.player))
+            {
                 return isFirstBlockValid(placement);
             }
 
@@ -83,9 +93,10 @@ namespace Blokus {
             return isCornerAdjacencyValid(placement) && hasNoEdgeAdjacency(placement);
         }
 
-        bool GameLogic::placeBlock(const BlockPlacement& placement)
+        bool GameLogic::placeBlock(const BlockPlacement &placement)
         {
-            if (!canPlaceBlock(placement)) {
+            if (!canPlaceBlock(placement))
+            {
                 return false;
             }
 
@@ -93,10 +104,11 @@ namespace Blokus {
             Block block(placement.type, placement.player);
             block.setRotation(placement.rotation);
             block.setFlipState(placement.flip);
-            
+
             PositionList absolutePositions = block.getAbsolutePositions(placement.position);
-            
-            for (const auto& pos : absolutePositions) {
+
+            for (const auto &pos : absolutePositions)
+            {
                 m_board[pos.first][pos.second] = placement.player;
                 m_playerOccupiedCells[placement.player].push_back(pos);
             }
@@ -105,22 +117,25 @@ namespace Blokus {
             setPlayerBlockUsed(placement.player, placement.type);
 
             // ù ���� ��ġ ǥ��
-            if (!hasPlayerPlacedFirstBlock(placement.player)) {
+            if (!hasPlayerPlacedFirstBlock(placement.player))
+            {
                 m_hasPlacedFirstBlock[placement.player] = true;
             }
-            
+
             // 게임 상태가 변경되었으므로 캐시 무효화
             invalidateCache();
 
             return true;
         }
 
-        bool GameLogic::removeBlock(const Position& position)
+        bool GameLogic::removeBlock(const Position &position)
         {
-            if (!isPositionValid(position)) return false;
+            if (!isPositionValid(position))
+                return false;
 
             PlayerColor owner = getCellOwner(position);
-            if (owner == PlayerColor::None) return false;
+            if (owner == PlayerColor::None)
+                return false;
 
             // �ܼ��� �ش� ���� ���� (�����δ� ��ü ������ ã�Ƽ� �����ؾ� ��)
             m_board[position.first][position.second] = PlayerColor::None;
@@ -142,7 +157,8 @@ namespace Blokus {
         bool GameLogic::isBlockUsed(PlayerColor player, BlockType blockType) const
         {
             auto it = m_usedBlocks.find(player);
-            if (it == m_usedBlocks.end()) return false;
+            if (it == m_usedBlocks.end())
+                return false;
             return it->second.find(blockType) != it->second.end();
         }
 
@@ -150,8 +166,10 @@ namespace Blokus {
         {
             std::vector<BlockType> result;
             auto it = m_usedBlocks.find(player);
-            if (it != m_usedBlocks.end()) {
-                for (BlockType blockType : it->second) {
+            if (it != m_usedBlocks.end())
+            {
+                for (BlockType blockType : it->second)
+                {
                     result.push_back(blockType);
                 }
             }
@@ -172,11 +190,12 @@ namespace Blokus {
                 BlockType::Pento_F, BlockType::Pento_I, BlockType::Pento_L,
                 BlockType::Pento_N, BlockType::Pento_P, BlockType::Pento_T,
                 BlockType::Pento_U, BlockType::Pento_V, BlockType::Pento_W,
-                BlockType::Pento_X, BlockType::Pento_Y, BlockType::Pento_Z
-            };
+                BlockType::Pento_X, BlockType::Pento_Y, BlockType::Pento_Z};
 
-            for (BlockType blockType : allTypes) {
-                if (!isBlockUsed(player, blockType)) {
+            for (BlockType blockType : allTypes)
+            {
+                if (!isBlockUsed(player, blockType))
+                {
                     available.push_back(blockType);
                 }
             }
@@ -192,7 +211,7 @@ namespace Blokus {
 
         bool GameLogic::canPlayerPlaceAnyBlock(PlayerColor player) const
         {
-            // 최적화된 버전 사용  
+            // 최적화된 버전 사용
             return canPlayerPlaceAnyBlockOptimized(player);
         }
 
@@ -200,15 +219,18 @@ namespace Blokus {
         {
             // 영구 차단된 플레이어인지 먼저 확인
             auto permanentIt = m_playerBlockedPermanently.find(player);
-            if (permanentIt != m_playerBlockedPermanently.end() && permanentIt->second) {
+            if (permanentIt != m_playerBlockedPermanently.end() && permanentIt->second)
+            {
                 spdlog::debug("🚫 [BLOCK_DEBUG] 플레이어 {} 영구 차단 상태로 배치 불가", static_cast<int>(player));
                 return false; // 이미 영구적으로 블록을 배치할 수 없는 상태
             }
 
             // 캐시가 유효하면 캐시된 결과 반환
-            if (m_cacheValid) {
+            if (m_cacheValid)
+            {
                 auto it = m_canPlaceAnyBlockCache.find(player);
-                if (it != m_canPlaceAnyBlockCache.end()) {
+                if (it != m_canPlaceAnyBlockCache.end())
+                {
                     return it->second;
                 }
             }
@@ -218,46 +240,57 @@ namespace Blokus {
             auto availableBlocks = getAvailableBlocks(player);
 
             // 빈 블록 리스트이면 바로 false 반환
-            if (availableBlocks.empty()) {
+            if (availableBlocks.empty())
+            {
                 result = false;
-            } else {
+            }
+            else
+            {
                 // 작은 블록부터 우선 검사 (배치 가능성이 높음)
-                std::sort(availableBlocks.begin(), availableBlocks.end(), 
-                    [](BlockType a, BlockType b) {
-                        return Utils::getBlockScore(a) < Utils::getBlockScore(b);
-                    });
+                std::sort(availableBlocks.begin(), availableBlocks.end(),
+                          [](BlockType a, BlockType b)
+                          {
+                              return Utils::getBlockScore(a) < Utils::getBlockScore(b);
+                          });
 
                 // 보드 가장자리부터 검사 (배치 가능성이 높음)
                 std::vector<Position> priorityPositions;
-                
+
                 // 1단계: 가장자리 위치 우선
-                for (int i = 0; i < BOARD_SIZE; ++i) {
-                    priorityPositions.push_back({0, i});         // 상단
-                    priorityPositions.push_back({BOARD_SIZE-1, i}); // 하단
-                    priorityPositions.push_back({i, 0});         // 좌측
-                    priorityPositions.push_back({i, BOARD_SIZE-1}); // 우측
+                for (int i = 0; i < BOARD_SIZE; ++i)
+                {
+                    priorityPositions.push_back({0, i});              // 상단
+                    priorityPositions.push_back({BOARD_SIZE - 1, i}); // 하단
+                    priorityPositions.push_back({i, 0});              // 좌측
+                    priorityPositions.push_back({i, BOARD_SIZE - 1}); // 우측
                 }
-                
+
                 // 2단계: 내부 위치
-                for (int row = 1; row < BOARD_SIZE - 1; ++row) {
-                    for (int col = 1; col < BOARD_SIZE - 1; ++col) {
+                for (int row = 1; row < BOARD_SIZE - 1; ++row)
+                {
+                    for (int col = 1; col < BOARD_SIZE - 1; ++col)
+                    {
                         priorityPositions.push_back({row, col});
                     }
                 }
 
                 // 중복 제거
                 std::sort(priorityPositions.begin(), priorityPositions.end());
-                priorityPositions.erase(std::unique(priorityPositions.begin(), priorityPositions.end()), 
-                                      priorityPositions.end());
+                priorityPositions.erase(std::unique(priorityPositions.begin(), priorityPositions.end()),
+                                        priorityPositions.end());
 
                 // 각 블록 타입에 대해 검사
-                for (BlockType blockType : availableBlocks) {
+                for (BlockType blockType : availableBlocks)
+                {
                     // 우선순위가 높은 위치부터 검사
-                    for (const Position& testPos : priorityPositions) {
-                        
+                    for (const Position &testPos : priorityPositions)
+                    {
+
                         // 기본 회전/대칭 조합만 검사 (최적화)
-                        for (int rot = 0; rot < 4; ++rot) {  
-                            for (int flip = 0; flip < 2; ++flip) { // flip 줄임 (0, 1만)
+                        for (int rot = 0; rot < 4; ++rot)
+                        {
+                            for (int flip = 0; flip < 2; ++flip)
+                            { // flip 줄임 (0, 1만)
                                 BlockPlacement testPlacement;
                                 testPlacement.type = blockType;
                                 testPlacement.position = testPos;
@@ -265,7 +298,8 @@ namespace Blokus {
                                 testPlacement.flip = static_cast<FlipState>(flip);
                                 testPlacement.player = player;
 
-                                if (canPlaceBlock(testPlacement)) {
+                                if (canPlaceBlock(testPlacement))
+                                {
                                     result = true;
                                     goto found; // 조기 종료
                                 }
@@ -273,23 +307,28 @@ namespace Blokus {
                         }
                     }
                 }
-                
-                found:
+
+            found:
                 result = result; // goto 레이블용
             }
 
             // 결과를 캐시에 저장
-            if (!m_cacheValid) {
+            if (!m_cacheValid)
+            {
                 m_canPlaceAnyBlockCache.clear();
                 m_cacheValid = true;
             }
             m_canPlaceAnyBlockCache[player] = result;
-            
+
             // 블록을 배치할 수 없으면 영구 차단 상태로 설정
-            if (!result) {
+            if (!result)
+            {
                 spdlog::debug("🔒 [BLOCK_DEBUG] 플레이어 {} 영구 차단 상태로 설정", static_cast<int>(player));
                 m_playerBlockedPermanently[player] = true;
-            } else {
+                // 알림 상태는 여기서 설정하지 않음 (needsBlockedNotification에서 처리)
+            }
+            else
+            {
                 spdlog::debug("✅ [BLOCK_DEBUG] 플레이어 {} 블록 배치 가능", static_cast<int>(player));
             }
 
@@ -301,33 +340,45 @@ namespace Blokus {
             // ��� �÷��̾ �� �̻� ������ ���� �� ������ ���� ����
             std::vector<PlayerColor> players = {
                 PlayerColor::Blue, PlayerColor::Yellow,
-                PlayerColor::Red, PlayerColor::Green
-            };
+                PlayerColor::Red, PlayerColor::Green};
 
             std::string playerStatus = "";
             bool anyCanPlace = false;
-            
-            for (PlayerColor player : players) {
+
+            for (PlayerColor player : players)
+            {
                 bool canPlace = canPlayerPlaceAnyBlock(player);
-                if (canPlace) {
+                if (canPlace)
+                {
                     anyCanPlace = true;
                 }
-                
+
                 std::string playerName = "Unknown";
-                switch(player) {
-                    case PlayerColor::Blue: playerName = "Blue"; break;
-                    case PlayerColor::Yellow: playerName = "Yellow"; break;
-                    case PlayerColor::Red: playerName = "Red"; break;
-                    case PlayerColor::Green: playerName = "Green"; break;
-                    default: break;
+                switch (player)
+                {
+                case PlayerColor::Blue:
+                    playerName = "Blue";
+                    break;
+                case PlayerColor::Yellow:
+                    playerName = "Yellow";
+                    break;
+                case PlayerColor::Red:
+                    playerName = "Red";
+                    break;
+                case PlayerColor::Green:
+                    playerName = "Green";
+                    break;
+                default:
+                    break;
                 }
-                
-                if (!playerStatus.empty()) playerStatus += ", ";
+
+                if (!playerStatus.empty())
+                    playerStatus += ", ";
                 playerStatus += playerName + ":" + (canPlace ? "가능" : "불가");
             }
-            
+
             spdlog::debug("🎯 [GAME_FINISH_DEBUG] 플레이어 배치 상태: {}", playerStatus);
-            
+
             return !anyCanPlace;
         }
 
@@ -337,17 +388,17 @@ namespace Blokus {
 
             std::vector<PlayerColor> players = {
                 PlayerColor::Blue, PlayerColor::Yellow,
-                PlayerColor::Red, PlayerColor::Green
-            };
+                PlayerColor::Red, PlayerColor::Green};
 
-            for (PlayerColor player : players) {
+            for (PlayerColor player : players)
+            {
                 int score = 0;
                 auto availableBlocks = getAvailableBlocks(player);
 
                 // 0점 기준으로 계산: 설치한 블록당 +점수
                 // 전체 블록 점수에서 남은 블록 점수를 빼면 설치한 블록 점수
                 int totalBlockScore = 0;
-                
+
                 // 전체 블록 점수 계산 (모든 블록 타입의 점수 합)
                 std::vector<BlockType> allBlocks = {
                     BlockType::Single, BlockType::Domino,
@@ -355,28 +406,31 @@ namespace Blokus {
                     BlockType::Tetro_I, BlockType::Tetro_O, BlockType::Tetro_T, BlockType::Tetro_L, BlockType::Tetro_S,
                     BlockType::Pento_F, BlockType::Pento_I, BlockType::Pento_L, BlockType::Pento_N,
                     BlockType::Pento_P, BlockType::Pento_T, BlockType::Pento_U, BlockType::Pento_V,
-                    BlockType::Pento_W, BlockType::Pento_X, BlockType::Pento_Y, BlockType::Pento_Z
-                };
-                
-                for (BlockType blockType : allBlocks) {
+                    BlockType::Pento_W, BlockType::Pento_X, BlockType::Pento_Y, BlockType::Pento_Z};
+
+                for (BlockType blockType : allBlocks)
+                {
                     totalBlockScore += Utils::getBlockScore(blockType);
                 }
-                
+
                 // 남은 블록 점수 계산
                 int remainingBlockScore = 0;
-                for (BlockType blockType : availableBlocks) {
+                for (BlockType blockType : availableBlocks)
+                {
                     remainingBlockScore += Utils::getBlockScore(blockType);
                 }
-                
+
                 // 설치한 블록 점수 = 전체 - 남은 블록
                 score = totalBlockScore - remainingBlockScore;
 
                 // 보너스 점수 계산
-                if (availableBlocks.empty()) {
+                if (availableBlocks.empty())
+                {
                     score += 15; // 모든 블록 사용 보너스
 
                     // 마지막 블록이 1칸 블록이었다면 추가 보너스
-                    if (isBlockUsed(player, BlockType::Single)) {
+                    if (isBlockUsed(player, BlockType::Single))
+                    {
                         score += 5;
                     }
                 }
@@ -389,7 +443,8 @@ namespace Blokus {
 
         PlayerColor GameLogic::getBoardCell(int row, int col) const
         {
-            if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE) {
+            if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE)
+            {
                 return PlayerColor::None;
             }
             return m_board[row][col];
@@ -401,16 +456,32 @@ namespace Blokus {
             return it != m_usedBlocks.end() ? static_cast<int>(it->second.size()) : 0;
         }
 
+        bool GameLogic::needsBlockedNotification(PlayerColor player) const
+        {
+            // 영구 차단 상태이면서 아직 알림을 보내지 않았다면 true
+            auto notifiedIt = m_playerBlockedNotified.find(player);
+            bool hasNotified = (notifiedIt != m_playerBlockedNotified.end() && notifiedIt->second);
+
+            if (!hasNotified)
+            {
+                // 알림 상태를 true로 설정 (최초 1번만)
+                m_playerBlockedNotified[player] = true;
+                return true;
+            }
+
+            return false;
+        }
+
         // ========================================
         // ���� ���� �Լ���
         // ========================================
 
-        bool GameLogic::isPositionValid(const Position& pos) const
+        bool GameLogic::isPositionValid(const Position &pos) const
         {
             return Utils::isPositionValid(pos, BOARD_SIZE);
         }
 
-        bool GameLogic::hasCollision(const BlockPlacement& placement) const
+        bool GameLogic::hasCollision(const BlockPlacement &placement) const
         {
             // Block Ŭ������ ����Ͽ� �浹 �˻�
             Block block(placement.type, placement.player);
@@ -419,8 +490,10 @@ namespace Blokus {
 
             PositionList absolutePositions = block.getAbsolutePositions(placement.position);
 
-            for (const auto& pos : absolutePositions) {
-                if (!isPositionValid(pos) || isCellOccupied(pos)) {
+            for (const auto &pos : absolutePositions)
+            {
+                if (!isPositionValid(pos) || isCellOccupied(pos))
+                {
                     return true;
                 }
             }
@@ -428,7 +501,7 @@ namespace Blokus {
             return false;
         }
 
-        bool GameLogic::isFirstBlockValid(const BlockPlacement& placement) const
+        bool GameLogic::isFirstBlockValid(const BlockPlacement &placement) const
         {
             // Block Ŭ������ ����Ͽ� ù ���� ����
             Block block(placement.type, placement.player);
@@ -439,16 +512,19 @@ namespace Blokus {
 
             // Ŭ���� ���: 4�� �𼭸� �� �ϳ��� ��ƾ� ��
             std::vector<Position> corners = {
-                {0, 0},                    // ���� �� �𼭸�
-                {0, BOARD_SIZE - 1},       // ������ �� �𼭸�  
-                {BOARD_SIZE - 1, 0},       // ���� �Ʒ� �𼭸�
-                {BOARD_SIZE - 1, BOARD_SIZE - 1}  // ������ �Ʒ� �𼭸�
+                {0, 0},                          // ���� �� �𼭸�
+                {0, BOARD_SIZE - 1},             // ������ �� �𼭸�
+                {BOARD_SIZE - 1, 0},             // ���� �Ʒ� �𼭸�
+                {BOARD_SIZE - 1, BOARD_SIZE - 1} // ������ �Ʒ� �𼭸�
             };
 
             // ������ �� �� �ϳ��� 4�� �𼭸� �� �ϳ��� ��Ȯ�� ��ġ�ؾ� ��
-            for (const auto& blockPos : absolutePositions) {
-                for (const auto& corner : corners) {
-                    if (blockPos == corner) {
+            for (const auto &blockPos : absolutePositions)
+            {
+                for (const auto &corner : corners)
+                {
+                    if (blockPos == corner)
+                    {
                         return true;
                     }
                 }
@@ -457,7 +533,7 @@ namespace Blokus {
             return false;
         }
 
-        bool GameLogic::isCornerAdjacencyValid(const BlockPlacement& placement) const
+        bool GameLogic::isCornerAdjacencyValid(const BlockPlacement &placement) const
         {
             // ���� �� ���ϰ� �𼭸��� �����ؾ� ��
             Block block(placement.type, placement.player);
@@ -466,11 +542,14 @@ namespace Blokus {
 
             PositionList absolutePositions = block.getAbsolutePositions(placement.position);
 
-            for (const auto& blockPos : absolutePositions) {
+            for (const auto &blockPos : absolutePositions)
+            {
                 std::vector<Position> diagonals = getDiagonalCells(blockPos);
 
-                for (const auto& diagonal : diagonals) {
-                    if (isPositionValid(diagonal) && getCellOwner(diagonal) == placement.player) {
+                for (const auto &diagonal : diagonals)
+                {
+                    if (isPositionValid(diagonal) && getCellOwner(diagonal) == placement.player)
+                    {
                         return true; // ���� �� ���ϰ� �𼭸� ���� �߰�
                     }
                 }
@@ -479,7 +558,7 @@ namespace Blokus {
             return false;
         }
 
-        bool GameLogic::hasNoEdgeAdjacency(const BlockPlacement& placement) const
+        bool GameLogic::hasNoEdgeAdjacency(const BlockPlacement &placement) const
         {
             // ���� �� ���ϰ� ������ �����ϸ� �ȵ�
             Block block(placement.type, placement.player);
@@ -488,11 +567,14 @@ namespace Blokus {
 
             PositionList absolutePositions = block.getAbsolutePositions(placement.position);
 
-            for (const auto& blockPos : absolutePositions) {
+            for (const auto &blockPos : absolutePositions)
+            {
                 std::vector<Position> adjacents = getAdjacentCells(blockPos);
 
-                for (const auto& adjacent : adjacents) {
-                    if (isPositionValid(adjacent) && getCellOwner(adjacent) == placement.player) {
+                for (const auto &adjacent : adjacents)
+                {
+                    if (isPositionValid(adjacent) && getCellOwner(adjacent) == placement.player)
+                    {
                         return false; // ���� �� ���ϰ� �� ���� �߰�
                     }
                 }
@@ -501,16 +583,18 @@ namespace Blokus {
             return true;
         }
 
-        std::vector<Position> GameLogic::getAdjacentCells(const Position& pos) const
+        std::vector<Position> GameLogic::getAdjacentCells(const Position &pos) const
         {
             std::vector<Position> adjacents;
 
             // �����¿� 4����
-            std::vector<Position> directions = { {-1, 0}, {1, 0}, {0, -1}, {0, 1} };
+            std::vector<Position> directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
 
-            for (const auto& dir : directions) {
-                Position adjacent = { pos.first + dir.first, pos.second + dir.second };
-                if (isPositionValid(adjacent)) {
+            for (const auto &dir : directions)
+            {
+                Position adjacent = {pos.first + dir.first, pos.second + dir.second};
+                if (isPositionValid(adjacent))
+                {
                     adjacents.push_back(adjacent);
                 }
             }
@@ -518,16 +602,18 @@ namespace Blokus {
             return adjacents;
         }
 
-        std::vector<Position> GameLogic::getDiagonalCells(const Position& pos) const
+        std::vector<Position> GameLogic::getDiagonalCells(const Position &pos) const
         {
             std::vector<Position> diagonals;
 
             // �밢�� 4����
-            std::vector<Position> directions = { {-1, -1}, {-1, 1}, {1, -1}, {1, 1} };
+            std::vector<Position> directions = {{-1, -1}, {-1, 1}, {1, -1}, {1, 1}};
 
-            for (const auto& dir : directions) {
-                Position diagonal = { pos.first + dir.first, pos.second + dir.second };
-                if (isPositionValid(diagonal)) {
+            for (const auto &dir : directions)
+            {
+                Position diagonal = {pos.first + dir.first, pos.second + dir.second};
+                if (isPositionValid(diagonal))
+                {
                     diagonals.push_back(diagonal);
                 }
             }
@@ -537,29 +623,35 @@ namespace Blokus {
 
         Position GameLogic::getPlayerStartCorner(PlayerColor player) const
         {
-            switch (player) {
-            case PlayerColor::Blue: return { 0, 0 };                          // ���� ��
-            case PlayerColor::Yellow: return { 0, BOARD_SIZE - 1 };          // ������ ��
-            case PlayerColor::Red: return { BOARD_SIZE - 1, 0 };             // ���� �Ʒ�
-            case PlayerColor::Green: return { BOARD_SIZE - 1, BOARD_SIZE - 1 }; // ������ �Ʒ�
-            default: return { 0, 0 };
+            switch (player)
+            {
+            case PlayerColor::Blue:
+                return {0, 0}; // ���� ��
+            case PlayerColor::Yellow:
+                return {0, BOARD_SIZE - 1}; // ������ ��
+            case PlayerColor::Red:
+                return {BOARD_SIZE - 1, 0}; // ���� �Ʒ�
+            case PlayerColor::Green:
+                return {BOARD_SIZE - 1, BOARD_SIZE - 1}; // ������ �Ʒ�
+            default:
+                return {0, 0};
             }
         }
 
         // ========================================
         // 캐시 관리 함수들
         // ========================================
-        
+
         void GameLogic::invalidateCache() const
         {
             spdlog::debug("🔄 [CACHE_DEBUG] 캐시 무효화 - 영구 차단 상태는 유지");
             m_cacheValid = false;
             m_canPlaceAnyBlockCache.clear();
-            // 영구 차단 상태는 유지 - 다른 플레이어의 블록 배치로 인해 
+            // 영구 차단 상태는 유지 - 다른 플레이어의 블록 배치로 인해
             // 이미 차단된 플레이어가 다시 배치 가능해지는 경우는 없음
             // m_playerBlockedPermanently는 보드 초기화 시에만 clear
         }
-        
+
         // getBlockShape�� ���� - Block Ŭ������ ���� ���
         // applyTransformation�� ���� - Block Ŭ������ ���� ���
         // normalizeShape�� ���� - Block Ŭ������ ���� ���
@@ -569,16 +661,14 @@ namespace Blokus {
         // ========================================
 
         GameStateManager::GameStateManager()
-            : m_gameState(GameState::Waiting)
-            , m_turnState(TurnState::WaitingForMove)  // Types.h�� TurnState ���
-            , m_turnNumber(1)
-            , m_currentPlayerIndex(0)
+            : m_gameState(GameState::Waiting), m_turnState(TurnState::WaitingForMove) // Types.h�� TurnState ���
+              ,
+              m_turnNumber(1), m_currentPlayerIndex(0)
         {
             // �÷��̾� ���� ����
             m_playerOrder = {
                 PlayerColor::Blue, PlayerColor::Yellow,
-                PlayerColor::Red, PlayerColor::Green
-            };
+                PlayerColor::Red, PlayerColor::Green};
         }
 
         void GameStateManager::startNewGame()
@@ -589,7 +679,7 @@ namespace Blokus {
             m_gameLogic.setCurrentPlayer(m_playerOrder[0]);
         }
 
-        void GameStateManager::startNewGame(const std::vector<PlayerColor>& turnOrder)
+        void GameStateManager::startNewGame(const std::vector<PlayerColor> &turnOrder)
         {
             setTurnOrder(turnOrder);
             startNewGame();
@@ -612,12 +702,14 @@ namespace Blokus {
 
         void GameStateManager::nextTurn()
         {
-            if (m_gameState != GameState::Playing) return;
+            if (m_gameState != GameState::Playing)
+                return;
 
             m_currentPlayerIndex = (m_currentPlayerIndex + 1) % m_playerOrder.size();
 
             // �� ���� ���� �� ��ȣ ����
-            if (m_currentPlayerIndex == 0) {
+            if (m_currentPlayerIndex == 0)
+            {
                 m_turnNumber++;
             }
 
@@ -625,10 +717,12 @@ namespace Blokus {
             m_gameLogic.setCurrentPlayer(newPlayer);
 
             // ���� ���� ���� Ȯ��
-            if (m_gameLogic.isGameFinished()) {
+            if (m_gameLogic.isGameFinished())
+            {
                 endGame();
             }
-            else {
+            else
+            {
                 m_turnState = TurnState::WaitingForMove;
             }
         }
@@ -649,12 +743,14 @@ namespace Blokus {
             return m_gameLogic.calculateScores();
         }
 
-        void GameStateManager::setTurnOrder(const std::vector<PlayerColor>& turnOrder)
+        void GameStateManager::setTurnOrder(const std::vector<PlayerColor> &turnOrder)
         {
-            if (!turnOrder.empty()) {
+            if (!turnOrder.empty())
+            {
                 m_playerOrder = turnOrder;
                 m_currentPlayerIndex = 0;
-                if (m_gameState == GameState::Playing) {
+                if (m_gameState == GameState::Playing)
+                {
                     m_gameLogic.setCurrentPlayer(m_playerOrder[0]);
                 }
             }
@@ -662,14 +758,16 @@ namespace Blokus {
 
         void GameStateManager::setCurrentPlayerIndex(int index)
         {
-            if (index >= 0 && index < static_cast<int>(m_playerOrder.size())) {
+            if (index >= 0 && index < static_cast<int>(m_playerOrder.size()))
+            {
                 m_currentPlayerIndex = index;
             }
         }
 
         PlayerColor GameStateManager::getNextPlayer() const
         {
-            if (m_playerOrder.empty()) {
+            if (m_playerOrder.empty())
+            {
                 return PlayerColor::None;
             }
             int nextIndex = (m_currentPlayerIndex + 1) % m_playerOrder.size();

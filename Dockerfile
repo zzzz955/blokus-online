@@ -70,7 +70,7 @@ RUN echo "=== Installing vcpkg ===" && \
 # vcpkg 의존성 설치
 # ==================================================
 RUN cd ${VCPKG_ROOT} && \
-    ./vcpkg install protobuf spdlog boost-asio boost-system nlohmann-json libpqxx openssl \
+    ./vcpkg install spdlog boost-asio boost-system nlohmann-json libpqxx openssl \
         --triplet=${VCPKG_DEFAULT_TRIPLET}
 
 # vcpkg 설치 완료
@@ -84,15 +84,14 @@ FROM vcpkg-builder AS app-builder
 # 작업 디렉토리 설정
 WORKDIR /app
 
-# 프로젝트 소스 복사 (proto, common, server만)
-COPY proto/ ./proto/
+# 프로젝트 소스 복사 (common, server만)
 COPY common/ ./common/
 COPY server/ ./server/
 COPY CMakeLists.txt ./
 
 # vcpkg 설치 확인
 RUN echo "=== Checking vcpkg installations ===" && \
-    ls -la ${VCPKG_ROOT}/installed/x64-linux/share/ | grep -E "(libpq|protobuf|openssl)" && \
+    ls -la ${VCPKG_ROOT}/installed/x64-linux/share/ | grep -E "(libpq|openssl|spdlog)" && \
     echo "=== Available packages ===" && \
     ${VCPKG_ROOT}/vcpkg list
 

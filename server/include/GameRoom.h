@@ -86,7 +86,6 @@ namespace Blokus {
             std::vector<Common::PlayerColor> getTurnOrder() const;
             
             // 자동 턴 스킵 관련
-            bool canCurrentPlayerMakeMove() const;
             void processAutoSkipAfterTurnChange(const std::string& skipReason = "자동"); // 턴 변경 후 자동 스킵 처리
             
             // 턴 타이머 관리

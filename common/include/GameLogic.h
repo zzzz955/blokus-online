@@ -49,6 +49,9 @@ namespace Blokus {
             bool canPlayerPlaceAnyBlockOptimized(PlayerColor player) const; // 최적화된 버전
             bool isGameFinished() const;
             std::map<PlayerColor, int> calculateScores() const;
+            
+            // 영구 차단 알림 관리
+            bool needsBlockedNotification(PlayerColor player) const;
 
             // 보드 상태 접근
             PlayerColor getBoardCell(int row, int col) const;
@@ -70,6 +73,9 @@ namespace Blokus {
             
             // 영구 캐시: 더 이상 블록을 배치할 수 없는 플레이어 추적
             mutable std::map<PlayerColor, bool> m_playerBlockedPermanently;
+            
+            // 영구 차단 알림 상태 추적 (최초 1번만 알림)
+            mutable std::map<PlayerColor, bool> m_playerBlockedNotified;
 
             // 내부 헬퍼 함수들
             bool isPositionValid(const Position& pos) const;

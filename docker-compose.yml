@@ -46,10 +46,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      # Protocol Buffers 문제 해결 대안들:
-      # dockerfile: Dockerfile.cmake-module    # CMake MODULE 모드 사용 (권장)
-      # dockerfile: Dockerfile.protobuf-fix    # 완전한 서버 전용 빌드
-      # dockerfile: Dockerfile.fallback        # vcpkg 사용 (확실한 해결책)
+      # Dockerfile build configuration
     container_name: blokus-server
     restart: unless-stopped
     

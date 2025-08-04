@@ -1,0 +1,8 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource>
+        <file>resource/my_turn.wav</file>
+        <file>resource/time_out.wav</file>
+        <file>resource/countdown.wav</file>
+    </qresource>
+</RCC>
