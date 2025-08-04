@@ -72,3 +72,23 @@ export interface AdminLoginForm {
   username: string;
   password: string;
 }
+
+export interface Testimonial {
+  id: number;
+  name: string;
+  rating: number;
+  comment?: string;
+  createdAt: string;
+  isPinned: boolean;
+  isPublished: boolean;
+  // 데이터베이스 필드 (스네이크케이스)
+  created_at?: Date;
+  is_pinned?: boolean;
+  is_published?: boolean;
+}
+
+export interface TestimonialForm {
+  name: string;
+  rating: number;
+  comment?: string;
+}

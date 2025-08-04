@@ -25,7 +25,7 @@ export default function Header() {
           <div className="flex-shrink-0">
             <Link href="/" className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-lg"></div>
-              <span className="font-gaming text-xl text-white">블로커스 온라인</span>
+              <span className="font-sans text-xl text-white">Blokus-online</span>
             </Link>
           </div>
 
