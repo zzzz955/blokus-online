@@ -24,7 +24,7 @@ export default function PatchNotesPage() {
     try {
       isLoadingRef.current = true;
       setLoading(true);
-      const response = await api.getFull<PatchNote[]>(`/api/patch-notes?page=${page}&limit=10`);
+      const response = await api.getFull(`/api/patch-notes?page=${page}&limit=10`) as PaginatedResponse<PatchNote>;
       setPatchNotes(response.data || []);
       setTotalPages(response.pagination?.totalPages || 1);
       setCurrentPage(page);
