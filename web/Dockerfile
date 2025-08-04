@@ -26,8 +26,7 @@ RUN apk add --no-cache \
 COPY package*.json ./
 
 # 의존성 설치 (production only)
-RUN rm -f package-lock.json && \
-    npm install --only=production --ignore-scripts && \
+RUN npm ci --only=production --ignore-scripts && \
     npm cache clean --force
 
 # ==================================================
@@ -54,8 +53,7 @@ COPY package*.json ./
 COPY . .
 
 # 개발 의존성 포함하여 설치 (build 시 필요)
-RUN rm -f package-lock.json && \
-    npm install --ignore-scripts
+RUN npm ci --ignore-scripts
 
 # Prisma 클라이언트 생성
 RUN npx prisma generate
@@ -127,8 +125,8 @@ RUN chmod +x /app/docker-entrypoint.sh
 # 사용자 변경
 USER nextjs
 
-# 런타임에 필요한 패키지들을 사용자 권한으로 설치
-RUN npm install prisma@latest bcryptjs@latest
+# 런타임에 필요한 패키지들을 사용자 권한으로 설치 (버전 고정)
+RUN npm install prisma@5.22.0 bcryptjs@2.4.3
 
 # 포트 노출
 EXPOSE 3000
