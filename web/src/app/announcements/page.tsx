@@ -20,7 +20,7 @@ export default function AnnouncementsPage() {
   const fetchAnnouncements = async (page: number = 1) => {
     try {
       setLoading(true);
-      const response = await api.getFull<Announcement[]>(`/api/announcements?page=${page}&limit=10`);
+      const response = await api.getFull(`/api/announcements?page=${page}&limit=10`) as PaginatedResponse<Announcement>;
       setAnnouncements(response.data || []);
       setTotalPages(response.pagination?.totalPages || 1);
       setCurrentPage(page);
