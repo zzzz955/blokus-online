@@ -246,7 +246,7 @@ export default function AdminPatchNotesPage() {
                   type="text"
                   value={form.title}
                   onChange={(e) => setForm(prev => ({ ...prev, title: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500"
+                  className="w-full px-3 py-2 border text-black rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500"
                   required
                   maxLength={200}
                 />
@@ -261,7 +261,7 @@ export default function AdminPatchNotesPage() {
                   value={form.download_url}
                   onChange={(e) => setForm(prev => ({ ...prev, download_url: e.target.value }))}
                   placeholder="https://github.com/user/repo/releases/download/..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500"
+                  className="w-full px-3 py-2 border text-black rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500"
                 />
               </div>
 
