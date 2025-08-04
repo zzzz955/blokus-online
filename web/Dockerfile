@@ -59,6 +59,7 @@ RUN rm -f package-lock.json && \
 
 # Prisma 클라이언트 생성
 RUN npx prisma generate
+RUN npx prisma db push
 
 # Next.js 빌드 (단계별 실행으로 디버깅 개선)
 RUN npm run build

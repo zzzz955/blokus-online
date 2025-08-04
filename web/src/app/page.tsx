@@ -1,10 +1,23 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Download, Users, Trophy, Shield, Gamepad2, Star } from 'lucide-react';
+import { Download, Users, Trophy, Shield, Gamepad2, Star, ChevronLeft, ChevronRight, MessageSquarePlus, ArrowRight } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import Card, { CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
+import TestimonialModal from '@/components/testimonials/TestimonialModal';
+import { api } from '@/utils/api';
+import { Testimonial } from '@/types';
 
 export default function HomePage() {
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [total, setTotal] = useState(0);
+
   const features = [
     {
       icon: <Users className="w-8 h-8 text-primary-400" />,
@@ -28,23 +41,47 @@ export default function HomePage() {
     },
   ];
 
-  const testimonials = [
-    {
-      name: '김민수',
-      rating: 5,
-      comment: '정말 재미있는 게임입니다! 친구들과 함께 하면 시간 가는 줄 모르네요.',
-    },
-    {
-      name: '이서연',
-      rating: 5,
-      comment: '전략적 사고가 필요한 게임이라 더욱 흥미롭습니다. UI도 깔끔하고 좋아요.',
-    },
-    {
-      name: '박지훈',
-      rating: 4,
-      comment: '온라인으로 블로커스를 즐길 수 있어서 좋습니다. 랭킹 시스템도 재미있어요.',
-    },
-  ];
+  const ITEMS_PER_PAGE = 5;
+
+  // 후기 목록 불러오기
+  const fetchTestimonials = async () => {
+    try {
+      setLoading(true);
+      const response = await api.getFull('/api/testimonials?home=true&limit=20') as any;
+      setTestimonials(response.data || []);
+      setHasMore(response.hasMore || false);
+      setTotal(response.total || 0);
+    } catch (error) {
+      console.error('Error fetching testimonials:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTestimonials();
+  }, []);
+
+  // 현재 페이지의 후기들
+  const getCurrentTestimonials = () => {
+    const startIndex = currentPage * ITEMS_PER_PAGE;
+    return testimonials.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  };
+
+  // 총 페이지 수 계산
+  const totalPages = Math.ceil(testimonials.length / ITEMS_PER_PAGE);
+
+  const handlePrevPage = () => {
+    setCurrentPage(prev => Math.max(0, prev - 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage(prev => Math.min(totalPages - 1, prev + 1));
+  };
+
+  const handleModalSuccess = () => {
+    fetchTestimonials(); // 후기 목록 새로고침
+  };
 
   return (
     <Layout>
@@ -70,7 +107,7 @@ export default function HomePage() {
                 </Button>
               </Link>
               <Link href="/guide">
-                <Button variant="outline" size="lg">
+                <Button size="lg" variant="secondary" className="text-primary-700">
                   게임 가이드 보기
                 </Button>
               </Link>
@@ -118,35 +155,138 @@ export default function HomePage() {
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
               플레이어 후기
             </h2>
-            <p className="text-xl text-gray-400">
+            <p className="text-xl text-gray-400 mb-6">
               블로커스 온라인을 즐기고 있는 플레이어들의 생생한 후기
             </p>
+            <div className="flex justify-center space-x-4">
+              <Button
+                onClick={() => setIsModalOpen(true)}
+                className="flex items-center space-x-2"
+              >
+                <MessageSquarePlus className="w-4 h-4" />
+                <span>후기 작성하기</span>
+              </Button>
+              {total > testimonials.length && (
+                <Link href="/testimonials">
+                  <Button variant="outline" className="flex items-center space-x-2">
+                    <ArrowRight className="w-4 h-4" />
+                    <span>후기 전체 보기</span>
+                  </Button>
+                </Link>
+              )}
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, index) => (
-              <Card key={index}>
-                <CardContent>
-                  <div className="flex items-center mb-4">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        size={16}
-                        className={`${
-                          i < testimonial.rating
-                            ? 'text-yellow-400 fill-current'
-                            : 'text-gray-600'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  <p className="text-gray-300 mb-4">{testimonial.comment}</p>
-                  <p className="text-white font-semibold">- {testimonial.name}</p>
+          {loading ? (
+            <div className="text-center text-gray-400">
+              후기를 불러오는 중...
+            </div>
+          ) : testimonials.length === 0 ? (
+            <div className="text-center">
+              <Card>
+                <CardContent className="py-12">
+                  <p className="text-gray-400 text-lg mb-4">
+                    아직 후기가 없습니다.
+                  </p>
+                  <p className="text-gray-500 mb-6">
+                    첫 번째 후기를 작성해보세요!
+                  </p>
+                  <Button
+                    onClick={() => setIsModalOpen(true)}
+                    className="flex items-center space-x-2"
+                  >
+                    <MessageSquarePlus className="w-4 h-4" />
+                    <span>후기 작성하기</span>
+                  </Button>
                 </CardContent>
               </Card>
-            ))}
-          </div>
+            </div>
+          ) : (
+            <>
+              {/* 후기 목록 */}
+              <div className="relative">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
+                  {getCurrentTestimonials().map((testimonial) => (
+                    <Card key={testimonial.id} className="h-full">
+                      <CardContent className="flex flex-col h-full">
+                        <div className="flex items-center mb-4">
+                          {[...Array(5)].map((_, i) => (
+                            <Star
+                              key={i}
+                              size={16}
+                              className={`${
+                                i < testimonial.rating
+                                  ? 'text-yellow-400 fill-current'
+                                  : 'text-gray-600'
+                              }`}
+                            />
+                          ))}
+                          {testimonial.isPinned && (
+                            <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary-900/30 text-primary-400">
+                              고정
+                            </span>
+                          )}
+                        </div>
+                        {testimonial.comment && (
+                          <p className="text-gray-300 mb-4 flex-1">
+                            {testimonial.comment}
+                          </p>
+                        )}
+                        <p className="text-white font-semibold">
+                          - {testimonial.name}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {/* 네비게이션 버튼 */}
+                {totalPages > 1 && (
+                  <div className="flex justify-center items-center space-x-4">
+                    <button
+                      onClick={handlePrevPage}
+                      disabled={currentPage === 0}
+                      className="p-2 rounded-full bg-gray-800 border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    
+                    <span className="text-gray-400">
+                      {currentPage + 1} / {totalPages}
+                    </span>
+                    
+                    <button
+                      onClick={handleNextPage}
+                      disabled={currentPage === totalPages - 1}
+                      className="p-2 rounded-full bg-gray-800 border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* 더 많은 후기 보기 버튼 */}
+              {hasMore && (
+                <div className="text-center mt-8">
+                  <Link href="/testimonials">
+                    <Button variant="outline" size="lg" className="flex items-center space-x-2">
+                      <ArrowRight className="w-4 h-4" />
+                      <span>후기 전체 보기 ({total}개)</span>
+                    </Button>
+                  </Link>
+                </div>
+              )}
+            </>
+          )}
         </div>
+
+        {/* 후기 작성 모달 */}
+        <TestimonialModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSuccess={handleModalSuccess}
+        />
       </section>
 
       {/* CTA Section */}

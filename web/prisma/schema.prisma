@@ -58,6 +58,18 @@ model AdminUser {
   @@map("admin_users")
 }
 
+model Testimonial {
+  id           Int      @id @default(autoincrement())
+  name         String
+  rating       Int
+  comment      String?
+  created_at   DateTime @default(now()) @map("created_at")
+  is_pinned    Boolean  @default(false) @map("is_pinned")
+  is_published Boolean  @default(true) @map("is_published")
+
+  @@map("testimonials")
+}
+
 enum SupportTicketStatus {
   PENDING
   ANSWERED

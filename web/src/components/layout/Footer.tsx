@@ -12,7 +12,7 @@ export default function Footer() {
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center space-x-2 mb-4">
               <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-lg"></div>
-              <span className="font-gaming text-xl text-white">블로커스 온라인</span>
+              <span className="font-sans text-xl text-white">Blokus-online</span>
             </div>
             <p className="text-gray-400 text-sm mb-4">
               전략적 사고와 창의성이 만나는 온라인 블로커스 게임입니다. 
