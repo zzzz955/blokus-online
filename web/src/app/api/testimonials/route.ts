@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 // Force dynamic rendering for this API route
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 // 후기 작성 데이터 검증

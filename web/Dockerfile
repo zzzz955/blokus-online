@@ -86,6 +86,9 @@ RUN apk add --no-cache \
     # Prisma 실행을 위한 OpenSSL
     openssl-dev
 
+# Prisma CLI 설치 (root 권한으로)
+RUN npm install -g prisma@latest
+
 # 애플리케이션 사용자 생성 (보안)
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
@@ -101,10 +104,8 @@ RUN mkdir -p /app/.next/cache && \
 COPY --from=app-builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=app-builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Prisma CLI를 위한 node_modules 복사 (Prisma 관련 패키지만)
-COPY --from=app-builder --chown=nextjs:nodejs /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
-COPY --from=app-builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
-COPY --from=app-builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+# Prisma 클라이언트 복사 (빌드 단계에서 생성된 것)
+COPY --from=app-builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 
 # public 폴더는 더 이상 필요하지 않음 (GitHub Releases로 전환)
 # COPY --chown=nextjs:nodejs ./public /app/public
