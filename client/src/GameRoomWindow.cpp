@@ -434,9 +434,6 @@ namespace Blokus {
         int y = (screenGeometry.height() - height()) / 2;
         move(x, y);
 
-        // 환영 메시지
-        addSystemMessage(QString::fromUtf8("%1님이 '%2' 방에 입장했습니다.").arg(myUsername, roomInfo.roomName));
-
         qDebug() << QString::fromUtf8("GameRoomWindow 생성 완료: 방 %1").arg(roomInfo.roomId);
     }
 
@@ -509,7 +506,7 @@ namespace Blokus {
         m_roomNameLabel->setStyleSheet("font-size: 16px; font-weight: bold; color: #2c3e50;");
 
         m_roomStatusLabel = new QLabel();
-        m_roomStatusLabel->setStyleSheet("font-size: 12px; color: #7f8c8d;");
+        m_roomStatusLabel->setStyleSheet("font-size: 12px; color: #ffffffff;");
 
         m_currentTurnLabel = new QLabel();
         m_currentTurnLabel->setStyleSheet("font-size: 14px; font-weight: bold; color: #34495e;");

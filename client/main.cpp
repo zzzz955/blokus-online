@@ -372,8 +372,6 @@ private slots:
         {
             // 자신의 로그인 브로드캐스트는 시스템 메시지 및 중복 요청 제외
             if (username != m_currentUsername) {
-                m_lobbyWindow->addSystemMessage(QString::fromUtf8("%1님이 로비에 입장했습니다.").arg(username));
-                // 새로운 사용자 목록 요청
                 if (m_networkClient && m_networkClient->isConnected())
                 {
                     m_networkClient->requestLobbyList();
@@ -387,8 +385,6 @@ private slots:
         qDebug() << QString::fromUtf8("사용자 로비 퇴장: %1").arg(username);
         if (m_lobbyWindow)
         {
-            m_lobbyWindow->addSystemMessage(QString::fromUtf8("%1님이 로비를 나갔습니다.").arg(username));
-            // 업데이트된 사용자 목록 요청
             if (m_networkClient && m_networkClient->isConnected())
             {
                 m_networkClient->requestLobbyList();
@@ -1414,7 +1410,7 @@ int main(int argc, char *argv[])
 
     // 애플리케이션 설정
     app.setApplicationName(QString::fromUtf8("블로커스 온라인"));
-    app.setApplicationVersion("1.0.0");
+    app.setApplicationVersion("1.2.0");
     app.setOrganizationName("Blokus Online");
 
     // 설정 시스템 초기화

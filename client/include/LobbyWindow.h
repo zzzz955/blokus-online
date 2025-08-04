@@ -138,7 +138,7 @@ namespace Blokus {
 
     public:
         void addSystemMessage(const QString& message);
-
+        const QString& getMyUsername() const { return m_myUsername; }
 
         // 버튼 쿨다운 관리
         QTimer* m_buttonCooldownTimer;

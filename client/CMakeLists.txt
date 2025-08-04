@@ -37,7 +37,6 @@ set(CLIENT_SOURCES
     "src/ResponsiveUI.cpp"
     "src/NetworkClient.cpp"
     "src/ClientConfigManager.cpp"
-    "src/ClientVersion.cpp"
     "src/SoundManager.cpp"
     "resource.qrc"
 )
@@ -57,7 +56,6 @@ set(CLIENT_HEADERS
     "include/ResponsiveUI.h"
     "include/NetworkClient.h"
     "include/ClientConfigManager.h"
-    "include/ClientVersion.h"
     "include/SoundManager.h"
 )
 
