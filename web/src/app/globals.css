@@ -93,19 +93,26 @@
   }
   
   .prose-custom {
-    @apply text-lg max-w-none;
+    @apply text-white text-lg max-w-none;
   }
+  .prose-custom ul
+  .prose-custom ol
+  .prose-custom li
+  .prose-custom span
+  .prose-custom h4
+  .prose-custom h5
+  .prose-custom h6
   .prose-custom h1, .prose-custom h2, .prose-custom h3 {
-    @apply text-gray-900 font-bold mb-4;
+    @apply text-white font-bold mb-4;
   }
   .prose-custom p {
     @apply text-white mb-4;
   }
   .prose-custom a {
-    @apply text-primary-600 hover:text-primary-700;
+    @apply text-white text-primary-600 hover:text-primary-700;
   }
   .prose-custom strong {
-    @apply text-gray-900 font-semibold;
+    @apply text-white font-semibold;
   }
 }
 

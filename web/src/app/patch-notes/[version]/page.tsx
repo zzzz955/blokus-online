@@ -226,7 +226,7 @@ export default function PatchNoteDetailPage({ params }: PatchNoteDetailPageProps
             <Button
               variant="outline"
               onClick={() => router.push('/patch-notes')}
-              className="flex items-center space-x-2"
+              className="flex items-center space-x-2 text-gray-400 hover:text-black"
             >
               <ArrowLeft className="w-4 h-4" />
               <span>목록으로</span>
