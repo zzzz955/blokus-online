@@ -107,8 +107,6 @@ COPY --from=app-builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_mo
 COPY --from=app-builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=app-builder --chown=nextjs:nodejs /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
 
-# bcrypt 모듈 복사 (관리자 계정 생성용)
-COPY --from=app-builder --chown=nextjs:nodejs /app/node_modules/bcrypt ./node_modules/bcrypt
 
 # public 폴더는 더 이상 필요하지 않음 (GitHub Releases로 전환)
 # COPY --chown=nextjs:nodejs ./public /app/public
@@ -129,8 +127,8 @@ RUN chmod +x /app/docker-entrypoint.sh
 # 사용자 변경
 USER nextjs
 
-# Prisma CLI를 사용자 권한으로 설치
-RUN npm install prisma@latest
+# 런타임에 필요한 패키지들을 사용자 권한으로 설치
+RUN npm install prisma@latest bcryptjs@latest
 
 # 포트 노출
 EXPOSE 3000
