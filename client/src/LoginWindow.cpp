@@ -8,6 +8,7 @@
 #include <QTimer>
 #include <QScreen>
 #include <QGuiApplication>
+#include <QSvgWidget>
 
 namespace Blokus
 {
@@ -19,6 +20,7 @@ namespace Blokus
           m_titleWidget(nullptr),
           m_titleLabel(nullptr),
           m_subtitleLabel(nullptr),
+          m_titleSvgWidget(nullptr),
           m_formContainer(nullptr),
           m_formLayout(nullptr),
           m_loginForm(nullptr),
@@ -117,9 +119,15 @@ namespace Blokus
         titleLayout->setContentsMargins(3, 3, 3, 3);
         titleLayout->setSpacing(2);
 
-        // 메인 타이틀 - 36px 고정 크기
+        // SVG 타이틀 이미지
+        m_titleSvgWidget = new QSvgWidget("resource/login_title.svg");
+        m_titleSvgWidget->setFixedHeight(240); // 고정 높이 설정
+        m_titleSvgWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        
+        // 메인 타이틀 - 36px 고정 크기 (숨김 처리)
         m_titleLabel = new QLabel(QString::fromUtf8("Blokus-Online"));
         m_titleLabel->setAlignment(Qt::AlignCenter);
+        m_titleLabel->setVisible(false); // SVG로 대체되므로 숨김
         // 타이틀 폰트 36px 고정 크기 설정
         QFont titleFont("맑은 고딕", 36, QFont::Bold);
         m_titleLabel->setFont(titleFont);
@@ -132,9 +140,10 @@ namespace Blokus
                                         .arg(ModernPastelTheme::getTextPrimary().green())
                                         .arg(ModernPastelTheme::getTextPrimary().blue()));
 
-        // 서브타이틀 - 20px 고정 크기
+        // 서브타이틀 - 20px 고정 크기 (숨김 처리)
         m_subtitleLabel = new QLabel(QString::fromUtf8("전략적 블록 배치 게임"));
         m_subtitleLabel->setAlignment(Qt::AlignCenter);
+        m_subtitleLabel->setVisible(false); // SVG로 대체되므로 숨김
         // 서브타이틀 폰트 20px 고정 크기 설정
         QFont subtitleFont("맑은 고딕", 20, QFont::Normal);
         m_subtitleLabel->setFont(subtitleFont);
@@ -147,6 +156,7 @@ namespace Blokus
                                            .arg(ModernPastelTheme::getTextSecondary().green())
                                            .arg(ModernPastelTheme::getTextSecondary().blue()));
 
+        titleLayout->addWidget(m_titleSvgWidget);
         titleLayout->addWidget(m_titleLabel);
         titleLayout->addWidget(m_subtitleLabel);
     }

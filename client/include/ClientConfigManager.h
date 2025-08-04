@@ -30,8 +30,8 @@ public:
     struct WindowConfig {
         int width = 1280;
         int height = 800;
-        int min_width = 800;
-        int min_height = 500;
+        int min_width = 600;
+        int min_height = 400;
     };
     
     struct GameBoardConfig {

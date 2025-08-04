@@ -14,6 +14,8 @@
 #include <QTimer>
 #include <QKeyEvent>
 #include <QMessageBox>
+#include <QSvgWidget>
+#include <QPixmap>
 #include "ResponsiveUI.h"
 
 namespace Blokus {
@@ -97,6 +99,7 @@ namespace Blokus {
         QWidget* m_titleWidget;
         QLabel* m_titleLabel;
         QLabel* m_subtitleLabel;
+        QSvgWidget* m_titleSvgWidget;
 
         // �� �����̳�
         QWidget* m_formContainer;

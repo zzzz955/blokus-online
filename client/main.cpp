@@ -1192,10 +1192,10 @@ private:
         m_loginWindow = new Blokus::LoginWindow();
         
         // 설정에서 창 크기 적용
-        auto& config = ClientConfigManager::instance();
-        const auto& windowConfig = config.getClientConfig().window;
-        m_loginWindow->resize(windowConfig.width, windowConfig.height);
-        m_loginWindow->setMinimumSize(windowConfig.min_width, windowConfig.min_height);
+        // auto& config = ClientConfigManager::instance();
+        // const auto& windowConfig = config.getClientConfig().window;
+        // m_loginWindow->resize(windowConfig.width, windowConfig.height);
+        // m_loginWindow->setMinimumSize(windowConfig.min_width, windowConfig.min_height);
 
         // 로그인 시그널 연결
         connect(m_loginWindow, &Blokus::LoginWindow::loginRequested,
