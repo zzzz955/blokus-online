@@ -59,7 +59,6 @@ RUN rm -f package-lock.json && \
 
 # Prisma 클라이언트 생성
 RUN npx prisma generate
-RUN npx prisma db push
 
 # Next.js 빌드 (단계별 실행으로 디버깅 개선)
 RUN npm run build
@@ -102,6 +101,11 @@ RUN mkdir -p /app/.next/cache && \
 COPY --from=app-builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=app-builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# Prisma CLI를 위한 node_modules 복사 (Prisma 관련 패키지만)
+COPY --from=app-builder --chown=nextjs:nodejs /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
+COPY --from=app-builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
+COPY --from=app-builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+
 # public 폴더는 더 이상 필요하지 않음 (GitHub Releases로 전환)
 # COPY --chown=nextjs:nodejs ./public /app/public
 
@@ -110,6 +114,10 @@ COPY --chown=nextjs:nodejs ./prisma /app/prisma
 
 # package.json에서 실행에 필요한 정보만 복사
 COPY --from=app-builder --chown=nextjs:nodejs /app/package.json ./package.json
+
+# 엔트리포인트 스크립트 복사
+COPY --chown=nextjs:nodejs ./docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
 
 # 포트 노출
 EXPOSE 3000
@@ -122,7 +130,7 @@ USER nextjs
 #     CMD curl -f http://localhost:3000/api/health || exit 1
 
 # 실행 명령
-CMD ["node", "server.js"]
+CMD ["/app/docker-entrypoint.sh"]
 
 # ==================================================
 # 빌드 정보 메타데이터
