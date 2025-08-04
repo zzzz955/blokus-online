@@ -2,7 +2,7 @@
 #include "DatabaseManager.h"
 #include "ConfigManager.h"
 #include <spdlog/spdlog.h>
-#include <bcrypt/BCrypt.hpp>
+#include <argon2.h>
 #include <openssl/rand.h>
 #include <random>
 #include <regex>
@@ -402,9 +402,53 @@ namespace Blokus {
 
         std::string AuthenticationService::hashPassword(const std::string& password) const {
             try {
-                // bcrypt를 사용한 패스워드 해싱 (rounds = 12, 웹과 동일)
-                std::string hashedPassword = BCrypt::generateHash(password, 12);
-                spdlog::debug("비밀번호 해시 생성 완료 (bcrypt, rounds=12)");
+                // Argon2id 해싱 (웹에서 bcrypt에서 argon2로 변경 예정)
+                const size_t hashlen = 32;
+                const size_t saltlen = 16;
+                
+                // 솔트 생성
+                unsigned char salt[saltlen];
+                if (RAND_bytes(salt, saltlen) != 1) {
+                    spdlog::error("솔트 생성 실패");
+                    return "";
+                }
+                
+                // Argon2 해시 생성
+                unsigned char hash[hashlen];
+                int result = argon2id_hash_raw(
+                    2,                                    // t_cost (iterations)
+                    1 << 16,                             // m_cost (64MB memory)
+                    1,                                   // parallelism
+                    password.c_str(), password.length(), // password
+                    salt, saltlen,                       // salt
+                    hash, hashlen                        // output hash
+                );
+                
+                if (result != ARGON2_OK) {
+                    spdlog::error("Argon2 해시 생성 실패: {}", argon2_error_message(result));
+                    return "";
+                }
+                
+                // Base64 인코딩된 해시 문자열 생성 (웹과 호환되는 형식)
+                size_t encodedlen = argon2_encodedlen(2, 1 << 16, 1, saltlen, hashlen, Argon2_id);
+                char* encoded = new char[encodedlen];
+                
+                result = argon2id_hash_encoded(
+                    2, 1 << 16, 1,
+                    password.c_str(), password.length(),
+                    salt, saltlen,
+                    hashlen, encoded, encodedlen
+                );
+                
+                std::string hashedPassword;
+                if (result == ARGON2_OK) {
+                    hashedPassword = std::string(encoded);
+                    spdlog::debug("비밀번호 해시 생성 완료 (Argon2id)");
+                } else {
+                    spdlog::error("Argon2 인코딩 실패: {}", argon2_error_message(result));
+                }
+                
+                delete[] encoded;
                 return hashedPassword;
             }
             catch (const std::exception& e) {
@@ -440,8 +484,14 @@ namespace Blokus {
 
         bool AuthenticationService::verifyPassword(const std::string& password, const std::string& hash) const {
             try {
-                // bcrypt 해시 검증
-                bool isValid = BCrypt::validatePassword(password, hash);
+                // Argon2 해시 검증
+                int result = argon2id_verify(hash.c_str(), password.c_str(), password.length());
+                bool isValid = (result == ARGON2_OK);
+                
+                if (!isValid && result != ARGON2_VERIFY_MISMATCH) {
+                    spdlog::error("Argon2 검증 오류: {}", argon2_error_message(result));
+                }
+                
                 spdlog::debug("비밀번호 검증 결과: {}", isValid ? "성공" : "실패");
                 return isValid;
             }

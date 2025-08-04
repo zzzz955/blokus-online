@@ -1,4 +1,4 @@
-import bcrypt from 'bcryptjs';
+import * as argon2 from 'argon2';
 import jwt from 'jsonwebtoken';
 import { NextAuthOptions } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
@@ -36,11 +36,22 @@ declare module "next-auth" {
 }
 
 export async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, 12);
+  // Argon2id 해싱 (게임 서버와 동일한 파라미터)
+  return argon2.hash(password, {
+    type: argon2.argon2id,
+    memoryCost: 2 ** 16, // 64MB
+    timeCost: 2,         // 2 iterations
+    parallelism: 1,      // 1 thread
+  });
 }
 
 export async function verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
-  return bcrypt.compare(password, hashedPassword);
+  try {
+    return await argon2.verify(hashedPassword, password);
+  } catch (error) {
+    console.error('비밀번호 검증 오류:', error);
+    return false;
+  }
 }
 
 export function generateToken(payload: JWTPayload): string {

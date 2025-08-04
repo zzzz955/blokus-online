@@ -12,6 +12,6 @@
     "nlohmann-json",
     "libpqxx",
     "openssl",
-    "bcrypt"
+    "argon2"
   ]
 }
