@@ -21,7 +21,7 @@ async function createAdminUser() {
     }
 
     // 기존 관리자 계정 확인
-    const existingAdmin = await prisma.admin.findUnique({
+    const existingAdmin = await prisma.adminUser.findUnique({
       where: { username: adminUsername }
     });
 
@@ -34,14 +34,11 @@ async function createAdminUser() {
     const hashedPassword = await bcrypt.hash(adminPassword, 12);
 
     // 관리자 계정 생성
-    const admin = await prisma.admin.create({
+    const admin = await prisma.adminUser.create({
       data: {
         username: adminUsername,
-        password: hashedPassword,
-        email: `${adminUsername}@blokus.local`,
-        full_name: '시스템 관리자',
-        role: 'super_admin',
-        is_active: true,
+        password_hash: hashedPassword,
+        role: 'SUPER_ADMIN',
       }
     });
 
