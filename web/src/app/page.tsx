@@ -259,9 +259,26 @@ export default function HomePage() {
                             {testimonial.comment}
                           </p>
                         )}
-                        <p className="text-white font-semibold">
-                          - {testimonial.name}
-                        </p>
+                        {testimonial.user ? (
+                          <div className="bg-gray-700/30 rounded-lg p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-white font-semibold">
+                                {testimonial.user.username}
+                              </p>
+                              <span className="text-xs bg-primary-600 text-white px-2 py-1 rounded">
+                                Lv.{testimonial.user.level}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-xs text-gray-400">
+                              <div>게임 {testimonial.user.totalGames}회</div>
+                              <div>승률 {testimonial.user.winRate}%</div>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-white font-semibold">
+                            - {testimonial.name}
+                          </p>
+                        )}
                       </CardContent>
                     </Card>
                   ))}

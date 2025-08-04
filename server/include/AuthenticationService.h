@@ -118,7 +118,7 @@ namespace Blokus {
 
         private:
             // ��ȣȭ/�ؽ�
-            std::string hashPassword(const std::string& password, const std::string& salt = "") const;
+            std::string hashPassword(const std::string& password) const;
             std::string generateSalt() const;
             bool verifyPassword(const std::string& password, const std::string& hash) const;
 

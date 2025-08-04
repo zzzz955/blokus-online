@@ -55,7 +55,7 @@ model UserStats {
   draws          Int @default(0)
   
   best_score     Int @default(0) @map("best_score")
-  total_score    BigInt @default(0) @map("total_score")
+  total_score    Int @default(0) @map("total_score")
   
   longest_win_streak  Int @default(0) @map("longest_win_streak")
   current_win_streak  Int @default(0) @map("current_win_streak")
@@ -116,7 +116,7 @@ model PatchNote {
 
 model SupportTicket {
   id           Int                 @id @default(autoincrement())
-  user_id      Int?                @map("user_id") // 로그인 사용자 연결
+  userId       Int?                @map("user_id") // 로그인 사용자 연결
   email        String
   subject      String
   message      String
@@ -126,7 +126,7 @@ model SupportTicket {
   replied_at   DateTime?           @map("replied_at")
   
   // 관계
-  user User? @relation(fields: [user_id], references: [user_id], onDelete: SetNull)
+  user User? @relation(fields: [userId], references: [user_id], onDelete: SetNull)
 
   @@map("support_tickets")
 }
@@ -143,8 +143,8 @@ model AdminUser {
 
 model Testimonial {
   id           Int      @id @default(autoincrement())
-  user_id      Int?     @map("user_id") // 게임 사용자 연결
-  name         String   // 표시명 (username 또는 display_name)
+  userId       Int?     @map("user_id") // 게임 사용자 연결
+  name         String?  // 표시명 (하위 호환성을 위해 유지, 게스트 사용자용)
   rating       Int
   comment      String?
   created_at   DateTime @default(now()) @map("created_at")
@@ -152,7 +152,7 @@ model Testimonial {
   is_published Boolean  @default(true) @map("is_published")
   
   // 관계
-  user User? @relation(fields: [user_id], references: [user_id], onDelete: SetNull)
+  user User? @relation(fields: [userId], references: [user_id], onDelete: SetNull)
 
   @@map("testimonials")
 }

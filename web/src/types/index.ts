@@ -73,6 +73,16 @@ export interface AdminLoginForm {
   password: string;
 }
 
+export interface GameUserStats {
+  username: string;
+  level: number;
+  totalGames: number;
+  wins: number;
+  totalScore: number;
+  bestScore: number;
+  winRate: number;
+}
+
 export interface Testimonial {
   id: number;
   name: string;
@@ -81,6 +91,7 @@ export interface Testimonial {
   createdAt: string;
   isPinned: boolean;
   isPublished: boolean;
+  user?: GameUserStats | null;
   // 데이터베이스 필드 (스네이크케이스)
   created_at?: Date;
   is_pinned?: boolean;
@@ -88,7 +99,6 @@ export interface Testimonial {
 }
 
 export interface TestimonialForm {
-  name: string;
   rating: number;
   comment?: string;
 }

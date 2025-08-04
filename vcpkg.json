@@ -11,6 +11,7 @@
     "boost-system",
     "nlohmann-json",
     "libpqxx",
-    "openssl"
+    "openssl",
+    "bcrypt"
   ]
 }
