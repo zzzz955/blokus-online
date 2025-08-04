@@ -28,6 +28,7 @@ set(CLIENT_SOURCES
     "src/NetworkClient.cpp"
     "src/ClientConfigManager.cpp"
     "src/ClientVersion.cpp"
+    "src/SoundManager.cpp"
 )
 
 set(CLIENT_HEADERS
@@ -46,6 +47,7 @@ set(CLIENT_HEADERS
     "include/NetworkClient.h"
     "include/ClientConfigManager.h"
     "include/ClientVersion.h"
+    "include/SoundManager.h"
 )
 
 # 실행 파일 생성
@@ -67,6 +69,7 @@ target_link_libraries(BlokusClient PRIVATE
     Qt5::Gui
     Qt5::Svg
     Qt5::Network
+    Qt5::Multimedia
 )
 
 # Windows 설정

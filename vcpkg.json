@@ -5,6 +5,7 @@
   "dependencies": [
     "qt5-base",
     "qt5-svg",
+    "qt5-multimedia",
     "spdlog",
     "boost-asio",
     "boost-system",

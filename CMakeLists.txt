@@ -14,7 +14,7 @@ endif()
 # 패키지 찾기
 #find_package(protobuf CONFIG REQUIRED)
 if(MSVC)
-    find_package(Qt5 REQUIRED COMPONENTS Core Widgets Gui Svg Network)
+    find_package(Qt5 REQUIRED COMPONENTS Core Widgets Gui Svg Network Multimedia)
 endif()
 find_package(spdlog CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
