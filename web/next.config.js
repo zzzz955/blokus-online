@@ -3,6 +3,21 @@ const nextConfig = {
   // Docker 배포를 위한 standalone 모드
   output: 'standalone',
   
+  // Git 커밋 해시 기반 빌드 ID (코드 변경시에만 캐시 무효화)
+  generateBuildId: async () => {
+    if (process.env.GITHUB_SHA) {
+      return process.env.GITHUB_SHA.substring(0, 7);
+    }
+    // 로컬 개발환경에서는 git 커밋 해시 사용
+    try {
+      const { execSync } = require('child_process');
+      const gitHash = execSync('git rev-parse --short HEAD').toString().trim();
+      return gitHash;
+    } catch {
+      return 'dev-build';
+    }
+  },
+  
   images: {
     domains: ['localhost', 'blokus-online.mooo.com'],
   },

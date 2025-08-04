@@ -1,4 +1,4 @@
-name: CI/CD Pipeline - Deploy to Server
+name: CI/CD Pipeline - Smart Deploy to Server
 
 on:
   push:
@@ -17,9 +17,264 @@ env:
   DOCKER_COMPOSE_FILE: docker-compose.yml
 
 jobs:
-  deploy:
-    name: Deploy to Ubuntu Server
+  detect-changes:
+    name: Detect Changed Files
     runs-on: ubuntu-latest
+    outputs:
+      game-server-changed: ${{ steps.changes.outputs.game-server }}
+      web-changed: ${{ steps.changes.outputs.web }}
+      infrastructure-changed: ${{ steps.changes.outputs.infrastructure }}
+    
+    steps:
+    - name: 체크아웃 소스코드
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: 변경사항 감지
+      id: changes
+      run: |
+        # 이전 커밋과 현재 커밋 간 변경된 파일 목록 가져오기
+        if [ "${{ github.event_name }}" = "push" ]; then
+          if [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
+            # 새로운 브랜치인 경우 모든 파일을 변경된 것으로 간주
+            CHANGED_FILES=$(git ls-files)
+          else
+            CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
+          fi
+        else
+          # workflow_dispatch의 경우 모든 서비스 빌드
+          CHANGED_FILES=$(git ls-files)
+        fi
+        
+        echo "Changed files:"
+        echo "$CHANGED_FILES"
+        
+        # 게임 서버 관련 변경사항 체크
+        GAME_SERVER_CHANGED=false
+        if echo "$CHANGED_FILES" | grep -E '^(server/|client/|common/|proto/|CMakeLists\.txt|vcpkg\.json)'; then
+          GAME_SERVER_CHANGED=true
+        fi
+        
+        # 웹 애플리케이션 관련 변경사항 체크
+        WEB_CHANGED=false
+        if echo "$CHANGED_FILES" | grep -E '^web/'; then
+          WEB_CHANGED=true
+        fi
+        
+        # 인프라 관련 변경사항 체크
+        INFRASTRUCTURE_CHANGED=false
+        if echo "$CHANGED_FILES" | grep -E '^(docker-compose\.yml|\.github/|\.env\.example)'; then
+          INFRASTRUCTURE_CHANGED=true
+        fi
+        
+        # 인프라 변경이 있으면 모든 서비스 재빌드
+        if [ "$INFRASTRUCTURE_CHANGED" = "true" ]; then
+          GAME_SERVER_CHANGED=true
+          WEB_CHANGED=true
+        fi
+        
+        echo "game-server=$GAME_SERVER_CHANGED" >> $GITHUB_OUTPUT
+        echo "web=$WEB_CHANGED" >> $GITHUB_OUTPUT
+        echo "infrastructure=$INFRASTRUCTURE_CHANGED" >> $GITHUB_OUTPUT
+        
+        echo "Game Server Changed: $GAME_SERVER_CHANGED"
+        echo "Web Changed: $WEB_CHANGED"
+        echo "Infrastructure Changed: $INFRASTRUCTURE_CHANGED"
+
+  shared-setup:
+    name: Shared Setup (Common Tasks)
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: |
+      needs.detect-changes.outputs.game-server-changed == 'true' || 
+      needs.detect-changes.outputs.web-changed == 'true' || 
+      needs.detect-changes.outputs.infrastructure-changed == 'true'
+    
+    steps:
+    - name: 체크아웃 소스코드
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: SSH 키 설정
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -p ${{ env.SSH_PORT }} -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
+        
+    - name: 서버 연결 테스트
+      run: |
+        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "echo 'Shared setup - Connection successful!'"
+        
+    - name: 공통 소스코드 동기화
+      run: |
+        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
+          mkdir -p ${{ env.DEPLOY_PATH }} && 
+          cd ${{ env.DEPLOY_PATH }} && 
+          if [ ! -d .git ]; then
+            git clone https://github.com/${{ github.repository }}.git .
+          else
+            git fetch origin main &&
+            git reset --hard origin/main
+          fi
+        "
+        
+    - name: 공통 환경변수 파일 생성 (인프라 변경시에만)
+      if: needs.detect-changes.outputs.infrastructure-changed == 'true'
+      run: |
+        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
+          cd ${{ env.DEPLOY_PATH }} && \\
+          
+          # 환경변수 기본값 설정
+          JWT_SECRET='${{ secrets.JWT_SECRET }}'
+          SESSION_TIMEOUT_HOURS='${{ secrets.SESSION_TIMEOUT_HOURS }}'
+          PASSWORD_SALT_ROUNDS='${{ secrets.PASSWORD_SALT_ROUNDS }}'
+          LOG_LEVEL='${{ secrets.LOG_LEVEL }}'
+          LOG_DIRECTORY='${{ secrets.LOG_DIRECTORY }}'
+          DEBUG_MODE='${{ secrets.DEBUG_MODE }}'
+          ENABLE_SQL_LOGGING='${{ secrets.ENABLE_SQL_LOGGING }}'
+          
+          # JWT 시크릿 자동 생성 (설정되지 않은 경우)
+          if [ -z \\\"\\\$JWT_SECRET\\\" ]; then
+            JWT_SECRET=\\\$(openssl rand -hex 32)
+            echo 'WARNING: JWT_SECRET not set, auto-generated. Please set it in Repository Secrets for security!'
+          fi
+          
+          cat > .env << EOF
+        # =========================
+        # 게임 서버 설정
+        # =========================
+        SERVER_PORT=${{ secrets.SERVER_PORT }}
+        SERVER_MAX_CLIENTS=${{ secrets.SERVER_MAX_CLIENTS }}
+        SERVER_THREAD_POOL_SIZE=${{ secrets.SERVER_THREAD_POOL_SIZE }}
+        BLOKUS_SERVER_VERSION=${{ secrets.BLOKUS_SERVER_VERSION }}
+        BLOKUS_DOWNLOAD_URL=${{ secrets.BLOKUS_DOWNLOAD_URL }}
+        
+        # 데이터베이스 설정 (게임 서버용)
+        DB_HOST=postgres
+        DB_PORT=${{ secrets.DB_PORT }}
+        DB_USER=${{ secrets.DB_USER }}
+        DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+        DB_NAME=${{ secrets.DB_NAME }}
+        DB_POOL_SIZE=${{ secrets.DB_POOL_SIZE }}
+        
+        # PostgreSQL 설정
+        POSTGRES_DB=${{ secrets.DB_NAME }}
+        POSTGRES_USER=${{ secrets.DB_USER }}
+        POSTGRES_PASSWORD=${{ secrets.DB_PASSWORD }}
+        
+        # 보안 설정
+        JWT_SECRET=\\\$JWT_SECRET
+        SESSION_TIMEOUT_HOURS=\\\${SESSION_TIMEOUT_HOURS:-24}
+        PASSWORD_SALT_ROUNDS=\\\${PASSWORD_SALT_ROUNDS:-12}
+        
+        # 로깅 설정
+        LOG_LEVEL=\\\${LOG_LEVEL:-info}
+        LOG_DIRECTORY=\\\${LOG_DIRECTORY:-/app/logs}
+        
+        # 개발 설정
+        DEBUG_MODE=\\\${DEBUG_MODE:-false}
+        ENABLE_SQL_LOGGING=\\\${ENABLE_SQL_LOGGING:-false}
+        
+        # =========================
+        # 웹 애플리케이션 설정
+        # =========================
+        WEB_PORT=${{ secrets.WEB_PORT }}
+        WEB_APP_URL=${{ secrets.WEB_APP_URL }}
+        WEB_CLIENT_DOWNLOAD_URL=${{ secrets.WEB_CLIENT_DOWNLOAD_URL }}
+        
+        # 웹 데이터베이스 설정 (동일한 PostgreSQL 컨테이너, 다른 DB명)
+        WEB_DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@postgres:5432/blokus_web
+        
+        # 웹 인증 설정
+        WEB_NEXTAUTH_SECRET=${{ secrets.WEB_NEXTAUTH_SECRET }}
+        WEB_JWT_SECRET=${{ secrets.WEB_JWT_SECRET }}
+        
+        # 웹 관리자 계정
+        WEB_ADMIN_USERNAME=${{ secrets.WEB_ADMIN_USERNAME }}
+        WEB_ADMIN_PASSWORD=${{ secrets.WEB_ADMIN_PASSWORD }}
+        
+        # SSL/도메인 설정
+        DOMAIN=${{ secrets.DOMAIN }}
+        CERTBOT_EMAIL=${{ secrets.CERTBOT_EMAIL }}
+        EOF
+        "
+        
+    - name: 공통 디렉토리 설정 (인프라 변경시에만)
+      if: needs.detect-changes.outputs.infrastructure-changed == 'true'
+      run: |
+        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
+          cd ${{ env.DEPLOY_PATH }} && \\
+          
+          # 기본 디렉토리 생성
+          mkdir -p downloads web/uploads certbot/conf certbot/www && \\
+          
+          # logs 디렉토리 강제 정리 및 재생성
+          rm -rf logs 2>/dev/null || echo 'logs cleanup completed' && \\
+          mkdir -p logs/nginx && \\
+          
+          # 권한 설정
+          chmod 755 downloads web/uploads logs logs/nginx certbot/conf certbot/www && \\
+          echo 'All directories created and configured successfully'
+        "
+
+  deploy-game-server:
+    name: Deploy Game Server
+    runs-on: ubuntu-latest
+    needs: [detect-changes, shared-setup]
+    if: needs.detect-changes.outputs.game-server-changed == 'true'
+    
+    steps:
+    - name: SSH 키 설정
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -p ${{ env.SSH_PORT }} -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
+        
+    - name: 게임 서버 빌드 및 재시작
+      run: |
+        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
+          cd ${{ env.DEPLOY_PATH }} && 
+          export DOCKER_BUILDKIT=1 && 
+          export COMPOSE_DOCKER_CLI_BUILD=1 && 
+          docker compose stop blokus-server && 
+          docker compose build blokus-server && 
+          docker compose up -d blokus-server --wait --wait-timeout 60
+        "
+
+  deploy-web:
+    name: Deploy Web Application
+    runs-on: ubuntu-latest
+    needs: [detect-changes, shared-setup]
+    if: needs.detect-changes.outputs.web-changed == 'true'
+    
+    steps:
+    - name: SSH 키 설정
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -p ${{ env.SSH_PORT }} -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
+        
+    - name: 웹 애플리케이션 빌드 및 재시작
+      run: |
+        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
+          cd ${{ env.DEPLOY_PATH }} && 
+          export DOCKER_BUILDKIT=1 && 
+          export COMPOSE_DOCKER_CLI_BUILD=1 && 
+          docker compose stop blokus-web && 
+          docker compose build blokus-web && 
+          docker compose up -d blokus-web --wait --wait-timeout 60
+        "
+
+  deploy-full:
+    name: Full Deploy (Infrastructure Changes)
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.infrastructure-changed == 'true'
     
     steps:
     - name: 체크아웃 소스코드
@@ -209,10 +464,91 @@ jobs:
       if: always()
       run: |
         if [ "${{ job.status }}" == "success" ]; then
-          echo "Deployment successful!"
+          echo "Full infrastructure deployment successful!"
           echo "Game Server: ${{ secrets.WEB_APP_URL }}:${{ secrets.SERVER_PORT }}"
           echo "Website: https://${{ secrets.WEB_APP_URL }}"
           echo "Client Download Directory: ${{ env.DEPLOY_PATH }}/downloads"
         else
-          echo "Deployment failed!"
+          echo "Full infrastructure deployment failed!"
+        fi
+        
+  deployment-summary:
+    name: Deployment Summary
+    runs-on: ubuntu-latest
+    needs: [detect-changes, shared-setup, deploy-game-server, deploy-web, deploy-full]
+    if: always()
+    
+    steps:
+    - name: 배포 결과 요약
+      run: |
+        echo "=== Smart Deployment Summary ==="
+        echo ""
+        
+        # 변경사항 감지 결과
+        echo "📊 Changes Detected:"
+        echo "  - Game Server: ${{ needs.detect-changes.outputs.game-server-changed }}"
+        echo "  - Web Application: ${{ needs.detect-changes.outputs.web-changed }}"
+        echo "  - Infrastructure: ${{ needs.detect-changes.outputs.infrastructure-changed }}"
+        echo ""
+        
+        # 개별 배포 결과
+        echo "🚀 Deployment Results:"
+        
+        if [ "${{ needs.detect-changes.outputs.game-server-changed }}" = "true" ]; then
+          if [ "${{ needs.deploy-game-server.result }}" = "success" ]; then
+            echo "  ✅ Game Server: Successfully deployed"
+          else
+            echo "  ❌ Game Server: Deployment failed"
+          fi
+        else
+          echo "  ⏭️ Game Server: Skipped (no changes)"
+        fi
+        
+        if [ "${{ needs.detect-changes.outputs.web-changed }}" = "true" ]; then
+          if [ "${{ needs.deploy-web.result }}" = "success" ]; then
+            echo "  ✅ Web Application: Successfully deployed"
+          else
+            echo "  ❌ Web Application: Deployment failed"
+          fi
+        else
+          echo "  ⏭️ Web Application: Skipped (no changes)"
+        fi
+        
+        if [ "${{ needs.detect-changes.outputs.infrastructure-changed }}" = "true" ]; then
+          if [ "${{ needs.deploy-full.result }}" = "success" ]; then
+            echo "  ✅ Full Infrastructure: Successfully deployed"
+          else
+            echo "  ❌ Full Infrastructure: Deployment failed"
+          fi
+        else
+          echo "  ⏭️ Full Infrastructure: Skipped (no changes)"
+        fi
+        
+        echo ""
+        echo "🌐 Service URLs:"
+        echo "  - Game Server: ${{ secrets.WEB_APP_URL }}:${{ secrets.SERVER_PORT }}"
+        echo "  - Website: https://${{ secrets.WEB_APP_URL }}"
+        
+        # 전체 성공 여부 체크
+        OVERALL_SUCCESS=true
+        
+        if [ "${{ needs.detect-changes.outputs.game-server-changed }}" = "true" ] && [ "${{ needs.deploy-game-server.result }}" != "success" ]; then
+          OVERALL_SUCCESS=false
+        fi
+        
+        if [ "${{ needs.detect-changes.outputs.web-changed }}" = "true" ] && [ "${{ needs.deploy-web.result }}" != "success" ]; then
+          OVERALL_SUCCESS=false
+        fi
+        
+        if [ "${{ needs.detect-changes.outputs.infrastructure-changed }}" = "true" ] && [ "${{ needs.deploy-full.result }}" != "success" ]; then
+          OVERALL_SUCCESS=false
+        fi
+        
+        echo ""
+        if [ "$OVERALL_SUCCESS" = "true" ]; then
+          echo "🎉 Smart deployment completed successfully!"
+          exit 0
+        else
+          echo "💥 Some deployments failed!"
+          exit 1
         fi

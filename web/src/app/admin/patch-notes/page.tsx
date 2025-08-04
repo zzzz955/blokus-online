@@ -219,7 +219,7 @@ export default function AdminPatchNotesPage() {
                     value={form.version}
                     onChange={(e) => setForm(prev => ({ ...prev, version: e.target.value }))}
                     placeholder="예: v1.0.0 또는 1.0.0"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    className="w-full px-3 py-2 border text-black border-gray-300 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500"
                     required
                   />
                 </div>
@@ -232,7 +232,7 @@ export default function AdminPatchNotesPage() {
                     type="date"
                     value={form.release_date}
                     onChange={(e) => setForm(prev => ({ ...prev, release_date: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    className="w-full px-3 py-2 border text-black border-gray-300 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500"
                     required
                   />
                 </div>
@@ -274,7 +274,7 @@ export default function AdminPatchNotesPage() {
                   onChange={(e) => setForm(prev => ({ ...prev, content: e.target.value }))}
                   rows={12}
                   placeholder="## 새로운 기능&#10;- 기능 1&#10;- 기능 2&#10;&#10;## 버그 수정&#10;- 수정 1&#10;- 수정 2"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500"
+                  className="w-full px-3 py-2 border text-black border-gray-300 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500"
                   required
                 />
               </div>
