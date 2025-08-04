@@ -5,6 +5,7 @@ import { getAdminFromRequest, requireAdmin } from '@/lib/admin-auth';
 const prisma = new PrismaClient();
 
 // Force dynamic rendering for this API route
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 // 후기 업데이트 데이터 검증
