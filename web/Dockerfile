@@ -86,9 +86,6 @@ RUN apk add --no-cache \
     # Prisma 실행을 위한 OpenSSL
     openssl-dev
 
-# Prisma CLI 설치 (root 권한으로)
-RUN npm install -g prisma@latest
-
 # 애플리케이션 사용자 생성 (보안)
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
@@ -104,8 +101,11 @@ RUN mkdir -p /app/.next/cache && \
 COPY --from=app-builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=app-builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Prisma 클라이언트 복사 (빌드 단계에서 생성된 것)
+# Prisma 관련 파일들 복사
 COPY --from=app-builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=app-builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
+COPY --from=app-builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=app-builder --chown=nextjs:nodejs /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
 
 # public 폴더는 더 이상 필요하지 않음 (GitHub Releases로 전환)
 # COPY --chown=nextjs:nodejs ./public /app/public
@@ -120,11 +120,14 @@ COPY --from=app-builder --chown=nextjs:nodejs /app/package.json ./package.json
 COPY --chown=nextjs:nodejs ./docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
-# 포트 노출
-EXPOSE 3000
-
 # 사용자 변경
 USER nextjs
+
+# Prisma CLI를 사용자 권한으로 설치
+RUN npm install prisma@latest
+
+# 포트 노출
+EXPOSE 3000
 
 # 헬스체크
 # HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
