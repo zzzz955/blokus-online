@@ -13,6 +13,9 @@ echo "📊 Running Prisma database migration..."
 npx prisma db push --accept-data-loss
 
 echo "✅ Database migration completed"
+
+echo "👤 Initializing admin user..."
+node scripts/init-admin.js
 echo "🌐 Starting Next.js server..."
 
 # Next.js 서버 시작

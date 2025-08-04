@@ -107,11 +107,17 @@ COPY --from=app-builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_mo
 COPY --from=app-builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=app-builder --chown=nextjs:nodejs /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
 
+# bcrypt 모듈 복사 (관리자 계정 생성용)
+COPY --from=app-builder --chown=nextjs:nodejs /app/node_modules/bcrypt ./node_modules/bcrypt
+
 # public 폴더는 더 이상 필요하지 않음 (GitHub Releases로 전환)
 # COPY --chown=nextjs:nodejs ./public /app/public
 
 # prisma 폴더 복사
 COPY --chown=nextjs:nodejs ./prisma /app/prisma
+
+# scripts 폴더 복사
+COPY --chown=nextjs:nodejs ./scripts /app/scripts
 
 # package.json에서 실행에 필요한 정보만 복사
 COPY --from=app-builder --chown=nextjs:nodejs /app/package.json ./package.json

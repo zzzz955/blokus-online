@@ -23,7 +23,24 @@ export async function apiRequest<T = any>(
     ...options,
   });
 
-  const data: ApiResponse<T> = await response.json();
+  let data: ApiResponse<T>;
+  const responseText = await response.text();
+  
+  try {
+    data = JSON.parse(responseText);
+  } catch (parseError) {
+    // HTML 응답인 경우 (404, 500 등)
+    console.error('API Response parsing failed:', {
+      status: response.status,
+      statusText: response.statusText,
+      url,
+      responseText: responseText.substring(0, 200) + '...'
+    });
+    throw new ApiError(
+      `서버 응답을 파싱할 수 없습니다 (${response.status}: ${response.statusText})`,
+      response.status
+    );
+  }
 
   if (!response.ok || !data.success) {
     throw new ApiError(
@@ -47,7 +64,24 @@ export async function apiRequestFull<T = any>(
     ...options,
   });
 
-  const data: ApiResponse<T> = await response.json();
+  let data: ApiResponse<T>;
+  const responseText = await response.text();
+  
+  try {
+    data = JSON.parse(responseText);
+  } catch (parseError) {
+    // HTML 응답인 경우 (404, 500 등)
+    console.error('API Response parsing failed:', {
+      status: response.status,
+      statusText: response.statusText,
+      url,
+      responseText: responseText.substring(0, 200) + '...'
+    });
+    throw new ApiError(
+      `서버 응답을 파싱할 수 없습니다 (${response.status}: ${response.statusText})`,
+      response.status
+    );
+  }
 
   if (!response.ok || !data.success) {
     throw new ApiError(
