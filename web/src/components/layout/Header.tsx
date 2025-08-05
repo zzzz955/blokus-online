@@ -20,6 +20,7 @@ export default function Header() {
     { name: '게임 가이드', href: '/guide' },
     { name: '공지사항', href: '/announcements' },
     { name: '패치 노트', href: '/patch-notes' },
+    { name: '게임 통계', href: '/stats' },
     { name: session?.user ? '내 문의' : '고객지원', href: session?.user ? '/support' : '/contact' },
   ];
 
