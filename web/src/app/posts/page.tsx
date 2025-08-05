@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react';
 import { Post, PostCategory, PaginatedResponse } from '@/types';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
+import Layout from '@/components/layout/Layout';
 
 const CATEGORY_LABELS: Record<PostCategory, string> = {
   QUESTION: '질문',
@@ -34,7 +35,7 @@ export default function PostsPage() {
       setLoading(true);
       const params = new URLSearchParams({
         page: currentPage.toString(),
-        limit: '10',
+        limit: '20',
       });
 
       if (selectedCategory !== 'ALL') {
@@ -90,17 +91,17 @@ export default function PostsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <Layout>
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* 헤더 */}
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">자유 게시판</h1>
-            <p className="text-gray-600 mt-2">블로쿠스 온라인 커뮤니티에서 자유롭게 소통해보세요</p>
+            <h1 className="text-3xl font-bold text-white">자유 게시판</h1>
+            <p className="text-gray-300 mt-2">블로커스 온라인 커뮤니티에서 자유롭게 소통해보세요</p>
           </div>
           {session && (
             <Link href="/posts/write">
-              <Button className="bg-blue-600 hover:bg-blue-700">
+              <Button className="bg-primary-600 hover:bg-primary-700">
                 글쓰기
               </Button>
             </Link>
@@ -113,8 +114,8 @@ export default function PostsPage() {
             onClick={() => setSelectedCategory('ALL')}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
               selectedCategory === 'ALL'
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-100'
+                ? 'bg-primary-600 text-white'
+                : 'bg-dark-card text-gray-300 hover:bg-gray-700'
             }`}
           >
             전체
@@ -125,8 +126,8 @@ export default function PostsPage() {
               onClick={() => setSelectedCategory(category as PostCategory)}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 selectedCategory === category
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-100'
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-dark-card text-gray-300 hover:bg-gray-700'
               }`}
             >
               {label}
@@ -142,7 +143,7 @@ export default function PostsPage() {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="제목이나 내용으로 검색..."
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="flex-1 px-4 py-2 bg-dark-card border border-dark-border text-white rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder-gray-400"
             />
             <Button type="submit" variant="outline">
               검색
@@ -153,15 +154,15 @@ export default function PostsPage() {
         {/* 로딩 상태 */}
         {loading && (
           <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="text-gray-600 mt-2">게시글을 불러오는 중...</p>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
+            <p className="text-gray-300 mt-2">게시글을 불러오는 중...</p>
           </div>
         )}
 
         {/* 에러 상태 */}
         {error && (
           <Card className="p-6 text-center">
-            <p className="text-red-600">{error}</p>
+            <p className="text-red-400">{error}</p>
             <Button onClick={fetchPosts} className="mt-4">
               다시 시도
             </Button>
@@ -173,10 +174,10 @@ export default function PostsPage() {
           <>
             {posts.length === 0 ? (
               <Card className="p-8 text-center">
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                <h3 className="text-lg font-medium text-white mb-2">
                   게시글이 없습니다
                 </h3>
-                <p className="text-gray-600 mb-4">
+                <p className="text-gray-300 mb-4">
                   첫 번째 게시글을 작성해보세요!
                 </p>
                 {session && (
@@ -186,40 +187,48 @@ export default function PostsPage() {
                 )}
               </Card>
             ) : (
-              <div className="space-y-4">
-                {posts.map((post) => (
-                  <Card key={post.id} className="p-6 hover:shadow-md transition-shadow">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <span className={`px-2 py-1 rounded-full text-sm font-medium ${CATEGORY_COLORS[post.category]}`}>
-                            {CATEGORY_LABELS[post.category]}
-                          </span>
-                          <span className="text-gray-500 text-sm">
-                            조회 {post.viewCount}
-                          </span>
-                        </div>
+              <div className="bg-dark-card border border-dark-border rounded-lg overflow-hidden">
+              <div className="divide-y divide-gray-700">
+                {posts.map((post, index) => (
+                  <div key={post.id} className="px-3 py-2 hover:bg-gray-700 transition-colors">
+                    <div className="flex items-center justify-between">
+                      {/* 좌측: 번호, 카테고리, 제목 */}
+                      <div className="flex items-center space-x-3 flex-1 min-w-0">
+                        <span className="text-gray-400 text-xs font-mono w-6 text-center">
+                          {(currentPage - 1) * 20 + index + 1}
+                        </span>
                         
-                        <Link href={`/posts/${post.id}`}>
-                          <h3 className="text-lg font-semibold text-gray-900 hover:text-blue-600 transition-colors">
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium flex-shrink-0 ${CATEGORY_COLORS[post.category]}`}>
+                          {CATEGORY_LABELS[post.category]}
+                        </span>
+                        
+                        <Link href={`/posts/${post.id}`} className="flex-1 min-w-0">
+                          <span className="text-sm text-white hover:text-primary-400 transition-colors truncate block">
                             {post.title}
-                          </h3>
-                        </Link>
-                        
-                        <div className="flex items-center gap-4 mt-3 text-sm text-gray-600">
-                          <span>
-                            {post.author.displayName || post.author.username}
                           </span>
-                          <span>{formatDate(post.createdAt)}</span>
-                          {post.createdAt !== post.updatedAt && (
-                            <span className="text-blue-600">(수정됨)</span>
+                        </Link>
+                      </div>
+
+                      {/* 우측: 작성자, 작성일, 조회수 */}
+                      <div className="flex items-center space-x-3 text-xs text-gray-400 flex-shrink-0">
+                        <span className="hidden sm:inline">
+                          {post.author.displayName || post.author.username}
+                        </span>
+                        <span className="hidden md:inline">
+                          {formatDate(post.createdAt)}
+                          {new Date(post.updatedAt).getTime() - new Date(post.createdAt).getTime() > 60000 && (
+                            <span className="text-primary-400 ml-1">(수정)</span>
                           )}
-                        </div>
+                        </span>
+                        <span className="w-8 text-right">
+                          {post.viewCount}
+                        </span>
                       </div>
                     </div>
-                  </Card>
+                  </div>
                 ))}
               </div>
+            </div>
             )}
 
             {/* 페이지네이션 */}
@@ -257,6 +266,6 @@ export default function PostsPage() {
           </>
         )}
       </div>
-    </div>
+    </Layout>
   );
 }

@@ -172,7 +172,7 @@ model Post {
   id           Int         @id @default(autoincrement())
   title        String      @db.VarChar(200)
   content      String      // Markdown content
-  category     PostCategory
+  category     post_category
   
   // 작성자 정보
   author_id    Int         @map("author_id")
@@ -192,7 +192,7 @@ model Post {
   @@map("posts")
 }
 
-enum PostCategory {
+enum post_category {
   QUESTION  // 질문
   GUIDE     // 공략
   GENERAL   // 기타

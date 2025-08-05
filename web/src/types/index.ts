@@ -108,6 +108,7 @@ export interface TestimonialForm {
 // ========================================
 
 export type PostCategory = 'QUESTION' | 'GUIDE' | 'GENERAL';
+export type post_category = PostCategory; // DB 호환성을 위한 별칭
 
 export interface Post {
   id: number;

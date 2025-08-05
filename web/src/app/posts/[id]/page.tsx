@@ -192,7 +192,8 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
                   {post.author.displayName || post.author.username}
                 </span>
                 <span>{formatDate(post.createdAt)}</span>
-                {post.createdAt !== post.updatedAt && (
+                {/* 수정된 시간이 생성 시간보다 1분 이상 차이날 때만 표시 */}
+                {new Date(post.updatedAt).getTime() - new Date(post.createdAt).getTime() > 60000 && (
                   <span className="text-blue-600">
                     (수정됨: {formatDate(post.updatedAt)})
                   </span>
