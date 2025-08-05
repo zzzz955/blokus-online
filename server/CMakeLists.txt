@@ -61,6 +61,7 @@ target_link_libraries(BlokusServer PRIVATE
     BlokusCommon
     Boost::system
     libpqxx::pqxx
+    unofficial::argon2::libargon2
 )
 
 # Windows ����
