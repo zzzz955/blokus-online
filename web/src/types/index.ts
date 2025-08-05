@@ -102,3 +102,53 @@ export interface TestimonialForm {
   rating: number;
   comment?: string;
 }
+
+// ========================================
+// 게시판 시스템 타입
+// ========================================
+
+export type PostCategory = 'QUESTION' | 'GUIDE' | 'GENERAL';
+
+export interface Post {
+  id: number;
+  title: string;
+  content: string;
+  category: PostCategory;
+  authorId: number;
+  author: {
+    username: string;
+    displayName?: string;
+  };
+  isHidden: boolean;
+  isDeleted: boolean;
+  viewCount: number;
+  createdAt: string;
+  updatedAt: string;
+  // 데이터베이스 필드 (스네이크케이스)
+  author_id?: number;
+  is_hidden?: boolean;
+  is_deleted?: boolean;
+  view_count?: number;
+  created_at?: Date;
+  updated_at?: Date;
+}
+
+export interface PostForm {
+  title: string;
+  content: string;
+  category: PostCategory;
+}
+
+export interface PostListQuery {
+  category?: PostCategory;
+  page?: number;
+  limit?: number;
+  search?: string;
+}
+
+export interface PostStats {
+  totalPosts: number;
+  questionCount: number;
+  guideCount: number;
+  generalCount: number;
+}

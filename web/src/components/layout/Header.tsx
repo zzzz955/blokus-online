@@ -18,6 +18,7 @@ export default function Header() {
   const navigation = [
     { name: '홈', href: '/' },
     { name: '게임 가이드', href: '/guide' },
+    { name: '자유 게시판', href: '/posts' },
     { name: '공지사항', href: '/announcements' },
     { name: '패치 노트', href: '/patch-notes' },
     { name: '게임 통계', href: '/stats' },

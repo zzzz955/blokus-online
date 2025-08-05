@@ -42,6 +42,7 @@ model User {
   user_stats     UserStats?
   testimonials   Testimonial[]
   support_tickets SupportTicket[]
+  posts          Post[]
   
   @@map("users")
 }
@@ -161,6 +162,40 @@ enum SupportTicketStatus {
   PENDING
   ANSWERED
   CLOSED
+}
+
+// ========================================
+// 게시판 시스템
+// ========================================
+
+model Post {
+  id           Int         @id @default(autoincrement())
+  title        String      @db.VarChar(200)
+  content      String      // Markdown content
+  category     PostCategory
+  
+  // 작성자 정보
+  author_id    Int         @map("author_id")
+  author       User        @relation(fields: [author_id], references: [user_id], onDelete: Cascade)
+  
+  // 게시글 상태
+  is_hidden    Boolean     @default(false) @map("is_hidden")    // 작성자가 숨김
+  is_deleted   Boolean     @default(false) @map("is_deleted")   // 관리자/작성자가 삭제
+  
+  // 통계
+  view_count   Int         @default(0) @map("view_count")
+  
+  // 시간 정보
+  created_at   DateTime    @default(now()) @map("created_at")
+  updated_at   DateTime    @updatedAt @map("updated_at")
+  
+  @@map("posts")
+}
+
+enum PostCategory {
+  QUESTION  // 질문
+  GUIDE     // 공략
+  GENERAL   // 기타
 }
 
 enum AdminRole {
