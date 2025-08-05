@@ -25,6 +25,8 @@ interface UserStatsDetail {
   level: number;
   experience_points: number;
   last_played?: Date;
+  created_at?: Date;
+  last_login_at?: Date;
   updated_at: Date;
   rank?: {
     by_wins: number;
@@ -55,7 +57,9 @@ export async function GET(
         user: {
           select: {
             username: true,
-            display_name: true
+            display_name: true,
+            created_at: true,
+            last_login_at: true
           }
         }
       }
@@ -104,6 +108,8 @@ export async function GET(
       level: userStats.level,
       experience_points: userStats.experience_points,
       last_played: userStats.last_played || undefined,
+      created_at: userStats.user.created_at || undefined,
+      last_login_at: userStats.user.last_login_at || undefined,
       updated_at: userStats.updated_at,
       rank: {
         by_wins: winsRank + 1,

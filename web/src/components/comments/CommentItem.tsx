@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { formatRelativeTime } from '@/utils/format'
 import Button from '@/components/ui/Button'
+import UserProfileModal from '@/components/ui/UserProfileModal'
 import ReplyForm from './ReplyForm'
 import ReplyItem from './ReplyItem'
 
@@ -47,6 +48,7 @@ export default function CommentItem({
   const [showReplyForm, setShowReplyForm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showUserProfile, setShowUserProfile] = useState(false)
 
   const isAuthor = currentUserId === comment.author.id
   const timeAgo = formatRelativeTime(comment.createdAt)
@@ -95,9 +97,12 @@ export default function CommentItem({
             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
               Lv.{comment.author.level}
             </span>
-            <span className="font-semibold text-gray-900">
+            <button
+              onClick={() => setShowUserProfile(true)}
+              className="font-semibold text-gray-900 hover:text-primary-600 transition-colors cursor-pointer"
+            >
               {comment.author.username}
-            </span>
+            </button>
           </div>
           <span className="text-sm text-gray-500">
             {timeAgo}
@@ -165,6 +170,14 @@ export default function CommentItem({
           ))}
         </div>
       )}
+
+      {/* 사용자 프로필 모달 */}
+      <UserProfileModal
+        userId={comment.author.id}
+        username={comment.author.username}
+        isOpen={showUserProfile}
+        onClose={() => setShowUserProfile(false)}
+      />
     </div>
   )
 }

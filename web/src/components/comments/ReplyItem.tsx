@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { formatRelativeTime } from '@/utils/format'
 import Button from '@/components/ui/Button'
+import UserProfileModal from '@/components/ui/UserProfileModal'
 
 interface Reply {
   id: number
@@ -24,6 +25,7 @@ interface ReplyItemProps {
 export default function ReplyItem({ reply, currentUserId, onReplyDeleted }: ReplyItemProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showUserProfile, setShowUserProfile] = useState(false)
 
   const isAuthor = currentUserId === reply.author.id
   const timeAgo = formatRelativeTime(reply.createdAt)
@@ -63,9 +65,12 @@ export default function ReplyItem({ reply, currentUserId, onReplyDeleted }: Repl
             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
               Lv.{reply.author.level}
             </span>
-            <span className="font-semibold text-gray-900 text-sm">
+            <button
+              onClick={() => setShowUserProfile(true)}
+              className="font-semibold text-gray-900 text-sm hover:text-primary-600 transition-colors cursor-pointer"
+            >
               {reply.author.username}
-            </span>
+            </button>
           </div>
           <span className="text-xs text-gray-500">
             {timeAgo}
@@ -96,6 +101,14 @@ export default function ReplyItem({ reply, currentUserId, onReplyDeleted }: Repl
           {error}
         </div>
       )}
+
+      {/* 사용자 프로필 모달 */}
+      <UserProfileModal
+        userId={reply.author.id}
+        username={reply.author.username}
+        isOpen={showUserProfile}
+        onClose={() => setShowUserProfile(false)}
+      />
     </div>
   )
 }

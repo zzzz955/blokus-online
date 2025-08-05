@@ -8,6 +8,7 @@ import ReactMarkdown from 'react-markdown';
 import { Post, PostCategory } from '@/types';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
+import UserProfileModal from '@/components/ui/UserProfileModal';
 import CommentSection from '@/components/comments/CommentSection';
 
 const CATEGORY_LABELS: Record<PostCategory, string> = {
@@ -33,6 +34,7 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [showUserProfile, setShowUserProfile] = useState(false);
 
   const fetchPost = async () => {
     try {
@@ -189,9 +191,12 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
               </h1>
               
               <div className="flex items-center gap-4 text-sm text-gray-600">
-                <span className="font-medium">
+                <button
+                  onClick={() => setShowUserProfile(true)}
+                  className="font-medium hover:text-primary-600 transition-colors cursor-pointer"
+                >
                   {post.author.displayName || post.author.username}
-                </span>
+                </button>
                 <span>{formatDate(post.createdAt)}</span>
                 {/* 수정된 시간이 생성 시간보다 1분 이상 차이날 때만 표시 */}
                 {new Date(post.updatedAt).getTime() - new Date(post.createdAt).getTime() > 60000 && (
@@ -282,6 +287,14 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
 
         {/* 댓글 섹션 */}
         <CommentSection postId={post.id} />
+
+        {/* 사용자 프로필 모달 */}
+        <UserProfileModal
+          userId={post.authorId}
+          username={post.author.username}
+          isOpen={showUserProfile}
+          onClose={() => setShowUserProfile(false)}
+        />
 
         {/* 하단 네비게이션 */}
         <div className="mt-8 flex justify-between">
