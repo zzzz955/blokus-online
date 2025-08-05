@@ -11,6 +11,7 @@ import { formatDate } from '@/utils/format';
 import { api } from '@/utils/api';
 import { PatchNote, PaginatedResponse } from '@/types';
 import ReactMarkdown from 'react-markdown';
+import CommentSection from '@/components/comments/CommentSection';
 
 interface PatchNoteDetailPageProps {
   params: { version: string };
@@ -220,6 +221,9 @@ export default function PatchNoteDetailPage({ params }: PatchNoteDetailPageProps
               )}
             </CardContent>
           </Card>
+
+          {/* 댓글 섹션 */}
+          <CommentSection patchNoteId={patchNote.id} />
 
           {/* 하단 네비게이션 */}
           <div className="mt-8 flex justify-between">

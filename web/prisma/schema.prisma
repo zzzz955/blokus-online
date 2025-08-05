@@ -43,6 +43,8 @@ model User {
   testimonials   Testimonial[]
   support_tickets SupportTicket[]
   posts          Post[]
+  comments       Comment[]
+  replies        Reply[]
   
   @@map("users")
 }
@@ -100,6 +102,9 @@ model Announcement {
   is_pinned    Boolean  @default(false) @map("is_pinned")
   is_published Boolean  @default(true) @map("is_published")
 
+  // 관계
+  comments     Comment[]
+
   @@map("announcements")
 }
 
@@ -111,6 +116,9 @@ model PatchNote {
   release_date DateTime @map("release_date")
   download_url String?  @map("download_url")
   created_at   DateTime @default(now()) @map("created_at")
+
+  // 관계
+  comments     Comment[]
 
   @@map("patch_notes")
 }
@@ -189,6 +197,9 @@ model Post {
   created_at   DateTime    @default(now()) @map("created_at")
   updated_at   DateTime    @updatedAt @map("updated_at")
   
+  // 관계
+  comments     Comment[]
+  
   @@map("posts")
 }
 
@@ -201,4 +212,60 @@ enum post_category {
 enum AdminRole {
   ADMIN
   SUPER_ADMIN
+}
+
+// ========================================
+// 댓글 시스템
+// ========================================
+
+model Comment {
+  id           Int      @id @default(autoincrement())
+  content      String   @db.Text
+  
+  // 작성자 정보 (인증된 사용자만)
+  author_id    Int      @map("author_id")
+  author       User     @relation(fields: [author_id], references: [user_id], onDelete: Cascade)
+  
+  // 댓글이 달린 대상 (다형성 관계)
+  post_id         Int?         @map("post_id")
+  announcement_id Int?         @map("announcement_id")
+  patch_note_id   Int?         @map("patch_note_id")
+  
+  post         Post?         @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  announcement Announcement? @relation(fields: [announcement_id], references: [id], onDelete: Cascade)
+  patch_note   PatchNote?    @relation(fields: [patch_note_id], references: [id], onDelete: Cascade)
+  
+  // 댓글 상태
+  is_deleted   Boolean  @default(false) @map("is_deleted")
+  
+  // 시간 정보
+  created_at   DateTime @default(now()) @map("created_at")
+  updated_at   DateTime @updatedAt @map("updated_at")
+  
+  // 관계
+  replies      Reply[]
+  
+  @@map("comments")
+}
+
+model Reply {
+  id           Int      @id @default(autoincrement())
+  content      String   @db.Text
+  
+  // 작성자 정보 (인증된 사용자만)
+  author_id    Int      @map("author_id")
+  author       User     @relation(fields: [author_id], references: [user_id], onDelete: Cascade)
+  
+  // 대댓글이 달린 댓글
+  comment_id   Int      @map("comment_id")
+  comment      Comment  @relation(fields: [comment_id], references: [id], onDelete: Cascade)
+  
+  // 대댓글 상태
+  is_deleted   Boolean  @default(false) @map("is_deleted")
+  
+  // 시간 정보
+  created_at   DateTime @default(now()) @map("created_at")
+  updated_at   DateTime @updatedAt @map("updated_at")
+  
+  @@map("replies")
 }

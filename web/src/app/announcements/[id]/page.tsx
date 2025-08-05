@@ -10,6 +10,7 @@ import { formatDateTime } from '@/utils/format';
 import { api } from '@/utils/api';
 import { Announcement } from '@/types';
 import ReactMarkdown from 'react-markdown';
+import CommentSection from '@/components/comments/CommentSection';
 
 interface AnnouncementDetailPageProps {
   params: { id: string };
@@ -193,6 +194,9 @@ export default function AnnouncementDetailPage({ params }: AnnouncementDetailPag
               </div>
             </CardContent>
           </Card>
+
+          {/* 댓글 섹션 */}
+          <CommentSection announcementId={announcement.id} />
 
           {/* 하단 네비게이션 */}
           <div className="mt-8 flex justify-between">

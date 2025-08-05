@@ -8,6 +8,7 @@ import ReactMarkdown from 'react-markdown';
 import { Post, PostCategory } from '@/types';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
+import CommentSection from '@/components/comments/CommentSection';
 
 const CATEGORY_LABELS: Record<PostCategory, string> = {
   QUESTION: '질문',
@@ -278,6 +279,9 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
             </ReactMarkdown>
           </div>
         </Card>
+
+        {/* 댓글 섹션 */}
+        <CommentSection postId={post.id} />
 
         {/* 하단 네비게이션 */}
         <div className="mt-8 flex justify-between">
