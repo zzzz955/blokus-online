@@ -119,6 +119,7 @@ export interface Post {
   author: {
     username: string;
     displayName?: string;
+    level: number;
   };
   isHidden: boolean;
   isDeleted: boolean;

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
+import Layout from '@/components/layout/Layout'
 
 interface ResetPasswordForm {
   username: string
@@ -75,7 +76,13 @@ export default function ResetPasswordPage() {
   }
 
   if (status === 'loading') {
-    return <div className="min-h-screen flex items-center justify-center">로딩 중...</div>
+    return (
+      <Layout>
+        <div className="flex items-center justify-center py-20">
+          <div className="text-white">로딩 중...</div>
+        </div>
+      </Layout>
+    )
   }
 
   if (!session?.user || session.user.needs_username) {
@@ -83,29 +90,30 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            비밀번호 재설정
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            {session.user.email}로 인증되었습니다<br/>
-            게임 ID를 입력하고 새 비밀번호를 설정해주세요
-          </p>
-        </div>
+    <Layout>
+      <div className="flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
+          <div>
+            <h2 className="mt-6 text-center text-3xl font-extrabold text-white">
+              비밀번호 재설정
+            </h2>
+            <p className="mt-2 text-center text-sm text-gray-300">
+              {session.user.email}로 인증되었습니다<br/>
+              게임 ID를 입력하고 새 비밀번호를 설정해주세요
+            </p>
+          </div>
 
         <Card className="p-8">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             {errors.root && (
-              <div className="text-red-600 text-sm text-center">
+              <div className="text-red-400 text-sm text-center">
                 {errors.root.message}
               </div>
             )}
 
             {/* 게임 ID */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-white">
                 게임 ID (사용자명) *
               </label>
               <input
@@ -116,20 +124,20 @@ export default function ResetPasswordPage() {
                     message: '올바른 게임 ID를 입력해주세요'
                   }
                 })}
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="mt-1 block w-full border border-dark-border bg-white text-gray-900 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="현재 게임에서 사용 중인 ID"
               />
               {errors.username && (
-                <p className="text-sm text-red-600 mt-1">{errors.username.message}</p>
+                <p className="text-sm text-red-400 mt-1">{errors.username.message}</p>
               )}
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-gray-400 mt-1">
                 이 이메일로 가입한 게임 ID를 정확히 입력해주세요
               </p>
             </div>
 
             {/* 새 비밀번호 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-white">
                 새 비밀번호 *
               </label>
               <input
@@ -141,17 +149,17 @@ export default function ResetPasswordPage() {
                     message: '비밀번호는 최소 6자 이상이어야 합니다'
                   }
                 })}
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="mt-1 block w-full border border-dark-border bg-white text-gray-900 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="새로운 게임 로그인 비밀번호"
               />
               {errors.newPassword && (
-                <p className="text-sm text-red-600 mt-1">{errors.newPassword.message}</p>
+                <p className="text-sm text-red-400 mt-1">{errors.newPassword.message}</p>
               )}
             </div>
 
             {/* 비밀번호 확인 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-white">
                 새 비밀번호 확인 *
               </label>
               <input
@@ -161,11 +169,11 @@ export default function ResetPasswordPage() {
                   validate: (value) => 
                     value === watchedNewPassword || '비밀번호가 일치하지 않습니다'
                 })}
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="mt-1 block w-full border border-dark-border bg-white text-gray-900 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="새 비밀번호 재입력"
               />
               {errors.confirmPassword && (
-                <p className="text-sm text-red-600 mt-1">{errors.confirmPassword.message}</p>
+                <p className="text-sm text-red-400 mt-1">{errors.confirmPassword.message}</p>
               )}
             </div>
 
@@ -181,13 +189,13 @@ export default function ResetPasswordPage() {
           <div className="mt-4 text-center">
             <button
               onClick={() => signOut({ callbackUrl: '/auth/signin' })}
-              className="text-sm text-gray-500 hover:text-gray-700"
+              className="text-sm text-gray-400 hover:text-gray-300"
             >
               다른 계정으로 로그인
             </button>
           </div>
         </Card>
       </div>
-    </div>
+    </Layout>
   )
 }

@@ -68,26 +68,26 @@ export default function ReplyForm({ commentId, onReplyAdded, onCancel }: ReplyFo
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-gray-50 p-4 rounded-lg">
+    <form onSubmit={handleSubmit} className="bg-dark-card border border-dark-border p-4 rounded-lg">
       <div className="mb-3">
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
           placeholder="대댓글을 작성해주세요..."
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none text-sm"
+          className="w-full px-3 py-2 border border-dark-border bg-white text-gray-900 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none text-sm placeholder-gray-500"
           rows={2}
           maxLength={1000}
           disabled={loading}
         />
         <div className="flex justify-between items-center mt-1">
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-gray-400">
             {content.length}/1000
           </span>
         </div>
       </div>
 
       {error && (
-        <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+        <div className="mb-3 p-2 bg-red-900/20 border border-red-500/30 rounded text-red-400 text-sm">
           {error}
         </div>
       )}

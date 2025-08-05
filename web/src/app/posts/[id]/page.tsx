@@ -8,8 +8,10 @@ import ReactMarkdown from 'react-markdown';
 import { Post, PostCategory } from '@/types';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
+import Layout from '@/components/layout/Layout';
 import UserProfileModal from '@/components/ui/UserProfileModal';
 import CommentSection from '@/components/comments/CommentSection';
+import { isPostModified } from '@/utils/format';
 
 const CATEGORY_LABELS: Record<PostCategory, string> = {
   QUESTION: '질문',
@@ -119,24 +121,26 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="text-gray-600 mt-2">게시글을 불러오는 중...</p>
+      <Layout>
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
+            <p className="text-gray-300 mt-2">게시글을 불러오는 중...</p>
+          </div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   if (error || !post) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <Layout>
         <div className="max-w-4xl mx-auto px-4 py-8">
           <Card className="p-8 text-center">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
+            <h2 className="text-xl font-semibold text-white mb-4">
               게시글을 찾을 수 없습니다
             </h2>
-            <p className="text-gray-600 mb-6">{error}</p>
+            <p className="text-gray-300 mb-6">{error}</p>
             <div className="flex justify-center gap-4">
               <Button onClick={() => router.back()}>
                 이전으로
@@ -149,7 +153,7 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
             </div>
           </Card>
         </div>
-      </div>
+      </Layout>
     );
   }
 
@@ -159,11 +163,11 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
   const isAdmin = false; // UI에서는 관리자 버튼을 숨김 (관리자 페이지에서 관리)
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <Layout>
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* 상단 네비게이션 */}
         <div className="mb-6">
-          <Link href="/posts" className="text-blue-600 hover:text-blue-800 text-sm">
+          <Link href="/posts" className="text-primary-400 hover:text-primary-300 text-sm">
             ← 게시판으로 돌아가기
           </Link>
         </div>
@@ -186,21 +190,21 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
                 </span>
               </div>
               
-              <h1 className="text-2xl font-bold text-gray-900 mb-4">
+              <h1 className="text-2xl font-bold text-white mb-4">
                 {post.title}
               </h1>
               
-              <div className="flex items-center gap-4 text-sm text-gray-600">
+              <div className="flex items-center gap-4 text-sm text-gray-300">
                 <button
                   onClick={() => setShowUserProfile(true)}
-                  className="font-medium hover:text-primary-600 transition-colors cursor-pointer"
+                  className="font-medium hover:text-primary-400 transition-colors cursor-pointer"
                 >
                   {post.author.displayName || post.author.username}
                 </button>
                 <span>{formatDate(post.createdAt)}</span>
-                {/* 수정된 시간이 생성 시간보다 1분 이상 차이날 때만 표시 */}
-                {new Date(post.updatedAt).getTime() - new Date(post.createdAt).getTime() > 60000 && (
-                  <span className="text-blue-600">
+                {/* 실제로 수정된 경우에만 표시 */}
+                {isPostModified(post.createdAt, post.updatedAt) && (
+                  <span className="text-primary-400">
                     (수정됨: {formatDate(post.updatedAt)})
                   </span>
                 )}
@@ -247,24 +251,24 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
             <ReactMarkdown
               components={{
                 // 마크다운 스타일링 커스터마이징
-                h1: ({ children }) => <h1 className="text-2xl font-bold text-gray-900 mb-4">{children}</h1>,
-                h2: ({ children }) => <h2 className="text-xl font-bold text-gray-900 mb-3">{children}</h2>,
-                h3: ({ children }) => <h3 className="text-lg font-bold text-gray-900 mb-2">{children}</h3>,
-                p: ({ children }) => <p className="text-gray-700 mb-4 leading-relaxed">{children}</p>,
-                ul: ({ children }) => <ul className="list-disc list-inside text-gray-700 mb-4 space-y-1">{children}</ul>,
-                ol: ({ children }) => <ol className="list-decimal list-inside text-gray-700 mb-4 space-y-1">{children}</ol>,
+                h1: ({ children }) => <h1 className="text-2xl font-bold text-white mb-4">{children}</h1>,
+                h2: ({ children }) => <h2 className="text-xl font-bold text-white mb-3">{children}</h2>,
+                h3: ({ children }) => <h3 className="text-lg font-bold text-white mb-2">{children}</h3>,
+                p: ({ children }) => <p className="text-gray-300 mb-4 leading-relaxed">{children}</p>,
+                ul: ({ children }) => <ul className="list-disc list-inside text-gray-300 mb-4 space-y-1">{children}</ul>,
+                ol: ({ children }) => <ol className="list-decimal list-inside text-gray-300 mb-4 space-y-1">{children}</ol>,
                 blockquote: ({ children }) => (
-                  <blockquote className="border-l-4 border-blue-300 pl-4 py-2 bg-blue-50 text-gray-700 mb-4 italic">
+                  <blockquote className="border-l-4 border-primary-500 pl-4 py-2 bg-dark-card text-gray-300 mb-4 italic">
                     {children}
                   </blockquote>
                 ),
                 code: ({ children }) => (
-                  <code className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-sm font-mono">
+                  <code className="bg-dark-card text-gray-300 px-2 py-1 rounded text-sm font-mono">
                     {children}
                   </code>
                 ),
                 pre: ({ children }) => (
-                  <pre className="bg-gray-100 text-gray-800 p-4 rounded-lg overflow-x-auto mb-4 text-sm font-mono">
+                  <pre className="bg-dark-card text-gray-300 p-4 rounded-lg overflow-x-auto mb-4 text-sm font-mono">
                     {children}
                   </pre>
                 ),
@@ -273,7 +277,7 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
                     href={href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-800 underline"
+                    className="text-primary-400 hover:text-primary-300 underline"
                   >
                     {children}
                   </a>
@@ -308,6 +312,6 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
           </Link>
         </div>
       </div>
-    </div>
+    </Layout>
   );
 }

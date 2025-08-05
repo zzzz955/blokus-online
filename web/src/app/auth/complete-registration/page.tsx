@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
+import Layout from '@/components/layout/Layout'
 
 interface RegistrationForm {
   username: string
@@ -131,7 +132,13 @@ export default function CompleteRegistrationPage() {
   }
 
   if (status === 'loading') {
-    return <div className="min-h-screen flex items-center justify-center">로딩 중...</div>
+    return (
+      <Layout>
+        <div className="flex items-center justify-center py-20">
+          <div className="text-white">로딩 중...</div>
+        </div>
+      </Layout>
+    )
   }
 
   if (!session?.user?.needs_username) {
@@ -139,17 +146,18 @@ export default function CompleteRegistrationPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            게임 계정 설정
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            {session.user.email}로 로그인했습니다<br/>
-            게임에 사용할 ID와 비밀번호를 설정해주세요
-          </p>
-        </div>
+    <Layout>
+      <div className="flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
+          <div>
+            <h2 className="mt-6 text-center text-3xl font-extrabold text-white">
+              게임 계정 설정
+            </h2>
+            <p className="mt-2 text-center text-sm text-gray-300">
+              {session.user.email}로 로그인했습니다<br/>
+              게임에 사용할 ID와 비밀번호를 설정해주세요
+            </p>
+          </div>
 
         <Card className="p-8">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -161,7 +169,7 @@ export default function CompleteRegistrationPage() {
 
             {/* 사용자명 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-white">
                 게임 ID (사용자명) *
               </label>
               <input
@@ -172,17 +180,17 @@ export default function CompleteRegistrationPage() {
                     message: '4-20자의 영문, 숫자, 언더스코어만 사용 가능합니다'
                   }
                 })}
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="mt-1 block w-full border border-dark-border bg-white text-gray-900 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="게임에서 사용할 ID"
               />
               {usernameCheck.checking && (
-                <p className="text-sm text-gray-500 mt-1">확인 중...</p>
+                <p className="text-sm text-gray-400 mt-1">확인 중...</p>
               )}
               {usernameCheck.available === true && (
-                <p className="text-sm text-green-600 mt-1">✓ {usernameCheck.message}</p>
+                <p className="text-sm text-green-400 mt-1">✓ {usernameCheck.message}</p>
               )}
               {(errors.username || usernameCheck.available === false) && (
-                <p className="text-sm text-red-600 mt-1">
+                <p className="text-sm text-red-400 mt-1">
                   {errors.username?.message || usernameCheck.message}
                 </p>
               )}
@@ -190,7 +198,7 @@ export default function CompleteRegistrationPage() {
 
             {/* 비밀번호 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-white">
                 비밀번호 *
               </label>
               <input
@@ -202,17 +210,17 @@ export default function CompleteRegistrationPage() {
                     message: '비밀번호는 최소 6자 이상이어야 합니다'
                   }
                 })}
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="mt-1 block w-full border border-dark-border bg-white text-gray-900 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="게임 로그인 비밀번호"
               />
               {errors.password && (
-                <p className="text-sm text-red-600 mt-1">{errors.password.message}</p>
+                <p className="text-sm text-red-400 mt-1">{errors.password.message}</p>
               )}
             </div>
 
             {/* 비밀번호 확인 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-white">
                 비밀번호 확인 *
               </label>
               <input
@@ -222,22 +230,22 @@ export default function CompleteRegistrationPage() {
                   validate: (value) => 
                     value === watchedPassword || '비밀번호가 일치하지 않습니다'
                 })}
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="mt-1 block w-full border border-dark-border bg-white text-gray-900 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="비밀번호 재입력"
               />
               {errors.confirmPassword && (
-                <p className="text-sm text-red-600 mt-1">{errors.confirmPassword.message}</p>
+                <p className="text-sm text-red-400 mt-1">{errors.confirmPassword.message}</p>
               )}
             </div>
 
             {/* 표시명 (선택사항) */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-white">
                 표시명 (선택사항)
               </label>
               <input
                 {...register('display_name')}
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="mt-1 block w-full border border-dark-border bg-white text-gray-900 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="웹사이트에 표시될 이름 (미입력시 ID 사용)"
               />
             </div>
@@ -254,13 +262,13 @@ export default function CompleteRegistrationPage() {
           <div className="mt-4 text-center">
             <button
               onClick={() => signOut({ callbackUrl: '/auth/signin' })}
-              className="text-sm text-gray-500 hover:text-gray-700"
+              className="text-sm text-gray-400 hover:text-gray-300"
             >
               다른 계정으로 로그인
             </button>
           </div>
         </Card>
       </div>
-    </div>
+    </Layout>
   )
 }

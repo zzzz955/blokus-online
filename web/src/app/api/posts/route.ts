@@ -44,6 +44,11 @@ export async function GET(request: NextRequest) {
           select: {
             username: true,
             display_name: true,
+            user_stats: {
+              select: {
+                level: true,
+              },
+            },
           },
         },
       },
@@ -64,6 +69,7 @@ export async function GET(request: NextRequest) {
       author: {
         username: post.author.username,
         displayName: post.author.display_name,
+        level: post.author.user_stats?.level || 1,
       },
       isHidden: post.is_hidden,
       isDeleted: post.is_deleted,

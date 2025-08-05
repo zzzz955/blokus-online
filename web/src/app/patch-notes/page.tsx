@@ -150,7 +150,7 @@ export default function PatchNotesPage() {
 
                         <div className="flex items-center space-x-4">
                           <Link href={`/patch-notes/${patchNote.version}`}>
-                            <Button variant="outline" size="sm" className="flex items-center space-x-2 text-gray-400 hover:text-black">
+                            <Button variant="outline" size="sm" className="flex items-center space-x-2 text-gray-400 hover:text-white">
                               자세히 보기
                             </Button>
                           </Link>

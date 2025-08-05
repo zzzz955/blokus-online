@@ -7,6 +7,7 @@ import { Post, PostCategory, PaginatedResponse } from '@/types';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import Layout from '@/components/layout/Layout';
+import { formatPostDate, isPostModified } from '@/utils/format';
 
 const CATEGORY_LABELS: Record<PostCategory, string> = {
   QUESTION: '질문',
@@ -72,23 +73,7 @@ export default function PostsPage() {
     fetchPosts();
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInHours = Math.abs(now.getTime() - date.getTime()) / (1000 * 60 * 60);
-
-    if (diffInHours < 24) {
-      return date.toLocaleTimeString('ko-KR', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      });
-    } else {
-      return date.toLocaleDateString('ko-KR', { 
-        month: 'short', 
-        day: 'numeric' 
-      });
-    }
-  };
+  // formatPostDate를 사용하므로 이 함수는 제거
 
   return (
     <Layout>
@@ -211,12 +196,15 @@ export default function PostsPage() {
 
                       {/* 우측: 작성자, 작성일, 조회수 */}
                       <div className="flex items-center space-x-3 text-xs text-gray-400 flex-shrink-0">
-                        <span className="hidden sm:inline">
-                          {post.author.displayName || post.author.username}
+                        <span className="hidden sm:inline flex items-center space-x-1">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
+                            Lv.{post.author.level}
+                          </span>
+                          <span>{post.author.displayName || post.author.username}</span>
                         </span>
                         <span className="hidden md:inline">
-                          {formatDate(post.createdAt)}
-                          {new Date(post.updatedAt).getTime() - new Date(post.createdAt).getTime() > 60000 && (
+                          {formatPostDate(post.createdAt)}
+                          {isPostModified(post.createdAt, post.updatedAt) && (
                             <span className="text-primary-400 ml-1">(수정)</span>
                           )}
                         </span>

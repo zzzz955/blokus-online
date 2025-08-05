@@ -79,20 +79,20 @@ export default function CommentForm({ postId, announcementId, patchNoteId, onCom
           value={content}
           onChange={(e) => setContent(e.target.value)}
           placeholder="댓글을 작성해주세요..."
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none"
+          className="w-full px-4 py-3 border border-dark-border bg-white text-gray-900 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none placeholder-gray-500"
           rows={3}
           maxLength={1000}
           disabled={loading}
         />
         <div className="flex justify-between items-center mt-2">
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-gray-400">
             {content.length}/1000
           </span>
         </div>
       </div>
 
       {error && (
-        <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        <div className="mb-3 p-3 bg-red-900/20 border border-red-500/30 rounded-lg text-red-400 text-sm">
           {error}
         </div>
       )}

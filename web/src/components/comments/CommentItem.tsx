@@ -89,22 +89,22 @@ export default function CommentItem({
   }
 
   return (
-    <div className="border border-gray-200 rounded-lg p-4">
+    <div className="border border-dark-border bg-dark-card rounded-lg p-4">
       {/* 댓글 헤더 */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center space-x-3">
           <div className="flex items-center space-x-2">
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary-600 text-white">
               Lv.{comment.author.level}
             </span>
             <button
               onClick={() => setShowUserProfile(true)}
-              className="font-semibold text-gray-900 hover:text-primary-600 transition-colors cursor-pointer"
+              className="font-semibold text-white hover:text-primary-400 transition-colors cursor-pointer"
             >
               {comment.author.username}
             </button>
           </div>
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-gray-400">
             {timeAgo}
           </span>
         </div>
@@ -124,12 +124,12 @@ export default function CommentItem({
 
       {/* 댓글 내용 */}
       <div className="mb-3">
-        <p className="text-gray-800 whitespace-pre-wrap">{comment.content}</p>
+        <p className="text-gray-300 whitespace-pre-wrap">{comment.content}</p>
       </div>
 
       {/* 에러 메시지 */}
       {error && (
-        <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+        <div className="mb-3 p-2 bg-red-900/20 border border-red-500/30 rounded text-red-400 text-sm">
           {error}
         </div>
       )}
@@ -139,7 +139,7 @@ export default function CommentItem({
         <div className="flex items-center space-x-4 mb-4">
           <button
             onClick={() => setShowReplyForm(!showReplyForm)}
-            className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+            className="text-sm text-primary-400 hover:text-primary-300 font-medium"
           >
             {showReplyForm ? '취소' : '대댓글 달기'}
           </button>
@@ -159,7 +159,7 @@ export default function CommentItem({
 
       {/* 대댓글 목록 */}
       {comment.replies.length > 0 && (
-        <div className="pl-6 border-l-2 border-gray-100 space-y-4">
+        <div className="pl-6 border-l-2 border-gray-600 space-y-4">
           {comment.replies.map((reply) => (
             <ReplyItem
               key={reply.id}

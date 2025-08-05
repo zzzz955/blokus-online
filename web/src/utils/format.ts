@@ -45,6 +45,36 @@ export function formatRelativeTime(date: string | Date): string {
   return formatDate(date);
 }
 
+export function formatPostDate(date: string | Date): string {
+  const d = new Date(date);
+  const now = new Date();
+  
+  // 오늘인지 확인 (같은 날짜인지)
+  const isToday = d.toDateString() === now.toDateString();
+  
+  if (isToday) {
+    // 오늘이면 24시간 형식 HH:MM
+    return d.toLocaleTimeString('ko-KR', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: false
+    });
+  } else {
+    // 오늘이 아니면 MM.DD 형식 (마지막 점 제거)
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${month}.${day}`;
+  }
+}
+
+export function isPostModified(createdAt: string, updatedAt: string): boolean {
+  const created = new Date(createdAt);
+  const updated = new Date(updatedAt);
+  
+  // updated_at이 created_at보다 나중이고, 차이가 1초 이상인 경우에만 수정된 것으로 간주
+  return updated.getTime() > created.getTime() && (updated.getTime() - created.getTime()) >= 1000;
+}
+
 export function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
   return text.substring(0, maxLength) + '...';

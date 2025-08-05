@@ -22,6 +22,7 @@ import {
   Shield,
   AlertTriangle
 } from 'lucide-react';
+import Layout from '@/components/layout/Layout';
 
 interface UserProfile {
   user_id: number;
@@ -131,7 +132,7 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-dark-bg">
+      <Layout>
         <div className="max-w-4xl mx-auto px-4 py-8">
           <div className="animate-pulse">
             <div className="h-8 bg-gray-700 rounded mb-4"></div>
@@ -141,23 +142,25 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-dark-bg flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-red-400 text-xl mb-4">{error}</div>
-          <button 
-            onClick={fetchProfile}
-            className="btn-primary"
-          >
-            다시 시도
-          </button>
+      <Layout>
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center">
+            <div className="text-red-400 text-xl mb-4">{error}</div>
+            <button 
+              onClick={fetchProfile}
+              className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg"
+            >
+              다시 시도
+            </button>
+          </div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
@@ -172,7 +175,7 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="min-h-screen bg-dark-bg">
+    <Layout>
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* 헤더 */}
         <div className="mb-8">
@@ -453,6 +456,6 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
-    </div>
+    </Layout>
   );
 }

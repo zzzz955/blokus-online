@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react';
 import { PostCategory, PostForm } from '@/types';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
+import Layout from '@/components/layout/Layout';
 
 const CATEGORY_OPTIONS: { value: PostCategory; label: string }[] = [
   { value: 'QUESTION', label: '질문' },
@@ -27,9 +28,11 @@ export default function WritePostPage() {
   // 로그인 확인
   if (status === 'loading') {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
+      <Layout>
+        <div className="flex items-center justify-center py-20">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+        </div>
+      </Layout>
     );
   }
 
@@ -86,19 +89,19 @@ export default function WritePostPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <Layout>
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* 헤더 */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">게시글 작성</h1>
-          <p className="text-gray-600 mt-2">커뮤니티에 새로운 게시글을 작성해보세요</p>
+          <h1 className="text-3xl font-bold text-white">게시글 작성</h1>
+          <p className="text-gray-300 mt-2">커뮤니티에 새로운 게시글을 작성해보세요</p>
         </div>
 
         <Card className="p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* 카테고리 선택 */}
             <div>
-              <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="category" className="block text-sm font-medium text-white mb-2">
                 카테고리
               </label>
               <select
@@ -106,7 +109,7 @@ export default function WritePostPage() {
                 name="category"
                 value={form.category}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-dark-border bg-white text-gray-900 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               >
                 {CATEGORY_OPTIONS.map(option => (
                   <option key={option.value} value={option.value}>
@@ -118,7 +121,7 @@ export default function WritePostPage() {
 
             {/* 제목 */}
             <div>
-              <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="title" className="block text-sm font-medium text-white mb-2">
                 제목 *
               </label>
               <input
@@ -129,16 +132,16 @@ export default function WritePostPage() {
                 onChange={handleChange}
                 maxLength={200}
                 placeholder="게시글 제목을 입력해주세요"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-dark-border bg-white text-gray-900 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-gray-400 mt-1">
                 {form.title.length}/200자
               </p>
             </div>
 
             {/* 내용 */}
             <div>
-              <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="content" className="block text-sm font-medium text-white mb-2">
                 내용 *
               </label>
               <textarea
@@ -148,9 +151,9 @@ export default function WritePostPage() {
                 onChange={handleChange}
                 rows={15}
                 placeholder="게시글 내용을 입력해주세요. 마크다운 문법을 사용할 수 있습니다."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-vertical"
+                className="w-full px-3 py-2 border border-dark-border bg-white text-gray-900 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-vertical"
               />
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-gray-400 mt-1">
                 마크다운 문법을 지원합니다. (굵게: **텍스트**, 기울임: *텍스트*, 링크: [텍스트](URL))
               </p>
             </div>
@@ -167,7 +170,7 @@ export default function WritePostPage() {
               <Button
                 type="submit"
                 disabled={loading}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-primary-600 hover:bg-primary-700"
               >
                 {loading ? (
                   <>
@@ -193,8 +196,8 @@ export default function WritePostPage() {
 
         {/* 도움말 */}
         <Card className="mt-6 p-4">
-          <h3 className="font-medium text-gray-900 mb-2">작성 가이드</h3>
-          <ul className="text-sm text-gray-600 space-y-1">
+          <h3 className="font-medium text-white mb-2">작성 가이드</h3>
+          <ul className="text-sm text-gray-300 space-y-1">
             <li>• <strong>질문:</strong> 게임 플레이, 규칙, 기술적 문제에 대한 질문</li>
             <li>• <strong>공략:</strong> 게임 전략, 팁, 가이드 공유</li>
             <li>• <strong>기타:</strong> 자유로운 주제의 게시글</li>
@@ -203,6 +206,6 @@ export default function WritePostPage() {
           </ul>
         </Card>
       </div>
-    </div>
+    </Layout>
   );
 }

@@ -57,22 +57,22 @@ export default function ReplyItem({ reply, currentUserId, onReplyDeleted }: Repl
   }
 
   return (
-    <div className="bg-gray-50 rounded-lg p-3">
+    <div className="bg-dark-card border border-dark-border rounded-lg p-3">
       {/* 대댓글 헤더 */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center space-x-3">
           <div className="flex items-center space-x-2">
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary-600 text-white">
               Lv.{reply.author.level}
             </span>
             <button
               onClick={() => setShowUserProfile(true)}
-              className="font-semibold text-gray-900 text-sm hover:text-primary-600 transition-colors cursor-pointer"
+              className="font-semibold text-white text-sm hover:text-primary-400 transition-colors cursor-pointer"
             >
               {reply.author.username}
             </button>
           </div>
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-gray-400">
             {timeAgo}
           </span>
         </div>
@@ -92,12 +92,12 @@ export default function ReplyItem({ reply, currentUserId, onReplyDeleted }: Repl
 
       {/* 대댓글 내용 */}
       <div className="mb-2">
-        <p className="text-gray-800 text-sm whitespace-pre-wrap">{reply.content}</p>
+        <p className="text-gray-300 text-sm whitespace-pre-wrap">{reply.content}</p>
       </div>
 
       {/* 에러 메시지 */}
       {error && (
-        <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-xs">
+        <div className="mt-2 p-2 bg-red-900/20 border border-red-500/30 rounded text-red-400 text-xs">
           {error}
         </div>
       )}
