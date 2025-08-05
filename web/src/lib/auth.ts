@@ -22,6 +22,12 @@ declare module "next-auth" {
       image?: string | null
       oauth_provider?: string | null
       needs_username?: boolean // OAuth 후 ID/PW 설정 필요 여부
+      needs_reactivation?: boolean // 계정 복구 필요 여부
+      deactivated_account?: {
+        username: string
+        display_name?: string
+        member_since: Date
+      }
     }
   }
   
@@ -32,6 +38,12 @@ declare module "next-auth" {
     image?: string | null
     oauth_provider?: string | null
     needs_username?: boolean
+    needs_reactivation?: boolean
+    deactivated_account?: {
+      username: string
+      display_name?: string
+      member_since: Date
+    }
   }
 }
 
@@ -122,30 +134,64 @@ export const authOptions: NextAuthOptions = {
       if (!account || !user.email) return false
       
       try {
-        // OAuth 사용자 확인
-        const existingUser = await prisma.user.findFirst({
+        // OAuth 사용자 확인 (활성 계정)
+        const existingActiveUser = await prisma.user.findFirst({
           where: {
             AND: [
               { oauth_provider: account.provider },
-              { email: user.email }
+              { email: user.email },
+              { is_active: true }
             ]
           }
         })
         
-        if (existingUser) {
-          // 기존 사용자 - 로그인 시간 업데이트
+        if (existingActiveUser) {
+          // 기존 활성 사용자 - 로그인 시간 업데이트
           await prisma.user.update({
-            where: { user_id: existingUser.user_id },
+            where: { user_id: existingActiveUser.user_id },
             data: { last_login_at: new Date() }
           })
           
-          user.id = existingUser.user_id.toString()
-          user.oauth_provider = existingUser.oauth_provider
-          user.needs_username = false // 이미 계정 완성됨
+          user.id = existingActiveUser.user_id.toString()
+          user.oauth_provider = existingActiveUser.oauth_provider
+          user.needs_username = false
+          user.needs_reactivation = false
         } else {
-          // 새 OAuth 사용자 - 임시 세션 생성 (ID/PW 입력 대기)
-          user.oauth_provider = account.provider
-          user.needs_username = true // ID/PW 설정 필요
+          // 비활성 계정 확인
+          const existingDeactivatedUser = await prisma.user.findFirst({
+            where: {
+              AND: [
+                { oauth_provider: account.provider },
+                { email: user.email },
+                { is_active: false }
+              ]
+            },
+            select: {
+              user_id: true,
+              username: true,
+              display_name: true,
+              created_at: true,
+              oauth_provider: true
+            }
+          })
+          
+          if (existingDeactivatedUser) {
+            // 비활성 계정 발견 - 복구 확인 필요
+            user.id = 'deactivated-' + existingDeactivatedUser.user_id.toString()
+            user.oauth_provider = existingDeactivatedUser.oauth_provider
+            user.needs_username = false
+            user.needs_reactivation = true
+            user.deactivated_account = {
+              username: existingDeactivatedUser.username,
+              display_name: existingDeactivatedUser.display_name || undefined,
+              member_since: existingDeactivatedUser.created_at
+            }
+          } else {
+            // 새 OAuth 사용자 - 임시 세션 생성 (ID/PW 입력 대기)
+            user.oauth_provider = account.provider
+            user.needs_username = true
+            user.needs_reactivation = false
+          }
         }
         
         return true
@@ -159,6 +205,8 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.oauth_provider = user.oauth_provider
         token.needs_username = user.needs_username
+        token.needs_reactivation = user.needs_reactivation
+        token.deactivated_account = user.deactivated_account
       }
       return token
     },
@@ -168,6 +216,12 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.sub!
         session.user.oauth_provider = token.oauth_provider as string
         session.user.needs_username = token.needs_username as boolean
+        session.user.needs_reactivation = token.needs_reactivation as boolean
+        session.user.deactivated_account = token.deactivated_account as {
+          username: string
+          display_name?: string
+          member_since: Date
+        }
       }
       return session
     }

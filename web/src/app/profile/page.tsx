@@ -17,7 +17,10 @@ import {
   Star,
   HelpCircle,
   Save,
-  X
+  X,
+  Lock,
+  Shield,
+  AlertTriangle
 } from 'lucide-react';
 
 interface UserProfile {
@@ -353,7 +356,7 @@ export default function ProfilePage() {
             </div>
 
             {/* 활동 통계 */}
-            <div className="bg-dark-card border border-dark-border rounded-lg p-6">
+            <div className="bg-dark-card border border-dark-border rounded-lg p-6 mb-6">
               <h2 className="text-xl font-semibold text-white mb-6">내 활동</h2>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -395,6 +398,56 @@ export default function ProfilePage() {
                     </div>
                   </div>
                 </Link>
+              </div>
+            </div>
+
+            {/* 계정 설정 */}
+            <div className="bg-dark-card border border-dark-border rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-white mb-6">계정 설정</h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Link 
+                  href="/profile/password-reset"
+                  className="bg-dark-bg border border-dark-border rounded-lg p-4 hover:border-green-500 transition-colors"
+                >
+                  <div className="flex items-center space-x-3">
+                    <Lock className="text-green-400" size={24} />
+                    <div>
+                      <div className="text-white font-medium">비밀번호 변경</div>
+                      <div className="text-gray-400 text-sm">보안을 위해 정기적으로 변경하세요</div>
+                    </div>
+                  </div>
+                </Link>
+
+                <Link 
+                  href="/profile/deactivate"
+                  className="bg-dark-bg border border-dark-border rounded-lg p-4 hover:border-red-500 transition-colors group"
+                >
+                  <div className="flex items-center space-x-3">
+                    <AlertTriangle className="text-red-400 group-hover:text-red-300" size={24} />
+                    <div>
+                      <div className="text-white font-medium group-hover:text-red-100">회원 탈퇴</div>
+                      <div className="text-gray-400 text-sm group-hover:text-red-200">계정을 비활성화합니다</div>
+                    </div>
+                  </div>
+                </Link>
+              </div>
+
+              {/* 보안 정보 */}
+              <div className="mt-6 pt-6 border-t border-dark-border">
+                <div className="flex items-start space-x-3">
+                  <Shield className="text-blue-400 mt-1" size={20} />
+                  <div>
+                    <h3 className="text-white font-medium mb-1">보안 안내</h3>
+                    <ul className="text-gray-400 text-sm space-y-1">
+                      <li>• 비밀번호는 영문, 숫자, 특수문자를 포함하여 8자 이상으로 설정하세요</li>
+                      <li>• 정기적인 비밀번호 변경으로 계정을 안전하게 보호하세요</li>
+                      {profile.oauth_provider && (
+                        <li>• {profile.oauth_provider} 계정으로 연동되어 있어 더욱 안전합니다</li>
+                      )}
+                    </ul>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
