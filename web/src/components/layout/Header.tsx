@@ -56,12 +56,15 @@ export default function Header() {
               <div className="w-8 h-8 animate-pulse bg-gray-600 rounded-full"></div>
             ) : session?.user ? (
               <div className="flex items-center space-x-3">
-                <div className="flex items-center space-x-2 text-white">
+                <Link
+                  href="/profile"
+                  className="flex items-center space-x-2 text-white hover:text-primary-400 transition-colors"
+                >
                   <User size={18} />
                   <span className="text-sm">
                     {session.user.name || session.user.email}
                   </span>
-                </div>
+                </Link>
                 <button
                   onClick={handleSignOut}
                   className="text-gray-300 hover:text-white text-sm px-3 py-1 rounded transition-colors"
@@ -126,12 +129,16 @@ export default function Header() {
               <div className="pt-2 border-t border-gray-600">
                 {session?.user ? (
                   <div className="space-y-2">
-                    <div className="flex items-center space-x-2 text-white px-3 py-2">
+                    <Link
+                      href="/profile"
+                      className="flex items-center space-x-2 text-white hover:text-primary-400 px-3 py-2 transition-colors"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
                       <User size={16} />
                       <span className="text-sm">
                         {session.user.name || session.user.email}
                       </span>
-                    </div>
+                    </Link>
                     <button
                       onClick={() => {
                         setIsMenuOpen(false);
