@@ -204,7 +204,7 @@ export async function PUT(request: NextRequest) {
     const response: ApiResponse<{ 
       user_id: number; 
       username: string; 
-      display_name?: string; 
+      display_name: string | null; 
       updated_at: Date 
     }> = {
       success: true,

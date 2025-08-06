@@ -139,10 +139,18 @@ export default function RichTextEditor({
       `}</style>
       
       <ReactQuill
-        ref={quillRef}
         theme="snow"
         value={value}
-        onChange={onChange}
+        onChange={(content) => {
+          onChange(content);
+          // Store reference for manual access if needed
+          if (typeof window !== 'undefined') {
+            const editor = document.querySelector('.ql-editor');
+            if (editor && quillRef.current !== editor) {
+              quillRef.current = { getEditor: () => editor, getEditingArea: () => editor };
+            }
+          }
+        }}
         modules={modules}
         formats={formats}
         placeholder={placeholder}

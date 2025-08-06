@@ -69,11 +69,11 @@ export class BatchScheduler {
 
     console.log('[BatchScheduler] 배치 스케줄러 시작');
     
-    for (const [id, schedule] of this.schedules) {
+    this.schedules.forEach((schedule, id) => {
       if (schedule.enabled) {
         this.scheduleJob(id);
       }
-    }
+    });
 
     this.isInitialized = true;
     console.log('[BatchScheduler] 스케줄러 초기화 완료');
@@ -83,10 +83,10 @@ export class BatchScheduler {
   stop() {
     console.log('[BatchScheduler] 배치 스케줄러 중지');
     
-    for (const [id, timer] of this.timers) {
+    this.timers.forEach((timer, id) => {
       clearTimeout(timer);
       console.log(`[BatchScheduler] ${id} 스케줄 해제`);
-    }
+    });
     
     this.timers.clear();
     this.isInitialized = false;
