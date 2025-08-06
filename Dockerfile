@@ -83,7 +83,7 @@ RUN cd ${VCPKG_ROOT} && \
     export CCACHE_DIR=/tmp/ccache && \
     # 빌드 최적화 플래그 추가
     export VCPKG_FEATURE_FLAGS=manifests,versions,binarycaching,compilertracking && \
-    export VCPKG_BINARY_SOURCES="clear;x-gha,readwrite" && \
+    export VCPKG_BINARY_SOURCES="clear;readwrite" && \
     # 의존성 설치 (빌드 시간 최적화) - 서버 전용 패키지만
     timeout 600 ./vcpkg install --triplet=${VCPKG_DEFAULT_TRIPLET} \
         --x-buildtrees-root=/tmp/vcpkg-buildtrees \
