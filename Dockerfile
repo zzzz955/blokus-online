@@ -62,9 +62,7 @@ RUN echo "=== Installing vcpkg for minimal packages ===" && \
 # ==================================================
 RUN cd ${VCPKG_ROOT} && \
     echo "=== Installing vcpkg packages individually ===" && \
-    # 병렬 빌드 설정 (안정성 우선)
     export VCPKG_MAX_CONCURRENCY=4 && \
-    # 개별 패키지 설치 (실패 지점 명확화)
     echo "Installing spdlog..." && \
     ./vcpkg install spdlog:x64-linux && \
     echo "Installing nlohmann-json..." && \
@@ -73,7 +71,6 @@ RUN cd ${VCPKG_ROOT} && \
     ./vcpkg install argon2:x64-linux && \
     echo "Installing libpqxx..." && \
     ./vcpkg install libpqxx:x64-linux && \
-    # 설치 확인
     ./vcpkg list && \
     echo "=== All vcpkg packages installed successfully ==="
 
@@ -150,10 +147,12 @@ WORKDIR /app
 COPY --from=app-builder /app/install/bin/BlokusServer ./
 
 # vcpkg 라이브러리 복사 (필요한 것들)
-RUN mkdir -p /usr/local/lib
-COPY --from=app-builder /opt/vcpkg/installed/x64-linux/lib/libspdlog.so* /usr/local/lib/ || echo "spdlog static linked"
-COPY --from=app-builder /opt/vcpkg/installed/x64-linux/lib/libargon2.so* /usr/local/lib/ || echo "argon2 static linked"
-COPY --from=app-builder /opt/vcpkg/installed/x64-linux/lib/libpqxx*.so* /usr/local/lib/ || echo "libpqxx static linked"
+COPY --from=app-builder /opt/vcpkg/installed/x64-linux/lib /tmp/vcpkg-libs
+RUN mkdir -p /usr/local/lib && \
+    cp /tmp/vcpkg-libs/libspdlog.so* /usr/local/lib/ 2>/dev/null || echo "spdlog static linked" && \
+    cp /tmp/vcpkg-libs/libargon2.so* /usr/local/lib/ 2>/dev/null || echo "argon2 static linked" && \
+    cp /tmp/vcpkg-libs/libpqxx*.so* /usr/local/lib/ 2>/dev/null || echo "libpqxx static linked" && \
+    rm -rf /tmp/vcpkg-libs
 
 # 라이브러리 경로 업데이트
 RUN ldconfig /usr/local/lib
