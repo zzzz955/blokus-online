@@ -4,6 +4,23 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch: # 수동 실행 허용
+    inputs:
+      force_deploy_game_server:
+        description: 'Force deploy Game Server (ignore change detection)'
+        type: boolean
+        default: false
+      force_deploy_web:
+        description: 'Force deploy Web Application (ignore change detection)'
+        type: boolean
+        default: false
+      force_deploy_full:
+        description: 'Force deploy Full Infrastructure (ignore change detection)'
+        type: boolean
+        default: false
+      retry_failed_deployments:
+        description: 'Retry previously failed deployments'
+        type: boolean
+        default: true
 
 env:
   # Repository에서 환경변수 주입
@@ -18,12 +35,15 @@ env:
 
 jobs:
   detect-changes:
-    name: Detect Changed Files
+    name: Detect Changed Files and Deployment State
     runs-on: ubuntu-latest
     outputs:
       game-server-changed: ${{ steps.changes.outputs.game-server }}
       web-changed: ${{ steps.changes.outputs.web }}
       infrastructure-changed: ${{ steps.changes.outputs.infrastructure }}
+      force-game-server: ${{ steps.deployment-logic.outputs.force-game-server }}
+      force-web: ${{ steps.deployment-logic.outputs.force-web }}
+      force-infrastructure: ${{ steps.deployment-logic.outputs.force-infrastructure }}
     
     steps:
     - name: 체크아웃 소스코드
@@ -92,14 +112,104 @@ jobs:
         echo "Web Changed: $WEB_CHANGED"
         echo "Infrastructure Changed: $INFRASTRUCTURE_CHANGED"
 
+    - name: SSH 키 설정 (배포 상태 확인용)
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -p ${{ env.SSH_PORT }} -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
+
+    - name: 이전 배포 상태 확인 및 배포 결정 로직
+      id: deployment-logic
+      run: |
+        echo "=== Deployment Decision Logic ==="
+        
+        # 기본 변경 감지 결과
+        GAME_SERVER_CHANGED="${{ steps.changes.outputs.game-server }}"
+        WEB_CHANGED="${{ steps.changes.outputs.web }}"
+        INFRASTRUCTURE_CHANGED="${{ steps.changes.outputs.infrastructure }}"
+        
+        # 강제 배포 플래그 확인
+        FORCE_GAME_SERVER="${{ github.event.inputs.force_deploy_game_server }}"
+        FORCE_WEB="${{ github.event.inputs.force_deploy_web }}"
+        FORCE_INFRASTRUCTURE="${{ github.event.inputs.force_deploy_full }}"
+        RETRY_FAILED="${{ github.event.inputs.retry_failed_deployments }}"
+        
+        # 기본값 설정 (workflow_dispatch가 아닌 경우)
+        if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+          RETRY_FAILED="true"
+        fi
+        
+        echo "Force Game Server: $FORCE_GAME_SERVER"
+        echo "Force Web: $FORCE_WEB"  
+        echo "Force Infrastructure: $FORCE_INFRASTRUCTURE"
+        echo "Retry Failed: $RETRY_FAILED"
+        
+        # 서버에서 이전 배포 상태 확인
+        LAST_DEPLOYMENT_STATUS=""
+        if [ "$RETRY_FAILED" = "true" ]; then
+          echo "Checking previous deployment status on server..."
+          LAST_DEPLOYMENT_STATUS=$(ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
+            if [ -f ${{ env.DEPLOY_PATH }}/.deployment_status ]; then
+              cat ${{ env.DEPLOY_PATH }}/.deployment_status
+            else
+              echo 'no_previous_deployment'
+            fi
+          " 2>/dev/null || echo "connection_failed")
+          
+          echo "Previous deployment status: $LAST_DEPLOYMENT_STATUS"
+        fi
+        
+        # 최종 배포 결정
+        DEPLOY_GAME_SERVER=false
+        DEPLOY_WEB=false  
+        DEPLOY_INFRASTRUCTURE=false
+        
+        # Game Server 배포 결정
+        if [ "$FORCE_GAME_SERVER" = "true" ] || [ "$GAME_SERVER_CHANGED" = "true" ]; then
+          DEPLOY_GAME_SERVER=true
+          echo "Game Server deployment: Required (force=$FORCE_GAME_SERVER, changed=$GAME_SERVER_CHANGED)"
+        elif [ "$RETRY_FAILED" = "true" ] && echo "$LAST_DEPLOYMENT_STATUS" | grep -q "game_server_failed"; then
+          DEPLOY_GAME_SERVER=true
+          echo "Game Server deployment: Required (previous deployment failed)"
+        fi
+        
+        # Web Application 배포 결정
+        if [ "$FORCE_WEB" = "true" ] || [ "$WEB_CHANGED" = "true" ]; then
+          DEPLOY_WEB=true
+          echo "Web deployment: Required (force=$FORCE_WEB, changed=$WEB_CHANGED)"
+        elif [ "$RETRY_FAILED" = "true" ] && echo "$LAST_DEPLOYMENT_STATUS" | grep -q "web_failed"; then
+          DEPLOY_WEB=true
+          echo "Web deployment: Required (previous deployment failed)"
+        fi
+        
+        # Infrastructure 배포 결정
+        if [ "$FORCE_INFRASTRUCTURE" = "true" ] || [ "$INFRASTRUCTURE_CHANGED" = "true" ]; then
+          DEPLOY_INFRASTRUCTURE=true
+          echo "Infrastructure deployment: Required (force=$FORCE_INFRASTRUCTURE, changed=$INFRASTRUCTURE_CHANGED)"
+        elif [ "$RETRY_FAILED" = "true" ] && echo "$LAST_DEPLOYMENT_STATUS" | grep -q "infrastructure_failed"; then
+          DEPLOY_INFRASTRUCTURE=true
+          echo "Infrastructure deployment: Required (previous deployment failed)"
+        fi
+        
+        # 출력 설정
+        echo "force-game-server=$DEPLOY_GAME_SERVER" >> $GITHUB_OUTPUT
+        echo "force-web=$DEPLOY_WEB" >> $GITHUB_OUTPUT
+        echo "force-infrastructure=$DEPLOY_INFRASTRUCTURE" >> $GITHUB_OUTPUT
+        
+        echo "=== Final Deployment Decision ==="
+        echo "Game Server: $DEPLOY_GAME_SERVER"
+        echo "Web Application: $DEPLOY_WEB"
+        echo "Infrastructure: $DEPLOY_INFRASTRUCTURE"
+
   shared-setup:
     name: Shared Setup (Common Tasks)
     runs-on: ubuntu-latest
     needs: detect-changes
     if: |
-      needs.detect-changes.outputs.game-server-changed == 'true' || 
-      needs.detect-changes.outputs.web-changed == 'true' || 
-      needs.detect-changes.outputs.infrastructure-changed == 'true'
+      needs.detect-changes.outputs.force-game-server == 'true' || 
+      needs.detect-changes.outputs.force-web == 'true' || 
+      needs.detect-changes.outputs.force-infrastructure == 'true'
     
     steps:
     - name: 체크아웃 소스코드
@@ -232,7 +342,7 @@ jobs:
     name: Deploy Game Server
     runs-on: ubuntu-latest
     needs: [detect-changes, shared-setup]
-    if: needs.detect-changes.outputs.game-server-changed == 'true'
+    if: needs.detect-changes.outputs.force-game-server == 'true'
     
     steps:
     - name: SSH 키 설정
@@ -248,16 +358,32 @@ jobs:
           cd ${{ env.DEPLOY_PATH }} && 
           export DOCKER_BUILDKIT=1 && 
           export COMPOSE_DOCKER_CLI_BUILD=1 && 
+          
+          # 배포 상태 업데이트 (시작)
+          echo 'game_server_deploying' > .deployment_status && 
+          
+          # 컨테이너 중지 및 빌드
           docker compose stop blokus-server && 
           docker compose build blokus-server && 
-          docker compose up -d blokus-server --wait --wait-timeout 60
+          docker compose up -d blokus-server --wait --wait-timeout 60 && 
+          
+          # 배포 성공 상태 업데이트
+          sed -i 's/game_server_deploying/game_server_success/' .deployment_status || echo 'game_server_success' > .deployment_status
         "
+
+    - name: 게임 서버 배포 실패 처리
+      if: failure()
+      run: |
+        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
+          cd ${{ env.DEPLOY_PATH }} && 
+          echo 'game_server_failed' > .deployment_status
+        " || true
 
   deploy-web:
     name: Deploy Web Application
     runs-on: ubuntu-latest
     needs: [detect-changes, shared-setup]
-    if: needs.detect-changes.outputs.web-changed == 'true'
+    if: needs.detect-changes.outputs.force-web == 'true'
     
     steps:
     - name: SSH 키 설정
@@ -273,16 +399,32 @@ jobs:
           cd ${{ env.DEPLOY_PATH }} && 
           export DOCKER_BUILDKIT=1 && 
           export COMPOSE_DOCKER_CLI_BUILD=1 && 
+          
+          # 배포 상태 업데이트 (시작)
+          echo 'web_deploying' >> .deployment_status && 
+          
+          # 컨테이너 중지 및 빌드
           docker compose stop blokus-web && 
           docker compose build blokus-web && 
-          docker compose up -d blokus-web --wait --wait-timeout 60
+          docker compose up -d blokus-web --wait --wait-timeout 60 && 
+          
+          # 배포 성공 상태 업데이트
+          sed -i 's/web_deploying/web_success/' .deployment_status || echo 'web_success' >> .deployment_status
         "
+
+    - name: 웹 애플리케이션 배포 실패 처리
+      if: failure()
+      run: |
+        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
+          cd ${{ env.DEPLOY_PATH }} && 
+          sed -i 's/web_deploying/web_failed/' .deployment_status || echo 'web_failed' >> .deployment_status
+        " || true
 
   deploy-full:
     name: Full Deploy (Infrastructure Changes)
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.infrastructure-changed == 'true'
+    if: needs.detect-changes.outputs.force-infrastructure == 'true'
     
     steps:
     - name: 체크아웃 소스코드
@@ -463,9 +605,25 @@ jobs:
           cd ${{ env.DEPLOY_PATH }} && \
           export DOCKER_BUILDKIT=1 && \
           export COMPOSE_DOCKER_CLI_BUILD=1 && \
+          
+          # 배포 상태 초기화
+          echo 'infrastructure_deploying' > .deployment_status && \
+          
+          # 인프라 전체 배포
           docker compose build --parallel && \
-          docker compose up -d --wait --wait-timeout 60
+          docker compose up -d --wait --wait-timeout 60 && \
+          
+          # 배포 성공 상태 업데이트
+          echo 'infrastructure_success' > .deployment_status
         "
+        
+    - name: 인프라 배포 실패 처리
+      if: failure()
+      run: |
+        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
+          cd ${{ env.DEPLOY_PATH }} && 
+          echo 'infrastructure_failed' > .deployment_status
+        " || true
         
         
     - name: 배포 결과 알림
@@ -492,44 +650,50 @@ jobs:
         echo "=== Smart Deployment Summary ==="
         echo ""
         
-        # 변경사항 감지 결과
+        # 변경사항 감지 및 배포 결정 결과
         echo "📊 Changes Detected:"
         echo "  - Game Server: ${{ needs.detect-changes.outputs.game-server-changed }}"
         echo "  - Web Application: ${{ needs.detect-changes.outputs.web-changed }}"
         echo "  - Infrastructure: ${{ needs.detect-changes.outputs.infrastructure-changed }}"
         echo ""
         
+        echo "🎯 Deployment Decisions (including retry logic):"
+        echo "  - Game Server: ${{ needs.detect-changes.outputs.force-game-server }}"
+        echo "  - Web Application: ${{ needs.detect-changes.outputs.force-web }}"
+        echo "  - Infrastructure: ${{ needs.detect-changes.outputs.force-infrastructure }}"
+        echo ""
+        
         # 개별 배포 결과
         echo "🚀 Deployment Results:"
         
-        if [ "${{ needs.detect-changes.outputs.game-server-changed }}" = "true" ]; then
+        if [ "${{ needs.detect-changes.outputs.force-game-server }}" = "true" ]; then
           if [ "${{ needs.deploy-game-server.result }}" = "success" ]; then
             echo "  ✅ Game Server: Successfully deployed"
           else
             echo "  ❌ Game Server: Deployment failed"
           fi
         else
-          echo "  ⏭️ Game Server: Skipped (no changes)"
+          echo "  ⏭️ Game Server: Skipped (no deployment needed)"
         fi
         
-        if [ "${{ needs.detect-changes.outputs.web-changed }}" = "true" ]; then
+        if [ "${{ needs.detect-changes.outputs.force-web }}" = "true" ]; then
           if [ "${{ needs.deploy-web.result }}" = "success" ]; then
             echo "  ✅ Web Application: Successfully deployed"
           else
             echo "  ❌ Web Application: Deployment failed"
           fi
         else
-          echo "  ⏭️ Web Application: Skipped (no changes)"
+          echo "  ⏭️ Web Application: Skipped (no deployment needed)"
         fi
         
-        if [ "${{ needs.detect-changes.outputs.infrastructure-changed }}" = "true" ]; then
+        if [ "${{ needs.detect-changes.outputs.force-infrastructure }}" = "true" ]; then
           if [ "${{ needs.deploy-full.result }}" = "success" ]; then
             echo "  ✅ Full Infrastructure: Successfully deployed"
           else
             echo "  ❌ Full Infrastructure: Deployment failed"
           fi
         else
-          echo "  ⏭️ Full Infrastructure: Skipped (no changes)"
+          echo "  ⏭️ Full Infrastructure: Skipped (no deployment needed)"
         fi
         
         echo ""
@@ -537,18 +701,18 @@ jobs:
         echo "  - Game Server: ${{ secrets.WEB_APP_URL }}:${{ secrets.SERVER_PORT }}"
         echo "  - Website: https://${{ secrets.WEB_APP_URL }}"
         
-        # 전체 성공 여부 체크
+        # 전체 성공 여부 체크 (새로운 로직 적용)
         OVERALL_SUCCESS=true
         
-        if [ "${{ needs.detect-changes.outputs.game-server-changed }}" = "true" ] && [ "${{ needs.deploy-game-server.result }}" != "success" ]; then
+        if [ "${{ needs.detect-changes.outputs.force-game-server }}" = "true" ] && [ "${{ needs.deploy-game-server.result }}" != "success" ]; then
           OVERALL_SUCCESS=false
         fi
         
-        if [ "${{ needs.detect-changes.outputs.web-changed }}" = "true" ] && [ "${{ needs.deploy-web.result }}" != "success" ]; then
+        if [ "${{ needs.detect-changes.outputs.force-web }}" = "true" ] && [ "${{ needs.deploy-web.result }}" != "success" ]; then
           OVERALL_SUCCESS=false
         fi
         
-        if [ "${{ needs.detect-changes.outputs.infrastructure-changed }}" = "true" ] && [ "${{ needs.deploy-full.result }}" != "success" ]; then
+        if [ "${{ needs.detect-changes.outputs.force-infrastructure }}" = "true" ] && [ "${{ needs.deploy-full.result }}" != "success" ]; then
           OVERALL_SUCCESS=false
         fi
         

@@ -74,7 +74,14 @@ export default function AdminBatchPage() {
     try {
       setRunning(scheduleId);
       
-      const result = await api.post(`/api/admin/batch/run`, { scheduleId });
+      const result = await api.post<{
+        success: boolean;
+        processed: number;
+        updated: number;
+        created: number;
+        errors: string[];
+        executionTime: number;
+      }>(`/api/admin/batch/run`, { scheduleId });
       
       alert(`배치 실행 완료!\n처리된 항목: ${result.processed}\n실행 시간: ${result.executionTime}ms`);
       
