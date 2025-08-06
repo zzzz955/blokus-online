@@ -70,7 +70,7 @@ RUN echo "=== Installing vcpkg ===" && \
 # vcpkg 의존성 설치
 # ==================================================
 RUN cd ${VCPKG_ROOT} && \
-    ./vcpkg install spdlog boost-asio boost-system nlohmann-json libpqxx openssl \
+    ./vcpkg install spdlog boost-asio boost-system nlohmann-json libpqxx openssl argon2 \
         --triplet=${VCPKG_DEFAULT_TRIPLET}
 
 # vcpkg 설치 완료
