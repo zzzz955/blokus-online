@@ -91,21 +91,19 @@ COPY server/ ./server/
 # 프로젝트 빌드 (최적화된 접근법)
 # ==================================================
 RUN echo "=== Building Blokus Game Server ===" && \
-    # CMake 구성 (Pure vcpkg)
     cmake -S . -B build \
     -GNinja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_CXX_STANDARD=20 \
+    -DCMAKE_MAKE_PROGRAM=/usr/bin/ninja \
+    -DCMAKE_CXX_COMPILER=/usr/bin/g++ \
     -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
     -DVCPKG_TARGET_TRIPLET=x64-linux \
     -DCMAKE_CXX_FLAGS="-O2 -DNDEBUG" && \
-    # 빌드 실행 (최적화된 병렬 빌드)
     ninja -C build -j$(nproc) && \
-    # 빌드 결과 검증
     echo "=== Verifying build results ===" && \
     ls -la build/server/ && \
     ldd build/server/BlokusServer | head -10 && \
-    # 실행 파일 검증 및 복사
     test -f build/server/BlokusServer && \
     mkdir -p /app/install/bin && \
     cp build/server/BlokusServer /app/install/bin/ && \
