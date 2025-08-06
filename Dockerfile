@@ -32,9 +32,10 @@ RUN echo "=== Installing system dependencies ===" && \
     curl \
     wget \
     ca-certificates \
-    # C++ 라이브러리들 (vcpkg와 충돌하지 않는 것들만)
+    # C++ 라이브러리들 (안정적인 시스템 패키지)
     libssl-dev \
     libpq-dev \
+    libpqxx-dev \
     libboost-all-dev \
     # PostgreSQL 빌드를 위한 시스템 의존성
     postgresql-server-dev-all \
@@ -61,7 +62,7 @@ RUN echo "=== Installing vcpkg for minimal packages ===" && \
 # vcpkg 패키지 수동 설치 (안정적인 개별 설치)
 # ==================================================
 RUN cd ${VCPKG_ROOT} && \
-    echo "=== Installing vcpkg packages individually ===" && \
+    echo "=== Installing essential vcpkg packages only ===" && \
     export VCPKG_MAX_CONCURRENCY=4 && \
     echo "Installing spdlog..." && \
     ./vcpkg install spdlog:x64-linux && \
@@ -69,10 +70,8 @@ RUN cd ${VCPKG_ROOT} && \
     ./vcpkg install nlohmann-json:x64-linux && \
     echo "Installing argon2..." && \
     ./vcpkg install argon2:x64-linux && \
-    echo "Installing libpqxx..." && \
-    ./vcpkg install libpqxx:x64-linux && \
     ./vcpkg list && \
-    echo "=== All vcpkg packages installed successfully ==="
+    echo "=== Essential vcpkg packages installed (libpqxx will use system package) ==="
 
 # ==================================================
 # Stage 2: Application Builder  
@@ -93,13 +92,16 @@ COPY server/ ./server/
 # 프로젝트 빌드 (하이브리드 접근법)
 # ==================================================
 RUN echo "=== Building Blokus Game Server ===" && \
-    # CMake 구성 (vcpkg toolchain 사용)
+    # pkg-config 경로 설정 (시스템 패키지 찾기)
+    export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:$PKG_CONFIG_PATH && \
+    # CMake 구성 (하이브리드 모드: vcpkg + 시스템 패키지)
     cmake -S . -B build \
         -GNinja \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_CXX_STANDARD=20 \
         -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
-        -DVCPKG_TARGET_TRIPLET=x64-linux && \
+        -DVCPKG_TARGET_TRIPLET=x64-linux \
+        -DCMAKE_FIND_PACKAGE_PREFER_CONFIG=OFF && \
     # 빌드 실행 (병렬 빌드 제한)
     ninja -C build -j4 && \
     # 빌드 결과 복사
@@ -122,6 +124,7 @@ RUN apt-get update && apt-get install -y \
     # 핵심 런타임 라이브러리
     libssl3 \
     libpq5 \
+    libpqxx-6.4 \
     libboost-system1.74.0 \
     libboost-thread1.74.0 \
     # 시스템 라이브러리
@@ -146,13 +149,13 @@ WORKDIR /app
 # 빌드된 실행파일 복사
 COPY --from=app-builder /app/install/bin/BlokusServer ./
 
-# vcpkg 라이브러리 복사 (필요한 것들)
+# vcpkg 라이브러리 복사 (vcpkg로 설치한 것들만)
 COPY --from=app-builder /opt/vcpkg/installed/x64-linux/lib /tmp/vcpkg-libs
 RUN mkdir -p /usr/local/lib && \
     cp /tmp/vcpkg-libs/libspdlog.so* /usr/local/lib/ 2>/dev/null || echo "spdlog static linked" && \
     cp /tmp/vcpkg-libs/libargon2.so* /usr/local/lib/ 2>/dev/null || echo "argon2 static linked" && \
-    cp /tmp/vcpkg-libs/libpqxx*.so* /usr/local/lib/ 2>/dev/null || echo "libpqxx static linked" && \
-    rm -rf /tmp/vcpkg-libs
+    rm -rf /tmp/vcpkg-libs && \
+    echo "libpqxx using system package"
 
 # 라이브러리 경로 업데이트
 RUN ldconfig /usr/local/lib
