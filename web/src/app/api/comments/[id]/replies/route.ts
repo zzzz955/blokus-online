@@ -86,7 +86,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     console.error('대댓글 작성 에러:', error)
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: '입력 데이터가 올바르지 않습니다.', details: error.errors },
+        { error: '입력 데이터가 올바르지 않습니다.', details: error.issues },
         { status: 400 }
       )
     }
