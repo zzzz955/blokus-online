@@ -119,8 +119,8 @@ RUN echo "=== Checking vcpkg installations ===" && \
 # ==================================================
 # 프로젝트 빌드 (vcpkg toolchain + ccache 사용)
 # ==================================================
-RUN # ccache 설정으로 컴파일 시간 단축
-    export PATH="/usr/lib/ccache:$PATH" && \
+# ccache 설정으로 컴파일 시간 단축
+RUN export PATH="/usr/lib/ccache:$PATH" && \
     export CCACHE_DIR=/tmp/ccache && \
     export CMAKE_C_COMPILER_LAUNCHER=ccache && \
     export CMAKE_CXX_COMPILER_LAUNCHER=ccache && \
