@@ -23,26 +23,14 @@ SHELL ["/bin/bash", "-euxo", "pipefail", "-c"]
 # ==================================================
 RUN echo "=== Installing system dependencies ===" && \
     apt-get update && apt-get install -y \
-    # 기본 빌드 도구
     build-essential \
     ninja-build \
     pkg-config \
-    git \
-    curl \
-    wget \
-    ca-certificates \
-    # PostgreSQL 시스템 의존성 (vcpkg libpq 빌드용)
-    postgresql-server-dev-all \
-    # 압축 및 유틸리티
-    tar \
-    gzip \
-    unzip \
-    zip \
-    bison \
-    flex \
-    libreadline-dev \
-    zlib1g-dev \
-    libssl-dev \
+    git wget curl ca-certificates tar gzip unzip zip \
+    autoconf automake libtool \
+    bison flex \
+    libpq-dev postgresql-server-dev-all postgresql-client \
+    ccache \
     && rm -rf /var/lib/apt/lists/* && \
     echo "=== System packages installed ==="
 
@@ -69,12 +57,17 @@ RUN echo "=== Installing vcpkg for minimal packages ===" && \
     echo "=== vcpkg bootstrap completed ==="
 
 # ==================================================
-# vcpkg 패키지 수동 설치 (안정적인 개별 설치)
+# vcpkg 패키지 설치 (최적화된 단일 설치)
 # ==================================================
 RUN cd ${VCPKG_ROOT} && \
     echo "=== Installing all required packages via vcpkg ===" && \
-    export VCPKG_MAX_CONCURRENCY=4 && \
-    ./vcpkg install spdlog boost-asio boost-system nlohmann-json libpqxx openssl argon2 --triplet=x64-linux && \
+    export VCPKG_MAX_CONCURRENCY=$(nproc) && \
+    export VCPKG_KEEP_ENV_VARS=VCPKG_MAX_CONCURRENCY && \
+    ./vcpkg install spdlog boost-asio boost-system nlohmann-json libpqxx openssl argon2 \
+    --triplet=x64-linux \
+    --x-buildtrees-root=/tmp/vcpkg-buildtrees \
+    --x-install-root=/opt/vcpkg/installed && \
+    rm -rf /tmp/vcpkg-buildtrees && \
     ./vcpkg list && \
     echo "=== All vcpkg packages installed successfully ==="
 
@@ -86,31 +79,37 @@ FROM dependencies AS app-builder
 
 WORKDIR /app
 
-# CMake 파일 먼저 복사
+# 캐싱 최적화를 위해 빌드 설정 파일들 먼저 복사
 COPY CMakeLists.txt ./
+COPY vcpkg.json ./
 
-# 소스코드 복사
+# 소스코드 복사 (캐시 계층 최적화)
 COPY common/ ./common/
 COPY server/ ./server/
 
 # ==================================================
-# 프로젝트 빌드 (하이브리드 접근법)
+# 프로젝트 빌드 (최적화된 접근법)
 # ==================================================
 RUN echo "=== Building Blokus Game Server ===" && \
     # CMake 구성 (Pure vcpkg)
     cmake -S . -B build \
-        -GNinja \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_CXX_STANDARD=20 \
-        -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
-        -DVCPKG_TARGET_TRIPLET=x64-linux && \
-    # 빌드 실행 (병렬 빌드 제한)
-    ninja -C build -j4 && \
-    # 빌드 결과 확인 및 복사
-    mkdir -p /app/install/bin && \
+    -GNinja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_CXX_STANDARD=20 \
+    -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
+    -DVCPKG_TARGET_TRIPLET=x64-linux \
+    -DCMAKE_CXX_FLAGS="-O2 -DNDEBUG" && \
+    # 빌드 실행 (최적화된 병렬 빌드)
+    ninja -C build -j$(nproc) && \
+    # 빌드 결과 검증
+    echo "=== Verifying build results ===" && \
     ls -la build/server/ && \
+    ldd build/server/BlokusServer | head -10 && \
+    # 실행 파일 검증 및 복사
     test -f build/server/BlokusServer && \
+    mkdir -p /app/install/bin && \
     cp build/server/BlokusServer /app/install/bin/ && \
+    chmod +x /app/install/bin/BlokusServer && \
     echo "=== Build completed successfully ==="
 
 # ==================================================
@@ -123,21 +122,20 @@ FROM ubuntu:22.04 AS game-server
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Seoul
 
-# 런타임 의존성 설치 (시스템 + vcpkg 혼합)
 RUN apt-get update && apt-get install -y \
-    # 기본 시스템 라이브러리
+    libssl3 \
+    libpq5 \
+    zlib1g \
     libc6 \
     libgcc-s1 \
     libstdc++6 \
-    # PostgreSQL 런타임 라이브러리
-    libpq5 \
-    # 네트워크 도구
     netcat-openbsd \
     curl \
-    # 시간대 설정
     tzdata \
-    && rm -rf /var/lib/apt/lists/* && \
-    echo "PostgreSQL from system, others from vcpkg"
+    jq \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean \
+    && echo "Runtime dependencies installed successfully"
 
 # 시간대 설정
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
