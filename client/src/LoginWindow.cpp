@@ -9,6 +9,8 @@
 #include <QScreen>
 #include <QGuiApplication>
 #include <QSvgWidget>
+#include <QDesktopServices>
+#include <QUrl>
 
 namespace Blokus
 {
@@ -29,31 +31,16 @@ namespace Blokus
           m_loginButton(nullptr),
           m_showRegisterButton(nullptr),
           m_showPasswordResetButton(nullptr),
-          m_registerForm(nullptr),
-          m_regUsernameEdit(nullptr),
-          m_regPasswordEdit(nullptr),
-          m_regConfirmPasswordEdit(nullptr),
-          m_regEmailEdit(nullptr),
-          m_registerButton(nullptr),
-          m_backToLoginFromRegisterButton(nullptr),
-          m_passwordResetForm(nullptr),
-          m_resetEmailEdit(nullptr),
-          m_passwordResetButton(nullptr),
-          m_backToLoginFromResetButton(nullptr),
           m_loadingWidget(nullptr),
           m_progressBar(nullptr),
           m_loadingLabel(nullptr),
           m_loadingMovie(nullptr),
-          m_currentForm(FormState::Login),
           m_isLoading(false),
           m_animationTimer(new QTimer(this))
     {
         setupUI();
         setupStyles();
         createAnimations();
-
-        // 기본적으로 로그인 폼 표시
-        showLoginForm();
 
         setWindowTitle(QString::fromUtf8("블로커스 온라인 - 로그인"));
         setFixedSize(400, 600);
@@ -95,10 +82,8 @@ namespace Blokus
         m_formLayout->setSpacing(3);
         m_formContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 
-        // 개별 폼들 설정
+        // 로그인 폼 설정
         setupLoginForm();
-        setupRegisterForm();
-        setupPasswordResetForm();
 
         // 로딩 위젯
         setupLoadingWidget();
@@ -109,6 +94,12 @@ namespace Blokus
         m_mainLayout->addWidget(m_formContainer);
         m_mainLayout->addStretch(2);
         m_mainLayout->addWidget(m_loadingWidget);
+        
+        // 로그인 폼 표시
+        if (m_usernameEdit)
+        {
+            m_usernameEdit->setFocus();
+        }
     }
 
     void LoginWindow::setupTitleArea()
@@ -275,155 +266,16 @@ namespace Blokus
 
         m_formLayout->addWidget(m_loginForm);
     }
-
-    void LoginWindow::setupRegisterForm()
+    
+    QString LoginWindow::getAuthUrl() const
     {
-        m_registerForm = new QWidget();
-        QVBoxLayout *layout = new QVBoxLayout(m_registerForm);
-        layout->setContentsMargins(8, 8, 8, 8); // 고정 마진
-        layout->setSpacing(8);                  // 고정 스페이싱
-
-        // 아이디 입력
-        QLabel *usernameLabel = new QLabel(QString::fromUtf8("아이디"));
-        QFont headerFont("맑은 고딕", 12, QFont::Bold); // 헤더 12px
-        usernameLabel->setFont(headerFont);
-        usernameLabel->setStyleSheet("font-weight: bold; color: #34495e;");
-        m_regUsernameEdit = new QLineEdit();
-        m_regUsernameEdit->setPlaceholderText(QString::fromUtf8("4-20자의 영문, 숫자"));
-        m_regUsernameEdit->setMaxLength(20);
-        QFont inputFont("맑은 고딕", 14, QFont::Normal); // 입력 텍스트 14px
-        m_regUsernameEdit->setFont(inputFont);
-        m_regUsernameEdit->setMinimumSize(70, 18);
-
-        // 비밀번호 입력
-        QLabel *passwordLabel = new QLabel(QString::fromUtf8("비밀번호"));
-        passwordLabel->setFont(headerFont); // 헤더 12px
-        passwordLabel->setStyleSheet("font-weight: bold; color: #34495e;");
-        m_regPasswordEdit = new QLineEdit();
-        m_regPasswordEdit->setPlaceholderText(QString::fromUtf8("8자 이상, 영문+숫자 조합"));
-        m_regPasswordEdit->setEchoMode(QLineEdit::Password);
-        m_regPasswordEdit->setMaxLength(50);
-        m_regPasswordEdit->setFont(inputFont); // 입력 텍스트 14px
-        m_regPasswordEdit->setMinimumSize(70, 18);
-
-        // 비밀번호 확인
-        QLabel *confirmLabel = new QLabel(QString::fromUtf8("비밀번호 확인"));
-        confirmLabel->setFont(headerFont); // 헤더 12px
-        confirmLabel->setStyleSheet("font-weight: bold; color: #34495e;");
-        m_regConfirmPasswordEdit = new QLineEdit();
-        m_regConfirmPasswordEdit->setPlaceholderText(QString::fromUtf8("비밀번호를 다시 입력하세요"));
-        m_regConfirmPasswordEdit->setEchoMode(QLineEdit::Password);
-        m_regConfirmPasswordEdit->setMaxLength(50);
-        m_regConfirmPasswordEdit->setFont(inputFont); // 입력 텍스트 14px
-        m_regConfirmPasswordEdit->setMinimumSize(70, 18);
-
-        // 이메일 입력
-        QLabel *emailLabel = new QLabel(QString::fromUtf8("이메일"));
-        emailLabel->setFont(headerFont); // 헤더 12px
-        emailLabel->setStyleSheet("font-weight: bold; color: #34495e;");
-        m_regEmailEdit = new QLineEdit();
-        m_regEmailEdit->setPlaceholderText(QString::fromUtf8("example@domain.com"));
-        m_regEmailEdit->setMaxLength(100);
-        m_regEmailEdit->setFont(inputFont); // 입력 텍스트 14px
-        m_regEmailEdit->setMinimumSize(70, 18);
-
-        // 버튼들
-        m_registerButton = new QPushButton(QString::fromUtf8("✨ 회원가입"));
-        m_registerButton->setStyleSheet(
-            "QPushButton { background-color: #27ae60; color: white; } "
-            "QPushButton:hover { background-color: #229954; }");
-        m_registerButton->setMinimumSize(70, 24);
-
-        m_backToLoginFromRegisterButton = new QPushButton(QString::fromUtf8("로그인으로 돌아가기"));
-        m_backToLoginFromRegisterButton->setStyleSheet(
-            "QPushButton { background-color: #95a5a6; color: white; } "
-            "QPushButton:hover { background-color: #7f8c8d; }");
-        m_backToLoginFromRegisterButton->setMinimumSize(70, 20);
-
-        // 레이아웃에 추가
-        layout->addWidget(usernameLabel);
-        layout->addWidget(m_regUsernameEdit);
-        layout->addWidget(passwordLabel);
-        layout->addWidget(m_regPasswordEdit);
-        layout->addWidget(confirmLabel);
-        layout->addWidget(m_regConfirmPasswordEdit);
-        layout->addWidget(emailLabel);
-        layout->addWidget(m_regEmailEdit);
-        layout->addSpacing(4); // 고정 스페이싱
-        layout->addWidget(m_registerButton);
-        layout->addSpacing(2); // 고정 스페이싱
-        layout->addWidget(m_backToLoginFromRegisterButton);
-
-        // 시그널 연결
-        connect(m_regUsernameEdit, &QLineEdit::textChanged, this, &LoginWindow::onUsernameTextChanged);
-        connect(m_regPasswordEdit, &QLineEdit::textChanged, this, &LoginWindow::onPasswordTextChanged);
-        connect(m_regEmailEdit, &QLineEdit::textChanged, this, &LoginWindow::onEmailTextChanged);
-        connect(m_registerButton, &QPushButton::clicked, this, &LoginWindow::onRegisterClicked);
-        connect(m_backToLoginFromRegisterButton, &QPushButton::clicked, this, &LoginWindow::onBackToLoginClicked);
-
-        m_formLayout->addWidget(m_registerForm);
-        m_registerForm->hide(); // 초기에는 숨김
+#ifdef QT_DEBUG
+        return "http://localhost:3000/auth/signin";
+#else
+        return "https://blokus-online.mooo.com/auth/signin";
+#endif
     }
 
-    void LoginWindow::setupPasswordResetForm()
-    {
-        m_passwordResetForm = new QWidget();
-        QVBoxLayout *layout = new QVBoxLayout(m_passwordResetForm);
-        layout->setContentsMargins(8, 8, 8, 8); // 고정 마진
-        layout->setSpacing(8);                  // 고정 스페이싱
-
-        // 설명 라벨
-        QLabel *descLabel = new QLabel(QString::fromUtf8("가입 시 사용한 이메일 주소를 입력하시면\n비밀번호 재설정 링크를 보내드립니다."));
-        descLabel->setAlignment(Qt::AlignCenter);
-        QFont descFont("맑은 고딕", 12, QFont::Normal); // 헤더 12px
-        descLabel->setFont(descFont);
-        descLabel->setStyleSheet("color: #7f8c8d; margin-bottom: 5px;");
-        descLabel->setWordWrap(true);
-
-        // 이메일 입력
-        QLabel *emailLabel = new QLabel(QString::fromUtf8("이메일"));
-        QFont headerFont("맑은 고딕", 12, QFont::Bold); // 헤더 12px
-        emailLabel->setFont(headerFont);
-        emailLabel->setStyleSheet("font-weight: bold; color: #34495e;");
-        m_resetEmailEdit = new QLineEdit();
-        m_resetEmailEdit->setPlaceholderText(QString::fromUtf8("example@domain.com"));
-        m_resetEmailEdit->setMaxLength(100);
-        QFont inputFont("맑은 고딕", 14, QFont::Normal); // 입력 텍스트 14px
-        m_resetEmailEdit->setFont(inputFont);
-        m_resetEmailEdit->setMinimumSize(70, 18);
-
-        // 버튼들
-        m_passwordResetButton = new QPushButton(QString::fromUtf8("📧 재설정 링크 전송"));
-        m_passwordResetButton->setStyleSheet(
-            "QPushButton { background-color: #3498db; color: white; } "
-            "QPushButton:hover { background-color: #2980b9; }");
-        m_passwordResetButton->setMinimumSize(70, 24);
-
-        m_backToLoginFromResetButton = new QPushButton(QString::fromUtf8("로그인으로 돌아가기"));
-        m_backToLoginFromResetButton->setStyleSheet(
-            "QPushButton { background-color: #95a5a6; color: white; } "
-            "QPushButton:hover { background-color: #7f8c8d; }");
-        m_backToLoginFromResetButton->setMinimumSize(70, 20);
-
-        // 레이아웃에 추가
-        layout->addWidget(descLabel);
-        layout->addSpacing(4); // 고정 스페이싱
-        layout->addWidget(emailLabel);
-        layout->addWidget(m_resetEmailEdit);
-        layout->addSpacing(6); // 고정 스페이싱
-        layout->addWidget(m_passwordResetButton);
-        layout->addSpacing(2); // 고정 스페이싱
-        layout->addWidget(m_backToLoginFromResetButton);
-
-        // 시그널 연결
-        connect(m_resetEmailEdit, &QLineEdit::textChanged, this, &LoginWindow::onEmailTextChanged);
-        connect(m_resetEmailEdit, &QLineEdit::returnPressed, this, &LoginWindow::onPasswordResetClicked);
-        connect(m_passwordResetButton, &QPushButton::clicked, this, &LoginWindow::onPasswordResetClicked);
-        connect(m_backToLoginFromResetButton, &QPushButton::clicked, this, &LoginWindow::onBackToLoginClicked);
-
-        m_formLayout->addWidget(m_passwordResetForm);
-        m_passwordResetForm->hide(); // 초기에는 숨김
-    }
 
     void LoginWindow::setupLoadingWidget()
     {
@@ -509,37 +361,6 @@ namespace Blokus
         }
         // 버튼 폰트는 CSS로 관리됨
 
-        // 회원가입 폼 스타일
-        if (m_regUsernameEdit)
-        {
-            m_regUsernameEdit->setStyleSheet(inputStyle);
-            m_regUsernameEdit->setFont(inputFont);
-        }
-        if (m_regPasswordEdit)
-        {
-            m_regPasswordEdit->setStyleSheet(inputStyle);
-            m_regPasswordEdit->setFont(inputFont);
-        }
-        if (m_regConfirmPasswordEdit)
-        {
-            m_regConfirmPasswordEdit->setStyleSheet(inputStyle);
-            m_regConfirmPasswordEdit->setFont(inputFont);
-        }
-        if (m_regEmailEdit)
-        {
-            m_regEmailEdit->setStyleSheet(inputStyle);
-            m_regEmailEdit->setFont(inputFont);
-        }
-        // 버튼 폰트는 CSS로 관리됨
-
-        // 비밀번호 재설정 폼 스타일
-        if (m_resetEmailEdit)
-        {
-            m_resetEmailEdit->setStyleSheet(inputStyle);
-            m_resetEmailEdit->setFont(inputFont);
-        }
-        // 버튼 폰트는 CSS로 관리됨
-
         // 타이틀과 서브타이틀 스타일 업데이트 (고정 크기)
         if (m_titleLabel)
         {
@@ -563,14 +384,6 @@ namespace Blokus
         if (m_loginForm)
         {
             m_loginForm->setStyleSheet(cardStyle);
-        }
-        if (m_registerForm)
-        {
-            m_registerForm->setStyleSheet(cardStyle);
-        }
-        if (m_passwordResetForm)
-        {
-            m_passwordResetForm->setStyleSheet(cardStyle);
         }
 
         // 프로그레스 바 스타일 (고정 스타일)
@@ -598,44 +411,6 @@ namespace Blokus
         connect(m_animationTimer, &QTimer::timeout, this, &LoginWindow::updateLoadingAnimation);
     }
 
-    void LoginWindow::showLoginForm()
-    {
-        m_currentForm = FormState::Login;
-        m_loginForm->show();
-        m_registerForm->hide();
-        m_passwordResetForm->hide();
-
-        if (m_usernameEdit)
-        {
-            m_usernameEdit->setFocus();
-        }
-    }
-
-    void LoginWindow::showRegisterForm()
-    {
-        m_currentForm = FormState::Register;
-        m_loginForm->hide();
-        m_registerForm->show();
-        m_passwordResetForm->hide();
-
-        if (m_regUsernameEdit)
-        {
-            m_regUsernameEdit->setFocus();
-        }
-    }
-
-    void LoginWindow::showPasswordResetForm()
-    {
-        m_currentForm = FormState::PasswordReset;
-        m_loginForm->hide();
-        m_registerForm->hide();
-        m_passwordResetForm->show();
-
-        if (m_resetEmailEdit)
-        {
-            m_resetEmailEdit->setFocus();
-        }
-    }
 
     // 이벤트 핸들러들
     void LoginWindow::onLoginClicked()
@@ -650,46 +425,15 @@ namespace Blokus
         emit loginRequested(username, password);
     }
 
-    void LoginWindow::onRegisterClicked()
-    {
-        if (!validateRegisterInput())
-            return;
-
-        QString username = m_regUsernameEdit->text().trimmed();
-        QString password = m_regPasswordEdit->text();
-        QString email = m_regEmailEdit->text().trimmed();
-
-        showLoadingState(true);
-        emit registerRequested(username, password, email);
-    }
-
-    void LoginWindow::onPasswordResetClicked()
-    {
-        if (!validatePasswordResetInput())
-            return;
-
-        QString email = m_resetEmailEdit->text().trimmed();
-
-        showLoadingState(true);
-        emit passwordResetRequested(email);
-    }
-
-    void LoginWindow::onBackToLoginClicked()
-    {
-        clearInputs();
-        showLoginForm();
-    }
 
     void LoginWindow::onShowRegisterForm()
     {
-        clearInputs();
-        showRegisterForm();
+        QDesktopServices::openUrl(QUrl(getAuthUrl()));
     }
 
     void LoginWindow::onShowPasswordResetForm()
     {
-        clearInputs();
-        showPasswordResetForm();
+        QDesktopServices::openUrl(QUrl(getAuthUrl()));
     }
 
     void LoginWindow::onUsernameTextChanged()
@@ -715,15 +459,6 @@ namespace Blokus
     // 키보드 이벤트 처리
     void LoginWindow::keyPressEvent(QKeyEvent *event)
     {
-        if (event->key() == Qt::Key_Escape)
-        {
-            if (m_currentForm != FormState::Login)
-            {
-                onBackToLoginClicked();
-                return;
-            }
-        }
-
         QMainWindow::keyPressEvent(event);
     }
 
@@ -750,39 +485,6 @@ namespace Blokus
         }
     }
 
-    void LoginWindow::setRegisterResult(bool success, const QString &message)
-    {
-        showLoadingState(false);
-
-        if (success)
-        {
-            showMessage(QString::fromUtf8("회원가입 성공"),
-                        QString::fromUtf8("회원가입이 완료되었습니다!\n이메일 인증 후 로그인해주세요."), false);
-            showLoginForm();
-            clearInputs();
-        }
-        else
-        {
-            showMessage(QString::fromUtf8("회원가입 실패"), message, true);
-        }
-    }
-
-    void LoginWindow::setPasswordResetResult(bool success, const QString &message)
-    {
-        showLoadingState(false);
-
-        if (success)
-        {
-            showMessage(QString::fromUtf8("이메일 전송 완료"),
-                        QString::fromUtf8("비밀번호 재설정 링크를 이메일로 보내드렸습니다.\n메일함을 확인해주세요."), false);
-            showLoginForm();
-            clearInputs();
-        }
-        else
-        {
-            showMessage(QString::fromUtf8("이메일 전송 실패"), message, true);
-        }
-    }
 
     // 유틸리티 함수들
     void LoginWindow::clearInputs()
@@ -792,20 +494,6 @@ namespace Blokus
             m_usernameEdit->clear();
         if (m_passwordEdit)
             m_passwordEdit->clear();
-
-        // 회원가입 폼 입력 초기화
-        if (m_regUsernameEdit)
-            m_regUsernameEdit->clear();
-        if (m_regPasswordEdit)
-            m_regPasswordEdit->clear();
-        if (m_regConfirmPasswordEdit)
-            m_regConfirmPasswordEdit->clear();
-        if (m_regEmailEdit)
-            m_regEmailEdit->clear();
-
-        // 비밀번호 재설정 폼 입력 초기화
-        if (m_resetEmailEdit)
-            m_resetEmailEdit->clear();
     }
 
     void LoginWindow::setFormEnabled(bool enabled)
@@ -821,28 +509,6 @@ namespace Blokus
             m_showRegisterButton->setEnabled(enabled);
         if (m_showPasswordResetButton)
             m_showPasswordResetButton->setEnabled(enabled);
-
-        // 회원가입 폼
-        if (m_regUsernameEdit)
-            m_regUsernameEdit->setEnabled(enabled);
-        if (m_regPasswordEdit)
-            m_regPasswordEdit->setEnabled(enabled);
-        if (m_regConfirmPasswordEdit)
-            m_regConfirmPasswordEdit->setEnabled(enabled);
-        if (m_regEmailEdit)
-            m_regEmailEdit->setEnabled(enabled);
-        if (m_registerButton)
-            m_registerButton->setEnabled(enabled);
-        if (m_backToLoginFromRegisterButton)
-            m_backToLoginFromRegisterButton->setEnabled(enabled);
-
-        // 비밀번호 재설정 폼
-        if (m_resetEmailEdit)
-            m_resetEmailEdit->setEnabled(enabled);
-        if (m_passwordResetButton)
-            m_passwordResetButton->setEnabled(enabled);
-        if (m_backToLoginFromResetButton)
-            m_backToLoginFromResetButton->setEnabled(enabled);
     }
 
     void LoginWindow::showLoadingState(bool loading)
@@ -885,86 +551,6 @@ namespace Blokus
         return true;
     }
 
-    bool LoginWindow::validateRegisterInput()
-    {
-        QString username = m_regUsernameEdit->text().trimmed();
-        QString password = m_regPasswordEdit->text();
-        QString confirmPassword = m_regConfirmPasswordEdit->text();
-        QString email = m_regEmailEdit->text().trimmed();
-
-        // 아이디 검증
-        if (username.length() < 4 || username.length() > 20)
-        {
-            showMessage(QString::fromUtf8("입력 오류"), QString::fromUtf8("아이디는 4-20자여야 합니다."), true);
-            m_regUsernameEdit->setFocus();
-            return false;
-        }
-
-        QRegularExpression usernameRegex("^[a-zA-Z0-9]+$");
-        if (!usernameRegex.match(username).hasMatch())
-        {
-            showMessage(QString::fromUtf8("입력 오류"), QString::fromUtf8("아이디는 영문과 숫자만 사용 가능합니다."), true);
-            m_regUsernameEdit->setFocus();
-            return false;
-        }
-
-        // 비밀번호 검증
-        if (password.length() < 8)
-        {
-            showMessage(QString::fromUtf8("입력 오류"), QString::fromUtf8("비밀번호는 8자 이상이어야 합니다."), true);
-            m_regPasswordEdit->setFocus();
-            return false;
-        }
-
-        QRegularExpression passwordRegex("^(?=.*[a-zA-Z])(?=.*[0-9]).+$");
-        if (!passwordRegex.match(password).hasMatch())
-        {
-            showMessage(QString::fromUtf8("입력 오류"), QString::fromUtf8("비밀번호는 영문과 숫자를 포함해야 합니다."), true);
-            m_regPasswordEdit->setFocus();
-            return false;
-        }
-
-        // 비밀번호 확인
-        if (password != confirmPassword)
-        {
-            showMessage(QString::fromUtf8("입력 오류"), QString::fromUtf8("비밀번호가 일치하지 않습니다."), true);
-            m_regConfirmPasswordEdit->setFocus();
-            return false;
-        }
-
-        // 이메일 검증
-        QRegularExpression emailRegex("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
-        if (!emailRegex.match(email).hasMatch())
-        {
-            showMessage(QString::fromUtf8("입력 오류"), QString::fromUtf8("올바른 이메일 주소를 입력해주세요."), true);
-            m_regEmailEdit->setFocus();
-            return false;
-        }
-
-        return true;
-    }
-
-    bool LoginWindow::validatePasswordResetInput()
-    {
-        QString email = m_resetEmailEdit->text().trimmed();
-
-        if (email.isEmpty())
-        {
-            showMessage(QString::fromUtf8("입력 오류"), QString::fromUtf8("이메일을 입력해주세요."), true);
-            m_resetEmailEdit->setFocus();
-            return false;
-        }
-
-        QRegularExpression emailRegex("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
-        if (!emailRegex.match(email).hasMatch())
-        {
-            showMessage(QString::fromUtf8("입력 오류"), QString::fromUtf8("올바른 이메일 주소를 입력해주세요."), true);
-            m_resetEmailEdit->setFocus();
-            return false;
-        }
-
-        return true;
-    }
 
     void LoginWindow::showMessage(const QString &title, const QString &message, bool isError)
     {

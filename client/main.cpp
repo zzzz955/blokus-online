@@ -65,26 +65,6 @@ private slots:
         m_networkClient->login(username, password);
     }
 
-    void handleRegisterRequest(const QString &username, const QString &password, const QString &email)
-    {
-        qDebug() << QString::fromUtf8("회원가입 시도: %1").arg(username);
-
-        if (!m_networkClient->isConnected())
-        {
-            m_loginWindow->setRegisterResult(false, QString::fromUtf8("서버에 연결되지 않았습니다."));
-            return;
-        }
-
-        m_networkClient->registerUser(username, password);
-    }
-
-    void handlePasswordResetRequest(const QString &email)
-    {
-        qDebug() << QString::fromUtf8("비밀번호 재설정 요청: %1").arg(email);
-
-        // 비밀번호 재설정은 아직 미구현
-        m_loginWindow->setPasswordResetResult(false, QString::fromUtf8("비밀번호 재설정 기능은 준비 중입니다."));
-    }
 
     void handleLoginSuccess(const QString &username)
     {
@@ -300,13 +280,6 @@ private slots:
         }
     }
 
-    void onRegisterResult(bool success, const QString &message)
-    {
-        if (m_loginWindow)
-        {
-            m_loginWindow->setRegisterResult(success, message);
-        }
-    }
 
     void onLobbyEntered()
     {
@@ -1121,8 +1094,6 @@ private:
         // 인증 관련 시그널
         connect(m_networkClient, &NetworkClient::loginResult,
                 this, &AppController::onLoginResult);
-        connect(m_networkClient, &NetworkClient::registerResult,
-                this, &AppController::onRegisterResult);
 
         // 일반 에러 시그널 추가
         connect(m_networkClient, &NetworkClient::errorReceived,
@@ -1200,10 +1171,6 @@ private:
         // 로그인 시그널 연결
         connect(m_loginWindow, &Blokus::LoginWindow::loginRequested,
                 this, &AppController::handleLoginRequest);
-        connect(m_loginWindow, &Blokus::LoginWindow::registerRequested,
-                this, &AppController::handleRegisterRequest);
-        connect(m_loginWindow, &Blokus::LoginWindow::passwordResetRequested,
-                this, &AppController::handlePasswordResetRequest);
         connect(m_loginWindow, &Blokus::LoginWindow::loginSuccessful,
                 this, &AppController::handleLoginSuccess);
 

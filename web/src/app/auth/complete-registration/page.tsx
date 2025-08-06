@@ -268,6 +268,7 @@ export default function CompleteRegistrationPage() {
             </button>
           </div>
         </Card>
+        </div>
       </div>
     </Layout>
   )

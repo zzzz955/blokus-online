@@ -135,7 +135,10 @@ add_custom_command(TARGET BlokusClient POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/resource/countdown.wav
         $<TARGET_FILE_DIR:BlokusClient>/resource/countdown.wav
-    COMMENT "Copying sound resource files to output directory"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/resource/login_title.svg
+        $<TARGET_FILE_DIR:BlokusClient>/resource/login_title.svg
+    COMMENT "Copying sound, image resource files to output directory"
 )
 
 # Visual C++ Redistributable DLL 복사 (정적 링킹 대신 사용하는 경우)
