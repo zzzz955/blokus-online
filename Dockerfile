@@ -25,7 +25,6 @@ RUN echo "=== Installing system dependencies ===" && \
     apt-get update && apt-get install -y \
     # 기본 빌드 도구
     build-essential \
-    cmake \
     ninja-build \
     pkg-config \
     git \
@@ -43,6 +42,17 @@ RUN echo "=== Installing system dependencies ===" && \
     zip \
     && rm -rf /var/lib/apt/lists/* && \
     echo "=== System packages installed ==="
+
+# ==================================================
+# CMake 최신 버전 설치 (3.24+ 필요)
+# ==================================================
+RUN echo "=== Installing latest CMake ===" && \
+    wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null && \
+    echo 'deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ jammy main' | tee /etc/apt/sources.list.d/kitware.list >/dev/null && \
+    apt-get update && \
+    apt-get install -y cmake && \
+    cmake --version && \
+    echo "=== CMake installation completed ==="
 
 # ==================================================
 # vcpkg 설치 (최소한의 패키지만)
