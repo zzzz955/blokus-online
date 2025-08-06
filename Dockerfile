@@ -151,10 +151,10 @@ RUN export PATH="/usr/lib/ccache:$PATH" && \
     echo "=== Application build completed ==="
 
 # ==================================================
-# Stage 3: Runtime Environment
+# Stage 3: Runtime Environment (Game Server Target)
 # 최종 런타임 이미지 (크기 최적화)
 # ==================================================
-FROM ubuntu:22.04 AS runtime
+FROM ubuntu:22.04 AS game-server
 
 # 환경 변수 설정
 ENV DEBIAN_FRONTEND=noninteractive
