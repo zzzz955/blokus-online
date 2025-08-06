@@ -44,21 +44,10 @@ set TEMP_DIR=temp_package_v%VERSION%
 if exist %TEMP_DIR% rmdir /s /q %TEMP_DIR%
 mkdir %TEMP_DIR%
 
-echo [INFO] Packaging essential files...
-copy "%BUILD_DIR%\BlokusClient.exe" "%TEMP_DIR%\" >nul
-copy "%BUILD_DIR%\Qt5*.dll" "%TEMP_DIR%\" >nul 2>nul
-copy "%BUILD_DIR%\libprotobuf.dll" "%TEMP_DIR%\" >nul 2>nul
-copy "%BUILD_DIR%\libssl*.dll" "%TEMP_DIR%\" >nul 2>nul
-copy "%BUILD_DIR%\libcrypto*.dll" "%TEMP_DIR%\" >nul 2>nul
-copy "%BUILD_DIR%\*.dll" "%TEMP_DIR%\" >nul 2>nul
-
-echo [INFO] Creating plugin directories...
-mkdir "%TEMP_DIR%\plugins\platforms" >nul 2>nul
-mkdir "%TEMP_DIR%\plugins\imageformats" >nul 2>nul
-
-copy "%BUILD_DIR%\plugins\platforms\qwindows.dll" "%TEMP_DIR%\plugins\platforms\" >nul 2>nul
-copy "%BUILD_DIR%\plugins\imageformats\qico.dll" "%TEMP_DIR%\plugins\imageformats\" >nul 2>nul
-copy "%BUILD_DIR%\plugins\imageformats\qjpeg.dll" "%TEMP_DIR%\plugins\imageformats\" >nul 2>nul
+echo [INFO] Packaging entire release directory for maximum stability...
+echo   Copying all files from %BUILD_DIR% to %TEMP_DIR%...
+xcopy "%BUILD_DIR%\*" "%TEMP_DIR%\" /E /I /Q >nul
+echo   Release directory copied completely (includes all DLLs, plugins, and resources)
 
 REM Check signature status
 echo [INFO] Checking code signature...
