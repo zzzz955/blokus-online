@@ -71,8 +71,9 @@ export function isPostModified(createdAt: string, updatedAt: string): boolean {
   const created = new Date(createdAt);
   const updated = new Date(updatedAt);
   
-  // updated_at이 created_at보다 나중이고, 차이가 1초 이상인 경우에만 수정된 것으로 간주
-  return updated.getTime() > created.getTime() && (updated.getTime() - created.getTime()) >= 1000;
+  // updated_at이 created_at보다 나중이고, 차이가 5초 이상인 경우에만 수정된 것으로 간주
+  // 5초 임계값으로 설정하여 작성 시 미세한 시간 차이는 무시하고 실제 수정만 감지
+  return updated.getTime() > created.getTime() && (updated.getTime() - created.getTime()) >= 5000;
 }
 
 export function truncateText(text: string, maxLength: number): string {

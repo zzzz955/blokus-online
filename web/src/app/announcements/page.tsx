@@ -131,10 +131,10 @@ export default function AnnouncementsPage() {
                           </h2>
                         </Link>
                         
-                        <p className="text-gray-300 line-clamp-2">
+                        {/* <p className="text-gray-300 line-clamp-2">
                           {announcement.content.replace(/[#*`]/g, '').substring(0, 150)}
                           {announcement.content.length > 150 && '...'}
-                        </p>
+                        </p> */}
                       </div>
                       
                       <Link href={`/announcements/${announcement.id}`}>

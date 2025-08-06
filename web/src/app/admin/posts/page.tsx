@@ -101,7 +101,7 @@ export default function AdminPostsPage() {
     setActionLoading(postId);
     try {
       let response;
-      
+
       if (action === 'delete') {
         response = await adminFetch(`/api/admin/posts/${postId}`, {
           method: 'DELETE',
@@ -190,11 +190,10 @@ export default function AdminPostsPage() {
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setSelectedCategory('ALL')}
-                className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                  selectedCategory === 'ALL'
+                className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${selectedCategory === 'ALL'
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+                  }`}
               >
                 전체
               </button>
@@ -202,11 +201,10 @@ export default function AdminPostsPage() {
                 <button
                   key={category}
                   onClick={() => setSelectedCategory(category as PostCategory)}
-                  className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                    selectedCategory === category
+                  className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${selectedCategory === category
                       ? 'bg-blue-600 text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                    }`}
                 >
                   {label}
                 </button>
@@ -227,11 +225,10 @@ export default function AdminPostsPage() {
                 <button
                   key={value}
                   onClick={() => setSelectedStatus(value as any)}
-                  className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                    selectedStatus === value
+                  className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${selectedStatus === value
                       ? 'bg-blue-600 text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                    }`}
                 >
                   {label}
                 </button>
@@ -308,14 +305,13 @@ export default function AdminPostsPage() {
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${CATEGORY_COLORS[post.category]}`}>
                               {CATEGORY_LABELS[post.category]}
                             </span>
-                            {getStatusBadge(post)}
+                            <p className="text-sm font-medium text-gray-900 truncate w-72">
+                              {post.title}
+                            </p>
                           </div>
-                          <p className="text-sm font-medium text-gray-900 truncate">
-                            {post.title}
-                          </p>
-                          <p className="text-sm text-gray-500 line-clamp-2">
+                          {/* <p className="text-sm text-gray-500 line-clamp-2">
                             {post.content}
-                          </p>
+                          </p> */}
                         </div>
                       </div>
                     </td>
@@ -388,11 +384,11 @@ export default function AdminPostsPage() {
             >
               이전
             </Button>
-            
+
             {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
               const page = currentPage <= 3 ? i + 1 : currentPage - 2 + i;
               if (page > totalPages) return null;
-              
+
               return (
                 <Button
                   key={page}
@@ -403,7 +399,7 @@ export default function AdminPostsPage() {
                 </Button>
               );
             })}
-            
+
             <Button
               variant="outline"
               disabled={currentPage === totalPages}

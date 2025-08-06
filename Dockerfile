@@ -4,7 +4,7 @@
 # ==================================================
 
 # ==================================================
-# Stage 1: vcpkg Builder
+# Stage 1: vcpkg Builder (캐시 최적화)
 # Microsoft vcpkg를 사용한 안정적인 의존성 관리
 # ==================================================
 FROM ubuntu:22.04 AS vcpkg-builder
@@ -20,7 +20,7 @@ ENV VCPKG_FEATURE_FLAGS=manifests,versions,binarycaching
 SHELL ["/bin/bash", "-euxo", "pipefail", "-c"]
 
 # ==================================================
-# 시스템 패키지 설치
+# 시스템 패키지 설치 (캐시 가능한 레이어)
 # ==================================================
 RUN echo "=== Installing build dependencies ===" && \
     apt-get update && apt-get install -y \
@@ -47,17 +47,17 @@ RUN echo "=== Installing build dependencies ===" && \
     # PostgreSQL 빌드 의존성 (libpq 빌드용)
     libpq-dev \
     postgresql-server-dev-all \
-    # 추가 유틸리티
+    # 추가 유틸리티 (컴파일 캐시)
     ccache \
     && rm -rf /var/lib/apt/lists/*
 
 # ==================================================
-# vcpkg 설치 및 부트스트랩
+# vcpkg 설치 및 부트스트랩 (캐시 가능한 레이어)
 # ==================================================
 RUN echo "=== Installing vcpkg ===" && \
     git clone https://github.com/Microsoft/vcpkg.git ${VCPKG_ROOT} && \
     cd ${VCPKG_ROOT} && \
-    # 안정적인 릴리즈 태그로 체크아웃 (옵션)
+    # 안정적인 릴리즈 태그로 체크아웃 (2024.08.23)
     git checkout 2024.08.23 && \
     # vcpkg 부트스트랩
     ./bootstrap-vcpkg.sh && \
@@ -65,28 +65,37 @@ RUN echo "=== Installing vcpkg ===" && \
     ./vcpkg version && \
     echo "=== vcpkg installation completed ==="
 
+# ==================================================
+# 의존성 매니페스트 파일 먼저 복사 (캐시 최적화 핵심)
+# 의존성이 변경되지 않으면 이후 레이어들이 모두 캐시됨
+# ==================================================
+COPY vcpkg.json vcpkg-configuration.json* ${VCPKG_ROOT}/
 
 # ==================================================
-# vcpkg 의존성 설치 (병렬 빌드 최적화)
+# vcpkg 의존성 설치 (병렬 빌드 + 캐시 최적화)
 # ==================================================
 RUN cd ${VCPKG_ROOT} && \
     # 병렬 빌드 최적화를 위한 환경변수 설정
     export VCPKG_MAX_CONCURRENCY=$(nproc) && \
     export VCPKG_KEEP_ENV_VARS=VCPKG_MAX_CONCURRENCY && \
+    # ccache 설정 (컴파일 캐시)
+    export PATH="/usr/lib/ccache:$PATH" && \
+    export CCACHE_DIR=/tmp/ccache && \
     # 의존성 설치 (빌드 시간 최적화)
-    ./vcpkg install spdlog boost-asio boost-system nlohmann-json libpqxx openssl argon2 \
-        --triplet=${VCPKG_DEFAULT_TRIPLET} \
+    ./vcpkg install --triplet=${VCPKG_DEFAULT_TRIPLET} \
         --x-buildtrees-root=/tmp/vcpkg-buildtrees \
-        --x-install-root=/opt/vcpkg/installed && \
+        --x-install-root=/opt/vcpkg/installed \
+        --x-packages-root=/tmp/vcpkg-packages && \
     # 임시 빌드 파일 정리로 이미지 크기 최적화
-    rm -rf /tmp/vcpkg-buildtrees && \
-    # vcpkg 캐시 정리
-    ./vcpkg list
+    rm -rf /tmp/vcpkg-buildtrees /tmp/vcpkg-packages /tmp/ccache && \
+    # vcpkg 설치 검증
+    ./vcpkg list && \
+    echo "=== vcpkg dependencies installation completed ==="
 
-# vcpkg 설치 완료
+# vcpkg 의존성 설치 완료 (소스코드와 독립적으로 캐시됨)
 
 # ==================================================
-# Stage 2: Application Builder
+# Stage 2: Application Builder (캐시 최적화)
 # 프로젝트 빌드 단계
 # ==================================================
 FROM vcpkg-builder AS app-builder
@@ -94,31 +103,47 @@ FROM vcpkg-builder AS app-builder
 # 작업 디렉토리 설정
 WORKDIR /app
 
-# 프로젝트 소스 복사 (common, server만)
-COPY common/ ./common/
-COPY server/ ./server/
+# CMake 프로젝트 파일 먼저 복사 (캐시 최적화)
 COPY CMakeLists.txt ./
 
-# vcpkg 설치 확인
+# 소스코드를 마지막에 복사 (가장 자주 변경되는 부분)
+COPY common/ ./common/
+COPY server/ ./server/
+
+# vcpkg 설치 확인 (디버깅용)
 RUN echo "=== Checking vcpkg installations ===" && \
     ls -la ${VCPKG_ROOT}/installed/x64-linux/share/ | grep -E "(libpq|openssl|spdlog)" && \
     echo "=== Available packages ===" && \
     ${VCPKG_ROOT}/vcpkg list
 
 # ==================================================
-# 프로젝트 빌드 (vcpkg toolchain 사용)
+# 프로젝트 빌드 (vcpkg toolchain + ccache 사용)
 # ==================================================
-RUN CMAKE_PATH=$(find ${VCPKG_ROOT}/downloads/tools -name cmake -type f | head -1) && \
+RUN # ccache 설정으로 컴파일 시간 단축
+    export PATH="/usr/lib/ccache:$PATH" && \
+    export CCACHE_DIR=/tmp/ccache && \
+    export CMAKE_C_COMPILER_LAUNCHER=ccache && \
+    export CMAKE_CXX_COMPILER_LAUNCHER=ccache && \
+    # CMake 경로 설정
+    CMAKE_PATH=$(find ${VCPKG_ROOT}/downloads/tools -name cmake -type f | head -1) && \
     export PATH="$(dirname $CMAKE_PATH):$PATH" && \
+    # CMake 구성 (Release 빌드)
     cmake -S . -B build \
         -GNinja \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_CXX_STANDARD=20 \
         -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
-        -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET} && \
-    ninja -C build -j1 -v && \
+        -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET} \
+        -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+        -DCMAKE_CXX_COMPILER_LAUNCHER=ccache && \
+    # 병렬 빌드 (CPU 코어 수 활용)
+    ninja -C build -j$(nproc) -v && \
+    # 빌드 결과 설치 디렉토리에 복사
     mkdir -p /app/install/bin && \
-    cp build/server/BlokusServer /app/install/bin/
+    cp build/server/BlokusServer /app/install/bin/ && \
+    # 빌드 캐시 정리
+    rm -rf /tmp/ccache && \
+    echo "=== Application build completed ==="
 
 # ==================================================
 # Stage 3: Runtime Environment

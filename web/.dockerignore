@@ -1,0 +1,112 @@
+# ==================================================
+# .dockerignore - Blokus Web Application 빌드 최적화
+# Next.js 애플리케이션 빌드 컨텍스트 최소화
+# ==================================================
+
+# ========== Version Control ==========
+.git/
+.gitignore
+.gitattributes
+
+# ========== Documentation ==========
+*.md
+README*
+CHANGELOG*
+LICENSE*
+docs/
+
+# ========== IDE and Editor ==========
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ========== Node.js ==========
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn-integrity
+
+# ========== Next.js ==========
+.next/
+out/
+build/
+dist/
+
+# ========== Testing ==========
+coverage/
+.nyc_output/
+test/
+tests/
+__tests__/
+*.test.*
+*.spec.*
+
+# ========== Environment files ==========
+.env.local
+.env.*.local
+.env.test
+.env.production
+# .env는 포함 (기본 환경변수 필요할 수 있음)
+
+# ========== Cache directories ==========
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+
+# ========== OS generated files ==========
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ========== Runtime data ==========
+logs/
+*.log
+*.pid
+*.seed
+*.pid.lock
+pids/
+
+# ========== Optional npm cache directory ==========
+.npm
+
+# ========== Optional REPL history ==========
+.node_repl_history
+
+# ========== Output of 'npm pack' ==========
+*.tgz
+
+# ========== Temporary folders ==========
+tmp/
+temp/
+*.tmp
+
+# ========== Uploads directory (런타임에서 마운트) ==========
+uploads/
+public/uploads/
+
+# ========== Storybook build outputs ==========
+.out
+.storybook-out
+
+# ========== Linting ==========
+.eslintcache
+
+# ========== TypeScript ==========
+*.tsbuildinfo
+
+# ========== Microbundle cache ==========
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/

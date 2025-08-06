@@ -4,7 +4,7 @@
 # ==================================================
 
 # ==================================================
-# Stage 1: Dependencies Builder
+# Stage 1: Dependencies Builder (캐시 최적화)
 # Node.js 환경에서 의존성 설치
 # ==================================================
 FROM node:20-alpine AS deps-builder
@@ -16,7 +16,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # 작업 디렉토리 설정
 WORKDIR /app
 
-# 시스템 패키지 업데이트 및 필수 도구 설치
+# 시스템 패키지 설치 (캐시 가능한 레이어)
 RUN apk add --no-cache \
     libc6-compat \
     openssl \
@@ -28,15 +28,16 @@ RUN apk add --no-cache \
     gcc \
     musl-dev
 
-# package.json과 package-lock.json 복사
+# package.json 파일들만 먼저 복사 (캐시 최적화 핵심)
+# 의존성이 변경되지 않으면 npm ci 단계가 캐시됨
 COPY package*.json ./
 
-# 의존성 설치 (production only) - native 모듈 빌드 허용
+# production 의존성 설치 (캐시됨)
 RUN npm ci --only=production && \
     npm cache clean --force
 
 # ==================================================
-# Stage 2: Application Builder
+# Stage 2: Application Builder (캐시 최적화)
 # Next.js 애플리케이션 빌드
 # ==================================================
 FROM node:20-alpine AS app-builder
@@ -48,7 +49,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # 작업 디렉토리 설정
 WORKDIR /app
 
-# 시스템 패키지 설치 (빌드 도구 포함)
+# 시스템 패키지 설치 (캐시 가능한 레이어)
 RUN apk add --no-cache \
     libc6-compat \
     openssl \
@@ -60,20 +61,25 @@ RUN apk add --no-cache \
     gcc \
     musl-dev
 
-# 전체 프로젝트 소스 복사
+# package.json 파일들 먼저 복사 (캐시 최적화)
 COPY package*.json ./
-COPY . .
 
-# 개발 의존성 포함하여 설치 (build 시 필요) - native 모듈 빌드 허용
+# 개발 의존성 포함하여 설치 (빌드 시 필요)
 RUN npm ci
 
-# Prisma 클라이언트 생성
+# Prisma schema 먼저 복사 (캐시 최적화)
+COPY prisma/ ./prisma/
+
+# Prisma 클라이언트 생성 (schema 변경 시에만 재실행)
 RUN npx prisma generate
 
-# Next.js 빌드 (단계별 실행으로 디버깅 개선)
-RUN npm run build
-RUN npm prune --production
-RUN npm cache clean --force
+# 나머지 소스코드 복사 (가장 자주 변경되는 부분)
+COPY . .
+
+# Next.js 빌드 (최적화된 단계별 실행)
+RUN npm run build && \
+    npm prune --production && \
+    npm cache clean --force
 
 # ==================================================
 # Stage 3: Runtime Environment

@@ -319,9 +319,9 @@ export default function AdminPatchNotesPage() {
                             {patchNote.title}
                           </h3>
                         </div>
-                        <p className="text-gray-600 text-sm mb-2 line-clamp-3">
+                        {/* <p className="text-gray-600 text-sm mb-2 line-clamp-3">
                           {patchNote.content.substring(0, 300)}...
-                        </p>
+                        </p> */}
                         <div className="text-xs text-gray-500">
                           릴리즈 날짜: {new Date(patchNote.release_date).toLocaleDateString()} | 
                           작성일: {new Date(patchNote.created_at).toLocaleString()}

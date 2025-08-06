@@ -56,13 +56,7 @@ export async function GET(
       }
     }
 
-    // 조회수 증가
-    await prisma.post.update({
-      where: { id: postId },
-      data: { view_count: { increment: 1 } },
-    });
-
-    // 응답 데이터 변환
+    // 응답 데이터 변환 (조회수 증가는 별도로 처리)
     const transformedPost = {
       id: post.id,
       title: post.title,
@@ -75,10 +69,24 @@ export async function GET(
       },
       isHidden: post.is_hidden,
       isDeleted: post.is_deleted,
-      viewCount: post.view_count + 1, // 증가된 조회수 반영
+      viewCount: post.view_count,
       createdAt: post.created_at.toISOString(),
       updatedAt: post.updated_at.toISOString(),
     };
+
+    // 조회수 증가는 응답 후 비동기로 처리 (updated_at 갱신 방지)
+    setImmediate(async () => {
+      try {
+        // 트리거를 임시로 비활성화하고 조회수만 증가
+        await prisma.$transaction(async (tx) => {
+          await tx.$executeRaw`SET session_replication_role = replica;`; // 트리거 비활성화
+          await tx.$executeRaw`UPDATE "posts" SET view_count = view_count + 1 WHERE id = ${postId};`;
+          await tx.$executeRaw`SET session_replication_role = DEFAULT;`; // 트리거 재활성화
+        });
+      } catch (error) {
+        console.error('조회수 증가 에러:', error);
+      }
+    });
 
     return NextResponse.json({
       success: true,
@@ -148,13 +156,18 @@ export async function PUT(
 
     const validatedData = schema.parse(body);
 
-    // 게시글 수정
+    // 게시글 수정 (KST 타임존으로 updated_at 설정)
+    const now = new Date();
+    const kstOffset = 9 * 60 * 60 * 1000; // UTC+9
+    const kstNow = new Date(now.getTime() + kstOffset);
+    
     const updatedPost = await prisma.post.update({
       where: { id: postId },
       data: {
         title: validatedData.title,
         content: validatedData.content,
         category: validatedData.category,
+        updated_at: kstNow,
       },
       include: {
         author: {

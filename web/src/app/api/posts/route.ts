@@ -120,13 +120,19 @@ export async function POST(request: NextRequest) {
 
     const validatedData = schema.parse(body);
 
-    // 게시글 생성
+    // 게시글 생성 (KST 타임존으로 현재 시간 설정)
+    const now = new Date();
+    const kstOffset = 9 * 60 * 60 * 1000; // UTC+9
+    const kstNow = new Date(now.getTime() + kstOffset);
+    
     const post = await prisma.post.create({
       data: {
         title: validatedData.title,
         content: validatedData.content,
         category: validatedData.category,
         author_id: parseInt(session.user.id),
+        created_at: kstNow,
+        updated_at: kstNow,
       },
       include: {
         author: {

@@ -296,9 +296,9 @@ export default function AdminAnnouncementsPage() {
                             </span>
                           )}
                         </div>
-                        <p className="text-gray-600 text-sm mb-2 line-clamp-2">
+                        {/* <p className="text-gray-600 text-sm mb-2 line-clamp-2">
                           {announcement.content.substring(0, 200)}...
-                        </p>
+                        </p> */}
                         <div className="text-xs text-gray-500">
                           작성자: {announcement.author} | 
                           작성일: {new Date(announcement.created_at).toLocaleString()}

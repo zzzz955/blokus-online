@@ -143,10 +143,10 @@ export default function PatchNotesPage() {
                           </h2>
                         </Link>
                         
-                        <p className="text-gray-300 line-clamp-3 mb-4">
+                        {/* <p className="text-gray-300 line-clamp-3 mb-4">
                           {patchNote.content.replace(/[#*`]/g, '').substring(0, 200)}
                           {patchNote.content.length > 200 && '...'}
-                        </p>
+                        </p> */}
 
                         <div className="flex items-center space-x-4">
                           <Link href={`/patch-notes/${patchNote.version}`}>

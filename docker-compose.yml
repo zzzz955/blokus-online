@@ -46,7 +46,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      # Dockerfile build configuration
+      # 캐시 최적화 설정
+      cache_from:
+        - blokus-server:latest
+      target: runtime
     container_name: blokus-server
     restart: unless-stopped
     
@@ -117,6 +120,10 @@ services:
     build:
       context: ./web
       dockerfile: Dockerfile
+      # 캐시 최적화 설정
+      cache_from:
+        - blokus-web:latest
+      target: runtime
     container_name: blokus-web
     restart: unless-stopped
     
