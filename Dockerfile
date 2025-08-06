@@ -38,6 +38,11 @@ RUN echo "=== Installing system dependencies ===" && \
     gzip \
     unzip \
     zip \
+    bison \
+    flex \
+    libreadline-dev \
+    zlib1g-dev \
+    libssl-dev \
     && rm -rf /var/lib/apt/lists/* && \
     echo "=== System packages installed ==="
 
