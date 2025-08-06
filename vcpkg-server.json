@@ -1,0 +1,14 @@
+{
+  "name": "blokus-online-server",
+  "version": "1.0.0",
+  "description": "Blokus Online Server Dependencies (No Qt)",
+  "dependencies": [
+    "spdlog",
+    "boost-asio",
+    "boost-system", 
+    "nlohmann-json",
+    "libpqxx",
+    "openssl",
+    "argon2"
+  ]
+}

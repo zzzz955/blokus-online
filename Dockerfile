@@ -66,10 +66,11 @@ RUN echo "=== Installing vcpkg ===" && \
     echo "=== vcpkg installation completed ==="
 
 # ==================================================
-# 의존성 매니페스트 파일 먼저 복사 (캐시 최적화 핵심)
+# 서버 전용 의존성 매니페스트 파일 복사 (Qt 제외로 libsystemd 에러 해결)
 # 의존성이 변경되지 않으면 이후 레이어들이 모두 캐시됨
 # ==================================================
-COPY vcpkg.json vcpkg-configuration.json* ${VCPKG_ROOT}/
+COPY vcpkg-server.json ${VCPKG_ROOT}/vcpkg.json
+COPY vcpkg-configuration.json* ${VCPKG_ROOT}/ 2>/dev/null || echo "vcpkg-configuration.json not found, skipping"
 
 # ==================================================
 # vcpkg 의존성 설치 (병렬 빌드 + 캐시 최적화)
@@ -81,16 +82,20 @@ RUN cd ${VCPKG_ROOT} && \
     # ccache 설정 (컴파일 캐시)
     export PATH="/usr/lib/ccache:$PATH" && \
     export CCACHE_DIR=/tmp/ccache && \
-    # 의존성 설치 (빌드 시간 최적화)
-    ./vcpkg install --triplet=${VCPKG_DEFAULT_TRIPLET} \
+    # 빌드 최적화 플래그 추가
+    export VCPKG_FEATURE_FLAGS=manifests,versions,binarycaching,compilertracking && \
+    export VCPKG_BINARY_SOURCES="clear;x-gha,readwrite" && \
+    # 의존성 설치 (빌드 시간 최적화) - 서버 전용 패키지만
+    timeout 600 ./vcpkg install --triplet=${VCPKG_DEFAULT_TRIPLET} \
         --x-buildtrees-root=/tmp/vcpkg-buildtrees \
         --x-install-root=/opt/vcpkg/installed \
-        --x-packages-root=/tmp/vcpkg-packages && \
+        --x-packages-root=/tmp/vcpkg-packages \
+        --clean-after-build && \
     # 임시 빌드 파일 정리로 이미지 크기 최적화
     rm -rf /tmp/vcpkg-buildtrees /tmp/vcpkg-packages /tmp/ccache && \
     # vcpkg 설치 검증
     ./vcpkg list && \
-    echo "=== vcpkg dependencies installation completed ==="
+    echo "=== Server-only vcpkg dependencies installation completed ==="
 
 # vcpkg 의존성 설치 완료 (소스코드와 독립적으로 캐시됨)
 

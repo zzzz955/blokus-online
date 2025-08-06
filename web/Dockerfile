@@ -32,8 +32,8 @@ RUN apk add --no-cache \
 # 의존성이 변경되지 않으면 npm ci 단계가 캐시됨
 COPY package*.json ./
 
-# production 의존성 설치 (캐시됨)
-RUN npm ci --only=production && \
+# production 의존성 설치 (캐시됨) - 최적화
+RUN npm ci --only=production --no-audit --no-fund && \
     npm cache clean --force
 
 # ==================================================

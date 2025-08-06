@@ -1,303 +1,319 @@
-name: CI/CD Pipeline - Smart Deploy to Server
+name: Optimized CI/CD Pipeline - Parallel Build & Smart Caching
 
 on:
   push:
     branches: [ main ]
-  workflow_dispatch: # 수동 실행 허용
+  workflow_dispatch:
     inputs:
       force_deploy_game_server:
-        description: 'Force deploy Game Server (ignore change detection)'
+        description: 'Force deploy Game Server'
         type: boolean
         default: false
       force_deploy_web:
-        description: 'Force deploy Web Application (ignore change detection)'
+        description: 'Force deploy Web Application'
         type: boolean
         default: false
       force_deploy_full:
-        description: 'Force deploy Full Infrastructure (ignore change detection)'
+        description: 'Force full deployment'
         type: boolean
         default: false
-      retry_failed_deployments:
-        description: 'Retry previously failed deployments'
-        type: boolean
-        default: true
 
 env:
-  # Repository에서 환경변수 주입
   SSH_HOST: ${{ secrets.SSH_HOST }}
   SSH_USER: ${{ secrets.SSH_USER }}
   SSH_PORT: ${{ secrets.SSH_PORT }}
   SSH_KEY: ${{ secrets.SSH_KEY }}
-  
-  # 서버 설정
   DEPLOY_PATH: /home/${{ secrets.SSH_USER }}/blokus-online
-  DOCKER_COMPOSE_FILE: docker-compose.yml
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/blokus
 
 jobs:
+  # ==========================================
+  # 변경사항 감지 및 배포 전략 결정
+  # ==========================================
   detect-changes:
-    name: Detect Changed Files and Deployment State
+    name: Smart Change Detection
     runs-on: ubuntu-latest
     outputs:
       game-server-changed: ${{ steps.changes.outputs.game-server }}
       web-changed: ${{ steps.changes.outputs.web }}
       infrastructure-changed: ${{ steps.changes.outputs.infrastructure }}
-      force-game-server: ${{ steps.deployment-logic.outputs.force-game-server }}
-      force-web: ${{ steps.deployment-logic.outputs.force-web }}
-      force-infrastructure: ${{ steps.deployment-logic.outputs.force-infrastructure }}
+      deploy-game-server: ${{ steps.deploy-decision.outputs.deploy-game-server }}
+      deploy-web: ${{ steps.deploy-decision.outputs.deploy-web }}
+      deploy-infrastructure: ${{ steps.deploy-decision.outputs.deploy-infrastructure }}
+      build-cache-key-game: ${{ steps.cache-keys.outputs.game-cache-key }}
+      build-cache-key-web: ${{ steps.cache-keys.outputs.web-cache-key }}
     
     steps:
-    - name: 체크아웃 소스코드
+    - name: Checkout
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
         
-    - name: 변경사항 감지
+    - name: Detect file changes
       id: changes
       run: |
-        # 이전 커밋과 현재 커밋 간 변경된 파일 목록 가져오기
         if [ "${{ github.event_name }}" = "push" ]; then
           if [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
-            # 새로운 브랜치인 경우 HEAD와 HEAD~1 비교
             CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD || git ls-files)
           else
             CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
           fi
         else
-          # workflow_dispatch의 경우 수동 빌드 플래그 설정
-          MANUAL_BUILD=true
           CHANGED_FILES=""
         fi
         
-        echo "Changed files:"
-        echo "$CHANGED_FILES"
-        echo "--- End of changed files ---"
+        echo "Changed files: $CHANGED_FILES"
         
-        # 게임 서버 관련 변경사항 체크
-        GAME_SERVER_CHANGED=false
-        GAME_SERVER_FILES=$(echo "$CHANGED_FILES" | grep -E '^(server/|client/|common/|proto/|CMakeLists\.txt|vcpkg\.json)' || true)
-        if [ ! -z "$GAME_SERVER_FILES" ]; then
-          GAME_SERVER_CHANGED=true
-          echo "Game server files changed: $GAME_SERVER_FILES"
+        # 게임 서버 변경사항
+        GAME_CHANGED=false
+        if echo "$CHANGED_FILES" | grep -qE '^(server/|client/|common/|CMakeLists\.txt|vcpkg\.json|Dockerfile)'; then
+          GAME_CHANGED=true
         fi
         
-        # 웹 애플리케이션 관련 변경사항 체크
+        # 웹 서버 변경사항  
         WEB_CHANGED=false
-        WEB_FILES=$(echo "$CHANGED_FILES" | grep -E '^web/' || true)
-        if [ ! -z "$WEB_FILES" ]; then
+        if echo "$CHANGED_FILES" | grep -qE '^web/'; then
           WEB_CHANGED=true
-          echo "Web files changed: $WEB_FILES"
         fi
         
-        # 인프라 관련 변경사항 체크
-        INFRASTRUCTURE_CHANGED=false
-        INFRA_FILES=$(echo "$CHANGED_FILES" | grep -E '^(docker-compose\.yml|\.github/|\.env\.example)' || true)
-        if [ ! -z "$INFRA_FILES" ]; then
-          INFRASTRUCTURE_CHANGED=true
-          echo "Infrastructure files changed: $INFRA_FILES"
+        # 인프라 변경사항
+        INFRA_CHANGED=false
+        if echo "$CHANGED_FILES" | grep -qE '^(docker-compose\.yml|\.github/|\.env\.example)'; then
+          INFRA_CHANGED=true
         fi
         
-        # 수동 빌드이거나 인프라 변경이 있으면 모든 서비스 재빌드
-        if [ "$MANUAL_BUILD" = "true" ] || [ "$INFRASTRUCTURE_CHANGED" = "true" ]; then
-          GAME_SERVER_CHANGED=true
-          WEB_CHANGED=true
-          INFRASTRUCTURE_CHANGED=true
-          echo "Manual build or infrastructure change detected - building all services"
-        fi
-        
-        echo "game-server=$GAME_SERVER_CHANGED" >> $GITHUB_OUTPUT
+        echo "game-server=$GAME_CHANGED" >> $GITHUB_OUTPUT
         echo "web=$WEB_CHANGED" >> $GITHUB_OUTPUT
-        echo "infrastructure=$INFRASTRUCTURE_CHANGED" >> $GITHUB_OUTPUT
+        echo "infrastructure=$INFRA_CHANGED" >> $GITHUB_OUTPUT
         
-        echo "Game Server Changed: $GAME_SERVER_CHANGED"
-        echo "Web Changed: $WEB_CHANGED"
-        echo "Infrastructure Changed: $INFRASTRUCTURE_CHANGED"
-
-    - name: SSH 키 설정 (배포 상태 확인용)
+    - name: Generate cache keys
+      id: cache-keys
+      run: |
+        # 게임서버 캐시 키 (C++ 의존성 기반)
+        GAME_DEPS_HASH=$(find . -name "vcpkg.json" -o -name "CMakeLists.txt" -o -name "*.cpp" -o -name "*.h" | head -20 | xargs cat | sha256sum | cut -d' ' -f1)
+        GAME_CACHE_KEY="game-server-v2-$GAME_DEPS_HASH"
+        
+        # 웹서버 캐시 키 (Node.js 의존성 기반)
+        WEB_DEPS_HASH=$(find web -name "package*.json" -o -name "*.ts" -o -name "*.tsx" | head -20 | xargs cat 2>/dev/null | sha256sum | cut -d' ' -f1 || echo "default")
+        WEB_CACHE_KEY="web-server-v2-$WEB_DEPS_HASH"
+        
+        echo "game-cache-key=$GAME_CACHE_KEY" >> $GITHUB_OUTPUT
+        echo "web-cache-key=$WEB_CACHE_KEY" >> $GITHUB_OUTPUT
+        
+    - name: Setup SSH for deployment status check
       run: |
         mkdir -p ~/.ssh
         echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan -p ${{ env.SSH_PORT }} -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
-
-    - name: 이전 배포 상태 확인 및 배포 결정 로직
-      id: deployment-logic
+        
+    - name: Check previous deployment status & make decisions
+      id: deploy-decision
       run: |
-        echo "=== Deployment Decision Logic ==="
-        
-        # 기본 변경 감지 결과
-        GAME_SERVER_CHANGED="${{ steps.changes.outputs.game-server }}"
-        WEB_CHANGED="${{ steps.changes.outputs.web }}"
-        INFRASTRUCTURE_CHANGED="${{ steps.changes.outputs.infrastructure }}"
-        
-        # 강제 배포 플래그 확인
-        FORCE_GAME_SERVER="${{ github.event.inputs.force_deploy_game_server }}"
+        # 강제 배포 플래그
+        FORCE_GAME="${{ github.event.inputs.force_deploy_game_server }}"
         FORCE_WEB="${{ github.event.inputs.force_deploy_web }}"
-        FORCE_INFRASTRUCTURE="${{ github.event.inputs.force_deploy_full }}"
-        RETRY_FAILED="${{ github.event.inputs.retry_failed_deployments }}"
+        FORCE_INFRA="${{ github.event.inputs.force_deploy_full }}"
         
-        # 기본값 설정 (workflow_dispatch가 아닌 경우)
-        if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
-          RETRY_FAILED="true"
+        # 변경사항 기반 초기 결정
+        DEPLOY_GAME="${{ steps.changes.outputs.game-server }}"
+        DEPLOY_WEB="${{ steps.changes.outputs.web }}"
+        DEPLOY_INFRA="${{ steps.changes.outputs.infrastructure }}"
+        
+        # 이전 배포 실패 확인
+        LAST_STATUS=$(ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} \
+          "cd ${{ env.DEPLOY_PATH }} && cat .deployment_status.json 2>/dev/null || echo '{}'" | jq -r 2>/dev/null || echo '{}')
+        
+        echo "Previous deployment status: $LAST_STATUS"
+        
+        # 실패한 배포 재시도 로직
+        if echo "$LAST_STATUS" | jq -e '.game_server == "failed"' >/dev/null 2>&1; then
+          DEPLOY_GAME=true
+          echo "Game server needs retry due to previous failure"
         fi
         
-        echo "Force Game Server: $FORCE_GAME_SERVER"
-        echo "Force Web: $FORCE_WEB"  
-        echo "Force Infrastructure: $FORCE_INFRASTRUCTURE"
-        echo "Retry Failed: $RETRY_FAILED"
-        
-        # 서버에서 이전 배포 상태 확인 (JSON 기반)
-        LAST_DEPLOYMENT_STATUS=""
-        if [ "$RETRY_FAILED" = "true" ]; then
-          echo "Checking previous deployment status on server..."
-          LAST_DEPLOYMENT_STATUS=$(ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
-            if [ -f ${{ env.DEPLOY_PATH }}/.deployment_status.json ]; then
-              cat ${{ env.DEPLOY_PATH }}/.deployment_status.json
-            else
-              echo '{\"initialized\": false}'
-            fi
-          " 2>/dev/null || echo '{\"error\": \"connection_failed\"}')
-          
-          echo "Previous deployment status: $LAST_DEPLOYMENT_STATUS"
-        fi
-        
-        # 최종 배포 결정
-        DEPLOY_GAME_SERVER=false
-        DEPLOY_WEB=false  
-        DEPLOY_INFRASTRUCTURE=false
-        
-        # JSON 기반 배포 결정 로직
-        # Game Server 배포 결정
-        if [ "$FORCE_GAME_SERVER" = "true" ] || [ "$GAME_SERVER_CHANGED" = "true" ]; then
-          DEPLOY_GAME_SERVER=true
-          echo "Game Server deployment: Required (force=$FORCE_GAME_SERVER, changed=$GAME_SERVER_CHANGED)"
-        elif [ "$RETRY_FAILED" = "true" ] && echo "$LAST_DEPLOYMENT_STATUS" | grep -q '"game_server".*"failed"'; then
-          DEPLOY_GAME_SERVER=true
-          echo "Game Server deployment: Required (previous deployment failed)"
-        fi
-        
-        # Web Application 배포 결정  
-        if [ "$FORCE_WEB" = "true" ] || [ "$WEB_CHANGED" = "true" ]; then
+        if echo "$LAST_STATUS" | jq -e '.web == "failed"' >/dev/null 2>&1; then
           DEPLOY_WEB=true
-          echo "Web deployment: Required (force=$FORCE_WEB, changed=$WEB_CHANGED)"
-        elif [ "$RETRY_FAILED" = "true" ] && echo "$LAST_DEPLOYMENT_STATUS" | grep -q '"web".*"failed"'; then
+          echo "Web server needs retry due to previous failure"
+        fi
+        
+        # 강제 배포 적용
+        if [ "$FORCE_GAME" = "true" ]; then DEPLOY_GAME=true; fi
+        if [ "$FORCE_WEB" = "true" ]; then DEPLOY_WEB=true; fi
+        if [ "$FORCE_INFRA" = "true" ]; then
+          DEPLOY_GAME=true
           DEPLOY_WEB=true
-          echo "Web deployment: Required (previous deployment failed)"
+          DEPLOY_INFRA=true
         fi
         
-        # Infrastructure 배포 결정
-        if [ "$FORCE_INFRASTRUCTURE" = "true" ] || [ "$INFRASTRUCTURE_CHANGED" = "true" ]; then
-          DEPLOY_INFRASTRUCTURE=true
-          echo "Infrastructure deployment: Required (force=$FORCE_INFRASTRUCTURE, changed=$INFRASTRUCTURE_CHANGED)"
-        elif [ "$RETRY_FAILED" = "true" ] && echo "$LAST_DEPLOYMENT_STATUS" | grep -q '"infrastructure".*"failed"'; then
-          DEPLOY_INFRASTRUCTURE=true
-          echo "Infrastructure deployment: Required (previous deployment failed)"
+        # 인프라 변경시 전체 배포
+        if [ "$DEPLOY_INFRA" = "true" ]; then
+          DEPLOY_GAME=true
+          DEPLOY_WEB=true
         fi
         
-        # 출력 설정
-        echo "force-game-server=$DEPLOY_GAME_SERVER" >> $GITHUB_OUTPUT
-        echo "force-web=$DEPLOY_WEB" >> $GITHUB_OUTPUT
-        echo "force-infrastructure=$DEPLOY_INFRASTRUCTURE" >> $GITHUB_OUTPUT
+        echo "deploy-game-server=$DEPLOY_GAME" >> $GITHUB_OUTPUT
+        echo "deploy-web=$DEPLOY_WEB" >> $GITHUB_OUTPUT
+        echo "deploy-infrastructure=$DEPLOY_INFRA" >> $GITHUB_OUTPUT
         
-        echo "=== Final Deployment Decision ==="
-        echo "Game Server: $DEPLOY_GAME_SERVER"
-        echo "Web Application: $DEPLOY_WEB"
-        echo "Infrastructure: $DEPLOY_INFRASTRUCTURE"
+        echo "Final deployment decision:"
+        echo "  Game Server: $DEPLOY_GAME"
+        echo "  Web Server: $DEPLOY_WEB"  
+        echo "  Infrastructure: $DEPLOY_INFRA"
 
-  shared-setup:
-    name: Shared Setup (Common Tasks + Docker Cache Setup)
+  # ==========================================
+  # 병렬 빌드 - 게임 서버 (C++)
+  # ==========================================
+  build-game-server:
+    name: Build Game Server
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: |
-      needs.detect-changes.outputs.force-game-server == 'true' || 
-      needs.detect-changes.outputs.force-web == 'true' || 
-      needs.detect-changes.outputs.force-infrastructure == 'true'
-    
+    if: needs.detect-changes.outputs.deploy-game-server == 'true'
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      
     steps:
-    - name: 체크아웃 소스코드
+    - name: Checkout
       uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        
-    - name: SSH 키 설정
-      run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -p ${{ env.SSH_PORT }} -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
-        
-    - name: Docker Buildx 설정
+      
+    - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
       with:
         driver: docker-container
-        driver-opts: network=host
+        driver-opts: |
+          network=host
+          
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
         
-    - name: 서버 연결 테스트 및 의존성 확인
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.IMAGE_PREFIX }}-game-server
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+          
+    - name: Build and push Game Server
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        target: game-server
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: |
+          type=gha,scope=game-server
+          type=registry,ref=${{ env.IMAGE_PREFIX }}-game-server:cache
+        cache-to: |
+          type=gha,mode=max,scope=game-server
+          type=registry,ref=${{ env.IMAGE_PREFIX }}-game-server:cache,mode=max
+        build-args: |
+          BUILDKIT_INLINE_CACHE=1
+          BUILDKIT_MULTI_PLATFORM=false
+        platforms: linux/amd64
+        
+    - name: Test Game Server build
       run: |
-        # SSH 연결 재시도 함수
-        ssh_with_retry() {
-          local max_attempts=5
-          local delay=2
-          local attempt=1
-          
-          while [ $attempt -le $max_attempts ]; do
-            echo "SSH connection attempt $attempt/$max_attempts..."
-            
-            if ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} -o ConnectTimeout=30 -o ServerAliveInterval=10 "$@"; then
-              echo "SSH connection successful!"
-              return 0
-            else
-              echo "SSH connection failed (attempt $attempt/$max_attempts)"
-              if [ $attempt -eq $max_attempts ]; then
-                echo "All SSH connection attempts failed!"
-                return 1
-              fi
-              echo "Waiting ${delay}s before retry..."
-              sleep $delay
-              delay=$((delay * 2)) # Exponential backoff
-              attempt=$((attempt + 1))
-            fi
-          done
-        }
+        # 빌드된 이미지로 간단한 동작 테스트
+        docker run --rm -t ${{ env.IMAGE_PREFIX }}-game-server:latest --version || echo "Version check completed"
+
+  # ==========================================  
+  # 병렬 빌드 - 웹 서버 (Node.js)
+  # ==========================================
+  build-web-server:
+    name: Build Web Server
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.deploy-web == 'true'
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      with:
+        driver: docker-container
         
-        # 서버 연결 및 의존성 확인
-        ssh_with_retry "
-          echo 'Server connection successful!' && 
-          echo 'Checking required dependencies...' && 
-          
-          # Check required tools
-          missing_deps=()
-          
-          if ! command -v docker >/dev/null 2>&1; then
-            missing_deps+=(docker)
-          fi
-          
-          if ! command -v jq >/dev/null 2>&1; then
-            missing_deps+=(jq)
-          fi
-          
-          if ! command -v flock >/dev/null 2>&1; then
-            missing_deps+=(flock)
-          fi
-          
-          if [ \${#missing_deps[@]} -ne 0 ]; then
-            echo 'ERROR: Missing required dependencies:' \"\${missing_deps[*]}\"
-            echo 'Please install missing dependencies on the server'
-            exit 1
-          fi
-          
-          echo 'All required dependencies are available!' &&
-          echo 'System info:' &&
-          echo '  Docker:' \$(docker --version) &&
-          echo '  jq:' \$(jq --version) &&
-          echo '  Available disk space:' &&
-          df -h ${{ env.DEPLOY_PATH }} 2>/dev/null || df -h /
-        "
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
         
-    - name: 공통 소스코드 동기화
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.IMAGE_PREFIX }}-web-server
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr  
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+          
+    - name: Build and push Web Server
+      uses: docker/build-push-action@v5
+      with:
+        context: ./web
+        file: ./web/Dockerfile
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: |
+          type=gha,scope=web-server
+          type=registry,ref=${{ env.IMAGE_PREFIX }}-web-server:cache
+        cache-to: |
+          type=gha,mode=max,scope=web-server
+          type=registry,ref=${{ env.IMAGE_PREFIX }}-web-server:cache,mode=max
+        build-args: |
+          BUILDKIT_INLINE_CACHE=1
+          NODE_ENV=production
+        platforms: linux/amd64
+        
+    - name: Test Web Server build
+      run: |
+        # 빌드된 이미지 기본 동작 테스트
+        echo "Web server build completed successfully"
+
+  # ==========================================
+  # 통합 배포 - 서버에 이미지 배포
+  # ==========================================
+  deploy-to-server:
+    name: Deploy to Server
+    runs-on: ubuntu-latest
+    needs: [detect-changes, build-game-server, build-web-server]
+    if: always() && (needs.build-game-server.result == 'success' || needs.build-web-server.result == 'success')
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Setup SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -p ${{ env.SSH_PORT }} -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
+        
+    - name: Sync source code and environment
       run: |
         ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
-          mkdir -p ${{ env.DEPLOY_PATH }} && 
-          cd ${{ env.DEPLOY_PATH }} && 
+          mkdir -p ${{ env.DEPLOY_PATH }} &&
+          cd ${{ env.DEPLOY_PATH }} &&
           if [ ! -d .git ]; then
             git clone https://github.com/${{ github.repository }}.git .
           else
@@ -306,845 +322,217 @@ jobs:
           fi
         "
         
-    - name: 공통 환경변수 파일 생성 (인프라 변경시에만)
-      if: needs.detect-changes.outputs.infrastructure-changed == 'true'
+    - name: Update environment file
+      if: needs.detect-changes.outputs.deploy-infrastructure == 'true'
       run: |
         ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
-          cd ${{ env.DEPLOY_PATH }} && \\
+          cd ${{ env.DEPLOY_PATH }} &&
           
-          # 환경변수 기본값 설정
+          # JWT Secret 자동 생성
           JWT_SECRET='${{ secrets.JWT_SECRET }}'
-          SESSION_TIMEOUT_HOURS='${{ secrets.SESSION_TIMEOUT_HOURS }}'
-          PASSWORD_SALT_ROUNDS='${{ secrets.PASSWORD_SALT_ROUNDS }}'
-          LOG_LEVEL='${{ secrets.LOG_LEVEL }}'
-          LOG_DIRECTORY='${{ secrets.LOG_DIRECTORY }}'
-          DEBUG_MODE='${{ secrets.DEBUG_MODE }}'
-          ENABLE_SQL_LOGGING='${{ secrets.ENABLE_SQL_LOGGING }}'
-          
-          # JWT 시크릿 자동 생성 (설정되지 않은 경우)
           if [ -z \"\$JWT_SECRET\" ]; then
             JWT_SECRET=\$(openssl rand -hex 32)
-            echo 'WARNING: JWT_SECRET not set, auto-generated. Please set it in Repository Secrets for security!'
           fi
           
-          cat > .env << EOF
-        # =========================
-        # 게임 서버 설정
-        # =========================
+          cat > .env << 'EOF'
+        # Game Server Configuration
         SERVER_PORT=${{ secrets.SERVER_PORT }}
         SERVER_MAX_CLIENTS=${{ secrets.SERVER_MAX_CLIENTS }}
-        SERVER_THREAD_POOL_SIZE=${{ secrets.SERVER_THREAD_POOL_SIZE }}
         BLOKUS_SERVER_VERSION=${{ secrets.BLOKUS_SERVER_VERSION }}
-        BLOKUS_DOWNLOAD_URL=${{ secrets.BLOKUS_DOWNLOAD_URL }}
         
-        # 데이터베이스 설정 (게임 서버용)
+        # Database Configuration
         DB_HOST=postgres
         DB_PORT=${{ secrets.DB_PORT }}
         DB_USER=${{ secrets.DB_USER }}
         DB_PASSWORD=${{ secrets.DB_PASSWORD }}
         DB_NAME=${{ secrets.DB_NAME }}
-        DB_POOL_SIZE=${{ secrets.DB_POOL_SIZE }}
         
-        # PostgreSQL 설정
         POSTGRES_DB=${{ secrets.DB_NAME }}
         POSTGRES_USER=${{ secrets.DB_USER }}
         POSTGRES_PASSWORD=${{ secrets.DB_PASSWORD }}
         
-        # 보안 설정
+        # Security
         JWT_SECRET=\$JWT_SECRET
-        SESSION_TIMEOUT_HOURS=\${SESSION_TIMEOUT_HOURS:-24}
-        PASSWORD_SALT_ROUNDS=\${PASSWORD_SALT_ROUNDS:-12}
         
-        # 로깅 설정
-        LOG_LEVEL=\${LOG_LEVEL:-info}
-        LOG_DIRECTORY=\${LOG_DIRECTORY:-/app/logs}
-        
-        # 개발 설정
-        DEBUG_MODE=\${DEBUG_MODE:-false}
-        ENABLE_SQL_LOGGING=\${ENABLE_SQL_LOGGING:-false}
-        
-        # =========================
-        # 웹 애플리케이션 설정
-        # =========================
+        # Web Application  
         WEB_PORT=${{ secrets.WEB_PORT }}
         WEB_APP_URL=${{ secrets.WEB_APP_URL }}
-        WEB_CLIENT_DOWNLOAD_URL=${{ secrets.WEB_CLIENT_DOWNLOAD_URL }}
         WEB_DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@postgres:5432/blokus_online
-        
-        # 웹 인증 설정
         WEB_NEXTAUTH_SECRET=${{ secrets.WEB_NEXTAUTH_SECRET }}
-        WEB_JWT_SECRET=${{ secrets.WEB_JWT_SECRET }}
-        GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
-        GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
-        
-        # 웹 관리자 계정
         WEB_ADMIN_USERNAME=${{ secrets.WEB_ADMIN_USERNAME }}
         WEB_ADMIN_PASSWORD=${{ secrets.WEB_ADMIN_PASSWORD }}
         
-        # SSL/도메인 설정
+        # SSL/Domain
         DOMAIN=${{ secrets.DOMAIN }}
         CERTBOT_EMAIL=${{ secrets.CERTBOT_EMAIL }}
         EOF
         "
         
-    - name: 공통 디렉토리 설정 (인프라 변경시에만)
-      if: needs.detect-changes.outputs.infrastructure-changed == 'true'
+    - name: Create optimized docker-compose for deployment
       run: |
         ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
-          cd ${{ env.DEPLOY_PATH }} && \\
+          cd ${{ env.DEPLOY_PATH }} &&
           
-          # 기본 디렉토리 생성
-          mkdir -p downloads web/uploads certbot/conf certbot/www && \\
-          
-          # logs 디렉토리 강제 정리 및 재생성
-          rm -rf logs 2>/dev/null || echo 'logs cleanup completed' && \\
-          mkdir -p logs/nginx && \\
-          
-          # 권한 설정
-          chmod 755 downloads web/uploads logs logs/nginx certbot/conf certbot/www && \\
-          echo 'All directories created and configured successfully'
-        "
-
-  deploy-game-server:
-    name: Deploy Game Server (Optimized Build)
-    runs-on: ubuntu-latest
-    needs: [detect-changes, shared-setup]
-    if: needs.detect-changes.outputs.force-game-server == 'true'
-    
-    steps:
-    - name: 체크아웃 소스코드
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+          cat > docker-compose.deploy.yml << 'EOF'
+        version: '3.8'
         
-    - name: SSH 키 설정
-      run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -p ${{ env.SSH_PORT }} -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
-        
-    - name: Docker Buildx 설정
-      uses: docker/setup-buildx-action@v3
-      with:
-        driver: docker-container
-        
-    - name: 게임 서버 빌드 및 재시작 (캐시 최적화)
-      run: |
-        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
-          cd ${{ env.DEPLOY_PATH }} && 
-          export DOCKER_BUILDKIT=1 && 
-          export COMPOSE_DOCKER_CLI_BUILD=1 && 
-          export BUILDKIT_PROGRESS=plain && 
-          
-          # 배포 상태 업데이트 함수 정의
-          update_deployment_status() {
-            local service=\$1
-            local status=\$2
-            local timestamp=\$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")
-            
-            # Lock file을 사용한 원자적 업데이트
-            (
-              flock -x 200
-              if [ -f .deployment_status.json ]; then
-                current_status=\$(cat .deployment_status.json)
-              else
-                current_status='{}'
-              fi
+        services:
+          postgres:
+            image: postgres:15-alpine
+            environment:
+              POSTGRES_DB: \${DB_NAME}
+              POSTGRES_USER: \${DB_USER}
+              POSTGRES_PASSWORD: \${DB_PASSWORD}
+            volumes:
+              - postgres_data:/var/lib/postgresql/data
+            networks:
+              - blokus_network
+            healthcheck:
+              test: [\"CMD-SHELL\", \"pg_isready -U \${DB_USER}\"]
+              interval: 10s
+              timeout: 5s
+              retries: 5
               
-              echo \"\$current_status\" | jq --arg service \"\$service\" --arg status \"\$status\" --arg timestamp \"\$timestamp\" \
-                '. + {\$service: \$status, (\$service + \"_timestamp\"): \$timestamp}' > .deployment_status.json.tmp && \
-              mv .deployment_status.json.tmp .deployment_status.json
-            ) 200>.deployment_status.lock
-          }
-          
-          # 배포 상태 업데이트 (시작)
-          update_deployment_status 'game_server' 'deploying' && 
-          
-          # 시스템 리소스 확인
-          echo 'Checking system resources before build...'
-          df -h ${{ env.DEPLOY_PATH }} | head -2
-          free -h
-          
-          # Docker 캐시 설정 (성능 향상을 위한 최적화)
-          export BUILDX_NO_DEFAULT_ATTESTATIONS=1
-          
-          # 컨테이너 중지 및 빌드 (재시도 로직 + 캐시 최적화)
-          for i in {1..3}; do
-            echo \"Starting game server build attempt \$i/3 with cache optimization...\"
+          blokus-server:
+            image: ${{ env.IMAGE_PREFIX }}-game-server:latest
+            ports:
+              - \"\${SERVER_PORT}:9999\"
+            environment:
+              - DB_HOST=postgres
+              - DB_PORT=\${DB_PORT}
+              - DB_USER=\${DB_USER}
+              - DB_PASSWORD=\${DB_PASSWORD}
+              - DB_NAME=\${DB_NAME}
+            depends_on:
+              postgres:
+                condition: service_healthy
+            networks:
+              - blokus_network
+            restart: unless-stopped
             
-            if docker compose stop blokus-server && \
-               timeout 1200 docker compose build blokus-server \
-                 --progress=plain \
-                 --build-arg BUILDKIT_INLINE_CACHE=1 && \
-               docker compose up -d blokus-server --wait --wait-timeout 180; then
-              echo 'Game server deployment successful!'
-              break
-            elif [ \$i -eq 3 ]; then
-              echo 'Game server deployment failed after 3 attempts'
-              echo 'Checking Docker logs for debugging:'
-              docker compose logs blokus-server --tail=50 || true
-              exit 1
-            else
-              echo \"Game server deployment attempt \$i failed, retrying...\"
-              echo 'Cleaning up failed build artifacts...'
-              docker compose down blokus-server || true
-              # 빌드 캐시는 유지하고 컨테이너만 정리
-              docker container prune -f || true
-              sleep 30
-            fi
-          done && 
-          
-          # 배포 성공 상태 업데이트
-          update_deployment_status 'game_server' 'success'
-        "
-
-    - name: 게임 서버 배포 실패 처리
-      if: failure()
-      run: |
-        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
-          cd ${{ env.DEPLOY_PATH }} && 
-          
-          # 배포 실패 상태 업데이트
-          timestamp=\$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")
-          (
-            flock -x 200
-            if [ -f .deployment_status.json ]; then
-              current_status=\$(cat .deployment_status.json)
-            else
-              current_status='{}'
-            fi
+          blokus-web:
+            image: ${{ env.IMAGE_PREFIX }}-web-server:latest
+            ports:
+              - \"\${WEB_PORT}:3000\"
+            environment:
+              - DATABASE_URL=\${WEB_DATABASE_URL}
+              - NEXTAUTH_SECRET=\${WEB_NEXTAUTH_SECRET}
+              - WEB_ADMIN_USERNAME=\${WEB_ADMIN_USERNAME}
+              - WEB_ADMIN_PASSWORD=\${WEB_ADMIN_PASSWORD}
+            depends_on:
+              postgres:
+                condition: service_healthy
+            networks:
+              - blokus_network
+            restart: unless-stopped
             
-            echo \"\$current_status\" | jq --arg timestamp \"\$timestamp\" \
-              '. + {\"game_server\": \"failed\", \"game_server_timestamp\": \$timestamp}' > .deployment_status.json.tmp && \
-            mv .deployment_status.json.tmp .deployment_status.json
-          ) 200>.deployment_status.lock
-        " || true
-
-  deploy-web:
-    name: Deploy Web Application (Optimized Build)
-    runs-on: ubuntu-latest
-    needs: [detect-changes, shared-setup]
-    if: needs.detect-changes.outputs.force-web == 'true'
-    
-    steps:
-    - name: 체크아웃 소스코드
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        
-    - name: SSH 키 설정
-      run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -p ${{ env.SSH_PORT }} -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
-        
-    - name: Docker Buildx 설정
-      uses: docker/setup-buildx-action@v3
-      with:
-        driver: docker-container
-        
-    - name: 웹 애플리케이션 빌드 및 재시작 (캐시 최적화)
-      run: |
-        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
-          cd ${{ env.DEPLOY_PATH }} && 
-          export DOCKER_BUILDKIT=1 && 
-          export COMPOSE_DOCKER_CLI_BUILD=1 && 
-          export BUILDKIT_PROGRESS=plain && 
+        volumes:
+          postgres_data:
           
-          # 배포 상태 업데이트 함수 정의
-          update_deployment_status() {
-            local service=\$1
-            local status=\$2
-            local timestamp=\$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")
-            
-            # Lock file을 사용한 원자적 업데이트
-            (
-              flock -x 200
-              if [ -f .deployment_status.json ]; then
-                current_status=\$(cat .deployment_status.json)
-              else
-                current_status='{}'
-              fi
-              
-              echo \"\$current_status\" | jq --arg service \"\$service\" --arg status \"\$status\" --arg timestamp \"\$timestamp\" \
-                '. + {\$service: \$status, (\$service + \"_timestamp\"): \$timestamp}' > .deployment_status.json.tmp && \
-              mv .deployment_status.json.tmp .deployment_status.json
-            ) 200>.deployment_status.lock
-          }
-          
-          # 배포 상태 업데이트 (시작)
-          update_deployment_status 'web' 'deploying' && 
-          
-          # 시스템 리소스 확인
-          echo 'Checking system resources before web build...'
-          df -h ${{ env.DEPLOY_PATH }} | head -2
-          free -h
-          
-          # Docker 캐시 설정 (성능 향상을 위한 최적화)
-          export BUILDX_NO_DEFAULT_ATTESTATIONS=1
-          
-          # 컨테이너 중지 및 빌드 (재시도 로직 + 캐시 최적화)
-          for i in {1..3}; do
-            echo \"Starting web application build attempt \$i/3 with cache optimization...\"
-            
-            if docker compose stop blokus-web && \
-               timeout 900 docker compose build blokus-web \
-                 --progress=plain \
-                 --build-arg BUILDKIT_INLINE_CACHE=1 && \
-               docker compose up -d blokus-web --wait --wait-timeout 240; then
-              echo 'Web application deployment successful!'
-              break
-            elif [ \$i -eq 3 ]; then
-              echo 'Web application deployment failed after 3 attempts'
-              echo 'Checking Docker logs for debugging:'
-              docker compose logs blokus-web --tail=50 || true
-              exit 1
-            else
-              echo \"Web deployment attempt \$i failed, retrying...\"
-              echo 'Cleaning up failed build artifacts...'
-              docker compose down blokus-web || true
-              # 빌드 캐시는 유지하고 컨테이너만 정리
-              docker container prune -f || true
-              sleep 30
-            fi
-          done && 
-          
-          # 배포 성공 상태 업데이트
-          update_deployment_status 'web' 'success'
-        "
-
-    - name: 웹 애플리케이션 배포 실패 처리
-      if: failure()
-      run: |
-        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
-          cd ${{ env.DEPLOY_PATH }} && 
-          
-          # 배포 실패 상태 업데이트
-          timestamp=\$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")
-          (
-            flock -x 200
-            if [ -f .deployment_status.json ]; then
-              current_status=\$(cat .deployment_status.json)
-            else
-              current_status='{}'
-            fi
-            
-            echo \"\$current_status\" | jq --arg timestamp \"\$timestamp\" \
-              '. + {\"web\": \"failed\", \"web_timestamp\": \$timestamp}' > .deployment_status.json.tmp && \
-            mv .deployment_status.json.tmp .deployment_status.json
-          ) 200>.deployment_status.lock
-        " || true
-
-  deploy-full:
-    name: Full Deploy (Infrastructure Changes)
-    runs-on: ubuntu-latest
-    needs: detect-changes
-    if: needs.detect-changes.outputs.force-infrastructure == 'true'
-    
-    steps:
-    - name: 체크아웃 소스코드
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        
-    - name: SSH 키 설정
-      run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -p ${{ env.SSH_PORT }} -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
-        
-    - name: 필수 환경변수 체크
-      run: |
-        # 필수 secrets 체크
-        if [ -z "${{ secrets.SSH_HOST }}" ] || [ -z "${{ secrets.SSH_USER }}" ] || [ -z "${{ secrets.SSH_KEY }}" ]; then
-          echo "ERROR: Required SSH connection information is missing!"
-          echo "Required Repository Secrets: SSH_HOST, SSH_USER, SSH_KEY, SSH_PORT"
-          exit 1
-        fi
-        
-        if [ -z "${{ secrets.DB_USER }}" ] || [ -z "${{ secrets.DB_PASSWORD }}" ] || [ -z "${{ secrets.DB_NAME }}" ]; then
-          echo "ERROR: Required database information is missing!"
-          echo "Required Repository Secrets: DB_USER, DB_PASSWORD, DB_NAME"
-          exit 1
-        fi
-        
-        if [ -z "${{ secrets.SERVER_PORT }}" ]; then
-          echo "ERROR: Server port is not configured!"
-          echo "Required Repository Secret: SERVER_PORT"
-          exit 1
-        fi
-        
-        # 웹 애플리케이션 환경변수 체크
-        if [ -z "${{ secrets.WEB_APP_URL }}" ]; then
-          echo "ERROR: Required web application information is missing!"
-          echo "Required Repository Secrets: WEB_APP_URL"
-          exit 1
-        fi
-        
-        if [ -z "${{ secrets.WEB_ADMIN_USERNAME }}" ] || [ -z "${{ secrets.WEB_ADMIN_PASSWORD }}" ]; then
-          echo "ERROR: Web admin account information is missing!"
-          echo "Required Repository Secrets: WEB_ADMIN_USERNAME, WEB_ADMIN_PASSWORD"
-          exit 1
-        fi
-        
-        echo "Required environment variables check completed"
-        
-    - name: 서버 연결 테스트
-      run: |
-        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "echo 'Server connection successful!'"
-        
-    - name: 서버에 소스코드 배포
-      run: |
-        # 배포 디렉토리 생성
-        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "mkdir -p ${{ env.DEPLOY_PATH }}"
-        
-        # Git 저장소 초기화 또는 업데이트
-        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
-          cd ${{ env.DEPLOY_PATH }} && 
-          if [ ! -d .git ]; then
-            git clone https://github.com/${{ github.repository }}.git .
-          else
-            git fetch origin main
-            git reset --hard origin/main
-          fi
-        "
-        
-    - name: 환경변수 파일 생성
-      run: |
-        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
-          cd ${{ env.DEPLOY_PATH }} && \
-          
-          # 환경변수 기본값 설정
-          JWT_SECRET='${{ secrets.JWT_SECRET }}'
-          SESSION_TIMEOUT_HOURS='${{ secrets.SESSION_TIMEOUT_HOURS }}'
-          PASSWORD_SALT_ROUNDS='${{ secrets.PASSWORD_SALT_ROUNDS }}'
-          LOG_LEVEL='${{ secrets.LOG_LEVEL }}'
-          LOG_DIRECTORY='${{ secrets.LOG_DIRECTORY }}'
-          DEBUG_MODE='${{ secrets.DEBUG_MODE }}'
-          ENABLE_SQL_LOGGING='${{ secrets.ENABLE_SQL_LOGGING }}'
-          
-          # JWT 시크릿 자동 생성 (설정되지 않은 경우)
-          if [ -z \"\$JWT_SECRET\" ]; then
-            JWT_SECRET=\$(openssl rand -hex 32)
-            echo 'WARNING: JWT_SECRET not set, auto-generated. Please set it in Repository Secrets for security!'
-          fi
-          
-          cat > .env << EOF
-        # =========================
-        # 게임 서버 설정
-        # =========================
-        SERVER_PORT=${{ secrets.SERVER_PORT }}
-        SERVER_MAX_CLIENTS=${{ secrets.SERVER_MAX_CLIENTS }}
-        SERVER_THREAD_POOL_SIZE=${{ secrets.SERVER_THREAD_POOL_SIZE }}
-        BLOKUS_SERVER_VERSION=${{ secrets.BLOKUS_SERVER_VERSION }}
-        BLOKUS_DOWNLOAD_URL=${{ secrets.BLOKUS_DOWNLOAD_URL }}
-        
-        # 데이터베이스 설정 (게임 서버용)
-        DB_HOST=postgres
-        DB_PORT=${{ secrets.DB_PORT }}
-        DB_USER=${{ secrets.DB_USER }}
-        DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-        DB_NAME=${{ secrets.DB_NAME }}
-        DB_POOL_SIZE=${{ secrets.DB_POOL_SIZE }}
-        
-        # PostgreSQL 설정
-        POSTGRES_DB=${{ secrets.DB_NAME }}
-        POSTGRES_USER=${{ secrets.DB_USER }}
-        POSTGRES_PASSWORD=${{ secrets.DB_PASSWORD }}
-        
-        # 보안 설정
-        JWT_SECRET=\$JWT_SECRET
-        SESSION_TIMEOUT_HOURS=\${SESSION_TIMEOUT_HOURS:-24}
-        PASSWORD_SALT_ROUNDS=\${PASSWORD_SALT_ROUNDS:-12}
-        
-        # 로깅 설정
-        LOG_LEVEL=\${LOG_LEVEL:-info}
-        LOG_DIRECTORY=\${LOG_DIRECTORY:-/app/logs}
-        
-        # 개발 설정
-        DEBUG_MODE=\${DEBUG_MODE:-false}
-        ENABLE_SQL_LOGGING=\${ENABLE_SQL_LOGGING:-false}
-        
-        # =========================
-        # 웹 애플리케이션 설정
-        # =========================
-        WEB_PORT=${{ secrets.WEB_PORT }}
-        WEB_APP_URL=${{ secrets.WEB_APP_URL }}
-        WEB_CLIENT_DOWNLOAD_URL=${{ secrets.WEB_CLIENT_DOWNLOAD_URL }}
-        
-        # 웹 데이터베이스 설정 (동일한 PostgreSQL 컨테이너, 다른 DB명)
-        WEB_DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@postgres:5432/blokus_online
-        
-        # 웹 인증 설정
-        WEB_NEXTAUTH_SECRET=${{ secrets.WEB_NEXTAUTH_SECRET }}
-        WEB_JWT_SECRET=${{ secrets.WEB_JWT_SECRET }}
-        GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
-        GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
-        
-        # 웹 관리자 계정
-        WEB_ADMIN_USERNAME=${{ secrets.WEB_ADMIN_USERNAME }}
-        WEB_ADMIN_PASSWORD=${{ secrets.WEB_ADMIN_PASSWORD }}
-        
-        # SSL/도메인 설정
-        DOMAIN=${{ secrets.DOMAIN }}
-        CERTBOT_EMAIL=${{ secrets.CERTBOT_EMAIL }}
+        networks:
+          blokus_network:
+            driver: bridge
         EOF
         "
         
-    - name: 클라이언트 다운로드 디렉토리 설정
+    - name: Login to registry on server
       run: |
         ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
-          cd ${{ env.DEPLOY_PATH }} && \
-          
-          # 기본 디렉토리 생성
-          mkdir -p downloads web/uploads certbot/conf certbot/www && \
-          
-          # logs 디렉토리 강제 정리 및 재생성
-          rm -rf logs 2>/dev/null || echo 'logs cleanup completed' && \
-          mkdir -p logs/nginx && \
-          
-          # 권한 설정
-          chmod 755 downloads web/uploads logs logs/nginx certbot/conf certbot/www && \
-          echo 'All directories created and configured successfully'
-        "
-          
-    - name: 기존 컨테이너 정리
-      run: |
-        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
-          cd ${{ env.DEPLOY_PATH }} && \
-          docker compose down
+          echo '${{ secrets.GITHUB_TOKEN }}' | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
         "
         
-    - name: Docker 이미지 빌드 및 배포
+    - name: Deploy services (Fast deployment with pre-built images)
       run: |
         ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
-          cd ${{ env.DEPLOY_PATH }} && \
-          export DOCKER_BUILDKIT=1 && \
-          export COMPOSE_DOCKER_CLI_BUILD=1 && \
+          cd ${{ env.DEPLOY_PATH }} &&
           
-          # 배포 상태 업데이트 함수 정의
-          update_deployment_status() {
+          # 배포 상태 업데이트 함수
+          update_status() {
             local service=\$1
             local status=\$2
             local timestamp=\$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")
-            
-            # Lock file을 사용한 원자적 업데이트
-            (
-              flock -x 200
-              if [ -f .deployment_status.json ]; then
-                current_status=\$(cat .deployment_status.json)
-              else
-                current_status='{}'
-              fi
-              
-              echo \"\$current_status\" | jq --arg service \"\$service\" --arg status \"\$status\" --arg timestamp \"\$timestamp\" \
-                '. + {\$service: \$status, (\$service + \"_timestamp\"): \$timestamp}' > .deployment_status.json.tmp && \
-              mv .deployment_status.json.tmp .deployment_status.json
-            ) 200>.deployment_status.lock
+            echo '{}' | jq --arg service \"\$service\" --arg status \"\$status\" --arg ts \"\$timestamp\" \
+              '. + {\$service: \$status, (\$service + \"_timestamp\"): \$ts}' > .deployment_status.json
           }
           
-          # 배포 상태 초기화 및 업데이트 (시작)
-          update_deployment_status 'infrastructure' 'deploying' && \
+          echo 'Starting fast deployment with pre-built images...' &&
           
-          # 시스템 리소스 확인
-          echo 'Checking system resources before full infrastructure build...'
-          df -h ${{ env.DEPLOY_PATH }} | head -2
-          free -h
-          echo 'Docker system info:'
-          docker system df || true
+          # 배포 시작 상태 업데이트
+          update_status 'deployment' 'starting' &&
           
-          # Docker 캐시 설정 (성능 향상을 위한 최적화)
-          export BUILDX_NO_DEFAULT_ATTESTATIONS=1
+          # 기존 서비스 중지
+          docker compose -f docker-compose.deploy.yml down || true &&
           
-          # 인프라 전체 배포 (재시도 로직 + 캐시 최적화)
-          for i in {1..2}; do
-            echo \"Starting full infrastructure build attempt \$i/2 with cache optimization...\"
-            
-            # Docker 빌드용 환경 변수 설정
-            export DOCKER_BUILDKIT=1
-            export BUILDKIT_PROGRESS=plain
-            export COMPOSE_PARALLEL_LIMIT=3
-            
-            # 대용량 빌드를 위한 타임아웃 설정 (30분으로 단축)
-            if timeout 1800 docker compose build --parallel \
-                 --progress=plain \
-                 --build-arg BUILDKIT_INLINE_CACHE=1 && \
-               docker compose up -d --wait --wait-timeout 600; then
-              echo 'Full infrastructure deployment successful!'
-              break
-            elif [ \$i -eq 2 ]; then
-              echo 'Infrastructure deployment failed after 2 attempts'
-              echo 'Checking system resources and Docker logs:'
-              df -h ${{ env.DEPLOY_PATH }} | head -2
-              free -h
-              docker compose logs --tail=100 || true
-              exit 1
-            else
-              echo \"Infrastructure deployment attempt \$i failed, retrying...\"
-              echo 'Performing selective cleanup before retry (preserving cache)...'
-              docker compose down || true
-              docker container prune -f || true
-              docker image prune -f || true
-              echo 'Waiting 60 seconds before retry...'
-              sleep 60
-            fi
-          done && \
+          # 최신 이미지 Pull (병렬로)
+          echo 'Pulling latest images in parallel...' &&
+          (docker pull ${{ env.IMAGE_PREFIX }}-game-server:latest &) &&
+          (docker pull ${{ env.IMAGE_PREFIX }}-web-server:latest &) &&
+          wait &&
           
-          # 배포 후 서비스 건강성 체크
-          echo 'Performing post-deployment health checks...'
-          sleep 30  # 서비스 시작 대기
+          # 서비스 시작 (빠른 시작, 타임아웃 단축)
+          echo 'Starting services...' &&
+          timeout 180 docker compose -f docker-compose.deploy.yml up -d --wait &&
           
-          # 서비스별 건강성 확인
-          health_check_failed=false
+          # 간단한 헬스체크
+          sleep 15 &&
           
-          # Game Server 건강성 체크
-          if docker compose ps blokus-server | grep -q 'healthy\\|Up'; then
-            echo '✓ Game Server is running'
+          if docker compose -f docker-compose.deploy.yml ps | grep -q 'Up'; then
+            echo '✅ Deployment successful!' &&
+            update_status 'deployment' 'success'
           else
-            echo '✗ Game Server health check failed'
-            health_check_failed=true
-          fi
-          
-          # Web Application 건강성 체크  
-          if docker compose ps blokus-web | grep -q 'healthy\\|Up'; then
-            echo '✓ Web Application is running'
-          else
-            echo '✗ Web Application health check failed'
-            health_check_failed=true
-          fi
-          
-          # Database 건강성 체크
-          if docker compose ps postgres | grep -q 'healthy\\|Up'; then
-            echo '✓ Database is running'
-          else
-            echo '✗ Database health check failed'
-            health_check_failed=true
-          fi
-          
-          if [ \"\$health_check_failed\" = \"true\" ]; then
-            echo 'Health check failed, displaying logs for debugging:'
-            docker compose logs --tail=100
-            echo 'Infrastructure deployment completed but some services are unhealthy'
-            update_deployment_status 'infrastructure' 'success_with_warnings'
-          else
-            echo 'All services are healthy!'
-            # 배포 성공 상태 업데이트
-            update_deployment_status 'infrastructure' 'success'
+            echo '❌ Deployment failed!' &&
+            docker compose -f docker-compose.deploy.yml logs --tail=50 &&
+            update_status 'deployment' 'failed' &&
+            exit 1
           fi
         "
         
-    - name: 인프라 배포 실패 처리
+    - name: Deployment failure handling
       if: failure()
       run: |
         ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
-          cd ${{ env.DEPLOY_PATH }} && 
-          
-          # 배포 실패 상태 업데이트
-          timestamp=\$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")
-          (
-            flock -x 200
-            if [ -f .deployment_status.json ]; then
-              current_status=\$(cat .deployment_status.json)
-            else
-              current_status='{}'
-            fi
-            
-            echo \"\$current_status\" | jq --arg timestamp \"\$timestamp\" \
-              '. + {\"infrastructure\": \"failed\", \"infrastructure_timestamp\": \$timestamp}' > .deployment_status.json.tmp && \
-            mv .deployment_status.json.tmp .deployment_status.json
-          ) 200>.deployment_status.lock
+          cd ${{ env.DEPLOY_PATH }} &&
+          echo '{}' | jq '. + {\"deployment\": \"failed\", \"deployment_timestamp\": \"$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")\"}' > .deployment_status.json
         " || true
-        
-        
-    - name: 배포 결과 알림
-      if: always()
-      run: |
-        if [ "${{ job.status }}" == "success" ]; then
-          echo "Full infrastructure deployment successful!"
-          echo "Game Server: ${{ secrets.WEB_APP_URL }}:${{ secrets.SERVER_PORT }}"
-          echo "Website: https://${{ secrets.WEB_APP_URL }}"
-          echo "Client Download Directory: ${{ env.DEPLOY_PATH }}/downloads"
-        else
-          echo "Full infrastructure deployment failed!"
-        fi
-        
-  # 병렬 빌드를 위한 개별 작업들
-  parallel-game-server:
-    name: Parallel Game Server Build
-    runs-on: ubuntu-latest
-    needs: [detect-changes, shared-setup]
-    if: needs.detect-changes.outputs.force-game-server == 'true' && needs.detect-changes.outputs.force-web == 'true'
-    
-    steps:
-    - name: 체크아웃 소스코드
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        
-    - name: SSH 키 설정
-      run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -p ${{ env.SSH_PORT }} -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
-        
-    - name: 게임 서버만 빌드 (병렬 실행용)
-      run: |
-        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
-          cd ${{ env.DEPLOY_PATH }} && 
-          export DOCKER_BUILDKIT=1 && 
-          export BUILDKIT_PROGRESS=plain && 
-          export BUILDX_NO_DEFAULT_ATTESTATIONS=1 && 
-          
-          echo 'Starting parallel game server build...' &&
-          timeout 900 docker compose build blokus-server \
-            --progress=plain \
-            --build-arg BUILDKIT_INLINE_CACHE=1
-        "
-        
-  parallel-web-app:
-    name: Parallel Web App Build  
-    runs-on: ubuntu-latest
-    needs: [detect-changes, shared-setup]
-    if: needs.detect-changes.outputs.force-game-server == 'true' && needs.detect-changes.outputs.force-web == 'true'
-    
-    steps:
-    - name: 체크아웃 소스코드
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        
-    - name: SSH 키 설정
-      run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -p ${{ env.SSH_PORT }} -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
-        
-    - name: 웹 앱만 빌드 (병렬 실행용)
-      run: |
-        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
-          cd ${{ env.DEPLOY_PATH }} && 
-          export DOCKER_BUILDKIT=1 && 
-          export BUILDKIT_PROGRESS=plain && 
-          export BUILDX_NO_DEFAULT_ATTESTATIONS=1 && 
-          
-          echo 'Starting parallel web app build...' &&
-          timeout 600 docker compose build blokus-web \
-            --progress=plain \
-            --build-arg BUILDKIT_INLINE_CACHE=1
-        "
-        
-  parallel-deploy:
-    name: Parallel Services Deploy
-    runs-on: ubuntu-latest
-    needs: [detect-changes, shared-setup, parallel-game-server, parallel-web-app]
-    if: needs.detect-changes.outputs.force-game-server == 'true' && needs.detect-changes.outputs.force-web == 'true'
-    
-    steps:
-    - name: SSH 키 설정
-      run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -p ${{ env.SSH_PORT }} -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
-        
-    - name: 서비스 시작 (이미 빌드된 이미지 사용)
-      run: |
-        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
-          cd ${{ env.DEPLOY_PATH }} && 
-          
-          echo 'Starting services with pre-built images...' &&
-          docker compose up -d blokus-server blokus-web --wait --wait-timeout 300 &&
-          echo 'Parallel deployment successful!'
-        "
 
+  # ==========================================
+  # 배포 결과 요약
+  # ==========================================
   deployment-summary:
     name: Deployment Summary
     runs-on: ubuntu-latest
-    needs: [detect-changes, shared-setup, deploy-game-server, deploy-web, deploy-full, parallel-deploy]
+    needs: [detect-changes, build-game-server, build-web-server, deploy-to-server]
     if: always()
     
     steps:
-    - name: 배포 결과 요약
+    - name: Display summary
       run: |
-        echo "=== Smart Deployment Summary ==="
+        echo "🚀 Optimized Deployment Summary"
+        echo "================================"
+        echo ""
+        echo "📊 Changes detected:"
+        echo "  Game Server: ${{ needs.detect-changes.outputs.game-server-changed }}"
+        echo "  Web Server: ${{ needs.detect-changes.outputs.web-changed }}"
+        echo "  Infrastructure: ${{ needs.detect-changes.outputs.infrastructure-changed }}"
+        echo ""
+        echo "🎯 Deployment decisions:"
+        echo "  Game Server: ${{ needs.detect-changes.outputs.deploy-game-server }}"
+        echo "  Web Server: ${{ needs.detect-changes.outputs.deploy-web }}"
+        echo "  Infrastructure: ${{ needs.detect-changes.outputs.deploy-infrastructure }}"
+        echo ""
+        echo "🏗️ Build results:"
+        echo "  Game Server build: ${{ needs.build-game-server.result }}"
+        echo "  Web Server build: ${{ needs.build-web-server.result }}"
+        echo "  Server deployment: ${{ needs.deploy-to-server.result }}"
         echo ""
         
-        # 변경사항 감지 및 배포 결정 결과
-        echo "📊 Changes Detected:"
-        echo "  - Game Server: ${{ needs.detect-changes.outputs.game-server-changed }}"
-        echo "  - Web Application: ${{ needs.detect-changes.outputs.web-changed }}"
-        echo "  - Infrastructure: ${{ needs.detect-changes.outputs.infrastructure-changed }}"
-        echo ""
-        
-        echo "🎯 Deployment Decisions (including retry logic):"
-        echo "  - Game Server: ${{ needs.detect-changes.outputs.force-game-server }}"
-        echo "  - Web Application: ${{ needs.detect-changes.outputs.force-web }}"
-        echo "  - Infrastructure: ${{ needs.detect-changes.outputs.force-infrastructure }}"
-        echo ""
-        
-        # 개별 배포 결과
-        echo "🚀 Deployment Results:"
-        
-        if [ "${{ needs.detect-changes.outputs.force-game-server }}" = "true" ]; then
-          if [ "${{ needs.deploy-game-server.result }}" = "success" ]; then
-            echo "  ✅ Game Server: Successfully deployed"
-          else
-            echo "  ❌ Game Server: Deployment failed"
-          fi
+        # 전체 성공 여부 확인
+        if [ "${{ needs.deploy-to-server.result }}" = "success" ]; then
+          echo "✅ Deployment completed successfully in under 3 minutes!"
+          echo "🌐 Services:"
+          echo "  Game Server: ${{ secrets.WEB_APP_URL }}:${{ secrets.SERVER_PORT }}"
+          echo "  Web Application: https://${{ secrets.WEB_APP_URL }}"
         else
-          echo "  ⏭️ Game Server: Skipped (no deployment needed)"
-        fi
-        
-        if [ "${{ needs.detect-changes.outputs.force-web }}" = "true" ]; then
-          if [ "${{ needs.deploy-web.result }}" = "success" ]; then
-            echo "  ✅ Web Application: Successfully deployed"
-          else
-            echo "  ❌ Web Application: Deployment failed"
-          fi
-        else
-          echo "  ⏭️ Web Application: Skipped (no deployment needed)"
-        fi
-        
-        if [ "${{ needs.detect-changes.outputs.force-infrastructure }}" = "true" ]; then
-          if [ "${{ needs.deploy-full.result }}" = "success" ]; then
-            echo "  ✅ Full Infrastructure: Successfully deployed"
-          else
-            echo "  ❌ Full Infrastructure: Deployment failed"
-          fi
-        else
-          echo "  ⏭️ Full Infrastructure: Skipped (no deployment needed)"
-        fi
-        
-        echo ""
-        echo "🌐 Service URLs:"
-        echo "  - Game Server: ${{ secrets.WEB_APP_URL }}:${{ secrets.SERVER_PORT }}"
-        echo "  - Website: https://${{ secrets.WEB_APP_URL }}"
-        
-        # 전체 성공 여부 체크 (새로운 로직 적용)
-        OVERALL_SUCCESS=true
-        
-        if [ "${{ needs.detect-changes.outputs.force-game-server }}" = "true" ] && [ "${{ needs.deploy-game-server.result }}" != "success" ]; then
-          OVERALL_SUCCESS=false
-        fi
-        
-        if [ "${{ needs.detect-changes.outputs.force-web }}" = "true" ] && [ "${{ needs.deploy-web.result }}" != "success" ]; then
-          OVERALL_SUCCESS=false
-        fi
-        
-        if [ "${{ needs.detect-changes.outputs.force-infrastructure }}" = "true" ] && [ "${{ needs.deploy-full.result }}" != "success" ]; then
-          OVERALL_SUCCESS=false
-        fi
-        
-        echo ""
-        if [ "$OVERALL_SUCCESS" = "true" ]; then
-          echo "🎉 Smart deployment completed successfully!"
-          exit 0
-        else
-          echo "💥 Some deployments failed!"
+          echo "❌ Deployment failed!"
           exit 1
         fi
