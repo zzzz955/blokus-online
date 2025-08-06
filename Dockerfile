@@ -93,7 +93,7 @@ COPY server/ ./server/
 # ==================================================
 RUN echo "=== Building Blokus Game Server ===" && \
     # pkg-config 경로 설정 (시스템 패키지 찾기)
-    export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:$PKG_CONFIG_PATH && \
+    export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig && \
     # CMake 구성 (하이브리드 모드: vcpkg + 시스템 패키지)
     cmake -S . -B build \
         -GNinja \
@@ -101,11 +101,14 @@ RUN echo "=== Building Blokus Game Server ===" && \
         -DCMAKE_CXX_STANDARD=20 \
         -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
         -DVCPKG_TARGET_TRIPLET=x64-linux \
-        -DCMAKE_FIND_PACKAGE_PREFER_CONFIG=OFF && \
+        -DCMAKE_FIND_PACKAGE_PREFER_CONFIG=OFF \
+        -DPkgConfig_ROOT=/usr/lib/x86_64-linux-gnu/pkgconfig && \
     # 빌드 실행 (병렬 빌드 제한)
     ninja -C build -j4 && \
-    # 빌드 결과 복사
+    # 빌드 결과 확인 및 복사
     mkdir -p /app/install/bin && \
+    ls -la build/server/ && \
+    test -f build/server/BlokusServer && \
     cp build/server/BlokusServer /app/install/bin/ && \
     echo "=== Build completed successfully ==="
 
@@ -124,7 +127,7 @@ RUN apt-get update && apt-get install -y \
     # 핵심 런타임 라이브러리
     libssl3 \
     libpq5 \
-    libpqxx-6.4 \
+    libpqxx-7.7 \
     libboost-system1.74.0 \
     libboost-thread1.74.0 \
     # 시스템 라이브러리
@@ -146,16 +149,17 @@ RUN groupadd -r blokus && useradd -r -g blokus -d /app -s /bin/bash blokus
 
 WORKDIR /app
 
-# 빌드된 실행파일 복사
+# 빌드된 실행파일 복사 및 권한 설정
 COPY --from=app-builder /app/install/bin/BlokusServer ./
+RUN chmod +x ./BlokusServer
 
 # vcpkg 라이브러리 복사 (vcpkg로 설치한 것들만)
-COPY --from=app-builder /opt/vcpkg/installed/x64-linux/lib /tmp/vcpkg-libs
-RUN mkdir -p /usr/local/lib && \
+RUN --mount=from=app-builder,source=/opt/vcpkg/installed/x64-linux/lib,target=/tmp/vcpkg-libs,type=bind \
+    mkdir -p /usr/local/lib && \
+    ls -la /tmp/vcpkg-libs/ && \
     cp /tmp/vcpkg-libs/libspdlog.so* /usr/local/lib/ 2>/dev/null || echo "spdlog static linked" && \
     cp /tmp/vcpkg-libs/libargon2.so* /usr/local/lib/ 2>/dev/null || echo "argon2 static linked" && \
-    rm -rf /tmp/vcpkg-libs && \
-    echo "libpqxx using system package"
+    echo "vcpkg libraries copied, libpqxx using system package"
 
 # 라이브러리 경로 업데이트
 RUN ldconfig /usr/local/lib
