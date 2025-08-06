@@ -467,7 +467,7 @@ jobs:
           update_status 'deployment' 'starting' &&
           
           # 기존 서비스 중지
-          docker compose -f docker-compose.deploy.yml down || true &&
+          docker compose down || true &&
           
           # 최신 이미지 Pull (병렬로)
           echo 'Pulling latest images in parallel...' &&
@@ -477,20 +477,7 @@ jobs:
           
           # 서비스 시작 (빠른 시작, 타임아웃 단축)
           echo 'Starting services...' &&
-          timeout 180 docker compose -f docker-compose.deploy.yml up -d --wait &&
-          
-          # 간단한 헬스체크
-          sleep 15 &&
-          
-          if docker compose -f docker-compose.deploy.yml ps | grep -q 'Up'; then
-            echo '✅ Deployment successful!' &&
-            update_status 'deployment' 'success'
-          else
-            echo '❌ Deployment failed!' &&
-            docker compose -f docker-compose.deploy.yml logs --tail=50 &&
-            update_status 'deployment' 'failed' &&
-            exit 1
-          fi
+          timeout 180 docker compose up -d --wait &&
         "
         
     - name: Deployment failure handling
