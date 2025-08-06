@@ -32,12 +32,8 @@ RUN echo "=== Installing system dependencies ===" && \
     curl \
     wget \
     ca-certificates \
-    # C++ 라이브러리들 (안정적인 시스템 패키지)
-    libssl-dev \
-    libpq-dev \
-    libpqxx-dev \
-    libboost-all-dev \
-    # PostgreSQL 빌드를 위한 시스템 의존성
+    # 기본적인 시스템 의존성들만 (vcpkg가 나머지 처리)
+    # PostgreSQL 시스템 헤더 (libpq 빌드용)
     postgresql-server-dev-all \
     # 압축 및 유틸리티
     tar \
@@ -62,7 +58,7 @@ RUN echo "=== Installing vcpkg for minimal packages ===" && \
 # vcpkg 패키지 수동 설치 (안정적인 개별 설치)
 # ==================================================
 RUN cd ${VCPKG_ROOT} && \
-    echo "=== Installing essential vcpkg packages only ===" && \
+    echo "=== Installing all required vcpkg packages ===" && \
     export VCPKG_MAX_CONCURRENCY=4 && \
     echo "Installing spdlog..." && \
     ./vcpkg install spdlog:x64-linux && \
@@ -70,8 +66,14 @@ RUN cd ${VCPKG_ROOT} && \
     ./vcpkg install nlohmann-json:x64-linux && \
     echo "Installing argon2..." && \
     ./vcpkg install argon2:x64-linux && \
+    echo "Installing openssl..." && \
+    ./vcpkg install openssl:x64-linux && \
+    echo "Installing boost-system..." && \
+    ./vcpkg install boost-system:x64-linux && \
+    echo "Installing libpqxx..." && \
+    ./vcpkg install libpqxx:x64-linux && \
     ./vcpkg list && \
-    echo "=== Essential vcpkg packages installed (libpqxx will use system package) ==="
+    echo "=== All vcpkg packages installed successfully ==="
 
 # ==================================================
 # Stage 2: Application Builder  
@@ -92,17 +94,13 @@ COPY server/ ./server/
 # 프로젝트 빌드 (하이브리드 접근법)
 # ==================================================
 RUN echo "=== Building Blokus Game Server ===" && \
-    # pkg-config 경로 설정 (시스템 패키지 찾기)
-    export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig && \
-    # CMake 구성 (하이브리드 모드: vcpkg + 시스템 패키지)
+    # CMake 구성 (vcpkg 중심)
     cmake -S . -B build \
         -GNinja \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_CXX_STANDARD=20 \
         -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
-        -DVCPKG_TARGET_TRIPLET=x64-linux \
-        -DCMAKE_FIND_PACKAGE_PREFER_CONFIG=OFF \
-        -DPkgConfig_ROOT=/usr/lib/x86_64-linux-gnu/pkgconfig && \
+        -DVCPKG_TARGET_TRIPLET=x64-linux && \
     # 빌드 실행 (병렬 빌드 제한)
     ninja -C build -j4 && \
     # 빌드 결과 확인 및 복사
@@ -122,15 +120,9 @@ FROM ubuntu:22.04 AS game-server
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Seoul
 
-# 런타임 의존성 설치 (최소한)
+# 런타임 의존성 설치 (최소한의 시스템 라이브러리)
 RUN apt-get update && apt-get install -y \
-    # 핵심 런타임 라이브러리
-    libssl3 \
-    libpq5 \
-    libpqxx-7.7 \
-    libboost-system1.74.0 \
-    libboost-thread1.74.0 \
-    # 시스템 라이브러리
+    # 기본 시스템 라이브러리
     libc6 \
     libgcc-s1 \
     libstdc++6 \
@@ -139,7 +131,8 @@ RUN apt-get update && apt-get install -y \
     curl \
     # 시간대 설정
     tzdata \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* && \
+    echo "All dependencies from vcpkg (statically linked)"
 
 # 시간대 설정
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
@@ -153,13 +146,12 @@ WORKDIR /app
 COPY --from=app-builder /app/install/bin/BlokusServer ./
 RUN chmod +x ./BlokusServer
 
-# vcpkg 라이브러리 복사 (vcpkg로 설치한 것들만)
+# vcpkg 라이브러리 복사 (동적 링크된 것들)
 RUN --mount=from=app-builder,source=/opt/vcpkg/installed/x64-linux/lib,target=/tmp/vcpkg-libs,type=bind \
     mkdir -p /usr/local/lib && \
     ls -la /tmp/vcpkg-libs/ && \
-    cp /tmp/vcpkg-libs/libspdlog.so* /usr/local/lib/ 2>/dev/null || echo "spdlog static linked" && \
-    cp /tmp/vcpkg-libs/libargon2.so* /usr/local/lib/ 2>/dev/null || echo "argon2 static linked" && \
-    echo "vcpkg libraries copied, libpqxx using system package"
+    cp /tmp/vcpkg-libs/*.so* /usr/local/lib/ 2>/dev/null || echo "All libraries statically linked" && \
+    echo "vcpkg libraries copied (if any dynamic libs exist)"
 
 # 라이브러리 경로 업데이트
 RUN ldconfig /usr/local/lib
