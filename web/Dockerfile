@@ -20,13 +20,19 @@ WORKDIR /app
 RUN apk add --no-cache \
     libc6-compat \
     openssl \
-    ca-certificates
+    ca-certificates \
+    # Native 모듈 빌드를 위한 도구들
+    python3 \
+    make \
+    g++ \
+    gcc \
+    musl-dev
 
 # package.json과 package-lock.json 복사
 COPY package*.json ./
 
-# 의존성 설치 (production only)
-RUN npm ci --only=production --ignore-scripts && \
+# 의존성 설치 (production only) - native 모듈 빌드 허용
+RUN npm ci --only=production && \
     npm cache clean --force
 
 # ==================================================
@@ -42,18 +48,24 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # 작업 디렉토리 설정
 WORKDIR /app
 
-# 시스템 패키지 설치
+# 시스템 패키지 설치 (빌드 도구 포함)
 RUN apk add --no-cache \
     libc6-compat \
     openssl \
-    ca-certificates
+    ca-certificates \
+    # Native 모듈 빌드를 위한 도구들
+    python3 \
+    make \
+    g++ \
+    gcc \
+    musl-dev
 
 # 전체 프로젝트 소스 복사
 COPY package*.json ./
 COPY . .
 
-# 개발 의존성 포함하여 설치 (build 시 필요)
-RUN npm ci --ignore-scripts
+# 개발 의존성 포함하여 설치 (build 시 필요) - native 모듈 빌드 허용
+RUN npm ci
 
 # Prisma 클라이언트 생성
 RUN npx prisma generate
@@ -125,8 +137,8 @@ RUN chmod +x /app/docker-entrypoint.sh
 # 사용자 변경
 USER nextjs
 
-# 런타임에 필요한 패키지들을 사용자 권한으로 설치 (버전 고정)
-RUN npm install prisma@5.22.0 bcryptjs@2.4.3
+# Runtime에 필요한 dependencies 복사 (빌드 단계에서 이미 설치됨)
+COPY --from=app-builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 
 # 포트 노출
 EXPOSE 3000

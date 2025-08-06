@@ -368,6 +368,8 @@ jobs:
         # 웹 인증 설정
         WEB_NEXTAUTH_SECRET=${{ secrets.WEB_NEXTAUTH_SECRET }}
         WEB_JWT_SECRET=${{ secrets.WEB_JWT_SECRET }}
+        GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+        GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
         
         # 웹 관리자 계정
         WEB_ADMIN_USERNAME=${{ secrets.WEB_ADMIN_USERNAME }}
@@ -742,11 +744,13 @@ jobs:
         WEB_CLIENT_DOWNLOAD_URL=${{ secrets.WEB_CLIENT_DOWNLOAD_URL }}
         
         # 웹 데이터베이스 설정 (동일한 PostgreSQL 컨테이너, 다른 DB명)
-        WEB_DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@postgres:5432/blokus_web
+        WEB_DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@postgres:5432/blokus_online
         
         # 웹 인증 설정
         WEB_NEXTAUTH_SECRET=${{ secrets.WEB_NEXTAUTH_SECRET }}
         WEB_JWT_SECRET=${{ secrets.WEB_JWT_SECRET }}
+        GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+        GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
         
         # 웹 관리자 계정
         WEB_ADMIN_USERNAME=${{ secrets.WEB_ADMIN_USERNAME }}
