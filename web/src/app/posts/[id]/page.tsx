@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
+import HtmlRenderer from '@/components/ui/HtmlRenderer';
 import { Post, PostCategory } from '@/types';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
@@ -247,46 +248,10 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
 
         {/* 게시글 내용 */}
         <Card className="p-6">
-          <div className="prose prose-slate max-w-none">
-            <ReactMarkdown
-              components={{
-                // 마크다운 스타일링 커스터마이징
-                h1: ({ children }) => <h1 className="text-2xl font-bold text-white mb-4">{children}</h1>,
-                h2: ({ children }) => <h2 className="text-xl font-bold text-white mb-3">{children}</h2>,
-                h3: ({ children }) => <h3 className="text-lg font-bold text-white mb-2">{children}</h3>,
-                p: ({ children }) => <p className="text-gray-300 mb-4 leading-relaxed">{children}</p>,
-                ul: ({ children }) => <ul className="list-disc list-inside text-gray-300 mb-4 space-y-1">{children}</ul>,
-                ol: ({ children }) => <ol className="list-decimal list-inside text-gray-300 mb-4 space-y-1">{children}</ol>,
-                blockquote: ({ children }) => (
-                  <blockquote className="border-l-4 border-primary-500 pl-4 py-2 bg-dark-card text-gray-300 mb-4 italic">
-                    {children}
-                  </blockquote>
-                ),
-                code: ({ children }) => (
-                  <code className="bg-dark-card text-gray-300 px-2 py-1 rounded text-sm font-mono">
-                    {children}
-                  </code>
-                ),
-                pre: ({ children }) => (
-                  <pre className="bg-dark-card text-gray-300 p-4 rounded-lg overflow-x-auto mb-4 text-sm font-mono">
-                    {children}
-                  </pre>
-                ),
-                a: ({ href, children }) => (
-                  <a
-                    href={href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary-400 hover:text-primary-300 underline"
-                  >
-                    {children}
-                  </a>
-                ),
-              }}
-            >
-              {post.content}
-            </ReactMarkdown>
-          </div>
+          <HtmlRenderer 
+            content={post.content}
+            className="prose-custom"
+          />
         </Card>
 
         {/* 댓글 섹션 */}

@@ -7,6 +7,7 @@ import { PostCategory, PostForm } from '@/types';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import Layout from '@/components/layout/Layout';
+import RichTextEditor from '@/components/ui/RichTextEditor';
 
 const CATEGORY_OPTIONS: { value: PostCategory; label: string }[] = [
   { value: 'QUESTION', label: '질문' },
@@ -144,17 +145,15 @@ export default function WritePostPage() {
               <label htmlFor="content" className="block text-sm font-medium text-white mb-2">
                 내용 *
               </label>
-              <textarea
-                id="content"
-                name="content"
+              <RichTextEditor
                 value={form.content}
-                onChange={handleChange}
-                rows={15}
-                placeholder="게시글 내용을 입력해주세요. 마크다운 문법을 사용할 수 있습니다."
-                className="w-full px-3 py-2 border border-dark-border bg-white text-gray-900 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-vertical"
+                onChange={(value) => setForm(prev => ({ ...prev, content: value }))}
+                placeholder="게시글 내용을 입력해주세요. 다양한 서식을 사용할 수 있습니다."
+                height={300}
+                className="mb-2"
               />
               <p className="text-sm text-gray-400 mt-1">
-                마크다운 문법을 지원합니다. (굵게: **텍스트**, 기울임: *텍스트*, 링크: [텍스트](URL))
+                서식 도구를 사용하여 풍부한 내용을 작성해보세요. (굵게, 기울임, 링크, 목록 등)
               </p>
             </div>
 

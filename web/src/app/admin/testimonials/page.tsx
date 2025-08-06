@@ -117,7 +117,7 @@ export default function AdminTestimonialsPage() {
   }
 
   return (
-    <div className="px-4 py-8">
+    <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
       <div className="sm:flex sm:items-center">
         <div className="sm:flex-auto">
           <h1 className="text-2xl font-semibold text-gray-900">후기 관리</h1>

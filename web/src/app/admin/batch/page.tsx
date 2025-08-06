@@ -7,10 +7,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
+import Card from '@/components/ui/Card';
+import Button from '@/components/ui/Button';
 import { api } from '@/utils/api';
-import { format } from '@/utils/format';
+import { formatDateTime } from '@/utils/format';
 
 interface BatchSchedule {
   id: string;
@@ -109,15 +109,15 @@ export default function AdminBatchPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'idle':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-500/20 text-gray-300';
       case 'running':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-500/20 text-blue-300';
       case 'failed':
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-500/20 text-red-300';
       case 'success':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-500/20 text-green-300';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-500/20 text-gray-300';
     }
   };
 
@@ -138,10 +138,10 @@ export default function AdminBatchPage() {
 
   if (loading) {
     return (
-      <div className="p-8">
+      <div className="p-8 max-w-7xl mx-auto">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">배치 데이터를 불러오는 중...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+          <p className="mt-4 text-gray-300">배치 데이터를 불러오는 중...</p>
         </div>
       </div>
     );
@@ -149,15 +149,15 @@ export default function AdminBatchPage() {
 
   if (error) {
     return (
-      <div className="p-8">
+      <div className="p-8 max-w-7xl mx-auto">
         <Card className="p-8 text-center">
-          <div className="text-red-600 mb-4">
+          <div className="text-red-400 mb-4">
             <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">데이터 로드 실패</h2>
-          <p className="text-gray-600 mb-4">{error}</p>
+          <h2 className="text-xl font-semibold text-white mb-2">데이터 로드 실패</h2>
+          <p className="text-gray-300 mb-4">{error}</p>
           <Button onClick={loadData}>다시 시도</Button>
         </Card>
       </div>
@@ -165,16 +165,16 @@ export default function AdminBatchPage() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-8 max-w-7xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">배치 작업 관리</h1>
-        <p className="mt-2 text-gray-600">게임 통계 배치 처리 및 스케줄 관리</p>
+        <h1 className="text-3xl font-bold text-white">배치 작업 관리</h1>
+        <p className="mt-2 text-gray-300">게임 통계 배치 처리 및 스케줄 관리</p>
       </div>
 
       {/* 배치 스케줄 */}
       <Card className="p-6 mb-8">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold text-gray-900">배치 스케줄</h2>
+          <h2 className="text-xl font-semibold text-white">배치 스케줄</h2>
           <Button onClick={loadData} className="flex items-center space-x-2">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -186,36 +186,36 @@ export default function AdminBatchPage() {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-3 px-4 font-semibold text-gray-900">작업명</th>
-                <th className="text-center py-3 px-4 font-semibold text-gray-900">스케줄</th>
-                <th className="text-center py-3 px-4 font-semibold text-gray-900">상태</th>
-                <th className="text-center py-3 px-4 font-semibold text-gray-900">마지막 실행</th>
-                <th className="text-center py-3 px-4 font-semibold text-gray-900">다음 실행</th>
-                <th className="text-center py-3 px-4 font-semibold text-gray-900">활성화</th>
-                <th className="text-center py-3 px-4 font-semibold text-gray-900">작업</th>
+              <tr className="border-b border-dark-border">
+                <th className="text-left py-3 px-4 font-semibold text-white">작업명</th>
+                <th className="text-center py-3 px-4 font-semibold text-white">스케줄</th>
+                <th className="text-center py-3 px-4 font-semibold text-white">상태</th>
+                <th className="text-center py-3 px-4 font-semibold text-white">마지막 실행</th>
+                <th className="text-center py-3 px-4 font-semibold text-white">다음 실행</th>
+                <th className="text-center py-3 px-4 font-semibold text-white">활성화</th>
+                <th className="text-center py-3 px-4 font-semibold text-white">작업</th>
               </tr>
             </thead>
             <tbody>
               {schedules.map((schedule) => (
-                <tr key={schedule.id} className="border-b border-gray-100">
-                  <td className="py-3 px-4 font-medium text-gray-900">{schedule.name}</td>
-                  <td className="py-3 px-4 text-center text-sm text-gray-600">{schedule.cron}</td>
+                <tr key={schedule.id} className="border-b border-dark-border">
+                  <td className="py-3 px-4 font-medium text-white">{schedule.name}</td>
+                  <td className="py-3 px-4 text-center text-sm text-gray-300">{schedule.cron}</td>
                   <td className="py-3 px-4 text-center">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(schedule.status)}`}>
                       {getStatusText(schedule.status)}
                     </span>
                     {schedule.retryCount > 0 && (
-                      <div className="text-xs text-red-600 mt-1">
+                      <div className="text-xs text-red-400 mt-1">
                         재시도: {schedule.retryCount}/{schedule.maxRetries}
                       </div>
                     )}
                   </td>
-                  <td className="py-3 px-4 text-center text-sm text-gray-600">
-                    {schedule.lastRun ? format.datetime(new Date(schedule.lastRun)) : '-'}
+                  <td className="py-3 px-4 text-center text-sm text-gray-300">
+                    {schedule.lastRun ? formatDateTime(new Date(schedule.lastRun)) : '-'}
                   </td>
-                  <td className="py-3 px-4 text-center text-sm text-gray-600">
-                    {format.datetime(new Date(schedule.nextRun))}
+                  <td className="py-3 px-4 text-center text-sm text-gray-300">
+                    {formatDateTime(new Date(schedule.nextRun))}
                   </td>
                   <td className="py-3 px-4 text-center">
                     <label className="inline-flex items-center">
@@ -223,7 +223,7 @@ export default function AdminBatchPage() {
                         type="checkbox"
                         checked={schedule.enabled}
                         onChange={(e) => toggleSchedule(schedule.id, e.target.checked)}
-                        className="form-checkbox h-4 w-4 text-blue-600"
+                        className="form-checkbox h-4 w-4 text-primary-500 bg-dark-card border-dark-border"
                       />
                     </label>
                   </td>
@@ -261,33 +261,33 @@ export default function AdminBatchPage() {
               </thead>
               <tbody>
                 {history.map((entry) => (
-                  <tr key={entry.id} className="border-b border-gray-100">
-                    <td className="py-3 px-4 text-sm text-gray-600">
-                      {format.datetime(new Date(entry.startTime))}
+                  <tr key={entry.id} className="border-b border-dark-border">
+                    <td className="py-3 px-4 text-sm text-gray-300">
+                      {formatDateTime(new Date(entry.startTime))}
                     </td>
                     <td className="py-3 px-4 text-center">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(entry.status)}`}>
                         {getStatusText(entry.status)}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-center text-sm text-gray-600">
+                    <td className="py-3 px-4 text-center text-sm text-gray-300">
                       {entry.result ? entry.result.processed : '-'}
                     </td>
-                    <td className="py-3 px-4 text-center text-sm text-gray-600">
+                    <td className="py-3 px-4 text-center text-sm text-gray-300">
                       {entry.result ? `${entry.result.executionTime}ms` : '-'}
                     </td>
                     <td className="py-3 px-4 text-center text-sm">
                       {entry.result && (
                         <div className="text-left">
-                          <div className="text-green-600">생성: {entry.result.created}</div>
-                          <div className="text-blue-600">업데이트: {entry.result.updated}</div>
+                          <div className="text-green-400">생성: {entry.result.created}</div>
+                          <div className="text-blue-400">업데이트: {entry.result.updated}</div>
                           {entry.result.errors.length > 0 && (
-                            <div className="text-red-600">오류: {entry.result.errors.length}</div>
+                            <div className="text-red-400">오류: {entry.result.errors.length}</div>
                           )}
                         </div>
                       )}
                       {entry.error && (
-                        <div className="text-red-600 text-xs">
+                        <div className="text-red-400 text-xs">
                           {entry.error.length > 50 ? entry.error.substring(0, 50) + '...' : entry.error}
                         </div>
                       )}
@@ -298,7 +298,7 @@ export default function AdminBatchPage() {
             </table>
           </div>
         ) : (
-          <div className="text-center py-8 text-gray-500">
+          <div className="text-center py-8 text-gray-400">
             실행 히스토리가 없습니다.
           </div>
         )}

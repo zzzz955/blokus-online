@@ -152,7 +152,7 @@ export default function AdminPostsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 space-y-6">
       {/* 헤더 */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">게시글 관리</h1>
