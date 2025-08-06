@@ -145,17 +145,17 @@ jobs:
         echo "Force Infrastructure: $FORCE_INFRASTRUCTURE"
         echo "Retry Failed: $RETRY_FAILED"
         
-        # 서버에서 이전 배포 상태 확인
+        # 서버에서 이전 배포 상태 확인 (JSON 기반)
         LAST_DEPLOYMENT_STATUS=""
         if [ "$RETRY_FAILED" = "true" ]; then
           echo "Checking previous deployment status on server..."
           LAST_DEPLOYMENT_STATUS=$(ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
-            if [ -f ${{ env.DEPLOY_PATH }}/.deployment_status ]; then
-              cat ${{ env.DEPLOY_PATH }}/.deployment_status
+            if [ -f ${{ env.DEPLOY_PATH }}/.deployment_status.json ]; then
+              cat ${{ env.DEPLOY_PATH }}/.deployment_status.json
             else
-              echo 'no_previous_deployment'
+              echo '{\"initialized\": false}'
             fi
-          " 2>/dev/null || echo "connection_failed")
+          " 2>/dev/null || echo '{\"error\": \"connection_failed\"}')
           
           echo "Previous deployment status: $LAST_DEPLOYMENT_STATUS"
         fi
@@ -165,20 +165,21 @@ jobs:
         DEPLOY_WEB=false  
         DEPLOY_INFRASTRUCTURE=false
         
+        # JSON 기반 배포 결정 로직
         # Game Server 배포 결정
         if [ "$FORCE_GAME_SERVER" = "true" ] || [ "$GAME_SERVER_CHANGED" = "true" ]; then
           DEPLOY_GAME_SERVER=true
           echo "Game Server deployment: Required (force=$FORCE_GAME_SERVER, changed=$GAME_SERVER_CHANGED)"
-        elif [ "$RETRY_FAILED" = "true" ] && echo "$LAST_DEPLOYMENT_STATUS" | grep -q "game_server_failed"; then
+        elif [ "$RETRY_FAILED" = "true" ] && echo "$LAST_DEPLOYMENT_STATUS" | grep -q '"game_server".*"failed"'; then
           DEPLOY_GAME_SERVER=true
           echo "Game Server deployment: Required (previous deployment failed)"
         fi
         
-        # Web Application 배포 결정
+        # Web Application 배포 결정  
         if [ "$FORCE_WEB" = "true" ] || [ "$WEB_CHANGED" = "true" ]; then
           DEPLOY_WEB=true
           echo "Web deployment: Required (force=$FORCE_WEB, changed=$WEB_CHANGED)"
-        elif [ "$RETRY_FAILED" = "true" ] && echo "$LAST_DEPLOYMENT_STATUS" | grep -q "web_failed"; then
+        elif [ "$RETRY_FAILED" = "true" ] && echo "$LAST_DEPLOYMENT_STATUS" | grep -q '"web".*"failed"'; then
           DEPLOY_WEB=true
           echo "Web deployment: Required (previous deployment failed)"
         fi
@@ -187,7 +188,7 @@ jobs:
         if [ "$FORCE_INFRASTRUCTURE" = "true" ] || [ "$INFRASTRUCTURE_CHANGED" = "true" ]; then
           DEPLOY_INFRASTRUCTURE=true
           echo "Infrastructure deployment: Required (force=$FORCE_INFRASTRUCTURE, changed=$INFRASTRUCTURE_CHANGED)"
-        elif [ "$RETRY_FAILED" = "true" ] && echo "$LAST_DEPLOYMENT_STATUS" | grep -q "infrastructure_failed"; then
+        elif [ "$RETRY_FAILED" = "true" ] && echo "$LAST_DEPLOYMENT_STATUS" | grep -q '"infrastructure".*"failed"'; then
           DEPLOY_INFRASTRUCTURE=true
           echo "Infrastructure deployment: Required (previous deployment failed)"
         fi
@@ -224,9 +225,67 @@ jobs:
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan -p ${{ env.SSH_PORT }} -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
         
-    - name: 서버 연결 테스트
+    - name: 서버 연결 테스트 및 의존성 확인
       run: |
-        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "echo 'Shared setup - Connection successful!'"
+        # SSH 연결 재시도 함수
+        ssh_with_retry() {
+          local max_attempts=5
+          local delay=2
+          local attempt=1
+          
+          while [ $attempt -le $max_attempts ]; do
+            echo "SSH connection attempt $attempt/$max_attempts..."
+            
+            if ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} -o ConnectTimeout=30 -o ServerAliveInterval=10 "$@"; then
+              echo "SSH connection successful!"
+              return 0
+            else
+              echo "SSH connection failed (attempt $attempt/$max_attempts)"
+              if [ $attempt -eq $max_attempts ]; then
+                echo "All SSH connection attempts failed!"
+                return 1
+              fi
+              echo "Waiting ${delay}s before retry..."
+              sleep $delay
+              delay=$((delay * 2)) # Exponential backoff
+              attempt=$((attempt + 1))
+            fi
+          done
+        }
+        
+        # 서버 연결 및 의존성 확인
+        ssh_with_retry "
+          echo 'Server connection successful!' && 
+          echo 'Checking required dependencies...' && 
+          
+          # Check required tools
+          missing_deps=()
+          
+          if ! command -v docker >/dev/null 2>&1; then
+            missing_deps+=(docker)
+          fi
+          
+          if ! command -v jq >/dev/null 2>&1; then
+            missing_deps+=(jq)
+          fi
+          
+          if ! command -v flock >/dev/null 2>&1; then
+            missing_deps+=(flock)
+          fi
+          
+          if [ \${#missing_deps[@]} -ne 0 ]; then
+            echo 'ERROR: Missing required dependencies:' \"\${missing_deps[*]}\"
+            echo 'Please install missing dependencies on the server'
+            exit 1
+          fi
+          
+          echo 'All required dependencies are available!' &&
+          echo 'System info:' &&
+          echo '  Docker:' \$(docker --version) &&
+          echo '  jq:' \$(jq --version) &&
+          echo '  Available disk space:' &&
+          df -h ${{ env.DEPLOY_PATH }} 2>/dev/null || df -h /
+        "
         
     - name: 공통 소스코드 동기화
       run: |
@@ -359,16 +418,64 @@ jobs:
           export DOCKER_BUILDKIT=1 && 
           export COMPOSE_DOCKER_CLI_BUILD=1 && 
           
-          # 배포 상태 업데이트 (시작)
-          echo 'game_server_deploying' > .deployment_status && 
+          # 배포 상태 업데이트 함수 정의
+          update_deployment_status() {
+            local service=\$1
+            local status=\$2
+            local timestamp=\$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")
+            
+            # Lock file을 사용한 원자적 업데이트
+            (
+              flock -x 200
+              if [ -f .deployment_status.json ]; then
+                current_status=\$(cat .deployment_status.json)
+              else
+                current_status='{}'
+              fi
+              
+              echo \"\$current_status\" | jq --arg service \"\$service\" --arg status \"\$status\" --arg timestamp \"\$timestamp\" \
+                '. + {\$service: \$status, (\$service + \"_timestamp\"): \$timestamp}' > .deployment_status.json.tmp && \
+              mv .deployment_status.json.tmp .deployment_status.json
+            ) 200>.deployment_status.lock
+          }
           
-          # 컨테이너 중지 및 빌드
-          docker compose stop blokus-server && 
-          docker compose build blokus-server && 
-          docker compose up -d blokus-server --wait --wait-timeout 60 && 
+          # 배포 상태 업데이트 (시작)
+          update_deployment_status 'game_server' 'deploying' && 
+          
+          # 시스템 리소스 확인
+          echo 'Checking system resources before build...'
+          df -h ${{ env.DEPLOY_PATH }} | head -2
+          free -h
+          
+          # 컨테이너 중지 및 빌드 (재시도 로직 포함, 긴 타임아웃)
+          for i in {1..3}; do
+            echo \"Starting game server build attempt \$i/3...\"
+            
+            # Docker 빌드용 환경 변수 설정
+            export DOCKER_BUILDKIT=1
+            export BUILDKIT_PROGRESS=plain
+            
+            if docker compose stop blokus-server && \
+               timeout 1800 docker compose build blokus-server --progress=plain && \
+               docker compose up -d blokus-server --wait --wait-timeout 180; then
+              echo 'Game server deployment successful!'
+              break
+            elif [ \$i -eq 3 ]; then
+              echo 'Game server deployment failed after 3 attempts'
+              echo 'Checking Docker logs for debugging:'
+              docker compose logs blokus-server --tail=50 || true
+              exit 1
+            else
+              echo \"Game server deployment attempt \$i failed, retrying...\"
+              echo 'Cleaning up failed build artifacts...'
+              docker compose down blokus-server || true
+              docker system prune -f --volumes || true
+              sleep 30
+            fi
+          done && 
           
           # 배포 성공 상태 업데이트
-          sed -i 's/game_server_deploying/game_server_success/' .deployment_status || echo 'game_server_success' > .deployment_status
+          update_deployment_status 'game_server' 'success'
         "
 
     - name: 게임 서버 배포 실패 처리
@@ -376,7 +483,21 @@ jobs:
       run: |
         ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
           cd ${{ env.DEPLOY_PATH }} && 
-          echo 'game_server_failed' > .deployment_status
+          
+          # 배포 실패 상태 업데이트
+          timestamp=\$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")
+          (
+            flock -x 200
+            if [ -f .deployment_status.json ]; then
+              current_status=\$(cat .deployment_status.json)
+            else
+              current_status='{}'
+            fi
+            
+            echo \"\$current_status\" | jq --arg timestamp \"\$timestamp\" \
+              '. + {\"game_server\": \"failed\", \"game_server_timestamp\": \$timestamp}' > .deployment_status.json.tmp && \
+            mv .deployment_status.json.tmp .deployment_status.json
+          ) 200>.deployment_status.lock
         " || true
 
   deploy-web:
@@ -400,16 +521,64 @@ jobs:
           export DOCKER_BUILDKIT=1 && 
           export COMPOSE_DOCKER_CLI_BUILD=1 && 
           
-          # 배포 상태 업데이트 (시작)
-          echo 'web_deploying' >> .deployment_status && 
+          # 배포 상태 업데이트 함수 정의
+          update_deployment_status() {
+            local service=\$1
+            local status=\$2
+            local timestamp=\$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")
+            
+            # Lock file을 사용한 원자적 업데이트
+            (
+              flock -x 200
+              if [ -f .deployment_status.json ]; then
+                current_status=\$(cat .deployment_status.json)
+              else
+                current_status='{}'
+              fi
+              
+              echo \"\$current_status\" | jq --arg service \"\$service\" --arg status \"\$status\" --arg timestamp \"\$timestamp\" \
+                '. + {\$service: \$status, (\$service + \"_timestamp\"): \$timestamp}' > .deployment_status.json.tmp && \
+              mv .deployment_status.json.tmp .deployment_status.json
+            ) 200>.deployment_status.lock
+          }
           
-          # 컨테이너 중지 및 빌드
-          docker compose stop blokus-web && 
-          docker compose build blokus-web && 
-          docker compose up -d blokus-web --wait --wait-timeout 60 && 
+          # 배포 상태 업데이트 (시작)
+          update_deployment_status 'web' 'deploying' && 
+          
+          # 시스템 리소스 확인
+          echo 'Checking system resources before web build...'
+          df -h ${{ env.DEPLOY_PATH }} | head -2
+          free -h
+          
+          # 컨테이너 중지 및 빌드 (재시도 로직 포함)
+          for i in {1..3}; do
+            echo \"Starting web application build attempt \$i/3...\"
+            
+            # Docker 빌드용 환경 변수 설정
+            export DOCKER_BUILDKIT=1
+            export BUILDKIT_PROGRESS=plain
+            
+            if docker compose stop blokus-web && \
+               timeout 1200 docker compose build blokus-web --progress=plain && \
+               docker compose up -d blokus-web --wait --wait-timeout 240; then
+              echo 'Web application deployment successful!'
+              break
+            elif [ \$i -eq 3 ]; then
+              echo 'Web application deployment failed after 3 attempts'
+              echo 'Checking Docker logs for debugging:'
+              docker compose logs blokus-web --tail=50 || true
+              exit 1
+            else
+              echo \"Web deployment attempt \$i failed, retrying...\"
+              echo 'Cleaning up failed build artifacts...'
+              docker compose down blokus-web || true
+              docker system prune -f --volumes || true
+              sleep 30
+            fi
+          done && 
           
           # 배포 성공 상태 업데이트
-          sed -i 's/web_deploying/web_success/' .deployment_status || echo 'web_success' >> .deployment_status
+          update_deployment_status 'web' 'success'
         "
 
     - name: 웹 애플리케이션 배포 실패 처리
@@ -417,7 +586,21 @@ jobs:
       run: |
         ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
           cd ${{ env.DEPLOY_PATH }} && 
-          sed -i 's/web_deploying/web_failed/' .deployment_status || echo 'web_failed' >> .deployment_status
+          
+          # 배포 실패 상태 업데이트
+          timestamp=\$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")
+          (
+            flock -x 200
+            if [ -f .deployment_status.json ]; then
+              current_status=\$(cat .deployment_status.json)
+            else
+              current_status='{}'
+            fi
+            
+            echo \"\$current_status\" | jq --arg timestamp \"\$timestamp\" \
+              '. + {\"web\": \"failed\", \"web_timestamp\": \$timestamp}' > .deployment_status.json.tmp && \
+            mv .deployment_status.json.tmp .deployment_status.json
+          ) 200>.deployment_status.lock
         " || true
 
   deploy-full:
@@ -606,15 +789,109 @@ jobs:
           export DOCKER_BUILDKIT=1 && \
           export COMPOSE_DOCKER_CLI_BUILD=1 && \
           
-          # 배포 상태 초기화
-          echo 'infrastructure_deploying' > .deployment_status && \
+          # 배포 상태 업데이트 함수 정의
+          update_deployment_status() {
+            local service=\$1
+            local status=\$2
+            local timestamp=\$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")
+            
+            # Lock file을 사용한 원자적 업데이트
+            (
+              flock -x 200
+              if [ -f .deployment_status.json ]; then
+                current_status=\$(cat .deployment_status.json)
+              else
+                current_status='{}'
+              fi
+              
+              echo \"\$current_status\" | jq --arg service \"\$service\" --arg status \"\$status\" --arg timestamp \"\$timestamp\" \
+                '. + {\$service: \$status, (\$service + \"_timestamp\"): \$timestamp}' > .deployment_status.json.tmp && \
+              mv .deployment_status.json.tmp .deployment_status.json
+            ) 200>.deployment_status.lock
+          }
           
-          # 인프라 전체 배포
-          docker compose build --parallel && \
-          docker compose up -d --wait --wait-timeout 60 && \
+          # 배포 상태 초기화 및 업데이트 (시작)
+          update_deployment_status 'infrastructure' 'deploying' && \
           
-          # 배포 성공 상태 업데이트
-          echo 'infrastructure_success' > .deployment_status
+          # 시스템 리소스 확인
+          echo 'Checking system resources before full infrastructure build...'
+          df -h ${{ env.DEPLOY_PATH }} | head -2
+          free -h
+          echo 'Docker system info:'
+          docker system df || true
+          
+          # 인프라 전체 배포 (재시도 로직 포함, 최대 타임아웃)
+          for i in {1..2}; do
+            echo \"Starting full infrastructure build attempt \$i/2...\"
+            
+            # Docker 빌드용 환경 변수 설정
+            export DOCKER_BUILDKIT=1
+            export BUILDKIT_PROGRESS=plain
+            export COMPOSE_PARALLEL_LIMIT=2
+            
+            # 대용량 빌드를 위한 타임아웃 설정 (40분)
+            if timeout 2400 docker compose build --parallel --progress=plain && \
+               docker compose up -d --wait --wait-timeout 600; then
+              echo 'Full infrastructure deployment successful!'
+              break
+            elif [ \$i -eq 2 ]; then
+              echo 'Infrastructure deployment failed after 2 attempts'
+              echo 'Checking system resources and Docker logs:'
+              df -h ${{ env.DEPLOY_PATH }} | head -2
+              free -h
+              docker compose logs --tail=100 || true
+              exit 1
+            else
+              echo \"Infrastructure deployment attempt \$i failed, retrying...\"
+              echo 'Performing comprehensive cleanup before retry...'
+              docker compose down || true
+              docker system prune -af --volumes || true
+              echo 'Waiting 60 seconds before retry...'
+              sleep 60
+            fi
+          done && \
+          
+          # 배포 후 서비스 건강성 체크
+          echo 'Performing post-deployment health checks...'
+          sleep 30  # 서비스 시작 대기
+          
+          # 서비스별 건강성 확인
+          health_check_failed=false
+          
+          # Game Server 건강성 체크
+          if docker compose ps blokus-server | grep -q 'healthy\\|Up'; then
+            echo '✓ Game Server is running'
+          else
+            echo '✗ Game Server health check failed'
+            health_check_failed=true
+          fi
+          
+          # Web Application 건강성 체크  
+          if docker compose ps blokus-web | grep -q 'healthy\\|Up'; then
+            echo '✓ Web Application is running'
+          else
+            echo '✗ Web Application health check failed'
+            health_check_failed=true
+          fi
+          
+          # Database 건강성 체크
+          if docker compose ps postgres | grep -q 'healthy\\|Up'; then
+            echo '✓ Database is running'
+          else
+            echo '✗ Database health check failed'
+            health_check_failed=true
+          fi
+          
+          if [ \"\$health_check_failed\" = \"true\" ]; then
+            echo 'Health check failed, displaying logs for debugging:'
+            docker compose logs --tail=100
+            echo 'Infrastructure deployment completed but some services are unhealthy'
+            update_deployment_status 'infrastructure' 'success_with_warnings'
+          else
+            echo 'All services are healthy!'
+            # 배포 성공 상태 업데이트
+            update_deployment_status 'infrastructure' 'success'
+          fi
         "
         
     - name: 인프라 배포 실패 처리
@@ -622,7 +899,21 @@ jobs:
       run: |
         ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
           cd ${{ env.DEPLOY_PATH }} && 
-          echo 'infrastructure_failed' > .deployment_status
+          
+          # 배포 실패 상태 업데이트
+          timestamp=\$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")
+          (
+            flock -x 200
+            if [ -f .deployment_status.json ]; then
+              current_status=\$(cat .deployment_status.json)
+            else
+              current_status='{}'
+            fi
+            
+            echo \"\$current_status\" | jq --arg timestamp \"\$timestamp\" \
+              '. + {\"infrastructure\": \"failed\", \"infrastructure_timestamp\": \$timestamp}' > .deployment_status.json.tmp && \
+            mv .deployment_status.json.tmp .deployment_status.json
+          ) 200>.deployment_status.lock
         " || true
         
         

@@ -67,11 +67,21 @@ RUN echo "=== Installing vcpkg ===" && \
 
 
 # ==================================================
-# vcpkg 의존성 설치
+# vcpkg 의존성 설치 (병렬 빌드 최적화)
 # ==================================================
 RUN cd ${VCPKG_ROOT} && \
+    # 병렬 빌드 최적화를 위한 환경변수 설정
+    export VCPKG_MAX_CONCURRENCY=$(nproc) && \
+    export VCPKG_KEEP_ENV_VARS=VCPKG_MAX_CONCURRENCY && \
+    # 의존성 설치 (빌드 시간 최적화)
     ./vcpkg install spdlog boost-asio boost-system nlohmann-json libpqxx openssl argon2 \
-        --triplet=${VCPKG_DEFAULT_TRIPLET}
+        --triplet=${VCPKG_DEFAULT_TRIPLET} \
+        --x-buildtrees-root=/tmp/vcpkg-buildtrees \
+        --x-install-root=/opt/vcpkg/installed && \
+    # 임시 빌드 파일 정리로 이미지 크기 최적화
+    rm -rf /tmp/vcpkg-buildtrees && \
+    # vcpkg 캐시 정리
+    ./vcpkg list
 
 # vcpkg 설치 완료
 
