@@ -69,8 +69,12 @@ RUN echo "=== Installing vcpkg ===" && \
 # 서버 전용 의존성 매니페스트 파일 복사 (Qt 제외로 libsystemd 에러 해결)
 # 의존성이 변경되지 않으면 이후 레이어들이 모두 캐시됨
 # ==================================================
+
+# 필수 파일: vcpkg-server.json을 vcpkg.json으로 복사
 COPY vcpkg-server.json ${VCPKG_ROOT}/vcpkg.json
-COPY vcpkg-configuration.json* ${VCPKG_ROOT}/ 2>/dev/null || echo "vcpkg-configuration.json not found, skipping"
+
+# vcpkg-configuration.json 파일은 선택적이므로 생략 (대부분의 경우 불필요)
+# COPY vcpkg-configuration.json ${VCPKG_ROOT}/ (commented out - file may not exist)
 
 # ==================================================
 # vcpkg 의존성 설치 (병렬 빌드 + 캐시 최적화)
