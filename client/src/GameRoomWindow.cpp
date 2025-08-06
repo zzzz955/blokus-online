@@ -38,7 +38,7 @@ namespace Blokus {
 
     void PlayerSlotWidget::setupUI()
     {
-        setFixedSize(130, 130);
+        setFixedSize(200, 130);
 
         m_mainLayout = new QVBoxLayout(this);
         m_mainLayout->setContentsMargins(4, 4, 4, 4);
@@ -81,7 +81,7 @@ namespace Blokus {
         m_scoreLabel->setStyleSheet("font-size: 12px; color: #35ff72;");
 
         // 남은 블록 수 표시
-        m_remainingBlocksLabel = new QLabel(QString::fromUtf8("블록: 21"));
+        m_remainingBlocksLabel = new QLabel(QString::fromUtf8("남은 블록: 21"));
         m_remainingBlocksLabel->setAlignment(Qt::AlignCenter);
         m_remainingBlocksLabel->setStyleSheet("font-size: 12px; color: #ff4e4e;");
 
@@ -254,7 +254,7 @@ namespace Blokus {
 
         // 점수 및 남은 블록 수 업데이트
         m_scoreLabel->setText(QString::fromUtf8("점수: %1").arg(slot.score));
-        m_remainingBlocksLabel->setText(QString::fromUtf8("블록: %1").arg(slot.remainingBlocks));
+        m_remainingBlocksLabel->setText(QString::fromUtf8("남은 블록: %1").arg(slot.remainingBlocks));
 
         // 액션 버튼 업데이트
         updateActionButton();
@@ -434,9 +434,6 @@ namespace Blokus {
         int y = (screenGeometry.height() - height()) / 2;
         move(x, y);
 
-        // 환영 메시지
-        addSystemMessage(QString::fromUtf8("%1님이 '%2' 방에 입장했습니다.").arg(myUsername, roomInfo.roomName));
-
         qDebug() << QString::fromUtf8("GameRoomWindow 생성 완료: 방 %1").arg(roomInfo.roomId);
     }
 
@@ -509,7 +506,7 @@ namespace Blokus {
         m_roomNameLabel->setStyleSheet("font-size: 16px; font-weight: bold; color: #2c3e50;");
 
         m_roomStatusLabel = new QLabel();
-        m_roomStatusLabel->setStyleSheet("font-size: 12px; color: #7f8c8d;");
+        m_roomStatusLabel->setStyleSheet("font-size: 12px; color: #ffffffff;");
 
         m_currentTurnLabel = new QLabel();
         m_currentTurnLabel->setStyleSheet("font-size: 14px; font-weight: bold; color: #34495e;");
@@ -594,7 +591,7 @@ namespace Blokus {
             m_slotsLayout->addWidget(slotWidget);
         }
 
-        m_slotsLayout->addStretch();
+        // m_slotsLayout->addStretch();
     }
 
     void GameRoomWindow::setupGameArea()
@@ -686,11 +683,11 @@ namespace Blokus {
 
         // 중앙 게임 상태
         m_gameStatusLabel = new QLabel(QString::fromUtf8("게임 대기 중"));
-        m_gameStatusLabel->setStyleSheet("font-size: 12px; font-weight: bold; color: #34495e;");
+        m_gameStatusLabel->setStyleSheet("font-size: 14px; font-weight: bold; color: #34495e;");
 
         // 오른쪽 좌표 표시
         m_coordinateLabel = new QLabel(QString::fromUtf8("보드 위에서 마우스를 움직이세요"));
-        m_coordinateLabel->setStyleSheet("font-size: 10px; color: #7f8c8d;");
+        m_coordinateLabel->setStyleSheet("font-size: 12px; color: #000000;");
 
         layout->addWidget(m_gameStartButton);
         layout->addStretch();
@@ -1954,7 +1951,7 @@ namespace Blokus {
         // 사용법 안내
         QLabel* helpLabel = new QLabel(QString::fromUtf8("💡 블록을 클릭하여 선택\n🔄 R키: 회전, F키: 뒤집기"));
         helpLabel->setStyleSheet(
-            "font-size: 10px; color: #6c757d; "
+            "font-size: 12px; color: #000000; font-weight: bold; "
             "background-color: #f8f9fa; padding: 6px; border-radius: 4px;"
         );
         helpLabel->setAlignment(Qt::AlignCenter);

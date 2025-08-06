@@ -1,5 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// Blokus Online - 통합 데이터베이스 스키마
+// OAuth 회원가입 + 필수 ID/PW 로그인 지원
 
 generator client {
   provider = "prisma-client-js"
@@ -10,6 +10,88 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ========================================
+// 게임 사용자 테이블 (OAuth + 필수 ID/PW)
+// ========================================
+
+model User {
+  user_id      Int      @id @default(autoincrement()) @map("user_id")
+  
+  // 필수 로그인 정보 (모든 사용자)
+  username     String   @unique @db.VarChar(20)
+  password_hash String  @map("password_hash") @db.VarChar(255)
+  
+  // OAuth 연동 정보 (선택사항, 계정 복구용)
+  email        String?  @unique @db.VarChar(100)
+  oauth_provider String? @map("oauth_provider") @db.VarChar(20)
+  oauth_id     String?  @map("oauth_id") @db.VarChar(100)
+  
+  // 사용자 프로필
+  display_name String?  @map("display_name") @db.VarChar(30)
+  avatar_url   String?  @map("avatar_url")
+  
+  // 계정 상태
+  is_active    Boolean  @default(true) @map("is_active")
+  
+  // 시간 정보
+  created_at   DateTime @default(now()) @map("created_at")
+  last_login_at DateTime? @map("last_login_at")
+  updated_at   DateTime @updatedAt @map("updated_at")
+  
+  // 관계
+  user_stats     UserStats?
+  testimonials   Testimonial[]
+  support_tickets SupportTicket[]
+  posts          Post[]
+  comments       Comment[]
+  replies        Reply[]
+  
+  @@map("users")
+}
+
+model UserStats {
+  user_id        Int @id @map("user_id")
+  
+  total_games    Int @default(0) @map("total_games")
+  wins           Int @default(0)
+  losses         Int @default(0)
+  draws          Int @default(0)
+  
+  best_score     Int @default(0) @map("best_score")
+  total_score    Int @default(0) @map("total_score")
+  
+  longest_win_streak  Int @default(0) @map("longest_win_streak")
+  current_win_streak  Int @default(0) @map("current_win_streak")
+  
+  level          Int @default(1)
+  experience_points Int @default(0) @map("experience_points")
+  
+  last_played    DateTime? @map("last_played")
+  updated_at     DateTime @updatedAt @map("updated_at")
+  
+  // 관계
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  
+  @@map("user_stats")
+}
+
+model UserFriend {
+  friendship_id     Int @id @default(autoincrement()) @map("friendship_id")
+  requester_user_id Int @map("requester_user_id")
+  addressee_user_id Int @map("addressee_user_id")
+  
+  status       String    @default("pending") @db.VarChar(20)
+  requested_at DateTime  @default(now()) @map("requested_at")
+  responded_at DateTime? @map("responded_at")
+  
+  @@unique([requester_user_id, addressee_user_id])
+  @@map("user_friends")
+}
+
+// ========================================
+// 웹사이트 테이블들
+// ========================================
+
 model Announcement {
   id           Int      @id @default(autoincrement())
   title        String
@@ -19,6 +101,9 @@ model Announcement {
   updated_at   DateTime @updatedAt @map("updated_at")
   is_pinned    Boolean  @default(false) @map("is_pinned")
   is_published Boolean  @default(true) @map("is_published")
+
+  // 관계
+  comments     Comment[]
 
   @@map("announcements")
 }
@@ -32,11 +117,15 @@ model PatchNote {
   download_url String?  @map("download_url")
   created_at   DateTime @default(now()) @map("created_at")
 
+  // 관계
+  comments     Comment[]
+
   @@map("patch_notes")
 }
 
 model SupportTicket {
   id           Int                 @id @default(autoincrement())
+  userId       Int?                @map("user_id") // 로그인 사용자 연결
   email        String
   subject      String
   message      String
@@ -44,6 +133,9 @@ model SupportTicket {
   admin_reply  String?             @map("admin_reply")
   created_at   DateTime            @default(now()) @map("created_at")
   replied_at   DateTime?           @map("replied_at")
+  
+  // 관계
+  user User? @relation(fields: [userId], references: [user_id], onDelete: SetNull)
 
   @@map("support_tickets")
 }
@@ -60,12 +152,16 @@ model AdminUser {
 
 model Testimonial {
   id           Int      @id @default(autoincrement())
-  name         String
+  userId       Int?     @map("user_id") // 게임 사용자 연결
+  name         String?  // 표시명 (하위 호환성을 위해 유지, 게스트 사용자용)
   rating       Int
   comment      String?
   created_at   DateTime @default(now()) @map("created_at")
   is_pinned    Boolean  @default(false) @map("is_pinned")
   is_published Boolean  @default(true) @map("is_published")
+  
+  // 관계
+  user User? @relation(fields: [userId], references: [user_id], onDelete: SetNull)
 
   @@map("testimonials")
 }
@@ -76,7 +172,100 @@ enum SupportTicketStatus {
   CLOSED
 }
 
+// ========================================
+// 게시판 시스템
+// ========================================
+
+model Post {
+  id           Int         @id @default(autoincrement())
+  title        String      @db.VarChar(200)
+  content      String      // Markdown content
+  category     post_category
+  
+  // 작성자 정보
+  author_id    Int         @map("author_id")
+  author       User        @relation(fields: [author_id], references: [user_id], onDelete: Cascade)
+  
+  // 게시글 상태
+  is_hidden    Boolean     @default(false) @map("is_hidden")    // 작성자가 숨김
+  is_deleted   Boolean     @default(false) @map("is_deleted")   // 관리자/작성자가 삭제
+  
+  // 통계
+  view_count   Int         @default(0) @map("view_count")
+  
+  // 시간 정보
+  created_at   DateTime    @default(now()) @map("created_at")
+  updated_at   DateTime    @updatedAt @map("updated_at")
+  
+  // 관계
+  comments     Comment[]
+  
+  @@map("posts")
+}
+
+enum post_category {
+  QUESTION  // 질문
+  GUIDE     // 공략
+  GENERAL   // 기타
+}
+
 enum AdminRole {
   ADMIN
   SUPER_ADMIN
+}
+
+// ========================================
+// 댓글 시스템
+// ========================================
+
+model Comment {
+  id           Int      @id @default(autoincrement())
+  content      String   @db.Text
+  
+  // 작성자 정보 (인증된 사용자만)
+  author_id    Int      @map("author_id")
+  author       User     @relation(fields: [author_id], references: [user_id], onDelete: Cascade)
+  
+  // 댓글이 달린 대상 (다형성 관계)
+  post_id         Int?         @map("post_id")
+  announcement_id Int?         @map("announcement_id")
+  patch_note_id   Int?         @map("patch_note_id")
+  
+  post         Post?         @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  announcement Announcement? @relation(fields: [announcement_id], references: [id], onDelete: Cascade)
+  patch_note   PatchNote?    @relation(fields: [patch_note_id], references: [id], onDelete: Cascade)
+  
+  // 댓글 상태
+  is_deleted   Boolean  @default(false) @map("is_deleted")
+  
+  // 시간 정보
+  created_at   DateTime @default(now()) @map("created_at")
+  updated_at   DateTime @updatedAt @map("updated_at")
+  
+  // 관계
+  replies      Reply[]
+  
+  @@map("comments")
+}
+
+model Reply {
+  id           Int      @id @default(autoincrement())
+  content      String   @db.Text
+  
+  // 작성자 정보 (인증된 사용자만)
+  author_id    Int      @map("author_id")
+  author       User     @relation(fields: [author_id], references: [user_id], onDelete: Cascade)
+  
+  // 대댓글이 달린 댓글
+  comment_id   Int      @map("comment_id")
+  comment      Comment  @relation(fields: [comment_id], references: [id], onDelete: Cascade)
+  
+  // 대댓글 상태
+  is_deleted   Boolean  @default(false) @map("is_deleted")
+  
+  // 시간 정보
+  created_at   DateTime @default(now()) @map("created_at")
+  updated_at   DateTime @updatedAt @map("updated_at")
+  
+  @@map("replies")
 }

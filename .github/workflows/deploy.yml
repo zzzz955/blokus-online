@@ -194,9 +194,7 @@ jobs:
         WEB_PORT=${{ secrets.WEB_PORT }}
         WEB_APP_URL=${{ secrets.WEB_APP_URL }}
         WEB_CLIENT_DOWNLOAD_URL=${{ secrets.WEB_CLIENT_DOWNLOAD_URL }}
-        
-        # 웹 데이터베이스 설정 (동일한 PostgreSQL 컨테이너, 다른 DB명)
-        WEB_DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@postgres:5432/blokus_web
+        WEB_DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@postgres:5432/blokus_online
         
         # 웹 인증 설정
         WEB_NEXTAUTH_SECRET=${{ secrets.WEB_NEXTAUTH_SECRET }}

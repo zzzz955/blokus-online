@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -10,14 +12,6 @@ export const dynamic = 'force-dynamic';
 // 후기 작성 데이터 검증
 function validateTestimonial(data: any) {
   const errors: string[] = [];
-  
-  if (!data.name || typeof data.name !== 'string') {
-    errors.push('이름을 입력해주세요');
-  } else if (data.name.trim().length === 0) {
-    errors.push('이름을 입력해주세요');
-  } else if (data.name.length > 50) {
-    errors.push('이름은 50자 이하로 입력해주세요');
-  }
   
   if (typeof data.rating !== 'number') {
     errors.push('별점을 선택해주세요');
@@ -53,8 +47,10 @@ export async function GET(request: NextRequest) {
     });
     const totalPages = Math.ceil(total / effectiveLimit);
 
-    // 후기 목록 조회 (is_pinned DESC, created_at DESC 순으로 정렬)
-    const testimonials = await prisma.testimonial.findMany({
+    console.log('Fetching testimonials, total count:', total);
+
+    // 후기 목록 조회 (사용자 정보 포함)
+    const rawTestimonials = await prisma.testimonial.findMany({
       where: { is_published: true },
       orderBy: [
         { is_pinned: 'desc' },
@@ -62,24 +58,47 @@ export async function GET(request: NextRequest) {
       ],
       take: effectiveLimit,
       skip: offset,
-      select: {
-        id: true,
-        name: true,
-        rating: true,
-        comment: true,
-        created_at: true,
-        is_pinned: true,
-        is_published: true
+      include: {
+        user: {
+          select: {
+            username: true,
+            user_stats: {
+              select: {
+                level: true,
+                total_games: true,
+                wins: true,
+                total_score: true,
+                best_score: true
+              }
+            }
+          }
+        }
       }
-    }).then((items: any[]) => items.map((item: any) => ({
+    } as any);
+
+    console.log('Raw testimonials from DB:', rawTestimonials.length);
+    
+    const testimonials = rawTestimonials.map((item: any) => ({
       id: item.id,
-      name: item.name,
       rating: item.rating,
       comment: item.comment,
       createdAt: item.created_at.toISOString(),
       isPinned: item.is_pinned,
-      isPublished: item.is_published
-    })));
+      isPublished: item.is_published,
+      user: item.user ? {
+        username: item.user.username,
+        level: item.user.user_stats?.level || 1,
+        totalGames: item.user.user_stats?.total_games || 0,
+        wins: item.user.user_stats?.wins || 0,
+        totalScore: item.user.user_stats?.total_score || 0,
+        bestScore: item.user.user_stats?.best_score || 0,
+        winRate: item.user.user_stats?.total_games > 0 
+          ? Math.round((item.user.user_stats.wins / item.user.user_stats.total_games) * 100)
+          : 0
+      } : null,
+      // 하위 호환성을 위한 name 필드 (사용자명 또는 게스트)
+      name: item.user?.username || '게스트 사용자'
+    }));
 
     if (homeMode) {
       // 홈페이지 모드에서는 간단한 응답
@@ -111,9 +130,18 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/testimonials - 새 후기 작성
+// POST /api/testimonials - 새 후기 작성 (로그인 필수)
 export async function POST(request: NextRequest) {
   try {
+    // 세션 확인
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { success: false, error: '로그인이 필요합니다.' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     
     // 입력 데이터 검증
@@ -128,34 +156,64 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const { name, rating, comment } = body;
+    const { rating, comment } = body;
+
+    // 기존 후기가 있는지 확인 (한 사용자당 하나의 후기만 허용)
+    const existingTestimonial = await prisma.testimonial.findFirst({
+      where: { userId: parseInt(session.user.id) }
+    } as any);
+
+    if (existingTestimonial) {
+      return NextResponse.json(
+        { success: false, error: '이미 후기를 작성하셨습니다. 수정을 원하시면 기존 후기를 삭제해주세요.' },
+        { status: 409 }
+      );
+    }
 
     // 데이터베이스에 후기 저장
     const testimonial = await prisma.testimonial.create({
       data: {
-        name,
+        userId: parseInt(session.user.id),
         rating,
         comment: comment || null,
       },
-      select: {
-        id: true,
-        name: true,
-        rating: true,
-        comment: true,
-        created_at: true,
-        is_pinned: true,
-        is_published: true
+      include: {
+        user: {
+          select: {
+            username: true,
+            user_stats: {
+              select: {
+                level: true,
+                total_games: true,
+                wins: true,
+                total_score: true,
+                best_score: true
+              }
+            }
+          }
+        }
       }
     });
 
     const newTestimonial = {
       id: testimonial.id,
-      name: testimonial.name,
       rating: testimonial.rating,
       comment: testimonial.comment,
       createdAt: testimonial.created_at.toISOString(),
       isPinned: testimonial.is_pinned,
-      isPublished: testimonial.is_published
+      isPublished: testimonial.is_published,
+      user: (testimonial as any).user ? {
+        username: (testimonial as any).user.username,
+        level: (testimonial as any).user.user_stats?.level || 1,
+        totalGames: (testimonial as any).user.user_stats?.total_games || 0,
+        wins: (testimonial as any).user.user_stats?.wins || 0,
+        totalScore: (testimonial as any).user.user_stats?.total_score || 0,
+        bestScore: (testimonial as any).user.user_stats?.best_score || 0,
+        winRate: (testimonial as any).user.user_stats?.total_games > 0 
+          ? Math.round(((testimonial as any).user.user_stats.wins / (testimonial as any).user.user_stats.total_games) * 100)
+          : 0
+      } : null,
+      name: (testimonial as any).user?.username || '게스트 사용자'
     };
 
     return NextResponse.json({
@@ -169,6 +227,67 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json(
       { success: false, error: '후기 등록에 실패했습니다.' },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE /api/testimonials - 후기 삭제 (본인만)
+export async function DELETE(request: NextRequest) {
+  try {
+    // 세션 확인
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { success: false, error: '로그인이 필요합니다.' },
+        { status: 401 }
+      );
+    }
+
+    const { searchParams } = new URL(request.url);
+    const testimonialId = searchParams.get('id');
+
+    if (!testimonialId) {
+      return NextResponse.json(
+        { success: false, error: '후기 ID가 필요합니다.' },
+        { status: 400 }
+      );
+    }
+
+    // 후기 존재 여부 및 소유권 확인
+    const testimonial = await prisma.testimonial.findUnique({
+      where: { id: parseInt(testimonialId) }
+    });
+
+    if (!testimonial) {
+      return NextResponse.json(
+        { success: false, error: '후기를 찾을 수 없습니다.' },
+        { status: 404 }
+      );
+    }
+
+    if (testimonial.userId !== parseInt(session.user.id)) {
+      return NextResponse.json(
+        { success: false, error: '본인의 후기만 삭제할 수 있습니다.' },
+        { status: 403 }
+      );
+    }
+
+    // 후기 삭제
+    await prisma.testimonial.delete({
+      where: { id: parseInt(testimonialId) }
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: '후기가 성공적으로 삭제되었습니다.'
+    });
+
+  } catch (error) {
+    console.error('Error deleting testimonial:', error);
+    
+    return NextResponse.json(
+      { success: false, error: '후기 삭제에 실패했습니다.' },
       { status: 500 }
     );
   }

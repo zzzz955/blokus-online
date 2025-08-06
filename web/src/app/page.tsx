@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Download, Users, Trophy, Shield, Gamepad2, Star, ChevronLeft, ChevronRight, MessageSquarePlus, ArrowRight } from 'lucide-react';
+import { Download, Users, Trophy, Shield, Gamepad2, Star, ChevronLeft, ChevronRight, MessageSquarePlus, ArrowRight, UserPlus } from 'lucide-react';
+import { useSession } from 'next-auth/react';
 import Layout from '@/components/layout/Layout';
 import Card, { CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -11,6 +12,7 @@ import { api } from '@/utils/api';
 import { Testimonial } from '@/types';
 
 export default function HomePage() {
+  const { data: session } = useSession();
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [currentPage, setCurrentPage] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -106,12 +108,37 @@ export default function HomePage() {
                   <span>무료 다운로드</span>
                 </Button>
               </Link>
+              
+              {!session?.user && (
+                <Link href="/auth/signin">
+                  <Button size="lg" variant="outline" className="flex items-center space-x-2 text-white border-white/30 hover:bg-white/10">
+                    <UserPlus size={20} />
+                    <span>회원가입하고 시작하기</span>
+                  </Button>
+                </Link>
+              )}
+              
               <Link href="/guide">
                 <Button size="lg" variant="secondary" className="text-primary-700">
                   게임 가이드 보기
                 </Button>
               </Link>
             </div>
+            
+            {!session?.user && (
+              <div className="mt-6 text-center text-gray-300 text-sm">
+                <p>
+                  이미 계정이 있으신가요?{' '}
+                  <Link href="/auth/signin" className="text-primary-400 hover:text-primary-300 underline">
+                    로그인
+                  </Link>
+                  {' '} | {' '}
+                  <Link href="/auth/reset-password" className="text-gray-400 hover:text-gray-300 underline">
+                    비밀번호 재설정
+                  </Link>
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -232,9 +259,26 @@ export default function HomePage() {
                             {testimonial.comment}
                           </p>
                         )}
-                        <p className="text-white font-semibold">
-                          - {testimonial.name}
-                        </p>
+                        {testimonial.user ? (
+                          <div className="bg-gray-700/30 rounded-lg p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-white font-semibold">
+                                {testimonial.user.username}
+                              </p>
+                              <span className="text-xs bg-primary-600 text-white px-2 py-1 rounded">
+                                Lv.{testimonial.user.level}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-xs text-gray-400">
+                              <div>게임 {testimonial.user.totalGames}회</div>
+                              <div>승률 {testimonial.user.winRate}%</div>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-white font-semibold">
+                            - {testimonial.name}
+                          </p>
+                        )}
                       </CardContent>
                     </Card>
                   ))}
@@ -296,14 +340,27 @@ export default function HomePage() {
             지금 바로 시작하세요!
           </h2>
           <p className="text-xl text-gray-200 mb-8 max-w-2xl mx-auto">
-            무료로 다운로드하고 친구들과 함께 블로커스 온라인의 재미를 경험해보세요.
+            {session?.user 
+              ? "게임을 다운로드하고 친구들과 함께 블로커스 온라인의 재미를 경험해보세요."
+              : "회원가입하고 무료로 다운로드하여 친구들과 함께 블로커스 온라인의 재미를 경험해보세요."
+            }
           </p>
-          <Link href="/download">
-            <Button size="lg" variant="secondary" className="text-primary-700">
-              <Download size={20} className="mr-2" />
-              게임 다운로드
-            </Button>
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            {!session?.user && (
+              <Link href="/auth/signin">
+                <Button size="lg" variant="secondary" className="flex items-center space-x-2 text-primary-700">
+                  <UserPlus size={20} />
+                  <span>회원가입</span>
+                </Button>
+              </Link>
+            )}
+            <Link href="/download">
+              <Button size="lg" variant="secondary" className="text-primary-700">
+                <Download size={20} className="mr-2" />
+                게임 다운로드
+              </Button>
+            </Link>
+          </div>
         </div>
       </section>
     </Layout>

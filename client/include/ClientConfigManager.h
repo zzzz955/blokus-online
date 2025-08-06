@@ -15,6 +15,9 @@ public:
     // ===========================================
     // 설정 구조체들
     // ===========================================
+
+    static constexpr const char* VERSION = "1.3.0";
+    static constexpr const char* BUILD_DATE = __DATE__ " " __TIME__;
     
     struct ServerConfig {
         QString host = "localhost";
@@ -27,8 +30,8 @@ public:
     struct WindowConfig {
         int width = 1280;
         int height = 800;
-        int min_width = 800;
-        int min_height = 500;
+        int min_width = 600;
+        int min_height = 400;
     };
     
     struct GameBoardConfig {

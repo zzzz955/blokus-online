@@ -45,7 +45,8 @@ namespace Blokus {
         nameLabel->setStyleSheet("font-weight: bold;");
         m_roomNameEdit = new QLineEdit();
         m_roomNameEdit->setPlaceholderText(QString::fromUtf8("방 이름을 입력하세요"));
-        m_roomNameEdit->setText(QString::fromUtf8("%1님의 방").arg("플레이어"));
+        auto parent = qobject_cast<LobbyWindow*>(parentWidget());
+        m_roomNameEdit->setText(QString::fromUtf8("%1님의 방").arg(parent->getMyUsername()));
         m_roomNameEdit->setMaxLength(30);
 
         // 게임 모드 (클래식만)
@@ -63,9 +64,11 @@ namespace Blokus {
         m_maxPlayersSpinBox->setRange(2, 4);
         m_maxPlayersSpinBox->setValue(4);
         m_maxPlayersSpinBox->setSuffix(QString::fromUtf8("명"));
+        m_maxPlayersSpinBox->setEnabled(false); // 클래식 모드 고정
 
         // 비공개 방 설정
         m_privateCheckBox = new QCheckBox(QString::fromUtf8("비공개 방 (패스워드 설정)"));
+        m_privateCheckBox->setEnabled(false); // 클래식 모드 고정
 
         QLabel* passwordLabel = new QLabel(QString::fromUtf8("방 패스워드"));
         passwordLabel->setStyleSheet("font-weight: bold;");

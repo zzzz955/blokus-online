@@ -2,7 +2,7 @@
 #include "DatabaseManager.h"
 #include "ConfigManager.h"
 #include <spdlog/spdlog.h>
-#include <openssl/sha.h>
+#include <argon2.h>
 #include <openssl/rand.h>
 #include <random>
 #include <regex>
@@ -105,9 +105,8 @@ namespace Blokus {
                 }
 
 
-                // 비밀번호 해시화
-                std::string salt = generateSalt();
-                std::string hashedPassword = hashPassword(password, salt);
+                // 비밀번호 해시화 (bcrypt)
+                std::string hashedPassword = hashPassword(password);
 
                 spdlog::info("새 사용자 등록 시도: {}", username);
 
@@ -401,22 +400,56 @@ namespace Blokus {
         // 내부 헬퍼 함수들
         // ========================================
 
-        std::string AuthenticationService::hashPassword(const std::string& password, const std::string& salt) const {
+        std::string AuthenticationService::hashPassword(const std::string& password) const {
             try {
-                std::string saltedPassword = password + salt;
-
-                unsigned char hash[SHA256_DIGEST_LENGTH];
-                SHA256_CTX sha256;
-                SHA256_Init(&sha256);
-                SHA256_Update(&sha256, saltedPassword.c_str(), saltedPassword.length());
-                SHA256_Final(hash, &sha256);
-
-                std::stringstream ss;
-                for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
-                    ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(hash[i]);
+                // Argon2id 해싱 (웹에서 bcrypt에서 argon2로 변경 예정)
+                const size_t hashlen = 32;
+                const size_t saltlen = 16;
+                
+                // 솔트 생성
+                unsigned char salt[saltlen];
+                if (RAND_bytes(salt, saltlen) != 1) {
+                    spdlog::error("솔트 생성 실패");
+                    return "";
                 }
-
-                return salt + ":" + ss.str();
+                
+                // Argon2 해시 생성
+                unsigned char hash[hashlen];
+                int result = argon2id_hash_raw(
+                    2,                                    // t_cost (iterations)
+                    1 << 16,                             // m_cost (64MB memory)
+                    1,                                   // parallelism
+                    password.c_str(), password.length(), // password
+                    salt, saltlen,                       // salt
+                    hash, hashlen                        // output hash
+                );
+                
+                if (result != ARGON2_OK) {
+                    spdlog::error("Argon2 해시 생성 실패: {}", argon2_error_message(result));
+                    return "";
+                }
+                
+                // Base64 인코딩된 해시 문자열 생성 (웹과 호환되는 형식)
+                size_t encodedlen = argon2_encodedlen(2, 1 << 16, 1, saltlen, hashlen, Argon2_id);
+                char* encoded = new char[encodedlen];
+                
+                result = argon2id_hash_encoded(
+                    2, 1 << 16, 1,
+                    password.c_str(), password.length(),
+                    salt, saltlen,
+                    hashlen, encoded, encodedlen
+                );
+                
+                std::string hashedPassword;
+                if (result == ARGON2_OK) {
+                    hashedPassword = std::string(encoded);
+                    spdlog::debug("비밀번호 해시 생성 완료 (Argon2id)");
+                } else {
+                    spdlog::error("Argon2 인코딩 실패: {}", argon2_error_message(result));
+                }
+                
+                delete[] encoded;
+                return hashedPassword;
             }
             catch (const std::exception& e) {
                 spdlog::error("비밀번호 해시 중 오류: {}", e.what());
@@ -451,22 +484,16 @@ namespace Blokus {
 
         bool AuthenticationService::verifyPassword(const std::string& password, const std::string& hash) const {
             try {
-                size_t colonPos = hash.find(':');
-                if (colonPos == std::string::npos) {
-                    return false;
+                // Argon2 해시 검증
+                int result = argon2id_verify(hash.c_str(), password.c_str(), password.length());
+                bool isValid = (result == ARGON2_OK);
+                
+                if (!isValid && result != ARGON2_VERIFY_MISMATCH) {
+                    spdlog::error("Argon2 검증 오류: {}", argon2_error_message(result));
                 }
-
-                std::string salt = hash.substr(0, colonPos);
-                std::string expectedHash = hash.substr(colonPos + 1);
-
-                std::string computedHash = hashPassword(password, salt);
-                size_t computedColonPos = computedHash.find(':');
-                if (computedColonPos == std::string::npos) {
-                    return false;
-                }
-
-                std::string computedHashPart = computedHash.substr(computedColonPos + 1);
-                return expectedHash == computedHashPart;
+                
+                spdlog::debug("비밀번호 검증 결과: {}", isValid ? "성공" : "실패");
+                return isValid;
             }
             catch (const std::exception& e) {
                 spdlog::error("비밀번호 검증 중 오류: {}", e.what());

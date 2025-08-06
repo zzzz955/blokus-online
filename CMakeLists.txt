@@ -18,6 +18,7 @@ if(MSVC)
 endif()
 find_package(spdlog CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
+find_package(unofficial-argon2 CONFIG REQUIRED)
 
 # Boost 설정 - system만 사용 (thread 패키지 제외)
 find_package(Boost REQUIRED COMPONENTS system)

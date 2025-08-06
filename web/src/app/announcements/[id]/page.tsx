@@ -10,6 +10,8 @@ import { formatDateTime } from '@/utils/format';
 import { api } from '@/utils/api';
 import { Announcement } from '@/types';
 import ReactMarkdown from 'react-markdown';
+import HtmlRenderer from '@/components/ui/HtmlRenderer';
+import CommentSection from '@/components/comments/CommentSection';
 
 interface AnnouncementDetailPageProps {
   params: { id: string };
@@ -132,67 +134,16 @@ export default function AnnouncementDetailPage({ params }: AnnouncementDetailPag
 
               {/* 내용 */}
               <div className="prose-custom">
-                <ReactMarkdown
-                  components={{
-                    h1: ({ children }) => (
-                      <h1 className="text-2xl font-bold text-white mb-4 mt-8">{children}</h1>
-                    ),
-                    h2: ({ children }) => (
-                      <h2 className="text-xl font-semibold text-white mb-3 mt-6">{children}</h2>
-                    ),
-                    h3: ({ children }) => (
-                      <h3 className="text-lg font-semibold text-white mb-2 mt-4">{children}</h3>
-                    ),
-                    p: ({ children }) => (
-                      <p className="text-white mb-4 leading-relaxed">{children}</p>
-                    ),
-                    ul: ({ children }) => (
-                      <ul className="list-disc list-inside text-white mb-4 space-y-2">{children}</ul>
-                    ),
-                    ol: ({ children }) => (
-                      <ol className="list-decimal list-inside text-white mb-4 space-y-2">{children}</ol>
-                    ),
-                    li: ({ children }) => (
-                      <li className="text-white">{children}</li>
-                    ),
-                    strong: ({ children }) => (
-                      <strong className="text-white font-semibold">{children}</strong>
-                    ),
-                    em: ({ children }) => (
-                      <em className="text-white italic">{children}</em>
-                    ),
-                    code: ({ children }) => (
-                      <code className="bg-gray-800 text-primary-400 px-2 py-1 rounded text-sm">
-                        {children}
-                      </code>
-                    ),
-                    pre: ({ children }) => (
-                      <pre className="bg-gray-800 p-4 rounded-lg overflow-x-auto mb-4">
-                        {children}
-                      </pre>
-                    ),
-                    blockquote: ({ children }) => (
-                      <blockquote className="border-l-4 border-primary-500 pl-4 italic text-white mb-4">
-                        {children}
-                      </blockquote>
-                    ),
-                    a: ({ href, children }) => (
-                      <a
-                        href={href}
-                        className="text-primary-400 hover:text-primary-300 underline"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        {children}
-                      </a>
-                    ),
-                  }}
-                >
-                  {announcement.content}
-                </ReactMarkdown>
+                <HtmlRenderer 
+                  content={announcement.content}
+                  className="announcement-content"
+                />
               </div>
             </CardContent>
           </Card>
+
+          {/* 댓글 섹션 */}
+          <CommentSection announcementId={announcement.id} />
 
           {/* 하단 네비게이션 */}
           <div className="mt-8 flex justify-between">

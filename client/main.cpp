@@ -65,26 +65,6 @@ private slots:
         m_networkClient->login(username, password);
     }
 
-    void handleRegisterRequest(const QString &username, const QString &password, const QString &email)
-    {
-        qDebug() << QString::fromUtf8("회원가입 시도: %1").arg(username);
-
-        if (!m_networkClient->isConnected())
-        {
-            m_loginWindow->setRegisterResult(false, QString::fromUtf8("서버에 연결되지 않았습니다."));
-            return;
-        }
-
-        m_networkClient->registerUser(username, password);
-    }
-
-    void handlePasswordResetRequest(const QString &email)
-    {
-        qDebug() << QString::fromUtf8("비밀번호 재설정 요청: %1").arg(email);
-
-        // 비밀번호 재설정은 아직 미구현
-        m_loginWindow->setPasswordResetResult(false, QString::fromUtf8("비밀번호 재설정 기능은 준비 중입니다."));
-    }
 
     void handleLoginSuccess(const QString &username)
     {
@@ -300,13 +280,6 @@ private slots:
         }
     }
 
-    void onRegisterResult(bool success, const QString &message)
-    {
-        if (m_loginWindow)
-        {
-            m_loginWindow->setRegisterResult(success, message);
-        }
-    }
 
     void onLobbyEntered()
     {
@@ -372,8 +345,6 @@ private slots:
         {
             // 자신의 로그인 브로드캐스트는 시스템 메시지 및 중복 요청 제외
             if (username != m_currentUsername) {
-                m_lobbyWindow->addSystemMessage(QString::fromUtf8("%1님이 로비에 입장했습니다.").arg(username));
-                // 새로운 사용자 목록 요청
                 if (m_networkClient && m_networkClient->isConnected())
                 {
                     m_networkClient->requestLobbyList();
@@ -387,8 +358,6 @@ private slots:
         qDebug() << QString::fromUtf8("사용자 로비 퇴장: %1").arg(username);
         if (m_lobbyWindow)
         {
-            m_lobbyWindow->addSystemMessage(QString::fromUtf8("%1님이 로비를 나갔습니다.").arg(username));
-            // 업데이트된 사용자 목록 요청
             if (m_networkClient && m_networkClient->isConnected())
             {
                 m_networkClient->requestLobbyList();
@@ -1125,8 +1094,6 @@ private:
         // 인증 관련 시그널
         connect(m_networkClient, &NetworkClient::loginResult,
                 this, &AppController::onLoginResult);
-        connect(m_networkClient, &NetworkClient::registerResult,
-                this, &AppController::onRegisterResult);
 
         // 일반 에러 시그널 추가
         connect(m_networkClient, &NetworkClient::errorReceived,
@@ -1196,18 +1163,14 @@ private:
         m_loginWindow = new Blokus::LoginWindow();
         
         // 설정에서 창 크기 적용
-        auto& config = ClientConfigManager::instance();
-        const auto& windowConfig = config.getClientConfig().window;
-        m_loginWindow->resize(windowConfig.width, windowConfig.height);
-        m_loginWindow->setMinimumSize(windowConfig.min_width, windowConfig.min_height);
+        // auto& config = ClientConfigManager::instance();
+        // const auto& windowConfig = config.getClientConfig().window;
+        // m_loginWindow->resize(windowConfig.width, windowConfig.height);
+        // m_loginWindow->setMinimumSize(windowConfig.min_width, windowConfig.min_height);
 
         // 로그인 시그널 연결
         connect(m_loginWindow, &Blokus::LoginWindow::loginRequested,
                 this, &AppController::handleLoginRequest);
-        connect(m_loginWindow, &Blokus::LoginWindow::registerRequested,
-                this, &AppController::handleRegisterRequest);
-        connect(m_loginWindow, &Blokus::LoginWindow::passwordResetRequested,
-                this, &AppController::handlePasswordResetRequest);
         connect(m_loginWindow, &Blokus::LoginWindow::loginSuccessful,
                 this, &AppController::handleLoginSuccess);
 
@@ -1414,7 +1377,7 @@ int main(int argc, char *argv[])
 
     // 애플리케이션 설정
     app.setApplicationName(QString::fromUtf8("블로커스 온라인"));
-    app.setApplicationVersion("1.0.0");
+    app.setApplicationVersion("1.2.0");
     app.setOrganizationName("Blokus Online");
 
     // 설정 시스템 초기화

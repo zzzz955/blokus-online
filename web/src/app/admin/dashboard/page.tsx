@@ -18,6 +18,19 @@ interface DashboardStats {
     answered: number;
     total: number;
   };
+  testimonials: {
+    total: number;
+    today: number;
+  };
+  posts: {
+    total: number;
+    today: number;
+    hidden: number;
+    deleted: number;
+  };
+  comments: {
+    today: number;
+  };
 }
 
 export default function AdminDashboard() {
@@ -30,24 +43,17 @@ export default function AdminDashboard() {
 
   const fetchDashboardStats = async () => {
     try {
-      // 실제로는 대시보드 통계 API를 만들어야 하지만, 
-      // 지금은 간단한 더미 데이터로 구성
-      setStats({
-        announcements: {
-          total: 0,
-          published: 0,
-          pinned: 0
-        },
-        patchNotes: {
-          total: 0,
-          latest: '없음'
-        },
-        supportTickets: {
-          pending: 0,
-          answered: 0,
-          total: 0
+      const response = await fetch('/api/admin/dashboard');
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setStats(result.data);
+        } else {
+          console.error('대시보드 통계 조회 실패:', result.error);
         }
-      });
+      } else {
+        console.error('대시보드 통계 API 호출 실패:', response.status);
+      }
     } catch (error) {
       console.error('대시보드 통계 조회 오류:', error);
     } finally {
@@ -58,20 +64,20 @@ export default function AdminDashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
       </div>
     );
   }
 
   return (
-    <div className="px-4 py-6 sm:px-0">
-      <div className="border-4 border-dashed border-gray-200 rounded-lg p-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">관리자 대시보드</h1>
+    <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+      <div className="border-4 border-dashed border-dark-border rounded-lg p-6 bg-dark-card">
+        <h1 className="text-2xl font-bold text-white mb-6">관리자 대시보드</h1>
         
         {/* 통계 카드들 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* 공지사항 통계 */}
-          <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="bg-dark-card border border-dark-border overflow-hidden shadow rounded-lg">
             <div className="p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
@@ -83,22 +89,22 @@ export default function AdminDashboard() {
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">
+                    <dt className="text-sm font-medium text-gray-400 truncate">
                       공지사항
                     </dt>
-                    <dd className="text-lg font-medium text-gray-900">
+                    <dd className="text-lg font-medium text-white">
                       총 {stats?.announcements.total || 0}개
                     </dd>
-                    <dd className="text-sm text-gray-500">
+                    <dd className="text-sm text-gray-400">
                       게시: {stats?.announcements.published || 0}개 | 고정: {stats?.announcements.pinned || 0}개
                     </dd>
                   </dl>
                 </div>
               </div>
             </div>
-            <div className="bg-gray-50 px-5 py-3">
+            <div className="bg-dark-bg px-5 py-3">
               <div className="text-sm">
-                <Link href="/admin/announcements" className="font-medium text-blue-700 hover:text-blue-900">
+                <Link href="/admin/announcements" className="font-medium text-blue-400 hover:text-blue-300">
                   관리하기 →
                 </Link>
               </div>
@@ -106,7 +112,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* 패치노트 통계 */}
-          <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="bg-dark-card border border-dark-border overflow-hidden shadow rounded-lg">
             <div className="p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
@@ -118,101 +124,136 @@ export default function AdminDashboard() {
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">
+                    <dt className="text-sm font-medium text-gray-400 truncate">
                       패치노트
                     </dt>
-                    <dd className="text-lg font-medium text-gray-900">
+                    <dd className="text-lg font-medium text-white">
                       총 {stats?.patchNotes.total || 0}개
                     </dd>
-                    <dd className="text-sm text-gray-500">
+                    <dd className="text-sm text-gray-400">
                       최신: {stats?.patchNotes.latest || '없음'}
                     </dd>
                   </dl>
                 </div>
               </div>
             </div>
-            <div className="bg-gray-50 px-5 py-3">
+            <div className="bg-dark-bg px-5 py-3">
               <div className="text-sm">
-                <Link href="/admin/patch-notes" className="font-medium text-green-700 hover:text-green-900">
+                <Link href="/admin/patch-notes" className="font-medium text-green-400 hover:text-green-300">
                   관리하기 →
                 </Link>
               </div>
             </div>
           </div>
 
-          {/* 지원 티켓 통계 */}
-          <div className="bg-white overflow-hidden shadow rounded-lg">
+          {/* 후기 통계 */}
+          <div className="bg-dark-card border border-dark-border overflow-hidden shadow rounded-lg">
             <div className="p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-yellow-500 rounded-md flex items-center justify-center">
+                  <div className="w-8 h-8 bg-purple-500 rounded-md flex items-center justify-center">
                     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192L5.636 18.364M12 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                     </svg>
                   </div>
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">
-                      지원 티켓
+                    <dt className="text-sm font-medium text-gray-400 truncate">
+                      후기
                     </dt>
-                    <dd className="text-lg font-medium text-gray-900">
-                      총 {stats?.supportTickets?.total || 0}개
+                    <dd className="text-lg font-medium text-white">
+                      총 {stats?.testimonials?.total || 0}개
                     </dd>
-                    <dd className="text-sm text-gray-500">
-                      대기: {stats?.supportTickets?.pending || 0}개 | 답변완료: {stats?.supportTickets?.answered || 0}개
+                    <dd className="text-sm text-gray-400">
+                      오늘: {stats?.testimonials?.today || 0}개
                     </dd>
                   </dl>
                 </div>
               </div>
             </div>
-            <div className="bg-gray-50 px-5 py-3">
+            <div className="bg-dark-bg px-5 py-3">
               <div className="text-sm">
-                <span className="font-medium text-yellow-700">
-                  곧 지원 예정
-                </span>
+                <Link href="/admin/testimonials" className="font-medium text-purple-400 hover:text-purple-300">
+                  관리하기 →
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          {/* 게시판 통계 */}
+          <div className="bg-dark-card border border-dark-border overflow-hidden shadow rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-orange-500 rounded-md flex items-center justify-center">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-400 truncate">
+                      게시판
+                    </dt>
+                    <dd className="text-lg font-medium text-white">
+                      총 {stats?.posts?.total || 0}개
+                    </dd>
+                    <dd className="text-sm text-gray-400">
+                      오늘: {stats?.posts?.today || 0}개 | 댓글: {stats?.comments?.today || 0}개
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+            <div className="bg-dark-bg px-5 py-3">
+              <div className="text-sm">
+                <Link href="/admin/posts" className="font-medium text-orange-400 hover:text-orange-300">
+                  관리하기 →
+                </Link>
               </div>
             </div>
           </div>
         </div>
 
         {/* 빠른 작업 */}
-        <div className="bg-white shadow rounded-lg">
+        <div className="bg-dark-card border border-dark-border shadow rounded-lg">
           <div className="px-4 py-5 sm:p-6">
-            <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+            <h3 className="text-lg leading-6 font-medium text-white mb-4">
               빠른 작업
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <Link 
                 href="/admin/announcements?action=create"
-                className="bg-blue-50 hover:bg-blue-100 p-4 rounded-lg border border-blue-200 transition-colors"
+                className="bg-blue-500/10 hover:bg-blue-500/20 p-4 rounded-lg border border-blue-500/30 transition-colors"
               >
-                <div className="text-blue-600 font-medium">새 공지사항</div>
-                <div className="text-blue-500 text-sm mt-1">공지사항 작성하기</div>
+                <div className="text-blue-400 font-medium">새 공지사항</div>
+                <div className="text-blue-300 text-sm mt-1">공지사항 작성하기</div>
               </Link>
               
               <Link 
                 href="/admin/patch-notes?action=create"
-                className="bg-green-50 hover:bg-green-100 p-4 rounded-lg border border-green-200 transition-colors"
+                className="bg-green-500/10 hover:bg-green-500/20 p-4 rounded-lg border border-green-500/30 transition-colors"
               >
-                <div className="text-green-600 font-medium">새 패치노트</div>
-                <div className="text-green-500 text-sm mt-1">패치노트 작성하기</div>
+                <div className="text-green-400 font-medium">새 패치노트</div>
+                <div className="text-green-300 text-sm mt-1">패치노트 작성하기</div>
               </Link>
               
               <Link 
-                href="/admin/announcements"
-                className="bg-gray-50 hover:bg-gray-100 p-4 rounded-lg border border-gray-200 transition-colors"
+                href="/admin/testimonials"
+                className="bg-purple-500/10 hover:bg-purple-500/20 p-4 rounded-lg border border-purple-500/30 transition-colors"
               >
-                <div className="text-gray-600 font-medium">공지사항 관리</div>
-                <div className="text-gray-500 text-sm mt-1">수정/삭제</div>
+                <div className="text-purple-400 font-medium">후기 관리</div>
+                <div className="text-purple-300 text-sm mt-1">승인/거절/삭제</div>
               </Link>
               
               <Link 
-                href="/admin/patch-notes"
-                className="bg-gray-50 hover:bg-gray-100 p-4 rounded-lg border border-gray-200 transition-colors"
+                href="/admin/posts"
+                className="bg-orange-500/10 hover:bg-orange-500/20 p-4 rounded-lg border border-orange-500/30 transition-colors"
               >
-                <div className="text-gray-600 font-medium">패치노트 관리</div>
-                <div className="text-gray-500 text-sm mt-1">수정/삭제</div>
+                <div className="text-orange-400 font-medium">게시글 관리</div>
+                <div className="text-orange-300 text-sm mt-1">숨김/삭제 관리</div>
               </Link>
             </div>
           </div>

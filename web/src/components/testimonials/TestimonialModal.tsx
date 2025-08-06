@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Star, Send, Loader2 } from 'lucide-react';
+import { useSession } from 'next-auth/react';
+import { X, Star, Send, Loader2, LogIn } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import { api } from '@/utils/api';
-import { TestimonialForm } from '@/types';
 
 interface TestimonialModalProps {
   isOpen: boolean;
@@ -13,8 +13,8 @@ interface TestimonialModalProps {
 }
 
 export default function TestimonialModal({ isOpen, onClose, onSuccess }: TestimonialModalProps) {
-  const [formData, setFormData] = useState<TestimonialForm>({
-    name: '',
+  const { data: session, status } = useSession();
+  const [formData, setFormData] = useState({
     rating: 5,
     comment: '',
   });
@@ -45,7 +45,6 @@ export default function TestimonialModal({ isOpen, onClose, onSuccess }: Testimo
 
   const handleClose = () => {
     setFormData({
-      name: '',
       rating: 5,
       comment: '',
     });
@@ -84,23 +83,45 @@ export default function TestimonialModal({ isOpen, onClose, onSuccess }: Testimo
           </div>
 
           {/* Content */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
-            {/* 이름 입력 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                이름 <span className="text-red-400">*</span>
-              </label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="익명 가능"
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                required
-                maxLength={50}
-                disabled={loading}
-              />
+          {!session?.user ? (
+            <div className="p-6 text-center space-y-4">
+              <div className="text-gray-300">
+                <LogIn className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                <p className="text-lg font-medium mb-2">로그인이 필요합니다</p>
+                <p className="text-gray-400 text-sm">
+                  후기를 작성하려면 먼저 로그인해주세요.
+                </p>
+              </div>
+              <div className="flex space-x-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleClose}
+                  className="flex-1"
+                >
+                  취소
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => window.location.href = '/auth/signin'}
+                  className="flex-1"
+                >
+                  로그인하기
+                </Button>
+              </div>
             </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              {/* 사용자 정보 표시 */}
+              <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600">
+                <div className="flex items-center space-x-3">
+                  <div className="text-white font-medium">{session.user.name || session.user.email}</div>
+                  <div className="text-gray-400 text-sm">님의 후기</div>
+                </div>
+                {session.user.email && (
+                  <div className="text-gray-500 text-xs mt-1">{session.user.email}</div>
+                )}
+              </div>
 
             {/* 별점 선택 */}
             <div>
@@ -159,36 +180,37 @@ export default function TestimonialModal({ isOpen, onClose, onSuccess }: Testimo
               </div>
             )}
 
-            {/* 액션 버튼 */}
-            <div className="flex space-x-3 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleClose}
-                disabled={loading}
-                className="flex-1"
-              >
-                취소
-              </Button>
-              <Button
-                type="submit"
-                disabled={loading || !formData.name.trim()}
-                className="flex-1 flex items-center justify-center space-x-2"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>등록 중...</span>
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-4 h-4" />
-                    <span>후기 등록</span>
-                  </>
-                )}
-              </Button>
-            </div>
-          </form>
+              {/* 액션 버튼 */}
+              <div className="flex space-x-3 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleClose}
+                  disabled={loading}
+                  className="flex-1"
+                >
+                  취소
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 flex items-center justify-center space-x-2"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>등록 중...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      <span>후기 등록</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
+          )}
         </div>
       </div>
     </>

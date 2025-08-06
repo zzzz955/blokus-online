@@ -1,6 +1,5 @@
 #include "NetworkClient.h"
 #include "ClientConfigManager.h"
-#include "ClientVersion.h"
 #include <QDebug>
 #include <QHostAddress>
 #include <QRegExp>
@@ -834,11 +833,11 @@ namespace Blokus {
     void NetworkClient::performVersionCheck()
     {
         qDebug() << QString::fromUtf8("🔍 서버 버전 호환성 검사 시작 - 클라이언트 버전: %1")
-                    .arg(QString::fromStdString(Blokus::Client::ClientVersion::getVersion()));
+                    .arg(QString::fromStdString(ClientConfigManager::VERSION));
         
         // 버전 확인 요청 (텍스트 기반)
         QString versionMessage = QString("version:check:%1")
-                                .arg(QString::fromStdString(Blokus::Client::ClientVersion::getVersion()));
+                                .arg(QString::fromStdString(ClientConfigManager::VERSION));
         sendMessage(versionMessage);
     }
     
@@ -884,7 +883,7 @@ namespace Blokus {
             msgBox.setWindowTitle(QString::fromUtf8("클라이언트 업데이트 필요"));
             msgBox.setText(QString::fromUtf8("서버와 호환되지 않는 클라이언트 버전입니다."));
             msgBox.setInformativeText(QString::fromUtf8("클라이언트: %1\n다운로드 URL: %2\n\n최신 버전을 다운로드하시겠습니까?")
-                                     .arg(QString::fromStdString(Blokus::Client::ClientVersion::getVersion()))
+                                     .arg(QString::fromStdString(ClientConfigManager::VERSION))
                                      .arg(downloadUrl));
             msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
             msgBox.setDefaultButton(QMessageBox::Yes);
