@@ -58,35 +58,24 @@ RUN echo "=== Installing vcpkg for minimal packages ===" && \
     echo "=== vcpkg bootstrap completed ==="
 
 # ==================================================
-# vcpkg 매니페스트 (CONFIG REQUIRED 패키지들)
+# vcpkg 패키지 수동 설치 (안정적인 개별 설치)
 # ==================================================
 RUN cd ${VCPKG_ROOT} && \
-    echo '{ 
-      "name": "blokus-game-server",
-      "version": "1.0.0", 
-      "dependencies": [
-        "spdlog",
-        "libpqxx",
-        "argon2",
-        "nlohmann-json"
-      ]
-    }' > vcpkg.json && \
-    echo "=== vcpkg manifest created ==="
-
-# ==================================================
-# vcpkg 의존성 설치 (안정적이고 단순한 방식)
-# ==================================================
-RUN cd ${VCPKG_ROOT} && \
-    echo "=== Installing vcpkg packages ===" && \
-    # 병렬 빌드 설정 (과도하지 않게)
+    echo "=== Installing vcpkg packages individually ===" && \
+    # 병렬 빌드 설정 (안정성 우선)
     export VCPKG_MAX_CONCURRENCY=4 && \
-    # 단순한 설치 (시간 제한 없음, 최적화 플래그 최소화)
-    ./vcpkg install --triplet=x64-linux --clean-after-build && \
+    # 개별 패키지 설치 (실패 지점 명확화)
+    echo "Installing spdlog..." && \
+    ./vcpkg install spdlog:x64-linux && \
+    echo "Installing nlohmann-json..." && \
+    ./vcpkg install nlohmann-json:x64-linux && \
+    echo "Installing argon2..." && \
+    ./vcpkg install argon2:x64-linux && \
+    echo "Installing libpqxx..." && \
+    ./vcpkg install libpqxx:x64-linux && \
     # 설치 확인
     ./vcpkg list && \
-    # 불필요한 빌드 파일 정리
-    rm -rf /tmp/vcpkg-* || echo "Cleanup completed" && \
-    echo "=== vcpkg packages installed successfully ==="
+    echo "=== All vcpkg packages installed successfully ==="
 
 # ==================================================
 # Stage 2: Application Builder  
