@@ -1,181 +1,149 @@
 # ==================================================
-# Multi-Stage Dockerfile - Blokus Online Server
-# vcpkg 기반 안정적인 빌드 (CONFIG REQUIRED 완전 해결)
+# Stable Multi-Stage Dockerfile - Blokus Online Game Server
+# 안정성과 신뢰성 중심의 게임 서버 빌드
 # ==================================================
 
 # ==================================================
-# Stage 1: vcpkg Builder (캐시 최적화)
-# Microsoft vcpkg를 사용한 안정적인 의존성 관리
+# Stage 1: Base System with Dependencies
+# 시스템 패키지 + 최소한의 vcpkg 조합
 # ==================================================
-FROM ubuntu:22.04 AS vcpkg-builder
+FROM ubuntu:22.04 AS dependencies
 
 # 환경 변수 설정
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Seoul
 ENV VCPKG_ROOT=/opt/vcpkg
 ENV VCPKG_DEFAULT_TRIPLET=x64-linux
-ENV VCPKG_FEATURE_FLAGS=manifests,versions,binarycaching
 
 # 빌드 실패 시 즉시 중단
 SHELL ["/bin/bash", "-euxo", "pipefail", "-c"]
 
 # ==================================================
-# 시스템 패키지 설치 (캐시 가능한 레이어)
+# 시스템 패키지 설치 (검증된 안정 패키지들)
 # ==================================================
-RUN echo "=== Installing build dependencies ===" && \
+RUN echo "=== Installing system dependencies ===" && \
     apt-get update && apt-get install -y \
-    # 빌드 도구
+    # 기본 빌드 도구
     build-essential \
+    cmake \
     ninja-build \
     pkg-config \
-    # 버전 관리 및 다운로드
     git \
-    wget \
     curl \
+    wget \
     ca-certificates \
-    # 압축 도구
+    # C++ 라이브러리들 (vcpkg와 충돌하지 않는 것들만)
+    libssl-dev \
+    libpq-dev \
+    libboost-all-dev \
+    # PostgreSQL 빌드를 위한 시스템 의존성
+    postgresql-server-dev-all \
+    # 압축 및 유틸리티
     tar \
     gzip \
     unzip \
     zip \
-    # vcpkg 의존성
-    autoconf \
-    automake \
-    libtool \
-    bison \
-    flex \
-    # PostgreSQL 빌드 의존성 (libpq 빌드용)
-    libpq-dev \
-    postgresql-server-dev-all \
-    # 추가 유틸리티 (컴파일 캐시)
-    ccache \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* && \
+    echo "=== System packages installed ==="
 
 # ==================================================
-# vcpkg 설치 및 부트스트랩 (캐시 가능한 레이어)
+# vcpkg 설치 (최소한의 패키지만)
 # ==================================================
-RUN echo "=== Installing vcpkg ===" && \
+RUN echo "=== Installing vcpkg for minimal packages ===" && \
     git clone https://github.com/Microsoft/vcpkg.git ${VCPKG_ROOT} && \
     cd ${VCPKG_ROOT} && \
-    # 안정적인 릴리즈 태그로 체크아웃 (2024.08.23)
+    # 안정적인 릴리즈 태그
     git checkout 2024.08.23 && \
-    # vcpkg 부트스트랩
     ./bootstrap-vcpkg.sh && \
-    # vcpkg 실행 가능성 확인
-    ./vcpkg version && \
-    echo "=== vcpkg installation completed ==="
+    echo "=== vcpkg bootstrap completed ==="
 
 # ==================================================
-# 서버 전용 의존성 매니페스트 파일 복사 (Qt 제외로 libsystemd 에러 해결)
-# 의존성이 변경되지 않으면 이후 레이어들이 모두 캐시됨
-# ==================================================
-
-# 필수 파일: vcpkg-server.json을 vcpkg.json으로 복사
-COPY vcpkg-server.json ${VCPKG_ROOT}/vcpkg.json
-
-# vcpkg-configuration.json 파일은 선택적이므로 생략 (대부분의 경우 불필요)
-# COPY vcpkg-configuration.json ${VCPKG_ROOT}/ (commented out - file may not exist)
-
-# ==================================================
-# vcpkg 의존성 설치 (병렬 빌드 + 캐시 최적화)
+# vcpkg 매니페스트 (CONFIG REQUIRED 패키지들)
 # ==================================================
 RUN cd ${VCPKG_ROOT} && \
-    # 병렬 빌드 최적화를 위한 환경변수 설정
-    export VCPKG_MAX_CONCURRENCY=$(nproc) && \
-    export VCPKG_KEEP_ENV_VARS=VCPKG_MAX_CONCURRENCY && \
-    # ccache 설정 (컴파일 캐시)
-    export PATH="/usr/lib/ccache:$PATH" && \
-    export CCACHE_DIR=/tmp/ccache && \
-    # 빌드 최적화 플래그 추가
-    export VCPKG_FEATURE_FLAGS=manifests,versions,binarycaching,compilertracking && \
-    export VCPKG_BINARY_SOURCES="clear;x-gha,readwrite" && \
-    # 의존성 설치 (빌드 시간 최적화) - 서버 전용 패키지만
-    timeout 600 ./vcpkg install --triplet=${VCPKG_DEFAULT_TRIPLET} \
-        --x-buildtrees-root=/tmp/vcpkg-buildtrees \
-        --x-install-root=/opt/vcpkg/installed \
-        --x-packages-root=/tmp/vcpkg-packages \
-        --clean-after-build && \
-    # 임시 빌드 파일 정리로 이미지 크기 최적화
-    rm -rf /tmp/vcpkg-buildtrees /tmp/vcpkg-packages /tmp/ccache && \
-    # vcpkg 설치 검증
-    ./vcpkg list && \
-    echo "=== Server-only vcpkg dependencies installation completed ==="
-
-# vcpkg 의존성 설치 완료 (소스코드와 독립적으로 캐시됨)
+    echo '{ 
+      "name": "blokus-game-server",
+      "version": "1.0.0", 
+      "dependencies": [
+        "spdlog",
+        "libpqxx",
+        "argon2",
+        "nlohmann-json"
+      ]
+    }' > vcpkg.json && \
+    echo "=== vcpkg manifest created ==="
 
 # ==================================================
-# Stage 2: Application Builder (캐시 최적화)
+# vcpkg 의존성 설치 (안정적이고 단순한 방식)
+# ==================================================
+RUN cd ${VCPKG_ROOT} && \
+    echo "=== Installing vcpkg packages ===" && \
+    # 병렬 빌드 설정 (과도하지 않게)
+    export VCPKG_MAX_CONCURRENCY=4 && \
+    # 단순한 설치 (시간 제한 없음, 최적화 플래그 최소화)
+    ./vcpkg install --triplet=x64-linux --clean-after-build && \
+    # 설치 확인
+    ./vcpkg list && \
+    # 불필요한 빌드 파일 정리
+    rm -rf /tmp/vcpkg-* || echo "Cleanup completed" && \
+    echo "=== vcpkg packages installed successfully ==="
+
+# ==================================================
+# Stage 2: Application Builder  
 # 프로젝트 빌드 단계
 # ==================================================
-FROM vcpkg-builder AS app-builder
+FROM dependencies AS app-builder
 
-# 작업 디렉토리 설정
 WORKDIR /app
 
-# CMake 프로젝트 파일 먼저 복사 (캐시 최적화)
+# CMake 파일 먼저 복사
 COPY CMakeLists.txt ./
 
-# 소스코드를 마지막에 복사 (가장 자주 변경되는 부분)
+# 소스코드 복사
 COPY common/ ./common/
 COPY server/ ./server/
 
-# vcpkg 설치 확인 (디버깅용)
-RUN echo "=== Checking vcpkg installations ===" && \
-    ls -la ${VCPKG_ROOT}/installed/x64-linux/share/ | grep -E "(libpq|openssl|spdlog)" && \
-    echo "=== Available packages ===" && \
-    ${VCPKG_ROOT}/vcpkg list
-
 # ==================================================
-# 프로젝트 빌드 (vcpkg toolchain + ccache 사용)
+# 프로젝트 빌드 (하이브리드 접근법)
 # ==================================================
-# ccache 설정으로 컴파일 시간 단축
-RUN export PATH="/usr/lib/ccache:$PATH" && \
-    export CCACHE_DIR=/tmp/ccache && \
-    export CMAKE_C_COMPILER_LAUNCHER=ccache && \
-    export CMAKE_CXX_COMPILER_LAUNCHER=ccache && \
-    # CMake 경로 설정
-    CMAKE_PATH=$(find ${VCPKG_ROOT}/downloads/tools -name cmake -type f | head -1) && \
-    export PATH="$(dirname $CMAKE_PATH):$PATH" && \
-    # CMake 구성 (Release 빌드)
+RUN echo "=== Building Blokus Game Server ===" && \
+    # CMake 구성 (vcpkg toolchain 사용)
     cmake -S . -B build \
         -GNinja \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_CXX_STANDARD=20 \
         -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
-        -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET} \
-        -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-        -DCMAKE_CXX_COMPILER_LAUNCHER=ccache && \
-    # 병렬 빌드 (CPU 코어 수 활용)
-    ninja -C build -j$(nproc) -v && \
-    # 빌드 결과 설치 디렉토리에 복사
+        -DVCPKG_TARGET_TRIPLET=x64-linux && \
+    # 빌드 실행 (병렬 빌드 제한)
+    ninja -C build -j4 && \
+    # 빌드 결과 복사
     mkdir -p /app/install/bin && \
     cp build/server/BlokusServer /app/install/bin/ && \
-    # 빌드 캐시 정리
-    rm -rf /tmp/ccache && \
-    echo "=== Application build completed ==="
+    echo "=== Build completed successfully ==="
 
 # ==================================================
 # Stage 3: Runtime Environment (Game Server Target)
-# 최종 런타임 이미지 (크기 최적화)
+# 최종 런타임 이미지
 # ==================================================
 FROM ubuntu:22.04 AS game-server
 
-# 환경 변수 설정
+# 환경 변수
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Seoul
 
 # 런타임 의존성 설치 (최소한)
 RUN apt-get update && apt-get install -y \
-    # 핵심 시스템 라이브러리
+    # 핵심 런타임 라이브러리
     libssl3 \
     libpq5 \
-    zlib1g \
+    libboost-system1.74.0 \
+    libboost-thread1.74.0 \
+    # 시스템 라이브러리
     libc6 \
     libgcc-s1 \
     libstdc++6 \
-    # 네트워크 도구 (헬스체크용)
+    # 네트워크 도구
     netcat-openbsd \
-    # 디버깅 도구 (선택적)
     curl \
     # 시간대 설정
     tzdata \
@@ -184,25 +152,24 @@ RUN apt-get update && apt-get install -y \
 # 시간대 설정
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# 애플리케이션 사용자 생성 (보안)
+# 애플리케이션 사용자 생성
 RUN groupadd -r blokus && useradd -r -g blokus -d /app -s /bin/bash blokus
 
-# 작업 디렉토리 설정
 WORKDIR /app
 
-# Stage 2에서 빌드된 실행파일 복사
+# 빌드된 실행파일 복사
 COPY --from=app-builder /app/install/bin/BlokusServer ./
 
-# vcpkg에서 빌드된 라이브러리들 복사 (필요한 것만)
+# vcpkg 라이브러리 복사 (필요한 것들)
 RUN mkdir -p /usr/local/lib
-COPY --from=app-builder /opt/vcpkg/installed/x64-linux/lib/ /usr/local/lib/
+COPY --from=app-builder /opt/vcpkg/installed/x64-linux/lib/libspdlog.so* /usr/local/lib/ || echo "spdlog static linked"
+COPY --from=app-builder /opt/vcpkg/installed/x64-linux/lib/libargon2.so* /usr/local/lib/ || echo "argon2 static linked"
+COPY --from=app-builder /opt/vcpkg/installed/x64-linux/lib/libpqxx*.so* /usr/local/lib/ || echo "libpqxx static linked"
 
 # 라이브러리 경로 업데이트
 RUN ldconfig /usr/local/lib
 
-# 런타임 준비 완료
-
-# 로그 및 설정 디렉토리 생성
+# 디렉토리 생성 및 권한 설정
 RUN mkdir -p /app/logs /app/config && \
     chown -R blokus:blokus /app
 
@@ -212,9 +179,9 @@ EXPOSE 9999
 # 사용자 변경
 USER blokus
 
-# 헬스체크 임시 비활성화 (디버깅용)
-# HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 \
-#     CMD netcat -z localhost 9999 || exit 1
+# 헬스체크
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD netcat -z localhost 9999 || exit 1
 
 # 실행 명령
 CMD ["./BlokusServer"]
@@ -223,8 +190,7 @@ CMD ["./BlokusServer"]
 # 빌드 정보 메타데이터
 # ==================================================
 LABEL maintainer="Blokus Online Team"
-LABEL version="1.0.0"
-LABEL description="Blokus Online Game Server - vcpkg stable build"
-LABEL build-strategy="Microsoft vcpkg"
-LABEL vcpkg-triplet="x64-linux"
-LABEL ubuntu-base="22.04"
+LABEL version="2.0.0"
+LABEL description="Blokus Online Game Server - Stable Hybrid Build"
+LABEL build-strategy="System packages + minimal vcpkg"
+LABEL base-image="ubuntu:22.04"
