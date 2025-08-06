@@ -32,8 +32,9 @@ RUN echo "=== Installing system dependencies ===" && \
     curl \
     wget \
     ca-certificates \
-    # 기본적인 시스템 의존성들만 (vcpkg가 나머지 처리)
-    # PostgreSQL 시스템 헤더 (libpq 빌드용)
+    # PostgreSQL 관련 패키지 (시스템 패키지로)
+    libpq-dev \
+    libpqxx-dev \
     postgresql-server-dev-all \
     # 압축 및 유틸리티
     tar \
@@ -58,7 +59,7 @@ RUN echo "=== Installing vcpkg for minimal packages ===" && \
 # vcpkg 패키지 수동 설치 (안정적인 개별 설치)
 # ==================================================
 RUN cd ${VCPKG_ROOT} && \
-    echo "=== Installing all required vcpkg packages ===" && \
+    echo "=== Installing vcpkg packages (no PostgreSQL) ===" && \
     export VCPKG_MAX_CONCURRENCY=4 && \
     echo "Installing spdlog..." && \
     ./vcpkg install spdlog:x64-linux && \
@@ -70,10 +71,8 @@ RUN cd ${VCPKG_ROOT} && \
     ./vcpkg install openssl:x64-linux && \
     echo "Installing boost-system..." && \
     ./vcpkg install boost-system:x64-linux && \
-    echo "Installing libpqxx..." && \
-    ./vcpkg install libpqxx:x64-linux && \
     ./vcpkg list && \
-    echo "=== All vcpkg packages installed successfully ==="
+    echo "=== vcpkg packages installed (libpqxx will use system package) ==="
 
 # ==================================================
 # Stage 2: Application Builder  
@@ -94,13 +93,15 @@ COPY server/ ./server/
 # 프로젝트 빌드 (하이브리드 접근법)
 # ==================================================
 RUN echo "=== Building Blokus Game Server ===" && \
-    # CMake 구성 (vcpkg 중심)
+    # CMake 구성 (하이브리드: vcpkg + 시스템)
+    export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig && \
     cmake -S . -B build \
         -GNinja \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_CXX_STANDARD=20 \
         -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
-        -DVCPKG_TARGET_TRIPLET=x64-linux && \
+        -DVCPKG_TARGET_TRIPLET=x64-linux \
+        -DCMAKE_FIND_PACKAGE_PREFER_CONFIG=OFF && \
     # 빌드 실행 (병렬 빌드 제한)
     ninja -C build -j4 && \
     # 빌드 결과 확인 및 복사
@@ -120,19 +121,21 @@ FROM ubuntu:22.04 AS game-server
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Seoul
 
-# 런타임 의존성 설치 (최소한의 시스템 라이브러리)
+# 런타임 의존성 설치 (시스템 + vcpkg 혼합)
 RUN apt-get update && apt-get install -y \
     # 기본 시스템 라이브러리
     libc6 \
     libgcc-s1 \
     libstdc++6 \
+    # PostgreSQL 런타임 라이브러리
+    libpq5 \
     # 네트워크 도구
     netcat-openbsd \
     curl \
     # 시간대 설정
     tzdata \
     && rm -rf /var/lib/apt/lists/* && \
-    echo "All dependencies from vcpkg (statically linked)"
+    echo "PostgreSQL from system, others from vcpkg"
 
 # 시간대 설정
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
