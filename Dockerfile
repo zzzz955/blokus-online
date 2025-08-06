@@ -31,9 +31,7 @@ RUN echo "=== Installing system dependencies ===" && \
     curl \
     wget \
     ca-certificates \
-    # PostgreSQL 관련 패키지 (시스템 패키지로)
-    libpq-dev \
-    libpqxx-dev \
+    # PostgreSQL 시스템 의존성 (vcpkg libpq 빌드용)
     postgresql-server-dev-all \
     # 압축 및 유틸리티
     tar \
@@ -69,20 +67,11 @@ RUN echo "=== Installing vcpkg for minimal packages ===" && \
 # vcpkg 패키지 수동 설치 (안정적인 개별 설치)
 # ==================================================
 RUN cd ${VCPKG_ROOT} && \
-    echo "=== Installing vcpkg packages (no PostgreSQL) ===" && \
+    echo "=== Installing all required packages via vcpkg ===" && \
     export VCPKG_MAX_CONCURRENCY=4 && \
-    echo "Installing spdlog..." && \
-    ./vcpkg install spdlog:x64-linux && \
-    echo "Installing nlohmann-json..." && \
-    ./vcpkg install nlohmann-json:x64-linux && \
-    echo "Installing argon2..." && \
-    ./vcpkg install argon2:x64-linux && \
-    echo "Installing openssl..." && \
-    ./vcpkg install openssl:x64-linux && \
-    echo "Installing boost-system..." && \
-    ./vcpkg install boost-system:x64-linux && \
+    ./vcpkg install spdlog boost-asio boost-system nlohmann-json libpqxx openssl argon2 --triplet=x64-linux && \
     ./vcpkg list && \
-    echo "=== vcpkg packages installed (libpqxx will use system package) ==="
+    echo "=== All vcpkg packages installed successfully ==="
 
 # ==================================================
 # Stage 2: Application Builder  
@@ -103,15 +92,13 @@ COPY server/ ./server/
 # 프로젝트 빌드 (하이브리드 접근법)
 # ==================================================
 RUN echo "=== Building Blokus Game Server ===" && \
-    # CMake 구성 (하이브리드: vcpkg + 시스템)
-    export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig && \
+    # CMake 구성 (Pure vcpkg)
     cmake -S . -B build \
         -GNinja \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_CXX_STANDARD=20 \
         -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
-        -DVCPKG_TARGET_TRIPLET=x64-linux \
-        -DCMAKE_FIND_PACKAGE_PREFER_CONFIG=OFF && \
+        -DVCPKG_TARGET_TRIPLET=x64-linux && \
     # 빌드 실행 (병렬 빌드 제한)
     ninja -C build -j4 && \
     # 빌드 결과 확인 및 복사
