@@ -477,7 +477,7 @@ jobs:
           
           # 서비스 시작 (빠른 시작, 타임아웃 단축)
           echo 'Starting services...' &&
-          timeout 180 docker compose up -d --wait &&
+          timeout 180 docker compose up -d
         "
         
     - name: Deployment failure handling
