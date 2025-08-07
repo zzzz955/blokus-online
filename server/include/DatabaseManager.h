@@ -6,6 +6,7 @@
 #include <memory>
 #include <optional>
 #include <cstdint>
+#include "ServerTypes.h"  // UserSettings 구조체 사용
 
 namespace Blokus {
     namespace Server {
@@ -94,6 +95,19 @@ namespace Blokus {
             DatabaseStats getStats();
             std::vector<UserAccount> getRanking(const std::string& orderBy = "rating", int limit = 100, int offset = 0);
             std::vector<std::string> getOnlineUsers();
+
+            // ========================================
+            // 사용자 설정 관리
+            // ========================================
+
+            // 사용자 설정 조회 (없으면 기본값으로 생성)
+            std::optional<UserSettings> getUserSettings(uint32_t userId);
+            
+            // 사용자 설정 업데이트 (없으면 생성)
+            bool updateUserSettings(uint32_t userId, const UserSettings& settings);
+            
+            // 사용자 설정 삭제 (사용자 삭제 시 호출)
+            bool deleteUserSettings(uint32_t userId);
 
             // ========================================
             // 친구 시스템 (추후 확장)

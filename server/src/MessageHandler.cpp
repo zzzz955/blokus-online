@@ -66,6 +66,10 @@ namespace Blokus::Server
         handlers_[MessageType::UserStats] = [this](const auto &params)
         { handleGetUserStats(params); };
 
+        // 사용자 설정 관련
+        handlers_[MessageType::UserSettings] = [this](const auto &params)
+        { handleUserSettings(params); };
+
         // 버전 관련
         handlers_[MessageType::VersionCheck] = [this](const auto &params)
         { handleVersionCheck(params); };
@@ -1908,4 +1912,115 @@ namespace Blokus::Server
                         clientVersion, ConfigManager::serverVersion, versionManager_->getDownloadURL());
         }
     }
+
+    // ========================================
+    // 사용자 설정 관련 핸들러 구현
+    // ========================================
+
+    void MessageHandler::handleUserSettings(const std::vector<std::string>& params)
+    {
+        try {
+            if (params.size() < 6) {
+                sendError("사용자 설정 업데이트에 필요한 파라미터가 부족합니다");
+                return;
+            }
+
+            if (!session_->isAuthenticated()) {
+                sendError("인증되지 않은 사용자입니다");
+                return;
+            }
+
+            // 파라미터 파싱: theme:language:bgm_mute:bgm_volume:sfx_mute:sfx_volume
+            UserSettings settings;
+            settings.theme = params[0];
+            settings.language = params[1];
+            settings.bgmMute = (params[2] == "true");
+            settings.bgmVolume = std::stoi(params[3]);
+            settings.effectMute = (params[4] == "true");
+            settings.effectVolume = std::stoi(params[5]);
+
+            // 유효성 검증
+            if (!settings.isValid()) {
+                sendError("잘못된 설정값입니다");
+                return;
+            }
+
+            // 데이터베이스 업데이트
+            if (databaseManager_ && databaseManager_->updateUserSettings(session_->getUserId(), settings)) {
+                // 세션에 설정 캐싱
+                session_->setUserSettings(settings);
+                
+                // 성공 응답
+                std::string response = "UserSettingsResponse:success:" + settings.theme + ":" + 
+                                     settings.language + ":" + 
+                                     (settings.bgmMute ? "true" : "false") + ":" + 
+                                     std::to_string(settings.bgmVolume) + ":" +
+                                     (settings.effectMute ? "true" : "false") + ":" + 
+                                     std::to_string(settings.effectVolume);
+                
+                sendTextMessage(response);
+                spdlog::info("Updated settings for user {}", session_->getUsername());
+            } else {
+                sendError("설정 업데이트에 실패했습니다");
+            }
+
+        } catch (const std::exception& e) {
+            spdlog::error("Error in handleUserSettings: {}", e.what());
+            sendError("서버 오류가 발생했습니다");
+        }
+    }
+
+    void MessageHandler::handleGetUserSettings(const std::vector<std::string>& params)
+    {
+        try {
+            if (!session_->isAuthenticated()) {
+                sendError("인증되지 않은 사용자입니다");
+                return;
+            }
+
+            // 세션에서 캐싱된 설정 확인
+            auto cachedSettings = session_->getUserSettings();
+            if (cachedSettings.has_value()) {
+                const auto& settings = cachedSettings.value();
+                std::string response = "UserSettingsResponse:success:" + settings.theme + ":" + 
+                                     settings.language + ":" + 
+                                     (settings.bgmMute ? "true" : "false") + ":" + 
+                                     std::to_string(settings.bgmVolume) + ":" +
+                                     (settings.effectMute ? "true" : "false") + ":" + 
+                                     std::to_string(settings.effectVolume);
+                
+                sendTextMessage(response);
+                return;
+            }
+
+            // 데이터베이스에서 조회 (캐싱된 설정이 없는 경우)
+            if (databaseManager_) {
+                auto settings = databaseManager_->getUserSettings(session_->getUserId());
+                if (settings.has_value()) {
+                    // 세션에 캐싱
+                    session_->setUserSettings(settings.value());
+                    
+                    const auto& s = settings.value();
+                    std::string response = "UserSettingsResponse:success:" + s.theme + ":" + 
+                                         s.language + ":" + 
+                                         (s.bgmMute ? "true" : "false") + ":" + 
+                                         std::to_string(s.bgmVolume) + ":" +
+                                         (s.effectMute ? "true" : "false") + ":" + 
+                                         std::to_string(s.effectVolume);
+                    
+                    sendTextMessage(response);
+                    spdlog::debug("Retrieved settings for user {}", session_->getUsername());
+                } else {
+                    sendError("사용자 설정을 찾을 수 없습니다");
+                }
+            } else {
+                sendError("데이터베이스 연결 오류입니다");
+            }
+
+        } catch (const std::exception& e) {
+            spdlog::error("Error in handleGetUserSettings: {}", e.what());
+            sendError("서버 오류가 발생했습니다");
+        }
+    }
+    
 } // namespace Blokus::Server

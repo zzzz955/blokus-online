@@ -77,6 +77,10 @@ namespace Blokus::Server {
         void handleGetUserStats(const std::vector<std::string>& params);
         void handleAfkVerify();  // AFK 검증 처리
         void handleAfkUnblock(); // AFK 모드 해제 처리
+        
+        // 사용자 설정 관련 핸들러들
+        void handleUserSettings(const std::vector<std::string>& params);     // 설정 업데이트
+        void handleGetUserSettings(const std::vector<std::string>& params);  // 설정 조회
 
         // 버전 관련 핸들러들
         void handleVersionCheck(const std::vector<std::string>& params);

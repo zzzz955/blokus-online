@@ -723,6 +723,147 @@ namespace Blokus {
             return {}; // 임시 구현
         }
 
+        // ========================================
+        // 사용자 설정 관리 구현
+        // ========================================
+
+        std::optional<UserSettings> DatabaseManager::getUserSettings(uint32_t userId) {
+            auto conn = dbPool_->borrowConnection();
+            if (!conn) {
+                spdlog::error("Failed to get database connection for getUserSettings");
+                return std::nullopt;
+            }
+
+            try {
+                pqxx::work txn(*conn);
+                
+                // 사용자 설정 조회
+                auto result = txn.exec_params(
+                    "SELECT theme, language, game_invite_notifications, "
+                    "friend_online_notifications, system_notifications, "
+                    "bgm_mute, bgm_volume, effect_mute, effect_volume "
+                    "FROM user_settings WHERE user_id = $1",
+                    userId
+                );
+
+                if (result.empty()) {
+                    // 설정이 없으면 기본값으로 생성
+                    UserSettings defaults = UserSettings::getDefaults();
+                    txn.exec_params(
+                        "INSERT INTO user_settings (user_id, theme, language, "
+                        "game_invite_notifications, friend_online_notifications, "
+                        "system_notifications, bgm_mute, bgm_volume, effect_mute, effect_volume) "
+                        "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+                        userId, defaults.theme, defaults.language,
+                        defaults.gameInviteNotifications, defaults.friendOnlineNotifications,
+                        defaults.systemNotifications, defaults.bgmMute, defaults.bgmVolume,
+                        defaults.effectMute, defaults.effectVolume
+                    );
+                    txn.commit();
+                    
+                    spdlog::info("Created default settings for user {}", userId);
+                    return defaults;
+                }
+
+                // 기존 설정 반환
+                auto row = result[0];
+                UserSettings settings;
+                settings.theme = row["theme"].as<std::string>();
+                settings.language = row["language"].as<std::string>();
+                settings.gameInviteNotifications = row["game_invite_notifications"].as<bool>();
+                settings.friendOnlineNotifications = row["friend_online_notifications"].as<bool>();
+                settings.systemNotifications = row["system_notifications"].as<bool>();
+                settings.bgmMute = row["bgm_mute"].as<bool>();
+                settings.bgmVolume = row["bgm_volume"].as<int>();
+                settings.effectMute = row["effect_mute"].as<bool>();
+                settings.effectVolume = row["effect_volume"].as<int>();
+
+                txn.commit();
+                spdlog::debug("Retrieved settings for user {}", userId);
+                return settings;
+
+            } catch (const std::exception& e) {
+                spdlog::error("Failed to get user settings for user {}: {}", userId, e.what());
+                return std::nullopt;
+            } finally {
+                dbPool_->returnConnection(std::move(conn));
+            }
+        }
+
+        bool DatabaseManager::updateUserSettings(uint32_t userId, const UserSettings& settings) {
+            if (!settings.isValid()) {
+                spdlog::error("Invalid settings provided for user {}", userId);
+                return false;
+            }
+
+            auto conn = dbPool_->borrowConnection();
+            if (!conn) {
+                spdlog::error("Failed to get database connection for updateUserSettings");
+                return false;
+            }
+
+            try {
+                pqxx::work txn(*conn);
+                
+                // UPSERT (INSERT ... ON CONFLICT UPDATE)
+                txn.exec_params(
+                    "INSERT INTO user_settings (user_id, theme, language, "
+                    "game_invite_notifications, friend_online_notifications, "
+                    "system_notifications, bgm_mute, bgm_volume, effect_mute, effect_volume) "
+                    "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) "
+                    "ON CONFLICT (user_id) DO UPDATE SET "
+                    "theme = EXCLUDED.theme, language = EXCLUDED.language, "
+                    "game_invite_notifications = EXCLUDED.game_invite_notifications, "
+                    "friend_online_notifications = EXCLUDED.friend_online_notifications, "
+                    "system_notifications = EXCLUDED.system_notifications, "
+                    "bgm_mute = EXCLUDED.bgm_mute, bgm_volume = EXCLUDED.bgm_volume, "
+                    "effect_mute = EXCLUDED.effect_mute, effect_volume = EXCLUDED.effect_volume, "
+                    "updated_at = CURRENT_TIMESTAMP",
+                    userId, settings.theme, settings.language,
+                    settings.gameInviteNotifications, settings.friendOnlineNotifications,
+                    settings.systemNotifications, settings.bgmMute, settings.bgmVolume,
+                    settings.effectMute, settings.effectVolume
+                );
+
+                txn.commit();
+                spdlog::info("Updated settings for user {}", userId);
+                return true;
+
+            } catch (const std::exception& e) {
+                spdlog::error("Failed to update user settings for user {}: {}", userId, e.what());
+                return false;
+            } finally {
+                dbPool_->returnConnection(std::move(conn));
+            }
+        }
+
+        bool DatabaseManager::deleteUserSettings(uint32_t userId) {
+            auto conn = dbPool_->borrowConnection();
+            if (!conn) {
+                spdlog::error("Failed to get database connection for deleteUserSettings");
+                return false;
+            }
+
+            try {
+                pqxx::work txn(*conn);
+                
+                auto result = txn.exec_params(
+                    "DELETE FROM user_settings WHERE user_id = $1",
+                    userId
+                );
+
+                txn.commit();
+                spdlog::info("Deleted settings for user {} (affected rows: {})", userId, result.affected_rows());
+                return true;
+
+            } catch (const std::exception& e) {
+                spdlog::error("Failed to delete user settings for user {}: {}", userId, e.what());
+                return false;
+            } finally {
+                dbPool_->returnConnection(std::move(conn));
+            }
+        }
+
         bool DatabaseManager::sendFriendRequest(uint32_t requesterId, uint32_t addresseeId) {
             return true; // 임시 구현
         }

@@ -111,6 +111,8 @@ namespace Blokus {
 
             // 유저 관련 (600-699)
             UserStats = 600,
+            UserSettings = 601,           // 사용자 설정 업데이트 요청
+            UserSettingsResponse = 602,   // 사용자 설정 응답
 
             // 버전 관련 (700-799)
             VersionCheck = 700,
@@ -183,6 +185,47 @@ namespace Blokus {
 
             std::chrono::system_clock::time_point serverStartTime;
             std::chrono::system_clock::time_point lastStatsUpdate;
+        };
+
+        // 사용자 설정 구조체
+        struct UserSettings {
+            // UI 설정
+            std::string theme = "dark";          // "dark" 또는 "light"
+            std::string language = "korean";     // "korean" (향후 확장 가능)
+
+            // 알림 설정 (현재 비활성화, 향후 확장용)
+            bool gameInviteNotifications = true;
+            bool friendOnlineNotifications = true;
+            bool systemNotifications = true;
+
+            // 오디오 설정
+            bool bgmMute = false;               // BGM 음소거
+            int bgmVolume = 50;                 // BGM 음량 (0-100)
+            bool effectMute = false;            // 효과음 음소거
+            int effectVolume = 50;              // 효과음 음량 (0-100)
+
+            // 유효성 검증
+            bool isValid() const {
+                return (theme == "dark" || theme == "light") &&
+                       (language == "korean") &&
+                       (bgmVolume >= 0 && bgmVolume <= 100) &&
+                       (effectVolume >= 0 && effectVolume <= 100);
+            }
+
+            // 기본값으로 초기화
+            static UserSettings getDefaults() {
+                UserSettings defaults;
+                defaults.theme = "dark";
+                defaults.language = "korean";
+                defaults.gameInviteNotifications = true;
+                defaults.friendOnlineNotifications = true;
+                defaults.systemNotifications = true;
+                defaults.bgmMute = false;
+                defaults.bgmVolume = 50;
+                defaults.effectMute = false;
+                defaults.effectVolume = 50;
+                return defaults;
+            }
         };
 
         // Ŭ���̾�Ʈ ���� ����

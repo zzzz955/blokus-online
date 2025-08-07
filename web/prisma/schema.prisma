@@ -40,6 +40,7 @@ model User {
   
   // 관계
   user_stats     UserStats?
+  user_settings  UserSettings?
   testimonials   Testimonial[]
   support_tickets SupportTicket[]
   posts          Post[]
@@ -73,6 +74,34 @@ model UserStats {
   user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
   
   @@map("user_stats")
+}
+
+model UserSettings {
+  user_id                     Int @id @map("user_id")
+  
+  // UI 설정
+  theme                       String  @default("dark") @db.VarChar(20)
+  language                    String  @default("korean") @db.VarChar(20)
+  
+  // 알림 설정  
+  game_invite_notifications   Boolean @default(true) @map("game_invite_notifications")
+  friend_online_notifications Boolean @default(true) @map("friend_online_notifications")
+  system_notifications        Boolean @default(true) @map("system_notifications")
+  
+  // 오디오 설정
+  bgm_mute                    Boolean @default(false) @map("bgm_mute")
+  bgm_volume                  Int     @default(50) @map("bgm_volume")
+  effect_mute                 Boolean @default(false) @map("effect_mute") 
+  effect_volume               Int     @default(50) @map("effect_volume")
+  
+  // 시간 정보
+  created_at                  DateTime @default(now()) @map("created_at")
+  updated_at                  DateTime @updatedAt @map("updated_at")
+  
+  // 관계
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  
+  @@map("user_settings")
 }
 
 model UserFriend {
