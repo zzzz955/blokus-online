@@ -371,6 +371,8 @@ jobs:
         WEB_NEXTAUTH_SECRET=${{ secrets.WEB_NEXTAUTH_SECRET }}
         WEB_ADMIN_USERNAME=${{ secrets.WEB_ADMIN_USERNAME }}
         WEB_ADMIN_PASSWORD=${{ secrets.WEB_ADMIN_PASSWORD }}
+        GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+        GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
         
         # SSL/Domain
         DOMAIN=${{ secrets.DOMAIN }}
