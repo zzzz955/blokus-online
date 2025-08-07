@@ -170,7 +170,7 @@ export default function AdminAnnouncementsPage() {
     <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
       <div className="border-4 border-dashed border-dark-border rounded-lg p-6 bg-dark-card">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">공지사항 관리</h1>
+          <h1 className="text-2xl font-bold text-white">공지사항 관리</h1>
           <button
             onClick={() => setShowForm(true)}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
@@ -194,14 +194,14 @@ export default function AdminAnnouncementsPage() {
 
         {/* 공지사항 폼 */}
         {showForm && (
-          <div className="mb-6 bg-white p-6 rounded-lg shadow">
+          <div className="mb-6 bg-dark-card border border-dark-border p-6 rounded-lg shadow">
             <h2 className="text-lg font-medium mb-4">
               {editingId ? '공지사항 수정' : '새 공지사항 작성'}
             </h2>
             
             <form onSubmit={handleSubmit}>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-white mb-2">
                   제목
                 </label>
                 <input
@@ -215,7 +215,7 @@ export default function AdminAnnouncementsPage() {
               </div>
 
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-white mb-2">
                   내용
                 </label>
                 <RichTextEditor
@@ -235,7 +235,7 @@ export default function AdminAnnouncementsPage() {
                     onChange={(e) => setForm(prev => ({ ...prev, is_pinned: e.target.checked }))}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                   />
-                  <span className="ml-2 text-sm text-gray-700">상단 고정</span>
+                  <span className="ml-2 text-sm text-white">상단 고정</span>
                 </label>
 
                 <label className="flex items-center">
@@ -245,7 +245,7 @@ export default function AdminAnnouncementsPage() {
                     onChange={(e) => setForm(prev => ({ ...prev, is_published: e.target.checked }))}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                   />
-                  <span className="ml-2 text-sm text-gray-700">게시</span>
+                  <span className="ml-2 text-sm text-white">게시</span>
                 </label>
               </div>
 
@@ -269,20 +269,20 @@ export default function AdminAnnouncementsPage() {
         )}
 
         {/* 공지사항 목록 */}
-        <div className="bg-white shadow rounded-lg">
+        <div className="bg-dark-card border border-dark-border shadow rounded-lg">
           <div className="px-4 py-5 sm:p-6">
             {announcements.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-gray-500">등록된 공지사항이 없습니다.</p>
+                <p className="text-gray-400">등록된 공지사항이 없습니다.</p>
               </div>
             ) : (
               <div className="space-y-4">
                 {announcements.map((announcement) => (
-                  <div key={announcement.id} className="border border-gray-200 rounded-lg p-4">
+                  <div key={announcement.id} className="border border-gray-600 rounded-lg p-4 bg-dark-bg">
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
                         <div className="flex items-center space-x-2 mb-2">
-                          <h3 className="text-lg font-medium text-gray-900">
+                          <h3 className="text-lg font-medium text-white">
                             {announcement.title}
                           </h3>
                           {announcement.is_pinned && (
@@ -299,7 +299,7 @@ export default function AdminAnnouncementsPage() {
                         {/* <p className="text-gray-600 text-sm mb-2 line-clamp-2">
                           {announcement.content.substring(0, 200)}...
                         </p> */}
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-gray-400">
                           작성자: {announcement.author} | 
                           작성일: {new Date(announcement.created_at).toLocaleString()}
                           {announcement.updated_at !== announcement.created_at && (

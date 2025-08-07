@@ -66,11 +66,6 @@ export default function SignInPage() {
                 </svg>
                 <span>{isLoading ? '로그인 중...' : 'Google로 시작하기'}</span>
               </Button>
-
-              {/* 추후 카카오, 네이버 버튼 추가 */}
-              <div className="text-center text-sm text-gray-500">
-                카카오, 네이버 로그인은 곧 추가됩니다
-              </div>
             </div>
           </Card>
 

@@ -20,14 +20,14 @@ export default function Footer() {
             </p>
             <div className="flex space-x-4">
               <a
-                href="https://github.com"
+                href="https://github.com/zzzz955/blokus-online"
                 className="text-gray-400 hover:text-white transition-colors"
                 aria-label="GitHub"
               >
                 <Github size={20} />
               </a>
               <a
-                href="mailto:contact@blokus-online.com"
+                href="mailto:zzzzz955@gmail.com"
                 className="text-gray-400 hover:text-white transition-colors"
                 aria-label="이메일"
               >
