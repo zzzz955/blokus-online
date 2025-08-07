@@ -2262,7 +2262,7 @@ namespace Blokus {
 
         // 내 턴일 때 효과음 재생
         if (isMyTurn) {
-            SoundManager::getInstance().playMyTurnSound();
+            BGMManager::getInstance().playMyTurnSound();
         }
 
         // 로그 출력
@@ -2395,7 +2395,7 @@ namespace Blokus {
         if (previousTurnTimedOut) {
             addSystemMessage(QString::fromUtf8("이전 플레이어의 시간이 초과되어 턴이 넘어왔습니다."));
             // 타임아웃 효과음 재생
-            SoundManager::getInstance().playTimeOutSound();
+            BGMManager::getInstance().playTimeOutSound();
         }
         
         // 턴 타이머 시작 (게임이 시작된 상태에서만)
@@ -2465,8 +2465,7 @@ namespace Blokus {
         m_isTimerActive = false;
         m_countdownTimer->stop();
 
-        // 사운드 매니저의 카운트다운도 중지
-        SoundManager::getInstance().stopCountdown();
+        // 카운트다운 중지 (BGM 기반으로는 개별 중지가 불필요 - 각 재생은 독립적)
 
         // 타이머 패널 내부 요소 숨김
         if (m_timerLabel && m_timerProgressBar) {
@@ -2533,7 +2532,7 @@ namespace Blokus {
         } else {
             // 카운트다운 사운드 관리 (5초 이하일 때)
             if (m_remainingTime <= 5 && m_remainingTime > 0) {
-                SoundManager::getInstance().startCountdown(m_remainingTime);
+                BGMManager::getInstance().playCountdownSound();
             }
             
             // 디스플레이 업데이트
@@ -2547,7 +2546,7 @@ namespace Blokus {
         stopTurnTimer();
 
         // 타임아웃 효과음 재생
-        SoundManager::getInstance().playTimeOutSound();
+        BGMManager::getInstance().playTimeOutSound();
 
         qDebug() << QString::fromUtf8("⏰ 턴 타임아웃 발생");
     }

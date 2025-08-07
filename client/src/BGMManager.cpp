@@ -6,15 +6,27 @@ BGMManager::BGMManager()
     : m_currentMusic(nullptr)
     , m_initialized(false)
     , m_currentState(GameState::NONE)
-    , m_volume(0.7f)  // 게임 적정 볼륨 70%
-    , m_muted(false)
+    , m_bgmVolume(0.7f)  // BGM 적정 볼륨 70%
+    , m_sfxVolume(0.8f)  // SFX 적정 볼륨 80%
+    , m_bgmMuted(false)
+    , m_sfxMuted(false)
 {
-    qDebug() << "🎮 BGMManager initializing with SDL_mixer...";
+    qDebug() << "🎮 BGMManager initializing with SDL_mixer (BGM + SFX)...";
+    
+    // SFX 배열 초기화
+    for (int i = 0; i < 3; ++i) {
+        m_soundEffects[i] = nullptr;
+    }
     
     // 상태별 BGM 파일 경로 설정
     m_musicPaths[GameState::LOBBY] = "resource/lobby/bgm_lobby.mp3";
     m_musicPaths[GameState::GAME_ROOM] = "resource/gameroom/bgm_gameroom.mp3";
     // GameState::IN_GAME는 향후 추가 예정
+    
+    // 효과음 파일 경로 설정
+    m_soundEffectPaths[SoundEffect::MY_TURN] = "resource/my_turn.wav";
+    m_soundEffectPaths[SoundEffect::TIME_OUT] = "resource/time_out.wav";
+    m_soundEffectPaths[SoundEffect::COUNTDOWN] = "resource/countdown.wav";
     
     // SDL_mixer 초기화
     m_initialized = initializeSDL();
@@ -62,11 +74,16 @@ bool BGMManager::initializeSDL()
     qDebug() << "   - Buffer size: 4096 bytes";
     
     // Check supported audio formats
-    int formats = Mix_Init(0);
+    int wanted_formats = MIX_INIT_OGG | MIX_INIT_MP3 | MIX_INIT_FLAC;
+    int formats = Mix_Init(wanted_formats);
     qDebug() << "🎵 Supported audio formats:";
+    qDebug() << "   - WAV: YES (always supported)";
     qDebug() << "   - OGG:" << (formats & MIX_INIT_OGG ? "YES" : "NO");
     qDebug() << "   - MP3:" << (formats & MIX_INIT_MP3 ? "YES" : "NO");
     qDebug() << "   - FLAC:" << (formats & MIX_INIT_FLAC ? "YES" : "NO");
+    
+    // 효과음 파일 로딩
+    loadSoundEffects();
     
     return true;
 }
@@ -76,11 +93,19 @@ void BGMManager::cleanupSDL()
     // 현재 재생 중인 음악 정지 및 해제
     stopCurrentBGM();
     
+    // 효과음 정리
+    for (int i = 0; i < 3; ++i) {
+        if (m_soundEffects[i]) {
+            Mix_FreeChunk(m_soundEffects[i]);
+            m_soundEffects[i] = nullptr;
+        }
+    }
+    
     // SDL_mixer 종료
     Mix_CloseAudio();
     SDL_Quit();
     
-    qDebug() << "🔊 SDL_mixer audio system cleaned up";
+    qDebug() << "🔊 SDL_mixer audio system cleaned up (BGM + SFX)";
 }
 
 void BGMManager::transitionToState(GameState newState)
@@ -105,7 +130,7 @@ void BGMManager::transitionToState(GameState newState)
     m_currentState = newState;
     
     // 3. 새 상태의 BGM 로드 및 재생
-    if (newState != GameState::NONE && !m_muted) {
+    if (newState != GameState::NONE && !m_bgmMuted) {
         loadAndPlayBGM(newState);
     }
 }
@@ -136,7 +161,7 @@ void BGMManager::loadAndPlayBGM(GameState state)
     }
     
     // 볼륨 설정 (0~128 범위로 변환)
-    int sdlVolume = static_cast<int>(m_volume * MIX_MAX_VOLUME);
+    int sdlVolume = static_cast<int>(m_bgmVolume * MIX_MAX_VOLUME);
     Mix_VolumeMusic(sdlVolume);
     
     // 무한 반복 재생 (-1 = 무한반복)
@@ -178,50 +203,137 @@ std::string BGMManager::getApplicationPath() const
     return qAppPath.toStdString();
 }
 
-void BGMManager::setVolume(float volume)
+// ========== BGM 볼륨 제어 ==========
+void BGMManager::setBGMVolume(float volume)
 {
-    // 볼륨 범위 제한 (0.0 ~ 1.0)
-    m_volume = qBound(0.0f, volume, 1.0f);
-    
-    if (m_initialized && Mix_PlayingMusic()) {
-        int sdlVolume = static_cast<int>(m_volume * MIX_MAX_VOLUME);
-        Mix_VolumeMusic(sdlVolume);
-    }
-    
-    qDebug() << "🔊 BGM volume set to:" << (m_volume * 100.0f) << "%";
+    m_bgmVolume = qBound(0.0f, volume, 1.0f);
+    applyBGMVolume();
+    qDebug() << "🎵 BGM volume set to:" << (m_bgmVolume * 100.0f) << "%";
 }
 
-void BGMManager::setMuted(bool muted)
+// 하위 호환성용 기존 API
+void BGMManager::setVolume(float volume)
 {
-    if (m_muted == muted) {
-        return;
-    }
+    setBGMVolume(volume);
+}
+
+void BGMManager::setBGMMuted(bool muted)
+{
+    if (m_bgmMuted == muted) return;
     
-    m_muted = muted;
-    
-    if (!m_initialized) {
-        return;
-    }
+    m_bgmMuted = muted;
+    if (!m_initialized) return;
     
     if (muted) {
-        // 음소거: 현재 재생 중인 BGM 정지
         if (Mix_PlayingMusic()) {
             Mix_PauseMusic();
             qDebug() << "🔇 BGM muted";
         }
     } else {
-        // 음소거 해제: 일시정지된 BGM이 있으면 재개, 없으면 현재 상태 BGM 재생
         if (Mix_PausedMusic()) {
             Mix_ResumeMusic();
             qDebug() << "🔊 BGM unmuted (resumed)";
         } else if (m_currentState != GameState::NONE) {
-            // 현재 상태에 맞는 BGM 새로 재생
             loadAndPlayBGM(m_currentState);
             qDebug() << "🔊 BGM unmuted (restarted)";
         }
     }
 }
 
+// 하위 호환성용 기존 API
+void BGMManager::setMuted(bool muted)
+{
+    setBGMMuted(muted);
+}
+
+// ========== SFX 볼륨 제어 ==========
+void BGMManager::setSFXVolume(float volume)
+{
+    m_sfxVolume = qBound(0.0f, volume, 1.0f);
+    applySFXVolume();
+    qDebug() << "🎵 SFX volume set to:" << (m_sfxVolume * 100.0f) << "%";
+}
+
+void BGMManager::setSFXMuted(bool muted)
+{
+    m_sfxMuted = muted;
+    qDebug() << "🔇 SFX" << (muted ? "muted" : "unmuted");
+}
+
+// ========== 효과음 재생 ==========
+void BGMManager::playSoundEffect(SoundEffect effect)
+{
+    if (!m_initialized || m_sfxMuted) return;
+    
+    int effectIndex = static_cast<int>(effect);
+    if (effectIndex < 0 || effectIndex >= 3 || !m_soundEffects[effectIndex]) {
+        qWarning() << "❌ Invalid sound effect:" << soundEffectToString(effect);
+        return;
+    }
+    
+    // 현재 볼륨 적용해서 재생 (-1은 첫 번째 빈 채널을 찾아서 재생)
+    int channel = Mix_PlayChannel(-1, m_soundEffects[effectIndex], 0);
+    if (channel == -1) {
+        qWarning() << "❌ Failed to play sound effect:" << Mix_GetError();
+    } else {
+        qDebug() << "🎵 Playing sound effect:" << soundEffectToString(effect);
+    }
+}
+
+// ========== 효과음 로딩 ==========
+void BGMManager::loadSoundEffects()
+{
+    qDebug() << "🎵 Loading sound effects...";
+    
+    loadSoundEffect(&m_soundEffects[0], "my_turn.wav", SoundEffect::MY_TURN);
+    loadSoundEffect(&m_soundEffects[1], "time_out.wav", SoundEffect::TIME_OUT);
+    loadSoundEffect(&m_soundEffects[2], "countdown.wav", SoundEffect::COUNTDOWN);
+    
+    // 초기 볼륨 적용
+    applySFXVolume();
+}
+
+void BGMManager::loadSoundEffect(Mix_Chunk** chunk, const char* filename, SoundEffect effect)
+{
+    std::string fullPath = getApplicationPath() + "/" + getSoundEffectPath(effect);
+    
+    *chunk = Mix_LoadWAV(fullPath.c_str());
+    if (*chunk) {
+        qDebug() << "✅ Loaded sound effect:" << soundEffectToString(effect) << "from" << QString::fromStdString(fullPath);
+    } else {
+        qWarning() << "❌ Failed to load sound effect:" << soundEffectToString(effect) << "-" << Mix_GetError();
+    }
+}
+
+// ========== 파일 경로 해결 ==========
+std::string BGMManager::getSoundEffectPath(SoundEffect effect) const
+{
+    auto it = m_soundEffectPaths.find(effect);
+    return (it != m_soundEffectPaths.end()) ? it->second : "";
+}
+
+// ========== 볼륨 적용 ==========
+void BGMManager::applyBGMVolume()
+{
+    if (m_initialized && Mix_PlayingMusic()) {
+        int sdlVolume = static_cast<int>(m_bgmVolume * MIX_MAX_VOLUME);
+        Mix_VolumeMusic(sdlVolume);
+    }
+}
+
+void BGMManager::applySFXVolume()
+{
+    if (!m_initialized) return;
+    
+    int sdlVolume = static_cast<int>(m_sfxVolume * MIX_MAX_VOLUME);
+    for (int i = 0; i < 3; ++i) {
+        if (m_soundEffects[i]) {
+            Mix_VolumeChunk(m_soundEffects[i], sdlVolume);
+        }
+    }
+}
+
+// ========== 디버깅 유틸리티 ==========
 const char* BGMManager::stateToString(GameState state) const
 {
     switch (state) {
@@ -230,5 +342,15 @@ const char* BGMManager::stateToString(GameState state) const
         case GameState::GAME_ROOM: return "GAME_ROOM";
         case GameState::IN_GAME:   return "IN_GAME";
         default:                   return "UNKNOWN";
+    }
+}
+
+const char* BGMManager::soundEffectToString(SoundEffect effect) const
+{
+    switch (effect) {
+        case SoundEffect::MY_TURN:   return "MY_TURN";
+        case SoundEffect::TIME_OUT:  return "TIME_OUT";  
+        case SoundEffect::COUNTDOWN: return "COUNTDOWN";
+        default:                     return "UNKNOWN";
     }
 }
