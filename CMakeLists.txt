@@ -8,7 +8,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # MSVC 설정
 if(MSVC)
     add_compile_options(/utf-8 /W4 /MP)
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+    # Visual C++ Runtime DLL 사용 (기본값) - VCRUNTIME140_1.dll 의존성 허용
+    # set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>") # 정적 링크 (제거)
 endif()
 
 # 패키지 찾기

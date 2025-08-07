@@ -41,6 +41,11 @@ set(CLIENT_SOURCES
     "resource.qrc"
 )
 
+# Windows 리소스 파일 (아이콘 포함)
+if(WIN32)
+    set(CLIENT_SOURCES ${CLIENT_SOURCES} "app_icon.rc")
+endif()
+
 set(CLIENT_HEADERS
     "include/GameBoard.h"
     "include/GameRoomWindow.h"
@@ -141,42 +146,33 @@ add_custom_command(TARGET BlokusClient POST_BUILD
     COMMENT "Copying sound, image resource files to output directory"
 )
 
-# Visual C++ Redistributable DLL 복사 (정적 링킹 대신 사용하는 경우)
+# Visual C++ Runtime DLL 자동 복사
 if(MSVC)
-    # Visual Studio 설치 경로에서 런타임 DLL 찾기
-    find_file(VCRUNTIME140_DLL 
-        NAMES vcruntime140.dll
-        PATHS 
-            "C:/Program Files (x86)/Microsoft Visual Studio/2019/*/VC/Redist/MSVC/*/x64/Microsoft.VC142.CRT/"
-            "C:/Program Files (x86)/Microsoft Visual Studio/2022/*/VC/Redist/MSVC/*/x64/Microsoft.VC142.CRT/"
-            "C:/Program Files/Microsoft Visual Studio/2019/*/VC/Redist/MSVC/*/x64/Microsoft.VC142.CRT/"
-            "C:/Program Files/Microsoft Visual Studio/2022/*/VC/Redist/MSVC/*/x64/Microsoft.VC142.CRT/"
-        NO_DEFAULT_PATH
-    )
-    
+    # 시스템에서 런타임 DLL 찾기 (여러 위치 시도)
     find_file(VCRUNTIME140_1_DLL 
         NAMES vcruntime140_1.dll
         PATHS 
+            "C:/Windows/System32"
             "C:/Program Files (x86)/Microsoft Visual Studio/2019/*/VC/Redist/MSVC/*/x64/Microsoft.VC142.CRT/"
             "C:/Program Files (x86)/Microsoft Visual Studio/2022/*/VC/Redist/MSVC/*/x64/Microsoft.VC142.CRT/"
             "C:/Program Files/Microsoft Visual Studio/2019/*/VC/Redist/MSVC/*/x64/Microsoft.VC142.CRT/"
             "C:/Program Files/Microsoft Visual Studio/2022/*/VC/Redist/MSVC/*/x64/Microsoft.VC142.CRT/"
-        NO_DEFAULT_PATH
+            "C:/Windows/SysWOW64"
     )
     
-    if(VCRUNTIME140_DLL AND VCRUNTIME140_1_DLL)
+    if(VCRUNTIME140_1_DLL)
+        # 빌드 후 자동으로 DLL 복사
         add_custom_command(TARGET BlokusClient POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                ${VCRUNTIME140_DLL}
-                $<TARGET_FILE_DIR:BlokusClient>/vcruntime140.dll
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                ${VCRUNTIME140_1_DLL}
-                $<TARGET_FILE_DIR:BlokusClient>/vcruntime140_1.dll
-            COMMENT "Copying Visual C++ Runtime DLLs"
+                "${VCRUNTIME140_1_DLL}"
+                "$<TARGET_FILE_DIR:BlokusClient>/vcruntime140_1.dll"
+            COMMENT "Copying VCRUNTIME140_1.dll to output directory"
         )
-        message(STATUS "Found and will copy Visual C++ Runtime DLLs")
+        message(STATUS "Found VCRUNTIME140_1.dll: ${VCRUNTIME140_1_DLL}")
+        message(STATUS "Will auto-copy to output directory after build")
     else()
-        message(WARNING "Visual C++ Runtime DLLs not found. Consider using static linking.")
+        message(WARNING "VCRUNTIME140_1.dll not found. Users may need to install Visual C++ Redistributable.")
+        message(STATUS "Alternative: Copy VCRUNTIME140_1.dll manually to client executable directory")
     endif()
 endif()
 
