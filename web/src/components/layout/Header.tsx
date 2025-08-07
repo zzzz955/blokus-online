@@ -57,7 +57,6 @@ export default function Header() {
     { name: '자유 게시판', href: '/posts' },
     { name: '공지사항', href: '/announcements' },
     { name: '패치 노트', href: '/patch-notes' },
-    { name: '게임 통계', href: '/stats' },
     { name: session?.user ? '내 문의' : '고객지원', href: session?.user ? '/support' : '/contact' },
   ];
 
@@ -68,6 +67,7 @@ export default function Header() {
     { name: '패치', href: '/admin/patch-notes' },
     { name: '후기', href: '/admin/testimonials' },
     { name: '게시글', href: '/admin/posts' },
+    { name: '통계', href: '/admin/stats' },
     { name: '배치', href: '/admin/batch' },
   ];
 
@@ -161,12 +161,6 @@ export default function Header() {
                     >
                       <LogIn size={16} />
                       <span>회원가입/로그인</span>
-                    </Link>
-                    <Link
-                      href="/auth/reset-password"
-                      className="text-gray-400 hover:text-gray-300 text-xs px-2 py-1 transition-colors"
-                    >
-                      비밀번호 재설정
                     </Link>
                   </div>
                 )}
@@ -270,13 +264,6 @@ export default function Header() {
                         >
                           <LogIn size={16} />
                           <span>회원가입/로그인</span>
-                        </Link>
-                        <Link
-                          href="/auth/reset-password"
-                          className="text-gray-400 hover:text-gray-300 block px-3 py-1 text-sm transition-colors"
-                          onClick={() => setIsMenuOpen(false)}
-                        >
-                          비밀번호 재설정
                         </Link>
                       </div>
                     )}

@@ -252,18 +252,18 @@ export default function AdminBatchPage() {
 
       {/* 실행 히스토리 */}
       <Card className="p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-6">실행 히스토리 (최근 20개)</h2>
+        <h2 className="text-xl font-semibold text-white mb-6">실행 히스토리 (최근 20개)</h2>
         
         {history.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-semibold text-gray-900">시작 시간</th>
-                  <th className="text-center py-3 px-4 font-semibold text-gray-900">상태</th>
-                  <th className="text-center py-3 px-4 font-semibold text-gray-900">처리된 항목</th>
-                  <th className="text-center py-3 px-4 font-semibold text-gray-900">실행 시간</th>
-                  <th className="text-center py-3 px-4 font-semibold text-gray-900">결과</th>
+                  <th className="text-left py-3 px-4 font-semibold text-white">시작 시간</th>
+                  <th className="text-center py-3 px-4 font-semibold text-white">상태</th>
+                  <th className="text-center py-3 px-4 font-semibold text-white">처리된 항목</th>
+                  <th className="text-center py-3 px-4 font-semibold text-white">실행 시간</th>
+                  <th className="text-center py-3 px-4 font-semibold text-white">결과</th>
                 </tr>
               </thead>
               <tbody>

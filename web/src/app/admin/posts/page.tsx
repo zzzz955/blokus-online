@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { PostCategory, Post } from '@/types';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
@@ -155,8 +156,8 @@ export default function AdminPostsPage() {
     <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 space-y-6">
       {/* 헤더 */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">게시글 관리</h1>
-        <p className="text-gray-600 mt-2">커뮤니티 게시글을 관리합니다</p>
+        <h1 className="text-2xl font-bold text-white">게시글 관리</h1>
+        <p className="text-gray-400 mt-2">커뮤니티 게시글을 관리합니다</p>
       </div>
 
       {/* 통계 */}
@@ -164,19 +165,19 @@ export default function AdminPostsPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card className="p-4">
             <div className="text-2xl font-bold text-blue-600">{stats.status.total}</div>
-            <div className="text-sm text-gray-600">전체 게시글</div>
+            <div className="text-sm text-gray-400">전체 게시글</div>
           </Card>
           <Card className="p-4">
             <div className="text-2xl font-bold text-green-600">{stats.status.active}</div>
-            <div className="text-sm text-gray-600">공개</div>
+            <div className="text-sm text-gray-400">공개</div>
           </Card>
           <Card className="p-4">
             <div className="text-2xl font-bold text-yellow-600">{stats.status.hidden}</div>
-            <div className="text-sm text-gray-600">숨김</div>
+            <div className="text-sm text-gray-400">숨김</div>
           </Card>
           <Card className="p-4">
             <div className="text-2xl font-bold text-red-600">{stats.status.deleted}</div>
-            <div className="text-sm text-gray-600">삭제</div>
+            <div className="text-sm text-gray-400">삭제</div>
           </Card>
         </div>
       )}
@@ -186,13 +187,13 @@ export default function AdminPostsPage() {
         <div className="space-y-4">
           {/* 카테고리 필터 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">카테고리</label>
+            <label className="block text-sm font-medium text-white mb-2">카테고리</label>
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setSelectedCategory('ALL')}
                 className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${selectedCategory === 'ALL'
                     ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                   }`}
               >
                 전체
@@ -203,7 +204,7 @@ export default function AdminPostsPage() {
                   onClick={() => setSelectedCategory(category as PostCategory)}
                   className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${selectedCategory === category
                       ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                     }`}
                 >
                   {label}
@@ -214,7 +215,7 @@ export default function AdminPostsPage() {
 
           {/* 상태 필터 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">상태</label>
+            <label className="block text-sm font-medium text-white mb-2">상태</label>
             <div className="flex flex-wrap gap-2">
               {[
                 { value: 'all', label: '전체' },
@@ -227,7 +228,7 @@ export default function AdminPostsPage() {
                   onClick={() => setSelectedStatus(value as any)}
                   className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${selectedStatus === value
                       ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                     }`}
                 >
                   {label}
@@ -257,7 +258,7 @@ export default function AdminPostsPage() {
         {loading ? (
           <div className="p-8 text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="text-gray-600 mt-2">게시글을 불러오는 중...</p>
+            <p className="text-gray-400 mt-2">게시글을 불러오는 중...</p>
           </div>
         ) : error ? (
           <div className="p-8 text-center">
@@ -268,36 +269,36 @@ export default function AdminPostsPage() {
           </div>
         ) : posts.length === 0 ? (
           <div className="p-8 text-center">
-            <p className="text-gray-600">조건에 맞는 게시글이 없습니다.</p>
+            <p className="text-gray-400">조건에 맞는 게시글이 없습니다.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+              <thead className="bg-dark-bg">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                     게시글
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                     작성자
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                     상태
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                     조회수
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                     작성일
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
                     관리
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-dark-card border border-dark-border divide-y divide-gray-200">
                 {posts.map((post) => (
-                  <tr key={post.id} className="hover:bg-gray-50">
+                  <tr key={post.id} className="hover:bg-gray-700/30">
                     <td className="px-6 py-4">
                       <div className="flex items-start space-x-3">
                         <div className="flex-1 min-w-0">
@@ -305,28 +306,33 @@ export default function AdminPostsPage() {
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${CATEGORY_COLORS[post.category]}`}>
                               {CATEGORY_LABELS[post.category]}
                             </span>
-                            <p className="text-sm font-medium text-gray-900 truncate w-72">
+                            <Link 
+                              href={`/posts/${post.id}`}
+                              className="text-sm font-medium text-white hover:text-blue-400 transition-colors truncate w-72 block"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
                               {post.title}
-                            </p>
+                            </Link>
                           </div>
-                          {/* <p className="text-sm text-gray-500 line-clamp-2">
+                          {/* <p className="text-sm text-gray-400 line-clamp-2">
                             {post.content}
                           </p> */}
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
+                      <div className="text-sm text-white">
                         {post.author.displayName || post.author.username}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {getStatusBadge(post)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                       {post.viewCount}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
                       {formatDate(post.createdAt)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

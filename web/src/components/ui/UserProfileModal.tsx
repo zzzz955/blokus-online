@@ -99,15 +99,15 @@ export default function UserProfileModal({ userId, username, isOpen, onClose }: 
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
       onClick={handleBackdropClick}
     >
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-dark-card border border-dark-border rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
         {/* 모달 헤더 */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">
+        <div className="flex items-center justify-between p-6 border-b border-dark-border">
+          <h2 className="text-xl font-semibold text-white">
             사용자 정보
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-500 transition-colors"
+            className="text-gray-400 hover:text-gray-300 transition-colors"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -120,7 +120,7 @@ export default function UserProfileModal({ userId, username, isOpen, onClose }: 
           {loading && (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-              <span className="ml-3 text-gray-600">로딩중...</span>
+              <span className="ml-3 text-gray-300">로딩중...</span>
             </div>
           )}
 
@@ -141,88 +141,88 @@ export default function UserProfileModal({ userId, username, isOpen, onClose }: 
             <div className="space-y-6">
               {/* 기본 정보 */}
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-3">기본 정보</h3>
-                <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                <h3 className="text-lg font-medium text-white mb-3">기본 정보</h3>
+                <div className="bg-dark-bg rounded-lg p-4 space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">사용자명</span>
-                    <span className="font-medium">{userData.username}</span>
+                    <span className="text-gray-400">사용자명</span>
+                    <span className="font-medium text-white">{userData.username}</span>
                   </div>
                   {userData.display_name && (
                     <div className="flex justify-between">
-                      <span className="text-gray-600">표시명</span>
-                      <span className="font-medium">{userData.display_name}</span>
+                      <span className="text-gray-400">표시명</span>
+                      <span className="font-medium text-white">{userData.display_name}</span>
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <span className="text-gray-600">레벨</span>
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-primary-100 text-primary-800">
+                    <span className="text-gray-400">레벨</span>
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-primary-600 text-white">
                       Lv.{userData.level}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">경험치</span>
-                    <span className="font-medium">{userData.experience_points.toLocaleString()} XP</span>
+                    <span className="text-gray-400">경험치</span>
+                    <span className="font-medium text-white">{userData.experience_points.toLocaleString()} XP</span>
                   </div>
                 </div>
               </div>
 
               {/* 게임 통계 */}
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-3">게임 통계</h3>
-                <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                <h3 className="text-lg font-medium text-white mb-3">게임 통계</h3>
+                <div className="bg-dark-bg rounded-lg p-4 space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">총 게임 수</span>
-                    <span className="font-medium">{userData.total_games.toLocaleString()}</span>
+                    <span className="text-gray-400">총 게임 수</span>
+                    <span className="font-medium text-white">{userData.total_games.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">승</span>
+                    <span className="text-gray-400">승</span>
                     <span className="font-medium text-green-600">{userData.wins.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">패</span>
+                    <span className="text-gray-400">패</span>
                     <span className="font-medium text-red-600">{userData.losses.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">무</span>
-                    <span className="font-medium text-gray-600">{userData.draws.toLocaleString()}</span>
+                    <span className="text-gray-400">무</span>
+                    <span className="font-medium text-gray-400">{userData.draws.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">승률</span>
-                    <span className="font-medium">{userData.win_rate.toFixed(1)}%</span>
+                    <span className="text-gray-400">승률</span>
+                    <span className="font-medium text-white">{userData.win_rate.toFixed(1)}%</span>
                   </div>
                 </div>
               </div>
 
               {/* 점수 정보 */}
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-3">점수 정보</h3>
-                <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                <h3 className="text-lg font-medium text-white mb-3">점수 정보</h3>
+                <div className="bg-dark-bg rounded-lg p-4 space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">최고 점수</span>
+                    <span className="text-gray-400">최고 점수</span>
                     <span className="font-medium text-yellow-600">{userData.best_score.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">총 점수</span>
-                    <span className="font-medium">{userData.total_score.toLocaleString()}</span>
+                    <span className="text-gray-400">총 점수</span>
+                    <span className="font-medium text-white">{userData.total_score.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">평균 점수</span>
-                    <span className="font-medium">{userData.average_score.toFixed(1)}</span>
+                    <span className="text-gray-400">평균 점수</span>
+                    <span className="font-medium text-white">{userData.average_score.toFixed(1)}</span>
                   </div>
                 </div>
               </div>
 
               {/* 연승 정보 */}
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-3">연승 정보</h3>
-                <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                <h3 className="text-lg font-medium text-white mb-3">연승 정보</h3>
+                <div className="bg-dark-bg rounded-lg p-4 space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">최대 연승</span>
-                    <span className="font-medium">{userData.longest_win_streak.toLocaleString()}</span>
+                    <span className="text-gray-400">최대 연승</span>
+                    <span className="font-medium text-white">{userData.longest_win_streak.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">현재 연승</span>
-                    <span className="font-medium">{userData.current_win_streak.toLocaleString()}</span>
+                    <span className="text-gray-400">현재 연승</span>
+                    <span className="font-medium text-white">{userData.current_win_streak.toLocaleString()}</span>
                   </div>
                 </div>
               </div>
@@ -230,15 +230,15 @@ export default function UserProfileModal({ userId, username, isOpen, onClose }: 
               {/* 랭킹 정보 */}
               {userData.rank && (
                 <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-3">랭킹</h3>
-                  <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                  <h3 className="text-lg font-medium text-white mb-3">랭킹</h3>
+                  <div className="bg-dark-bg rounded-lg p-4 space-y-3">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">승수 랭킹</span>
-                      <span className="font-medium">{userData.rank.by_wins}위</span>
+                      <span className="text-gray-400">승수 랭킹</span>
+                      <span className="font-medium text-white">{userData.rank.by_wins}위</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">점수 랭킹</span>
-                      <span className="font-medium">{userData.rank.by_score}위</span>
+                      <span className="text-gray-400">점수 랭킹</span>
+                      <span className="font-medium text-white">{userData.rank.by_score}위</span>
                     </div>
                   </div>
                 </div>
@@ -246,24 +246,24 @@ export default function UserProfileModal({ userId, username, isOpen, onClose }: 
 
               {/* 활동 정보 */}
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-3">활동 정보</h3>
-                <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                <h3 className="text-lg font-medium text-white mb-3">활동 정보</h3>
+                <div className="bg-dark-bg rounded-lg p-4 space-y-3">
                   {userData.created_at && (
                     <div className="flex justify-between">
-                      <span className="text-gray-600">가입일</span>
-                      <span className="font-medium text-sm">{formatDateTime(userData.created_at)}</span>
+                      <span className="text-gray-400">가입일</span>
+                      <span className="font-medium text-sm text-white">{formatDateTime(userData.created_at)}</span>
                     </div>
                   )}
                   {userData.last_login_at && (
                     <div className="flex justify-between">
-                      <span className="text-gray-600">최근 로그인</span>
-                      <span className="font-medium text-sm">{formatRelativeTime(userData.last_login_at)}</span>
+                      <span className="text-gray-400">최근 로그인</span>
+                      <span className="font-medium text-sm text-white">{formatRelativeTime(userData.last_login_at)}</span>
                     </div>
                   )}
                   {userData.last_played && (
                     <div className="flex justify-between">
-                      <span className="text-gray-600">최근 게임</span>
-                      <span className="font-medium text-sm">{formatRelativeTime(userData.last_played)}</span>
+                      <span className="text-gray-400">최근 게임</span>
+                      <span className="font-medium text-sm text-white">{formatRelativeTime(userData.last_played)}</span>
                     </div>
                   )}
                 </div>
@@ -273,7 +273,7 @@ export default function UserProfileModal({ userId, username, isOpen, onClose }: 
         </div>
 
         {/* 모달 푸터 */}
-        <div className="flex justify-end p-6 border-t border-gray-200">
+        <div className="flex justify-end p-6 border-t border-dark-border">
           <Button
             variant="secondary"
             onClick={onClose}

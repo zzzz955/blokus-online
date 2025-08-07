@@ -110,7 +110,7 @@ export default function AdminTestimonialsPage() {
       <div className="px-4 py-8">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">로딩 중...</p>
+          <p className="mt-4 text-gray-400">로딩 중...</p>
         </div>
       </div>
     );
@@ -120,8 +120,8 @@ export default function AdminTestimonialsPage() {
     <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
       <div className="sm:flex sm:items-center">
         <div className="sm:flex-auto">
-          <h1 className="text-2xl font-semibold text-gray-900">후기 관리</h1>
-          <p className="mt-2 text-sm text-gray-700">
+          <h1 className="text-2xl font-semibold text-white">후기 관리</h1>
+          <p className="mt-2 text-sm text-white">
             사용자들이 작성한 후기를 관리할 수 있습니다.
           </p>
         </div>
@@ -166,45 +166,45 @@ export default function AdminTestimonialsPage() {
           <div className="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
             <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
               <table className="min-w-full divide-y divide-gray-300">
-                <thead className="bg-gray-50">
+                <thead className="bg-dark-bg">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                       작성자
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                       별점
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                       후기 내용
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                       작성일
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                       상태
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                       관리
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-dark-card border border-dark-border divide-y divide-gray-200">
                   {testimonials.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                      <td colSpan={6} className="px-6 py-4 text-center text-gray-400">
                         등록된 후기가 없습니다.
                       </td>
                     </tr>
                   ) : (
                     testimonials.map((testimonial) => (
-                      <tr key={testimonial.id} className={!testimonial.isPublished ? 'bg-gray-50' : ''}>
+                      <tr key={testimonial.id} className={!testimonial.isPublished ? 'bg-dark-bg' : ''}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <div>
-                              <div className="text-sm font-medium text-gray-900">
+                              <div className="text-sm font-medium text-white">
                                 {testimonial.name}
                               </div>
-                              <div className="text-sm text-gray-500">
+                              <div className="text-sm text-gray-400">
                                 ID: {testimonial.id}
                               </div>
                             </div>
@@ -223,17 +223,17 @@ export default function AdminTestimonialsPage() {
                                 }`}
                               />
                             ))}
-                            <span className="ml-2 text-sm text-gray-600">
+                            <span className="ml-2 text-sm text-gray-400">
                               {testimonial.rating}점
                             </span>
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="text-sm text-gray-900 max-w-xs truncate">
+                          <div className="text-sm text-white max-w-xs truncate">
                             {testimonial.comment || '(내용 없음)'}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
                           {formatDate(testimonial.createdAt)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -307,21 +307,21 @@ export default function AdminTestimonialsPage() {
             <button
               onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
               disabled={currentPage === 1}
-              className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400"
+              className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-white bg-dark-card border border-dark-border hover:bg-dark-bg disabled:bg-gray-100 disabled:text-gray-400"
             >
               이전
             </button>
             <button
               onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
               disabled={currentPage === totalPages}
-              className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400"
+              className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-white bg-dark-card border border-dark-border hover:bg-dark-bg disabled:bg-gray-100 disabled:text-gray-400"
             >
               다음
             </button>
           </div>
           <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm text-gray-700">
+              <p className="text-sm text-white">
                 <span className="font-medium">{currentPage}</span> / <span className="font-medium">{totalPages}</span> 페이지
               </p>
             </div>
@@ -330,14 +330,14 @@ export default function AdminTestimonialsPage() {
                 <button
                   onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                   disabled={currentPage === 1}
-                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400"
+                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-dark-card border border-dark-border text-sm font-medium text-gray-400 hover:bg-dark-bg disabled:bg-gray-100 disabled:text-gray-400"
                 >
                   이전
                 </button>
                 <button
                   onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                   disabled={currentPage === totalPages}
-                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400"
+                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-dark-card border border-dark-border text-sm font-medium text-gray-400 hover:bg-dark-bg disabled:bg-gray-100 disabled:text-gray-400"
                 >
                   다음
                 </button>
@@ -351,7 +351,7 @@ export default function AdminTestimonialsPage() {
       <div className="mt-6 flex justify-end">
         <button
           onClick={fetchTestimonials}
-          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-white bg-dark-card border border-dark-border hover:bg-dark-bg"
         >
           <RotateCcw size={16} className="mr-2" />
           새로고침
