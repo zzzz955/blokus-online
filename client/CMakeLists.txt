@@ -148,32 +148,30 @@ add_custom_command(TARGET BlokusClient POST_BUILD
 
 # Visual C++ Runtime DLL 자동 복사
 if(MSVC)
-    # 시스템에서 런타임 DLL 찾기 (여러 위치 시도)
-    find_file(VCRUNTIME140_1_DLL 
-        NAMES vcruntime140_1.dll
-        PATHS 
-            "C:/Windows/System32"
-            "C:/Program Files (x86)/Microsoft Visual Studio/2019/*/VC/Redist/MSVC/*/x64/Microsoft.VC142.CRT/"
-            "C:/Program Files (x86)/Microsoft Visual Studio/2022/*/VC/Redist/MSVC/*/x64/Microsoft.VC142.CRT/"
-            "C:/Program Files/Microsoft Visual Studio/2019/*/VC/Redist/MSVC/*/x64/Microsoft.VC142.CRT/"
-            "C:/Program Files/Microsoft Visual Studio/2022/*/VC/Redist/MSVC/*/x64/Microsoft.VC142.CRT/"
-            "C:/Windows/SysWOW64"
+    # resource 폴더 위치 (CMakeLists.txt 위치 기준 상대경로)
+    set(RESOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resource")
+
+    # 복사할 DLL 목록
+    set(VC_DLLS
+        vcruntime140.dll
+        vcruntime140_1.dll
+        msvcp140.dll
     )
-    
-    if(VCRUNTIME140_1_DLL)
-        # 빌드 후 자동으로 DLL 복사
-        add_custom_command(TARGET BlokusClient POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${VCRUNTIME140_1_DLL}"
-                "$<TARGET_FILE_DIR:BlokusClient>/vcruntime140_1.dll"
-            COMMENT "Copying VCRUNTIME140_1.dll to output directory"
-        )
-        message(STATUS "Found VCRUNTIME140_1.dll: ${VCRUNTIME140_1_DLL}")
-        message(STATUS "Will auto-copy to output directory after build")
-    else()
-        message(WARNING "VCRUNTIME140_1.dll not found. Users may need to install Visual C++ Redistributable.")
-        message(STATUS "Alternative: Copy VCRUNTIME140_1.dll manually to client executable directory")
-    endif()
+
+    foreach(DLL_NAME IN LISTS VC_DLLS)
+        set(DLL_PATH "${RESOURCE_DIR}/${DLL_NAME}")
+        if(EXISTS "${DLL_PATH}")
+            add_custom_command(TARGET BlokusClient POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${DLL_PATH}"
+                    "$<TARGET_FILE_DIR:BlokusClient>/${DLL_NAME}"
+                COMMENT "Copying ${DLL_NAME} from resource directory to output directory"
+            )
+            message(STATUS "Will copy ${DLL_NAME} from resource directory")
+        else()
+            message(WARNING "DLL not found in resource directory: ${DLL_PATH}")
+        endif()
+    endforeach()
 endif()
 
 # ===========================================
