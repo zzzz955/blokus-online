@@ -26,6 +26,7 @@ env:
   DEPLOY_PATH: /home/${{ secrets.SSH_USER }}/blokus-online
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ghcr.io/${{ github.repository }}/blokus
+  IMAGE_TAG: ${{ github.sha }}
 
 jobs:
   # ==========================================
@@ -200,9 +201,8 @@ jobs:
       with:
         images: ${{ env.IMAGE_PREFIX }}-game-server
         tags: |
-          type=ref,event=branch
-          type=ref,event=pr
           type=sha,prefix={{branch}}-
+          type=raw,value=${{ env.IMAGE_TAG }}
           type=raw,value=latest,enable={{is_default_branch}}
           
     - name: Build and push Game Server
@@ -266,9 +266,8 @@ jobs:
       with:
         images: ${{ env.IMAGE_PREFIX }}-web-server
         tags: |
-          type=ref,event=branch
-          type=ref,event=pr  
           type=sha,prefix={{branch}}-
+          type=raw,value=${{ env.IMAGE_TAG }}
           type=raw,value=latest,enable={{is_default_branch}}
           
     - name: Build and push Web Server
@@ -341,6 +340,11 @@ jobs:
           fi
           
           cat > .env << 'EOF'
+        # Image Configuration
+        IMAGE_TAG=${{ env.IMAGE_TAG }}
+        GAME_SERVER_IMAGE=${{ env.IMAGE_PREFIX }}-game-server:${{ env.IMAGE_TAG }}
+        WEB_SERVER_IMAGE=${{ env.IMAGE_PREFIX }}-web-server:${{ env.IMAGE_TAG }}
+        
         # Game Server Configuration
         SERVER_PORT=${{ secrets.SERVER_PORT }}
         SERVER_MAX_CLIENTS=${{ secrets.SERVER_MAX_CLIENTS }}
@@ -374,73 +378,6 @@ jobs:
         EOF
         "
         
-    - name: Create optimized docker-compose for deployment
-      run: |
-        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
-          cd ${{ env.DEPLOY_PATH }} &&
-          
-          cat > docker-compose.deploy.yml << 'EOF'
-        version: '3.8'
-        
-        services:
-          postgres:
-            image: postgres:15-alpine
-            environment:
-              POSTGRES_DB: \${DB_NAME}
-              POSTGRES_USER: \${DB_USER}
-              POSTGRES_PASSWORD: \${DB_PASSWORD}
-            volumes:
-              - postgres_data:/var/lib/postgresql/data
-            networks:
-              - blokus_network
-            healthcheck:
-              test: [\"CMD-SHELL\", \"pg_isready -U \${DB_USER}\"]
-              interval: 10s
-              timeout: 5s
-              retries: 5
-              
-          blokus-server:
-            image: ${{ env.IMAGE_PREFIX }}-game-server:latest
-            ports:
-              - \"\${SERVER_PORT}:9999\"
-            environment:
-              - DB_HOST=postgres
-              - DB_PORT=\${DB_PORT}
-              - DB_USER=\${DB_USER}
-              - DB_PASSWORD=\${DB_PASSWORD}
-              - DB_NAME=\${DB_NAME}
-            depends_on:
-              postgres:
-                condition: service_healthy
-            networks:
-              - blokus_network
-            restart: unless-stopped
-            
-          blokus-web:
-            image: ${{ env.IMAGE_PREFIX }}-web-server:latest
-            ports:
-              - \"\${WEB_PORT}:3000\"
-            environment:
-              - DATABASE_URL=\${WEB_DATABASE_URL}
-              - NEXTAUTH_SECRET=\${WEB_NEXTAUTH_SECRET}
-              - WEB_ADMIN_USERNAME=\${WEB_ADMIN_USERNAME}
-              - WEB_ADMIN_PASSWORD=\${WEB_ADMIN_PASSWORD}
-            depends_on:
-              postgres:
-                condition: service_healthy
-            networks:
-              - blokus_network
-            restart: unless-stopped
-            
-        volumes:
-          postgres_data:
-          
-        networks:
-          blokus_network:
-            driver: bridge
-        EOF
-        "
-        
     - name: Login to registry on server
       run: |
         ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
@@ -469,15 +406,22 @@ jobs:
           # 기존 서비스 중지
           docker compose down || true &&
           
-          # 최신 이미지 Pull (병렬로)
-          echo 'Pulling latest images in parallel...' &&
-          (docker pull ${{ env.IMAGE_PREFIX }}-game-server:latest &) &&
-          (docker pull ${{ env.IMAGE_PREFIX }}-web-server:latest &) &&
+          # 최신 이미지 Pull (SHA 기반 태그 사용)
+          echo 'Pulling images with SHA tags...' &&
+          (docker pull ${{ env.IMAGE_PREFIX }}-game-server:${{ env.IMAGE_TAG }} &) &&
+          (docker pull ${{ env.IMAGE_PREFIX }}-web-server:${{ env.IMAGE_TAG }} &) &&
           wait &&
           
-          # 서비스 시작 (빠른 시작, 타임아웃 단축)
+          # 서비스 시작
           echo 'Starting services...' &&
-          timeout 180 docker compose up -d
+          timeout 180 docker compose up -d &&
+          
+          # 헬스체크 대기 (간단한 검증)
+          echo 'Waiting for services to be healthy...' &&
+          timeout 120 docker compose ps --filter health=healthy --format json | grep healthy || echo 'Health check timeout - services may still be starting'
+          
+          # 배포 성공 상태 업데이트
+          update_status 'deployment' 'success'
         "
         
     - name: Deployment failure handling

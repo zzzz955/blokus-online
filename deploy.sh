@@ -1,8 +1,9 @@
 #!/bin/bash
-# Smart Deployment Script for Blokus Online
+# Unified Deployment Script for Blokus Online
+# Uses pre-built images from GitHub Container Registry
 
-echo "🚀 Blokus Online Smart Deployment"
-echo "================================="
+echo "🚀 Blokus Online Unified Deployment"
+echo "===================================="
 
 # Git 변경사항 확인
 CHANGED_FILES=$(git diff --name-only HEAD~1)
@@ -47,16 +48,30 @@ echo "==================="
 [ "$DEPLOY_NGINX" = true ] && echo "✅ Nginx (blokus-nginx)"
 echo ""
 
-# 배포 실행
+# 이미지 태그 설정 (기본값: latest, 환경변수로 SHA 기반 태그 사용 가능)
+IMAGE_TAG=${IMAGE_TAG:-latest}
+echo "🏷️ Using image tag: $IMAGE_TAG"
+
+# GitHub Container Registry 로그인 확인
+if ! docker info | grep -q "Registry: https://ghcr.io"; then
+    echo "⚠️ Please login to GitHub Container Registry first:"
+    echo "   echo \$GITHUB_TOKEN | docker login ghcr.io -u YOUR_USERNAME --password-stdin"
+fi
+
+# 배포 실행 (사전 빌드된 이미지 사용)
 if [ "$DEPLOY_SERVER" = true ]; then
-    echo "🎮 Deploying Game Server..."
-    docker-compose up -d --build blokus-server
+    echo "🎮 Deploying Game Server with image tag: $IMAGE_TAG..."
+    GAME_SERVER_IMAGE="ghcr.io/zzzz955/blokus-online/blokus-game-server:$IMAGE_TAG" \
+    docker-compose pull blokus-server
+    docker-compose up -d blokus-server
     echo "✅ Game Server deployed"
 fi
 
 if [ "$DEPLOY_WEB" = true ]; then
-    echo "🌐 Deploying Web Service..."
-    docker-compose up -d --build blokus-web
+    echo "🌐 Deploying Web Service with image tag: $IMAGE_TAG..."
+    WEB_SERVER_IMAGE="ghcr.io/zzzz955/blokus-online/blokus-web-server:$IMAGE_TAG" \
+    docker-compose pull blokus-web
+    docker-compose up -d blokus-web
     echo "✅ Web Service deployed"
 fi
 
@@ -80,3 +95,14 @@ echo ""
 echo "🎉 Deployment completed!"
 echo "📊 Service Status:"
 docker-compose ps
+
+# 간단한 헬스체크
+echo ""
+echo "🩺 Health Check:"
+sleep 10  # 서비스 시작 대기
+if docker-compose ps --filter health=healthy | grep -q healthy; then
+    echo "✅ Services are healthy"
+else
+    echo "⚠️ Some services may still be starting or have issues"
+    echo "Run 'docker-compose logs' to check details"
+fi

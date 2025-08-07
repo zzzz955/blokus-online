@@ -43,13 +43,7 @@ services:
 
   # ========== Blokus Game Server ==========
   blokus-server:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      # 캐시 최적화 설정
-      cache_from:
-        - blokus-server:latest
-      target: runtime
+    image: ${GAME_SERVER_IMAGE:-ghcr.io/zzzz955/blokus-online/blokus-game-server:${IMAGE_TAG:-latest}}
     container_name: blokus-server
     restart: unless-stopped
     
@@ -101,12 +95,12 @@ services:
       postgres:
         condition: service_healthy
     
-    # healthcheck:
-    #   test: ["CMD", "netcat", "-z", "localhost", "${SERVER_PORT:-9999}"]
-    #   interval: 30s
-    #   timeout: 10s
-    #   retries: 3
-    #   start_period: 60s
+    healthcheck:
+      test: ["CMD", "netcat", "-z", "localhost", "9999"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     
     # 로그 설정
     logging:
@@ -117,13 +111,7 @@ services:
 
   # ========== Blokus Web Application ==========
   blokus-web:
-    build:
-      context: ./web
-      dockerfile: Dockerfile
-      # 캐시 최적화 설정
-      cache_from:
-        - blokus-web:latest
-      target: runtime
+    image: ${WEB_SERVER_IMAGE:-ghcr.io/zzzz955/blokus-online/blokus-web-server:${IMAGE_TAG:-latest}}
     container_name: blokus-web
     restart: unless-stopped
     
@@ -173,12 +161,12 @@ services:
       postgres:
         condition: service_healthy
     
-    # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
-    #   interval: 30s
-    #   timeout: 10s
-    #   retries: 3
-    #   start_period: 30s
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     
     # 로그 설정
     logging:
