@@ -439,9 +439,11 @@ namespace Blokus {
 
     GameRoomWindow::~GameRoomWindow()
     {
+        qDebug() << QString::fromUtf8("=== GameRoomWindow 소멸자 ===");
         if (m_gameManager) {
             delete m_gameManager;
         }
+        qDebug() << QString::fromUtf8("=== GameRoomWindow 소멸 완료 ===");
     }
 
     void GameRoomWindow::setupUI()

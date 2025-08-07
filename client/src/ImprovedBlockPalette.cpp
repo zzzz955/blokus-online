@@ -519,8 +519,9 @@ namespace Blokus {
             parentWidget()->update();
         }
 
-        // Qt 이벤트 루프 강제 처리
-        QApplication::processEvents();
+        // 🔧 FIX: Replace processEvents with update() to avoid UI blocking
+        // processEvents() can freeze the main thread - use update() for async refresh
+        update();
 
         qDebug() << QString::fromUtf8("✅ %1 방향 팔레트 레이아웃 업데이트 완료")
             .arg(getDirectionName());

@@ -269,9 +269,7 @@ namespace Blokus {
             // 환영 메시지
             qDebug() << QString::fromUtf8("환영 메시지 추가...");
             addSystemMessage(QString::fromUtf8("안녕하세요, %1님! 블로커스 온라인에 오신 것을 환영합니다.").arg(username));
-
             qDebug() << QString::fromUtf8("LobbyWindow 생성자 완료");
-
         }
         catch (const std::exception& e) {
             qDebug() << QString::fromUtf8("LobbyWindow 생성 중 예외: %1").arg(e.what());
@@ -977,7 +975,6 @@ namespace Blokus {
             // 마지막 열(모드)는 자동으로 남은 공간 차지
         }
     }
-
     // ========================================
     // 데이터 업데이트 함수들
     // ========================================

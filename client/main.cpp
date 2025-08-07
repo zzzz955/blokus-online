@@ -22,8 +22,12 @@
 #include "ClientTypes.h"
 #include "NetworkClient.h"
 #include "ClientConfigManager.h"
+#include "BGMManager.h"
 
 using namespace Blokus;
+
+// Forward declaration
+class AppController;
 
 class AppController : public QObject
 {
@@ -915,6 +919,19 @@ private slots:
     }
 
 private:
+    // 🎵 BGM 상태 전환 헬퍼 함수들
+    void transitionToLobbyBGM()
+    {
+        qDebug() << "🎵 Transitioning to Lobby BGM";
+        BGMManager::getInstance().onLobbyEntered();
+    }
+    
+    void transitionToGameRoomBGM()
+    {
+        qDebug() << "🎵 Transitioning to Game Room BGM";
+        BGMManager::getInstance().onGameRoomEntered();
+    }
+
     void showGameResultDialog(const QString &resultJson)
     {
         try
@@ -1116,12 +1133,18 @@ private:
                 this, &AppController::onMyStatsUpdated);
 
         // 방 관련 시그널 추가
-        connect(m_networkClient, &NetworkClient::roomCreated,
-                this, &AppController::onRoomCreated);
-        connect(m_networkClient, &NetworkClient::roomJoined,
-                this, &AppController::onRoomJoined);
-        connect(m_networkClient, &NetworkClient::roomLeft,
-                this, &AppController::onRoomLeft);
+        connect(m_networkClient, &NetworkClient::roomCreated, [this](int roomId, const QString& roomName) {
+            onRoomCreated(roomId, roomName);
+            transitionToGameRoomBGM();  // 🎵 방 생성 성공 → 게임룸 BGM
+        });
+        connect(m_networkClient, &NetworkClient::roomJoined, [this](int roomId, const QString& roomName) {
+            onRoomJoined(roomId, roomName);
+            transitionToGameRoomBGM();  // 🎵 방 참여 성공 → 게임룸 BGM
+        });
+        connect(m_networkClient, &NetworkClient::roomLeft, [this]() {
+            onRoomLeft();
+            transitionToLobbyBGM();  // 🎵 방 나가기 성공 → 로비 BGM
+        });
         connect(m_networkClient, &NetworkClient::lobbyLeft,
                 this, &AppController::onRoomLeft);
         connect(m_networkClient, &NetworkClient::roomError,
@@ -1171,8 +1194,10 @@ private:
         // 로그인 시그널 연결
         connect(m_loginWindow, &Blokus::LoginWindow::loginRequested,
                 this, &AppController::handleLoginRequest);
-        connect(m_loginWindow, &Blokus::LoginWindow::loginSuccessful,
-                this, &AppController::handleLoginSuccess);
+        connect(m_loginWindow, &Blokus::LoginWindow::loginSuccessful, [this](const QString& username) {
+            handleLoginSuccess(username);
+            transitionToLobbyBGM();  // 🎵 로그인 성공 → 로비 BGM
+        });
 
         // 로그인 창이 닫히면 애플리케이션 종료
         connect(m_loginWindow, &QMainWindow::destroyed,
@@ -1340,9 +1365,43 @@ private:
     Blokus::GameRoomInfo m_currentRoomInfo;
 };
 
+#ifdef _WIN32
+// Windows에서 WinMain을 직접 구현
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+{
+    Q_UNUSED(hInstance);
+    Q_UNUSED(hPrevInstance); 
+    Q_UNUSED(nCmdShow);
+    
+    int argc = 0;
+    char** argv = nullptr;
+    
+    // 명령줄 인수 파싱
+    LPWSTR* szArglist = CommandLineToArgvW(GetCommandLineW(), &argc);
+    if (szArglist != nullptr) {
+        argv = new char*[argc];
+        for (int i = 0; i < argc; i++) {
+            int len = WideCharToMultiByte(CP_UTF8, 0, szArglist[i], -1, nullptr, 0, nullptr, nullptr);
+            argv[i] = new char[len];
+            WideCharToMultiByte(CP_UTF8, 0, szArglist[i], -1, argv[i], len, nullptr, nullptr);
+        }
+        LocalFree(szArglist);
+    }
+    
+    QApplication app(argc, argv);
+    
+    // 메모리 정리
+    if (argv) {
+        for (int i = 0; i < argc; i++) {
+            delete[] argv[i];
+        }
+        delete[] argv;
+    }
+#else
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
+#endif
 
 #ifdef _WIN32
     // Windows에서 디버그 모드일 때 콘솔 창 강제 할당

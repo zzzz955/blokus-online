@@ -85,9 +85,14 @@ namespace Blokus {
             m_socket->disconnect();
             if (m_socket->state() != QAbstractSocket::UnconnectedState) {
                 m_socket->disconnectFromHost();
-                if (!m_socket->waitForDisconnected(3000)) {
-                    m_socket->abort();
-                }
+                // 🔧 FIX: Remove blocking waitForDisconnected - use async disconnection
+                // The disconnected() signal will be emitted when disconnection completes
+                QTimer::singleShot(3000, this, [this]() {
+                    if (m_socket && m_socket->state() != QAbstractSocket::UnconnectedState) {
+                        qDebug() << "🚨 Force aborting connection after timeout";
+                        m_socket->abort();
+                    }
+                });
             }
             m_socket->deleteLater();
             m_socket = nullptr;

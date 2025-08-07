@@ -9,21 +9,11 @@ set(CMAKE_AUTOUIC ON)
 if(MSVC)
     add_compile_options(/utf-8)
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS UNICODE _UNICODE)
-    
-    # 일단 정적 링킹 비활성화 (라이브러리 충돌 해결을 위해)
-    # Visual C++ Runtime 정적 링킹 (VCRUNTIME140_1.dll 종속성 제거)
-    # set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-    
-    # 또는 컴파일/링크 플래그로 설정
-    # add_compile_options(
-    #     $<$<CONFIG:Debug>:/MTd>      # Debug: 정적 링킹
-    #     $<$<CONFIG:Release>:/MT>     # Release: 정적 링킹
-    # )
 endif()
 
 # 클라이언트 소스 파일들
 set(CLIENT_SOURCES
-    main.cpp
+    "main.cpp"
     "src/GameBoard.cpp"
     "src/GameRoomWindow.cpp"
     "src/ImprovedBlockPalette.cpp"
@@ -38,13 +28,10 @@ set(CLIENT_SOURCES
     "src/NetworkClient.cpp"
     "src/ClientConfigManager.cpp"
     "src/SoundManager.cpp"
+    "src/BGMManager.cpp"
     "resource.qrc"
+    "app_icon.rc"
 )
-
-# Windows 리소스 파일 (아이콘 포함)
-if(WIN32)
-    set(CLIENT_SOURCES ${CLIENT_SOURCES} "app_icon.rc")
-endif()
 
 set(CLIENT_HEADERS
     "include/GameBoard.h"
@@ -62,6 +49,7 @@ set(CLIENT_HEADERS
     "include/NetworkClient.h"
     "include/ClientConfigManager.h"
     "include/SoundManager.h"
+    "include/BGMManager.h"
 )
 
 # 실행 파일 생성
@@ -75,6 +63,10 @@ target_include_directories(BlokusClient PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
+# SDL2 설정
+find_package(SDL2 CONFIG REQUIRED)
+find_package(SDL2_mixer_ext CONFIG REQUIRED)
+
 # 라이브러리 링크
 target_link_libraries(BlokusClient PRIVATE
     BlokusCommon
@@ -84,39 +76,23 @@ target_link_libraries(BlokusClient PRIVATE
     Qt5::Svg
     Qt5::Network
     Qt5::Multimedia
+    SDL2::SDL2
+    SDL2_mixer_ext::SDL2_mixer_ext
 )
 
-# Windows 설정
+# Windows 설정 - 표준 Qt 애플리케이션
 if(WIN32)
-    # 빌드 타입 디버깅
-    message(STATUS "Current CMAKE_BUILD_TYPE: '${CMAKE_BUILD_TYPE}'")
-    message(STATUS "Debug flag check: '$<CONFIG:Debug>'")
+    # 항상 WIN32 애플리케이션으로 설정 (Qt 표준)
+    set_target_properties(BlokusClient PROPERTIES
+        WIN32_EXECUTABLE TRUE
+    )
     
-    # 디버그 모드에서만 콘솔 표시
-    if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR 
-       CMAKE_BUILD_TYPE STREQUAL "DEBUG" OR
-       "${CMAKE_BUILD_TYPE}" MATCHES "Debug")
-        
-        message(STATUS "==> Debug build detected: Console window ENABLED")
-        set_target_properties(BlokusClient PROPERTIES
-            WIN32_EXECUTABLE FALSE  # 콘솔 애플리케이션으로 설정
-        )
-        
-        # 추가 디버그 링커 플래그 및 매크로 정의
-        if(MSVC)
-            set_target_properties(BlokusClient PROPERTIES
-                LINK_FLAGS "/SUBSYSTEM:CONSOLE"
-            )
-            # 디버그 매크로 정의
-            target_compile_definitions(BlokusClient PRIVATE DEBUG _DEBUG)
-        endif()
-        
-    else()
-        message(STATUS "==> Release build detected: Console window DISABLED")
-        set_target_properties(BlokusClient PROPERTIES
-            WIN32_EXECUTABLE TRUE   # Windows 애플리케이션으로 설정
-        )
-    endif()
+    # Debug 매크로 정의
+    target_compile_definitions(BlokusClient PRIVATE
+        $<$<CONFIG:Debug>:DEBUG _DEBUG>
+    )
+    
+    # Qt5::WinMain 링크 제거 - 직접 WinMain 구현
 endif()
 
 # 컴파일러 플래그
@@ -143,7 +119,15 @@ add_custom_command(TARGET BlokusClient POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/resource/login_title.svg
         $<TARGET_FILE_DIR:BlokusClient>/resource/login_title.svg
-    COMMENT "Copying sound, image resource files to output directory"
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:BlokusClient>/resource/lobby
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/resource/lobby
+        $<TARGET_FILE_DIR:BlokusClient>/resource/lobby
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:BlokusClient>/resource/gameroom
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/resource/gameroom
+        $<TARGET_FILE_DIR:BlokusClient>/resource/gameroom
+    COMMENT "Copying sound, image, and BGM resource files to output directory"
 )
 
 # Visual C++ Runtime DLL 자동 복사
