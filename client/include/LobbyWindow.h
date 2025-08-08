@@ -64,7 +64,7 @@ namespace Blokus {
         Q_OBJECT
 
     public:
-        explicit LobbyWindow(const QString& username, QWidget* parent = nullptr);
+        explicit LobbyWindow(const QString& username, const QString displayname, QWidget* parent = nullptr);
         ~LobbyWindow();
 
         // 데이터 업데이트 함수들
@@ -141,10 +141,14 @@ namespace Blokus {
         QString formatChatMessage(const ChatMessage& message);
         QString formatUserStatus(const UserInfo& user);
         QString formatRoomStatus(const RoomInfo& room);
+        QString getDisplayNameFromUsername(const QString& username) const;
 
     public:
         void addSystemMessage(const QString& message);
         const QString& getMyUsername() const { return m_myUsername; }
+        const QString& getMyDisplayName() const { 
+            return m_myDisplayName.isEmpty() ? m_myUsername : m_myDisplayName; 
+        }
 
         // 버튼 쿨다운 관리
         QTimer* m_buttonCooldownTimer;
@@ -157,6 +161,7 @@ namespace Blokus {
     private:
         // 사용자 정보
         QString m_myUsername;
+        QString m_myDisplayName;
         UserInfo m_myUserInfo;
 
         // 메인 레이아웃

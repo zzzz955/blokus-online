@@ -60,6 +60,11 @@ namespace Blokus::Server {
             return session_ ? session_->getUsername() : "";
         }
 
+        /// @brief 표시명 반환 (displayName 우선, 없으면 username)
+        std::string getDisplayName() const {
+            return session_ ? session_->getDisplayName() : getUsername();
+        }
+
         /// @brief 연결 상태 확인
         bool isConnected() const {
             return session_ && session_->isActive();

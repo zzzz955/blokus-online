@@ -54,7 +54,8 @@ namespace Blokus {
 
     // Qt 호환 UserInfo (Common::UserInfo를 Qt 문자열로 래핑)
     struct UserInfo {
-        QString username;
+        QString username;    // 로그인 ID (고유 식별자)
+        QString displayName; // 표시명 (사용자가 보는 이름)
         int level;
         int totalGames;
         int wins;
@@ -73,6 +74,7 @@ namespace Blokus {
         // 기본 생성자
         UserInfo()
             : username(QString::fromUtf8("익명"))
+            , displayName(QString::fromUtf8("익명"))
             , level(1), totalGames(0), wins(0), losses(0), draws(0)
             , averageScore(0), totalScore(0), bestScore(0), isOnline(true)
             , status(QString::fromUtf8("로비"))
@@ -83,6 +85,7 @@ namespace Blokus {
         // Common::UserInfo에서 변환 (자동 변환)
         UserInfo(const Common::UserInfo& common)
             : username(QString::fromUtf8(common.username.c_str()))
+            , displayName(QString::fromUtf8(common.username.c_str())) // Common에는 displayName이 없으므로 username을 사용
             , level(common.level), totalGames(common.totalGames)
             , wins(common.wins), losses(common.losses), draws(0)
             , averageScore(common.averageScore), totalScore(0), bestScore(0), isOnline(common.isOnline)
@@ -167,14 +170,15 @@ namespace Blokus {
 
     struct PlayerSlot {
         PlayerColor color;
-        QString username;    // Qt 문자열 사용
+        QString username;    // 로그인 ID (Qt 문자열 사용)
+        QString displayName; // 표시명 (사용자가 보는 이름)
         bool isHost;
         bool isReady;
         int score;
         int remainingBlocks;
 
         PlayerSlot()
-            : color(PlayerColor::None), username("")
+            : color(PlayerColor::None), username(""), displayName("")
             , isHost(false), isReady(false), score(0)
             , remainingBlocks(Common::BLOCKS_PER_PLAYER) {
         }  // Common 상수 사용
@@ -183,6 +187,7 @@ namespace Blokus {
         PlayerSlot(const Common::PlayerSlot& common)
             : color(common.color)
             , username(QString::fromUtf8(common.username.c_str()))
+            , displayName(QString::fromUtf8(common.username.c_str())) // Common에는 displayName이 없으므로 username을 사용
             , isHost(common.isHost), isReady(common.isReady)
             , score(common.score), remainingBlocks(common.remainingBlocks) {
         }
@@ -192,7 +197,7 @@ namespace Blokus {
 
         QString getDisplayName() const {
             if (isEmpty()) return QString::fromUtf8("빈 슬롯");
-            return username;
+            return displayName.isEmpty() ? username : displayName;
         }
 
         bool isActive() const { return !isEmpty(); }

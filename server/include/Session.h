@@ -47,6 +47,7 @@ namespace Blokus::Server {
         const std::string& getSessionId() const { return sessionId_; }
         const std::string& getUserId() const { return userId_; }
         const std::string& getUsername() const { return username_; }
+        std::string getDisplayName() const { return userAccount_ ? userAccount_->displayName : username_; }
         ConnectionState getState() const { return state_; }
         int getCurrentRoomId() const { return currentRoomId_; }
 

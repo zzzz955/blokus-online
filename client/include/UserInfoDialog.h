@@ -76,6 +76,7 @@ namespace Blokus {
         QGroupBox* m_basicInfoGroup;
         QLabel* m_avatarLabel;
         QLabel* m_usernameLabel;
+        QLabel* m_displayNameLabel;
         QLabel* m_statusLabel;
 
         // 통계 정보 섹션

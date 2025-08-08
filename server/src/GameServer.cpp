@@ -686,10 +686,11 @@ namespace Blokus::Server {
             for (const auto& lobbySession : lobbyUsers) {
                 if (lobbySession && lobbySession->isActive() && !lobbySession->getUsername().empty()) {
                     std::string username = lobbySession->getUsername();
+                    std::string displayName = lobbySession->getDisplayName();
                     int userLevel = lobbySession->getUserLevel();
                     std::string userStatus = lobbySession->getUserStatusString();
                     
-                    response << ":" << username << "," << userLevel << "," << userStatus;
+                    response << ":" << username << "," << displayName << "," << userLevel << "," << userStatus;
                     validUserCount++;
                 }
             }

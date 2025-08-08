@@ -135,7 +135,7 @@ namespace Blokus {
             pqxx::work txn(*conn);
             try {
                 auto result = txn.exec_params(
-                    "SELECT u.user_id, u.username, u.password_hash, "
+                    "SELECT u.user_id, u.username, u.display_name, u.password_hash, "
                     "       COALESCE(s.total_games, 0), COALESCE(s.wins, 0), COALESCE(s.losses, 0), "
                     "       COALESCE(s.draws, 0), COALESCE(s.level, 1), COALESCE(s.experience_points, 0), "
                     "       COALESCE(s.total_score, 0), COALESCE(s.best_score, 0), "
@@ -155,16 +155,17 @@ namespace Blokus {
                 UserAccount user;
                 user.userId = result[0][0].as<uint32_t>();
                 user.username = result[0][1].as<std::string>();
-                user.passwordHash = result[0][2].as<std::string>();
-                user.totalGames = result[0][3].as<int>();
-                user.wins = result[0][4].as<int>();
-                user.losses = result[0][5].as<int>();
-                user.draws = result[0][6].as<int>();
-                user.level = result[0][7].as<int>();
-                user.experiencePoints = result[0][8].as<int>();
-                user.totalScore = result[0][9].as<int>();
-                user.bestScore = result[0][10].as<int>();
-                user.isActive = result[0][11].as<bool>();
+                user.displayName = result[0][2].is_null() ? user.username : result[0][2].as<std::string>();
+                user.passwordHash = result[0][3].as<std::string>();
+                user.totalGames = result[0][4].as<int>();
+                user.wins = result[0][5].as<int>();
+                user.losses = result[0][6].as<int>();
+                user.draws = result[0][7].as<int>();
+                user.level = result[0][8].as<int>();
+                user.experiencePoints = result[0][9].as<int>();
+                user.totalScore = result[0][10].as<int>();
+                user.bestScore = result[0][11].as<int>();
+                user.isActive = result[0][12].as<bool>();
 
                 txn.commit();
                 dbPool_->returnConnection(std::move(conn));
@@ -179,6 +180,58 @@ namespace Blokus {
             }
         }
 
+        std::optional<UserAccount> DatabaseManager::getUserByDisplayName(const std::string& displayName) {
+            if (!isInitialized_) return std::nullopt;
+
+            auto conn = dbPool_->getConnection();
+            pqxx::work txn(*conn);
+            try {
+                auto result = txn.exec_params(
+                    "SELECT u.user_id, u.username, u.display_name, u.password_hash, "
+                    "       COALESCE(s.total_games, 0), COALESCE(s.wins, 0), COALESCE(s.losses, 0), "
+                    "       COALESCE(s.draws, 0), COALESCE(s.level, 1), COALESCE(s.experience_points, 0), "
+                    "       COALESCE(s.total_score, 0), COALESCE(s.best_score, 0), "
+                    "       u.is_active "
+                    "FROM users u "
+                    "LEFT JOIN user_stats s ON u.user_id = s.user_id "
+                    "WHERE LOWER(u.display_name) = LOWER($1) AND u.is_active = true",
+                    displayName
+                );
+
+                if (result.empty()) {
+                    txn.abort();
+                    dbPool_->returnConnection(std::move(conn));
+                    return std::nullopt;
+                }
+
+                UserAccount user;
+                user.userId = result[0][0].as<uint32_t>();
+                user.username = result[0][1].as<std::string>();
+                user.displayName = result[0][2].is_null() ? user.username : result[0][2].as<std::string>();
+                user.passwordHash = result[0][3].as<std::string>();
+                user.totalGames = result[0][4].as<int>();
+                user.wins = result[0][5].as<int>();
+                user.losses = result[0][6].as<int>();
+                user.draws = result[0][7].as<int>();
+                user.level = result[0][8].as<int>();
+                user.experiencePoints = result[0][9].as<int>();
+                user.totalScore = result[0][10].as<int>();
+                user.bestScore = result[0][11].as<int>();
+                user.isActive = result[0][12].as<bool>();
+
+                txn.commit();
+                dbPool_->returnConnection(std::move(conn));
+                return user;
+
+            }
+            catch (const std::exception& e) {
+                txn.abort();
+                dbPool_->returnConnection(std::move(conn));
+                spdlog::error("getUserByDisplayName 오류: {}", e.what());
+                return std::nullopt;
+            }
+        }
+
         std::optional<UserAccount> DatabaseManager::getUserById(uint32_t userId) {
             if (!isInitialized_) return std::nullopt;
 
@@ -186,9 +239,10 @@ namespace Blokus {
             pqxx::work txn(*conn);
             try {
                 auto result = txn.exec_params(
-                    "SELECT u.user_id, u.username, u.password_hash, "
+                    "SELECT u.user_id, u.username, u.display_name, u.password_hash, "
                     "       COALESCE(s.total_games, 0), COALESCE(s.wins, 0), COALESCE(s.losses, 0), "
                     "       COALESCE(s.draws, 0), COALESCE(s.level, 1), COALESCE(s.experience_points, 0), "
+                    "       COALESCE(s.total_score, 0), COALESCE(s.best_score, 0), "
                     "       u.is_active "
                     "FROM users u "
                     "LEFT JOIN user_stats s ON u.user_id = s.user_id "
@@ -205,13 +259,16 @@ namespace Blokus {
                 UserAccount user;
                 user.userId = result[0]["user_id"].as<uint32_t>();
                 user.username = result[0]["username"].as<std::string>();
+                user.displayName = result[0]["display_name"].is_null() ? user.username : result[0]["display_name"].as<std::string>();
                 user.passwordHash = result[0]["password_hash"].as<std::string>();
-                user.totalGames = result[0][3].as<int>();
-                user.wins = result[0][4].as<int>();
-                user.losses = result[0][5].as<int>();
-                user.draws = result[0][6].as<int>();
-                user.level = result[0][7].as<int>();
-                user.experiencePoints = result[0][8].as<int>();
+                user.totalGames = result[0][4].as<int>();
+                user.wins = result[0][5].as<int>();
+                user.losses = result[0][6].as<int>();
+                user.draws = result[0][7].as<int>();
+                user.level = result[0][8].as<int>();
+                user.experiencePoints = result[0][9].as<int>();
+                user.totalScore = result[0][10].as<int>();
+                user.bestScore = result[0][11].as<int>();
                 user.isActive = result[0]["is_active"].as<bool>();
 
                 txn.commit();
@@ -318,9 +375,10 @@ namespace Blokus {
             pqxx::work txn(*conn);
             try {
                 auto result = txn.exec_params(
-                    "SELECT u.user_id, u.username, u.password_hash, "
+                    "SELECT u.user_id, u.username, u.display_name, u.password_hash, "
                     "       COALESCE(s.total_games, 0), COALESCE(s.wins, 0), COALESCE(s.losses, 0), "
                     "       COALESCE(s.draws, 0), COALESCE(s.level, 1), COALESCE(s.experience_points, 0), "
+                    "       COALESCE(s.total_score, 0), COALESCE(s.best_score, 0), "
                     "       u.is_active "
                     "FROM users u "
                     "LEFT JOIN user_stats s ON u.user_id = s.user_id "
@@ -337,13 +395,16 @@ namespace Blokus {
                 UserAccount user;
                 user.userId = result[0]["user_id"].as<uint32_t>();
                 user.username = result[0]["username"].as<std::string>();
+                user.displayName = result[0]["display_name"].is_null() ? user.username : result[0]["display_name"].as<std::string>();
                 user.passwordHash = result[0]["password_hash"].as<std::string>();
-                user.totalGames = result[0][3].as<int>();
-                user.wins = result[0][4].as<int>();
-                user.losses = result[0][5].as<int>();
-                user.draws = result[0][6].as<int>();
-                user.level = result[0][7].as<int>();
-                user.experiencePoints = result[0][8].as<int>();
+                user.totalGames = result[0][4].as<int>();
+                user.wins = result[0][5].as<int>();
+                user.losses = result[0][6].as<int>();
+                user.draws = result[0][7].as<int>();
+                user.level = result[0][8].as<int>();
+                user.experiencePoints = result[0][9].as<int>();
+                user.totalScore = result[0][10].as<int>();
+                user.bestScore = result[0][11].as<int>();
                 user.isActive = result[0]["is_active"].as<bool>();
 
                 txn.commit();

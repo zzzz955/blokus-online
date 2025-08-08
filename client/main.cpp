@@ -36,7 +36,7 @@ class AppController : public QObject
 
 public:
     AppController()
-        : m_loginWindow(nullptr), m_lobbyWindow(nullptr), m_gameRoomWindow(nullptr), m_networkClient(nullptr), m_currentUsername(""), m_currentRoomInfo(), m_isLoadingInitialSettings(false), m_cachedUserSettings(UserSettings::getDefaults())
+        : m_loginWindow(nullptr), m_lobbyWindow(nullptr), m_gameRoomWindow(nullptr), m_networkClient(nullptr), m_currentUsername(""), m_currentUserInfo(), m_currentRoomInfo(), m_isLoadingInitialSettings(false), m_cachedUserSettings(UserSettings::getDefaults())
     {
         initializeApplication();
         initializeConfiguration();
@@ -134,6 +134,7 @@ private slots:
         }
 
         m_currentUsername.clear();
+        m_currentDisplayname.clear();
         m_currentRoomInfo = GameRoomInfo();
     }
 
@@ -296,7 +297,47 @@ private slots:
             m_loginWindow->setLoginResult(success, message);
         }
     }
-
+    
+    void onUserProfileReceived(const QString &username, const QString &userInfoJson)
+    {
+        qDebug() << QString::fromUtf8("사용자 프로필 정보 수신: %1").arg(username);
+        
+        // JSON 파싱하여 UserInfo 객체 생성
+        QJsonParseError error;
+        QJsonDocument doc = QJsonDocument::fromJson(userInfoJson.toUtf8(), &error);
+        
+        if (error.error != QJsonParseError::NoError) {
+            qDebug() << QString::fromUtf8("❌ 사용자 프로필 JSON 파싱 오류: %1").arg(error.errorString());
+            return;
+        }
+        
+        QJsonObject json = doc.object();
+        UserInfo userInfo;
+        userInfo.username = QString::fromStdString(json["username"].toString().toStdString());
+        userInfo.displayName = QString::fromStdString(json["displayName"].toString().toStdString());
+        userInfo.level = json["level"].toInt();
+        userInfo.totalGames = json["totalGames"].toInt();
+        userInfo.wins = json["wins"].toInt();
+        userInfo.losses = json["losses"].toInt();
+        userInfo.totalScore = json["totalScore"].toInt();
+        userInfo.bestScore = json["bestScore"].toInt();
+        userInfo.experience = json["experiencePoints"].toInt();
+        userInfo.isOnline = true;
+        userInfo.status = QString::fromUtf8("로비");
+        
+        // 전역 사용자 정보 캐싱
+        m_currentUserInfo = userInfo;
+        m_currentUsername = username;
+        m_currentDisplayname = userInfo.displayName;
+        
+        // LobbyWindow에 사용자 정보 설정
+        if (m_lobbyWindow) {
+            m_lobbyWindow->setMyUserInfo(userInfo);
+        }
+        
+        qDebug() << QString::fromUtf8("✅ 사용자 프로필 캐싱 완료: %1 (표시명: %2)")
+                    .arg(userInfo.username).arg(userInfo.displayName);
+    }
 
     void onLobbyEntered()
     {
@@ -304,64 +345,22 @@ private slots:
         // 서버에서 로그인 시 자동으로 로비 정보를 전송하므로 별도 요청 불필요
     }
 
-    void onLobbyUserListReceived(const QStringList &users)
+    void onLobbyUserListReceived(const QList<UserInfo> &users)
     {
         qDebug() << QString::fromUtf8("로비 사용자 목록 업데이트: %1명").arg(users.size());
         if (m_lobbyWindow)
         {
-            QList<UserInfo> userList;
-            for (const QString &userDisplayText : users)
-            {
-                UserInfo user;
-                
-                // "Lv.3 zzzz955 (로비)" 형태에서 실제 username만 추출
-                // 정규식을 사용하여 "Lv.숫자 실제이름 (상태)" 패턴에서 실제이름만 추출
-                QRegExp userRegex("^Lv\\.\\d+\\s+([^\\s]+)\\s+\\([^)]+\\)$");
-                if (userRegex.indexIn(userDisplayText) != -1) {
-                    // 정규식 매치된 경우 - 새로운 형식
-                    user.username = userRegex.cap(1); // 실제 username
-                    
-                    // 레벨과 상태도 추출
-                    QRegExp levelRegex("^Lv\\.(\\d+)");
-                    QRegExp statusRegex("\\(([^)]+)\\)$");
-                    
-                    if (levelRegex.indexIn(userDisplayText) != -1) {
-                        user.level = levelRegex.cap(1).toInt();
-                    } else {
-                        user.level = 1;
-                    }
-                    
-                    if (statusRegex.indexIn(userDisplayText) != -1) {
-                        user.status = statusRegex.cap(1);
-                    } else {
-                        user.status = QString::fromUtf8("온라인");
-                    }
-                } else {
-                    // 구버전 형식 또는 단순 username
-                    user.username = userDisplayText;
-                    user.status = QString::fromUtf8("온라인");
-                    user.level = 1;
-                }
-                
-                user.totalGames = 0;
-                user.wins = 0;
-                user.losses = 0;
-                userList.append(user);
-                
-                qDebug() << QString::fromUtf8("사용자 파싱: 표시='%1' -> 실제username='%2', 레벨=%3, 상태='%4'")
-                         .arg(userDisplayText).arg(user.username).arg(user.level).arg(user.status);
-            }
-            m_lobbyWindow->updateUserList(userList);
+            m_lobbyWindow->updateUserList(users);
         }
     }
 
-    void onLobbyUserJoined(const QString &username)
+    void onLobbyUserJoined(const QString &displayname)
     {
-        qDebug() << QString::fromUtf8("사용자 로비 입장: %1").arg(username);
+        qDebug() << QString::fromUtf8("사용자 로비 입장: %1").arg(displayname);
         if (m_lobbyWindow)
         {
             // 자신의 로그인 브로드캐스트는 시스템 메시지 및 중복 요청 제외
-            if (username != m_currentUsername) {
+            if (displayname != m_currentDisplayname) {
                 if (m_networkClient && m_networkClient->isConnected())
                 {
                     m_networkClient->requestLobbyList();
@@ -420,72 +419,48 @@ private slots:
     void onUserStatsReceived(const QString &statsJson)
     {
         qDebug() << QString::fromUtf8("사용자 통계 정보 수신: %1").arg(statsJson);
+        
+        // JSON 파싱하여 UserInfo 객체 생성
+        QJsonParseError error;
+        QJsonDocument doc = QJsonDocument::fromJson(statsJson.toUtf8(), &error);
+        
+        if (error.error != QJsonParseError::NoError) {
+            qDebug() << QString::fromUtf8("❌ 사용자 통계 JSON 파싱 오류: %1").arg(error.errorString());
+            return;
+        }
+        
         if (m_lobbyWindow)
         {
-            // JSON 파싱해서 UserInfo 구조체 구성
+            QJsonObject json = doc.object();
             UserInfo userInfo;
 
             // JSON에서 정보 추출
-            QRegExp usernameRegex("\"username\":\"([^\"]+)\"");
-            QRegExp levelRegex("\"level\":(\\d+)");
-            QRegExp currentExpRegex("\"currentExp\":(\\d+)");
-            QRegExp requiredExpRegex("\"requiredExp\":(\\d+)");
-            QRegExp totalGamesRegex("\"totalGames\":(\\d+)");
-            QRegExp winsRegex("\"wins\":(\\d+)");
-            QRegExp lossesRegex("\"losses\":(\\d+)");
-            QRegExp drawsRegex("\"draws\":(\\d+)");
-            QRegExp winRateRegex("\"winRate\":([\\d.]+)");
-            QRegExp statusRegex("\"status\":\"([^\"]+)\"");
-
-            if (usernameRegex.indexIn(statsJson) != -1)
-                userInfo.username = usernameRegex.cap(1);
-            if (levelRegex.indexIn(statsJson) != -1)
-                userInfo.level = levelRegex.cap(1).toInt();
-            if (currentExpRegex.indexIn(statsJson) != -1)
-                userInfo.experience = currentExpRegex.cap(1).toInt();
-            if (requiredExpRegex.indexIn(statsJson) != -1)
-                userInfo.requiredExp = requiredExpRegex.cap(1).toInt();
-            if (totalGamesRegex.indexIn(statsJson) != -1) {
-                int totalGames = totalGamesRegex.cap(1).toInt();
-                userInfo.gamesPlayed = totalGames;
-                userInfo.totalGames = totalGames;
+            userInfo.username = json["username"].toString();
+            userInfo.displayName = json["displayName"].toString();
+            if (userInfo.displayName.isEmpty()) {
+                userInfo.displayName = userInfo.username; // Fallback to username if displayName not found
             }
-            if (winsRegex.indexIn(statsJson) != -1)
-                userInfo.wins = winsRegex.cap(1).toInt();
-            if (lossesRegex.indexIn(statsJson) != -1)
-                userInfo.losses = lossesRegex.cap(1).toInt();
-            if (drawsRegex.indexIn(statsJson) != -1)
-                userInfo.draws = drawsRegex.cap(1).toInt();
-            if (winRateRegex.indexIn(statsJson) != -1)
-                userInfo.winRate = winRateRegex.cap(1).toDouble();
-            if (statusRegex.indexIn(statsJson) != -1)
-                userInfo.status = statusRegex.cap(1);
-            
-            // 점수 관련 필드 파싱 (서버에서 제공)
-            QRegExp averageScoreRegex("\"averageScore\":([\\d.]+)");
-            QRegExp totalScoreRegex("\"totalScore\":(\\d+)");
-            QRegExp bestScoreRegex("\"bestScore\":(\\d+)");
-            
-            if (averageScoreRegex.indexIn(statsJson) != -1)
-                userInfo.averageScore = averageScoreRegex.cap(1).toDouble();
-            else
-                userInfo.averageScore = 0;
-                
-            if (totalScoreRegex.indexIn(statsJson) != -1)
-                userInfo.totalScore = totalScoreRegex.cap(1).toInt();
-            else
-                userInfo.totalScore = 0;
-                
-            if (bestScoreRegex.indexIn(statsJson) != -1)
-                userInfo.bestScore = bestScoreRegex.cap(1).toInt();
-            else
-                userInfo.bestScore = 0;
+            userInfo.level = json["level"].toInt();
+            userInfo.experience = json["currentExp"].toInt();
+            userInfo.requiredExp = json["requiredExp"].toInt();
+            userInfo.totalGames = json["totalGames"].toInt();
+            userInfo.gamesPlayed = userInfo.totalGames;
+            userInfo.wins = json["wins"].toInt();
+            userInfo.losses = json["losses"].toInt();
+            userInfo.draws = json["draws"].toInt();
+            userInfo.winRate = json["winRate"].toDouble();
+            userInfo.status = json["status"].toString();
+            userInfo.isOnline = true;
+            userInfo.averageScore = json["averageScore"].toInt();
+            userInfo.totalScore = json["totalScore"].toInt();
+            userInfo.bestScore = json["bestScore"].toInt();
 
             // 자신의 정보인지 다른 사용자의 정보인지 확인
             qDebug() << QString::fromUtf8("사용자 정보 비교: 응답='%1', 현재='%2'").arg(userInfo.username).arg(m_currentUsername);
             
             if (userInfo.username == m_currentUsername) {
-                // 자신의 정보면 UI 업데이트 + 모달 표시
+                // 자신의 정보면 전역 정보 업데이트 + UI 업데이트 + 모달 표시
+                m_currentUserInfo = userInfo;
                 qDebug() << QString::fromUtf8("자신의 정보로 판단하여 setMyUserInfo + showUserInfoDialog 호출");
                 m_lobbyWindow->setMyUserInfo(userInfo);
                 m_lobbyWindow->showUserInfoDialog(userInfo);
@@ -500,68 +475,44 @@ private slots:
     void onMyStatsUpdated(const QString &statsJson)
     {
         qDebug() << QString::fromUtf8("내 통계 정보 자동 업데이트: %1").arg(statsJson);
+        
+        // JSON 파싱하여 UserInfo 객체 생성
+        QJsonParseError error;
+        QJsonDocument doc = QJsonDocument::fromJson(statsJson.toUtf8(), &error);
+        
+        if (error.error != QJsonParseError::NoError) {
+            qDebug() << QString::fromUtf8("❌ 내 통계 JSON 파싱 오류: %1").arg(error.errorString());
+            return;
+        }
+        
         if (m_lobbyWindow)
         {
-            // JSON 파싱해서 UserInfo 구조체 구성 (onUserStatsReceived와 동일한 로직)
+            QJsonObject json = doc.object();
             UserInfo userInfo;
 
             // JSON에서 정보 추출
-            QRegExp usernameRegex("\"username\":\"([^\"]+)\"");
-            QRegExp levelRegex("\"level\":(\\d+)");
-            QRegExp currentExpRegex("\"currentExp\":(\\d+)");
-            QRegExp requiredExpRegex("\"requiredExp\":(\\d+)");
-            QRegExp totalGamesRegex("\"totalGames\":(\\d+)");
-            QRegExp winsRegex("\"wins\":(\\d+)");
-            QRegExp lossesRegex("\"losses\":(\\d+)");
-            QRegExp drawsRegex("\"draws\":(\\d+)");
-            QRegExp winRateRegex("\"winRate\":([\\d.]+)");
-            QRegExp statusRegex("\"status\":\"([^\"]+)\"");
-
-            if (usernameRegex.indexIn(statsJson) != -1)
-                userInfo.username = usernameRegex.cap(1);
-            if (levelRegex.indexIn(statsJson) != -1)
-                userInfo.level = levelRegex.cap(1).toInt();
-            if (currentExpRegex.indexIn(statsJson) != -1)
-                userInfo.experience = currentExpRegex.cap(1).toInt();
-            if (requiredExpRegex.indexIn(statsJson) != -1)
-                userInfo.requiredExp = requiredExpRegex.cap(1).toInt();
-            if (totalGamesRegex.indexIn(statsJson) != -1) {
-                int totalGames = totalGamesRegex.cap(1).toInt();
-                userInfo.gamesPlayed = totalGames;
-                userInfo.totalGames = totalGames;
+            userInfo.username = json["username"].toString();
+            userInfo.displayName = json["displayName"].toString();
+            if (userInfo.displayName.isEmpty()) {
+                userInfo.displayName = userInfo.username; // Fallback to username if displayName not found
             }
-            if (winsRegex.indexIn(statsJson) != -1)
-                userInfo.wins = winsRegex.cap(1).toInt();
-            if (lossesRegex.indexIn(statsJson) != -1)
-                userInfo.losses = lossesRegex.cap(1).toInt();
-            if (drawsRegex.indexIn(statsJson) != -1)
-                userInfo.draws = drawsRegex.cap(1).toInt();
-            if (winRateRegex.indexIn(statsJson) != -1)
-                userInfo.winRate = winRateRegex.cap(1).toDouble();
-            if (statusRegex.indexIn(statsJson) != -1)
-                userInfo.status = statusRegex.cap(1);
-            
-            // 점수 관련 필드 파싱 (서버에서 제공)
-            QRegExp averageScoreRegex("\"averageScore\":([\\d.]+)");
-            QRegExp totalScoreRegex("\"totalScore\":(\\d+)");
-            QRegExp bestScoreRegex("\"bestScore\":(\\d+)");
-            
-            if (averageScoreRegex.indexIn(statsJson) != -1)
-                userInfo.averageScore = averageScoreRegex.cap(1).toDouble();
-            else
-                userInfo.averageScore = 0;
-                
-            if (totalScoreRegex.indexIn(statsJson) != -1)
-                userInfo.totalScore = totalScoreRegex.cap(1).toInt();
-            else
-                userInfo.totalScore = 0;
-                
-            if (bestScoreRegex.indexIn(statsJson) != -1)
-                userInfo.bestScore = bestScoreRegex.cap(1).toInt();
-            else
-                userInfo.bestScore = 0;
+            userInfo.level = json["level"].toInt();
+            userInfo.experience = json["currentExp"].toInt();
+            userInfo.requiredExp = json["requiredExp"].toInt();
+            userInfo.totalGames = json["totalGames"].toInt();
+            userInfo.gamesPlayed = userInfo.totalGames;
+            userInfo.wins = json["wins"].toInt();
+            userInfo.losses = json["losses"].toInt();
+            userInfo.draws = json["draws"].toInt();
+            userInfo.winRate = json["winRate"].toDouble();
+            userInfo.status = json["status"].toString();
+            userInfo.isOnline = true;
+            userInfo.averageScore = json["averageScore"].toInt();
+            userInfo.totalScore = json["totalScore"].toInt();
+            userInfo.bestScore = json["bestScore"].toInt();
 
-            // 자동 업데이트는 모달 표시 없이 UI만 업데이트
+            // 전역 사용자 정보 업데이트 (자동 업데이트는 모달 표시 없이 UI만 업데이트)
+            m_currentUserInfo = userInfo;
             m_lobbyWindow->setMyUserInfo(userInfo);
         }
     }
@@ -679,14 +630,14 @@ private slots:
         GameRoomInfo gameRoomInfo;
         gameRoomInfo.roomId = roomId;
         gameRoomInfo.roomName = roomName;
-        gameRoomInfo.hostUsername = m_currentUsername;
+        gameRoomInfo.hostUsername = m_currentDisplayname;
         gameRoomInfo.hostColor = PlayerColor::Blue;
         gameRoomInfo.maxPlayers = 4;
         gameRoomInfo.gameMode = QString::fromUtf8("클래식");
         gameRoomInfo.isPlaying = false;
 
         // 호스트로 설정 (0번 인덱스 = Blue 색상)
-        gameRoomInfo.playerSlots[0].username = m_currentUsername;
+        gameRoomInfo.playerSlots[0].username = m_currentDisplayname;
         gameRoomInfo.playerSlots[0].isHost = true;
         gameRoomInfo.playerSlots[0].isReady = true;
         gameRoomInfo.playerSlots[0].color = PlayerColor::Blue;
@@ -780,6 +731,20 @@ private slots:
         }
     }
 
+    // displayName 포함 채팅 메시지 처리
+    void onChatMessageReceivedWithDisplayName(const QString &username, const QString &displayName, const QString &message)
+    {
+        qDebug() << QString::fromUtf8("채팅 메시지 수신 (displayName 포함): [%1] (%2) %3").arg(displayName).arg(username).arg(message);
+
+        // GameRoomWindow에 displayName 캐시 업데이트
+        if (m_gameRoomWindow) {
+            m_gameRoomWindow->updateDisplayNameCache(username, displayName);
+        }
+        
+        // 기존 처리 로직과 동일하게 처리
+        onChatMessageReceived(username, message);
+    }
+
     // 로비 채팅 핸들러 추가
     void handleLobbyChatMessage(const QString &message)
     {
@@ -867,22 +832,56 @@ private slots:
         gameRoomInfo.gameMode = gameMode;
         gameRoomInfo.isPlaying = isPlaying;
 
-        // 플레이어 정보 파싱 (9번 인덱스부터) - 형식: userId,username,isHost,isReady,colorIndex
+        // 플레이어 정보 파싱 (9번 인덱스부터) - 형식: userId,username,displayName,isHost,isReady,colorIndex
         qDebug() << QString::fromUtf8("플레이어 데이터 파싱 시작: %1개 항목").arg(roomInfo.size() - 9);
         for (int i = 9; i < roomInfo.size(); ++i)
         {
             QStringList playerData = roomInfo[i].split(',');
             qDebug() << QString::fromUtf8("플레이어 %1: %2 (필드 수: %3)").arg(i - 8).arg(roomInfo[i]).arg(playerData.size());
 
-            if (playerData.size() >= 5)
+            if (playerData.size() >= 6)
             {
+                // 새로운 형식: userId,username,displayName,isHost,isReady,colorIndex
+                QString userId = playerData[0];
+                QString username = playerData[1];
+                QString displayName = playerData[2];
+                bool isHost = (playerData[3] == "1");
+                bool isReady = (playerData[4] == "1");
+                int colorIndex = playerData[5].toInt();
+
+                qDebug() << QString::fromUtf8("  - 사용자: %1 [%2], 색상: %3").arg(displayName).arg(username).arg(colorIndex);
+
+                // 색상 인덱스를 기반으로 정확한 슬롯에 배치 (PlayerColor 1-4를 배열 인덱스 0-3으로 변환)
+                // 잘못된 색상 값(11 등)을 1-4 범위로 정규화
+                int normalizedColorIndex = ((colorIndex - 1) % 4) + 1;
+                if (normalizedColorIndex >= 1 && normalizedColorIndex <= 4)
+                {
+                    PlayerColor playerColor = static_cast<PlayerColor>(normalizedColorIndex);
+                    int slotIndex = normalizedColorIndex - 1; // PlayerColor 1-4를 배열 인덱스 0-3으로 변환
+
+                    qDebug() << QString::fromUtf8("🔧 슬롯 %1에 플레이어 배치: %2 [%3] (색상=%4)")
+                                    .arg(slotIndex)
+                                    .arg(displayName)
+                                    .arg(username)
+                                    .arg(colorIndex);
+
+                    gameRoomInfo.playerSlots[slotIndex].username = username;
+                    gameRoomInfo.playerSlots[slotIndex].displayName = displayName;
+                    gameRoomInfo.playerSlots[slotIndex].isHost = isHost;
+                    gameRoomInfo.playerSlots[slotIndex].isReady = isReady;
+                    gameRoomInfo.playerSlots[slotIndex].color = playerColor;
+                }
+            }
+            else if (playerData.size() >= 5)
+            {
+                // 구버전 호환성을 위한 기존 형식 지원: userId,username,isHost,isReady,colorIndex
                 QString userId = playerData[0];
                 QString username = playerData[1];
                 bool isHost = (playerData[2] == "1");
                 bool isReady = (playerData[3] == "1");
                 int colorIndex = playerData[4].toInt();
 
-                qDebug() << QString::fromUtf8("  - 사용자: %1, 색상: %2").arg(username).arg(colorIndex);
+                qDebug() << QString::fromUtf8("  - 사용자 (구버전): %1, 색상: %2").arg(username).arg(colorIndex);
 
                 // 색상 인덱스를 기반으로 정확한 슬롯에 배치 (PlayerColor 1-4를 배열 인덱스 0-3으로 변환)
                 // 잘못된 색상 값(11 등)을 1-4 범위로 정규화
@@ -898,6 +897,7 @@ private slots:
                                     .arg(colorIndex);
 
                     gameRoomInfo.playerSlots[slotIndex].username = username;
+                    gameRoomInfo.playerSlots[slotIndex].displayName = username; // Fallback to username
                     gameRoomInfo.playerSlots[slotIndex].isHost = isHost;
                     gameRoomInfo.playerSlots[slotIndex].isReady = isReady;
                     gameRoomInfo.playerSlots[slotIndex].color = playerColor;
@@ -905,7 +905,7 @@ private slots:
             }
             else if (playerData.size() >= 4)
             {
-                // 하위 호환성을 위한 기존 형식 지원
+                // 최구버전 호환성을 위한 기존 형식 지원
                 QString userId = playerData[0];
                 QString username = playerData[1];
                 bool isHost = (playerData[2] == "1");
@@ -917,6 +917,7 @@ private slots:
                     if (gameRoomInfo.playerSlots[slot].isEmpty())
                     {
                         gameRoomInfo.playerSlots[slot].username = username;
+                        gameRoomInfo.playerSlots[slot].displayName = username; // Fallback to username
                         gameRoomInfo.playerSlots[slot].isHost = isHost;
                         gameRoomInfo.playerSlots[slot].isReady = isReady;
                         gameRoomInfo.playerSlots[slot].color = static_cast<PlayerColor>(slot + 1);
@@ -955,7 +956,8 @@ private slots:
         qDebug() << QString::fromUtf8("플레이어 방 입장: %1").arg(username);
         if (m_gameRoomWindow)
         {
-            m_gameRoomWindow->addSystemMessage(QString::fromUtf8("%1님이 방에 입장했습니다.").arg(username));
+            QString displayName = m_gameRoomWindow->getDisplayNameFromUsername(username);
+            m_gameRoomWindow->addSystemMessage(QString::fromUtf8("%1님이 방에 입장했습니다.").arg(displayName));
         }
     }
 
@@ -983,7 +985,8 @@ private slots:
 
             // 개별 플레이어의 준비 상태만 업데이트 (전체 룸 정보는 건드리지 않음)
             m_gameRoomWindow->updatePlayerReadyState(username, ready);
-            m_gameRoomWindow->addSystemMessage(QString::fromUtf8("%1님이 %2했습니다.").arg(username).arg(status));
+            QString displayName = m_gameRoomWindow->getDisplayNameFromUsername(username);
+            m_gameRoomWindow->addSystemMessage(QString::fromUtf8("%1님이 %2했습니다.").arg(displayName).arg(status));
         }
     }
 
@@ -993,6 +996,43 @@ private slots:
         if (m_gameRoomWindow)
         {
             m_gameRoomWindow->addSystemMessage(QString::fromUtf8("%1님이 새로운 방장이 되었습니다.").arg(newHost));
+        }
+    }
+
+    // displayName 지원 메서드들
+    void onPlayerJoinedWithDisplayName(const QString &username, const QString &displayName)
+    {
+        qDebug() << QString::fromUtf8("플레이어 방 입장 (displayName 포함): %1 (%2)").arg(username).arg(displayName);
+        if (m_gameRoomWindow)
+        {
+            // displayName 캐시 업데이트
+            m_gameRoomWindow->onPlayerJoinedWithDisplayName(username, displayName);
+            // 시스템 메시지는 displayName으로 표시
+            m_gameRoomWindow->addSystemMessage(QString::fromUtf8("%1님이 방에 입장했습니다.").arg(displayName));
+        }
+    }
+
+    void onPlayerLeftWithDisplayName(const QString &username, const QString &displayName)
+    {
+        qDebug() << QString::fromUtf8("플레이어 방 퇴장 (displayName 포함): %1 (%2)").arg(username).arg(displayName);
+        if (m_gameRoomWindow)
+        {
+            // displayName 캐시에서 제거
+            m_gameRoomWindow->onPlayerLeftWithDisplayName(username, displayName);
+            // 서버에서 이미 시스템 메시지를 보내므로 중복 메시지 제거
+            // m_gameRoomWindow->addSystemMessage(QString::fromUtf8("%1님이 방을 나갔습니다.").arg(displayName));
+        }
+    }
+
+    void onHostChangedWithDisplayName(const QString &username, const QString &displayName)
+    {
+        qDebug() << QString::fromUtf8("방장 변경 (displayName 포함): %1 (%2)").arg(username).arg(displayName);
+        if (m_gameRoomWindow)
+        {
+            // displayName 캐시 업데이트 (새 방장의 displayName)
+            m_gameRoomWindow->onHostChangedWithDisplayName(username, displayName);
+            // 시스템 메시지는 displayName으로 표시
+            m_gameRoomWindow->addSystemMessage(QString::fromUtf8("%1님이 새로운 방장이 되었습니다.").arg(displayName));
         }
     }
 
@@ -1147,21 +1187,24 @@ private:
             {
                 QString playerName = it.key();
                 int score = it.value().toInt();
-                resultMessage += QString::fromUtf8("  %1: %2점\n").arg(playerName).arg(score);
+                QString displayName = m_gameRoomWindow->getDisplayNameFromUsername(playerName);
+                resultMessage += QString::fromUtf8("  %1: %2점\n").arg(displayName).arg(score);
             }
 
             // 승자 표시
             resultMessage += QString::fromUtf8("\n🏆 승리자: ");
             if (winners.size() == 1)
             {
-                resultMessage += winners[0].toString() + QString::fromUtf8("님!");
+                QString winnerDisplayName = m_gameRoomWindow->getDisplayNameFromUsername(winners[0].toString());
+                resultMessage += winnerDisplayName + QString::fromUtf8("님!");
             }
             else if (winners.size() > 1)
             {
                 QStringList winnerNames;
                 for (int i = 0; i < winners.size(); ++i)
                 {
-                    winnerNames << winners[i].toString();
+                    QString winnerDisplayName = m_gameRoomWindow->getDisplayNameFromUsername(winners[i].toString());
+                    winnerNames << winnerDisplayName;
                 }
                 resultMessage += winnerNames.join(", ") + QString::fromUtf8("님들! (동점)");
             }
@@ -1287,6 +1330,8 @@ private:
         // 인증 관련 시그널
         connect(m_networkClient, &NetworkClient::loginResult,
                 this, &AppController::onLoginResult);
+        connect(m_networkClient, &NetworkClient::userProfileReceived,
+                this, &AppController::onUserProfileReceived);
 
         // 일반 에러 시그널 추가
         connect(m_networkClient, &NetworkClient::errorReceived,
@@ -1335,6 +1380,8 @@ private:
         // 채팅 관련 시그널
         connect(m_networkClient, &NetworkClient::chatMessageReceived,
                 this, &AppController::onChatMessageReceived);
+        connect(m_networkClient, &NetworkClient::chatMessageReceivedWithDisplayName,
+                this, &AppController::onChatMessageReceivedWithDisplayName);
 
         // 방 정보 동기화 시그널
         connect(m_networkClient, &NetworkClient::roomInfoReceived,
@@ -1349,6 +1396,15 @@ private:
                 this, &AppController::onPlayerReady);
         connect(m_networkClient, &NetworkClient::hostChanged,
                 this, &AppController::onHostChanged);
+        
+        // displayName 지원 시그널들
+        connect(m_networkClient, &NetworkClient::playerJoinedWithDisplayName,
+                this, &AppController::onPlayerJoinedWithDisplayName);
+        connect(m_networkClient, &NetworkClient::playerLeftWithDisplayName,
+                this, &AppController::onPlayerLeftWithDisplayName);
+        connect(m_networkClient, &NetworkClient::hostChangedWithDisplayName,
+                this, &AppController::onHostChangedWithDisplayName);
+        
         connect(m_networkClient, &NetworkClient::gameStarted,
                 this, &AppController::onGameStarted);
         connect(m_networkClient, &NetworkClient::gameEnded,
@@ -1394,7 +1450,7 @@ private:
 
         try
         {
-            m_lobbyWindow = new Blokus::LobbyWindow(m_currentUsername);
+            m_lobbyWindow = new Blokus::LobbyWindow(m_currentUsername, m_currentDisplayname);
             
             // 설정에서 창 크기 적용
             auto& config = ClientConfigManager::instance();
@@ -1421,6 +1477,15 @@ private:
             m_lobbyWindow->show();
             m_lobbyWindow->raise();
             m_lobbyWindow->activateWindow();
+
+            // 로비 진입 시 자동으로 사용자 목록과 방 목록 갱신 요청
+            if (m_networkClient && m_networkClient->isConnected()) {
+                qDebug() << QString::fromUtf8("로비 진입: 사용자 목록 및 방 목록 자동 갱신 요청");
+                QTimer::singleShot(100, [this]() {
+                    m_networkClient->requestLobbyList();  // 사용자 목록 갱신
+                    m_networkClient->requestRoomList();   // 방 목록 갱신
+                });
+            }
 
             qDebug() << QString::fromUtf8("로비 창 생성 완료");
         }
@@ -1455,7 +1520,7 @@ private:
             }
 
             // 새 게임 룸 창 생성
-            m_gameRoomWindow = new Blokus::GameRoomWindow(roomInfo, m_currentUsername);
+            m_gameRoomWindow = new Blokus::GameRoomWindow(roomInfo, m_currentUsername, m_currentDisplayname);
             m_currentRoomInfo = roomInfo;
             
             // 설정에서 창 크기 적용
@@ -1548,6 +1613,8 @@ private:
     Blokus::GameRoomWindow *m_gameRoomWindow;
     Blokus::NetworkClient *m_networkClient;
     QString m_currentUsername;
+    QString m_currentDisplayname;
+    UserInfo m_currentUserInfo;
     Blokus::GameRoomInfo m_currentRoomInfo;
     
     // 설정 캐싱 관련

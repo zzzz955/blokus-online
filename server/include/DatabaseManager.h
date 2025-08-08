@@ -15,6 +15,7 @@ namespace Blokus {
         struct UserAccount {
             uint32_t userId;
             std::string username;
+            std::string displayName;  // 사용자 표시명
             std::string passwordHash;
             int totalGames;
             int wins;
@@ -59,6 +60,7 @@ namespace Blokus {
 
             // 사용자 조회
             std::optional<UserAccount> getUserByUsername(const std::string& username);
+            std::optional<UserAccount> getUserByDisplayName(const std::string& displayName);
             std::optional<UserAccount> getUserById(uint32_t userId);
 
             // 사용자 생성/수정

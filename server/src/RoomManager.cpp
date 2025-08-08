@@ -185,7 +185,9 @@ namespace Blokus {
             spdlog::info("✅ 방 참여 성공: 플레이어 '{}' -> 방 {} ({}명)",
                 username, roomId, room->getPlayerCount());
 
-            triggerRoomEvent(roomId, "PLAYER_JOINED", username);
+            // displayName 포함하여 이벤트 전송
+            std::string displayName = session->getDisplayName();
+            triggerRoomEvent(roomId, "PLAYER_JOINED", username + ":" + displayName);
 
             return true;
         }
@@ -216,6 +218,7 @@ namespace Blokus {
             }
 
             std::string username = player->getUsername();
+            std::string displayName = player->getDisplayName();
 
             // 방에서 플레이어 제거
             if (!room->removePlayer(userId)) {
@@ -229,7 +232,8 @@ namespace Blokus {
             spdlog::info("✅ 방 나가기 성공: 플레이어 '{}' <- 방 {} ({}명)",
                 username, roomId, room->getPlayerCount());
 
-            triggerRoomEvent(roomId, "PLAYER_LEFT", username);
+            // displayName 포함하여 이벤트 전송
+            triggerRoomEvent(roomId, "PLAYER_LEFT", username + ":" + displayName);
 
             // 방이 비었거나 해체 상태라면 제거
             if (room->isEmpty() || room->getState() == RoomState::Disbanded) {

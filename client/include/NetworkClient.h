@@ -9,6 +9,7 @@
 #include <QJsonObject>
 #include <functional>
 #include <unordered_map>
+#include "ClientTypes.h"
 
 namespace Blokus {
 
@@ -77,6 +78,7 @@ namespace Blokus {
         void loginResult(bool success, const QString& message, const QString& sessionToken = "");
         void registerResult(bool success, const QString& message);
         void logoutResult(bool success);
+        void userProfileReceived(const QString& username, const QString& userInfoJson);
 
         // 메시지 시그널
         void messageReceived(const QString& message);
@@ -89,7 +91,7 @@ namespace Blokus {
         // 로비 시그널
         void lobbyEntered();
         void lobbyLeft();
-        void lobbyUserListReceived(const QStringList& users);
+        void lobbyUserListReceived(const QList<UserInfo>& users);
         void lobbyUserJoined(const QString& username);
         void lobbyUserLeft(const QString& username);
         void roomListReceived(const QStringList& rooms);
@@ -117,6 +119,11 @@ namespace Blokus {
         void gameResult(const QString& resultJson);
         void gameReset(); // 게임 리셋 신호
         
+        // displayName 지원 추가 시그널들
+        void playerJoinedWithDisplayName(const QString& username, const QString& displayName);
+        void playerLeftWithDisplayName(const QString& username, const QString& displayName);
+        void hostChangedWithDisplayName(const QString& username, const QString& displayName);
+        
         // 게임 상태 동기화 시그널
         void gameStateUpdated(const QString& gameStateJson);
         void blockPlaced(const QString& playerName, int blockType, int row, int col, int rotation, int flip, int playerColor, int scoreGained);
@@ -125,6 +132,7 @@ namespace Blokus {
         
         // 채팅 시그널
         void chatMessageReceived(const QString& username, const QString& message);
+        void chatMessageReceivedWithDisplayName(const QString& username, const QString& displayName, const QString& message);
         void chatMessageSent();
         
         // AFK 관련 시그널

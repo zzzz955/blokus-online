@@ -563,9 +563,42 @@ namespace Blokus {
     {
         QStringList parts = response.split(':');
         
-        if (parts[0] == "AUTH_SUCCESS" && parts.size() >= 3) {
+        if (parts[0] == "AUTH_SUCCESS" && parts.size() >= 10) {
             QString username = parts[1];
             QString sessionToken = parts[2];
+            QString displayName = parts[3];
+            int level = parts[4].toInt();
+            int totalGames = parts[5].toInt();
+            int wins = parts[6].toInt();
+            int losses = parts[7].toInt();
+            int totalScore = parts[8].toInt();
+            int bestScore = parts[9].toInt();
+            int experiencePoints = parts[10].toInt();
+            
+            m_currentSessionToken = sessionToken;
+            setState(ConnectionState::Authenticated);
+            emit loginResult(true, QString::fromUtf8("로그인 성공"), sessionToken);
+            
+            // ':' 구분자 기반 사용자 정보를 JSON 형태로 변환하여 전송
+            QJsonObject userInfoJson;
+            userInfoJson["username"] = username;
+            userInfoJson["displayName"] = displayName;
+            userInfoJson["level"] = level;
+            userInfoJson["totalGames"] = totalGames;
+            userInfoJson["wins"] = wins;
+            userInfoJson["losses"] = losses;
+            userInfoJson["totalScore"] = totalScore;
+            userInfoJson["bestScore"] = bestScore;
+            userInfoJson["experiencePoints"] = experiencePoints;
+            
+            QJsonDocument doc(userInfoJson);
+            emit userProfileReceived(username, doc.toJson(QJsonDocument::Compact));
+        }
+        else if (parts[0] == "AUTH_SUCCESS" && parts.size() >= 3) {
+            // 기존 호환성을 위한 폴백
+            QString username = parts[1];
+            QString sessionToken = parts[2];
+            
             m_currentSessionToken = sessionToken;
             setState(ConnectionState::Authenticated);
             emit loginResult(true, QString::fromUtf8("로그인 성공"), sessionToken);
@@ -593,30 +626,52 @@ namespace Blokus {
         }
         else if (parts[0] == "LOBBY_USER_LIST" && parts.size() >= 2) {
             int userCount = parts[1].toInt();
-            QStringList users;
+            QList<UserInfo> users;
             
             qDebug() << QString::fromUtf8("로비 사용자 목록 수신: 총 %1명, 파트 개수: %2").arg(userCount).arg(parts.size());
             
-            // 서버 형식: LOBBY_USER_LIST:count:user1,level1,status1:user2,level2,status2...
+            // 서버 형식: LOBBY_USER_LIST:count:user1,displayName1,level1,status1:user2,displayName2,level2,status2...
             for (int i = 2; i < parts.size(); ++i) {
                 if (!parts[i].isEmpty()) {
                     QStringList userInfo = parts[i].split(',');
-                    if (userInfo.size() >= 3) {
-                        QString username = userInfo[0];
-                        int level = userInfo[1].toInt();
-                        QString status = userInfo[2];
+                    if (userInfo.size() >= 4) {
+                        // 새로운 형식: username,displayName,level,status
+                        UserInfo user;
+                        user.username = userInfo[0];
+                        user.displayName = userInfo[1];
+                        user.level = userInfo[2].toInt();
+                        user.status = userInfo[3];
+                        user.isOnline = true;
                         
-                        users.append(QString::fromUtf8("Lv.%1 %2 (%3)").arg(level).arg(username).arg(status));
-                        qDebug() << QString::fromUtf8("사용자 추가: %1 (레벨: %2, 상태: %3)").arg(username).arg(level).arg(status);
+                        users.append(user);
+                        qDebug() << QString::fromUtf8("사용자 추가: %1 [%2] (레벨: %3, 상태: %4)").arg(user.displayName).arg(user.username).arg(user.level).arg(user.status);
+                    } else if (userInfo.size() >= 3) {
+                        // 구버전 호환성을 위한 처리: username,level,status
+                        UserInfo user;
+                        user.username = userInfo[0];
+                        user.displayName = ""; // displayName 없음
+                        user.level = userInfo[1].toInt();
+                        user.status = userInfo[2];
+                        user.isOnline = true;
+                        
+                        users.append(user);
+                        qDebug() << QString::fromUtf8("사용자 추가 (구버전): %1 (레벨: %2, 상태: %3)").arg(user.username).arg(user.level).arg(user.status);
                     } else if (userInfo.size() >= 1) {
-                        // 구버전 호환성을 위한 처리
-                        users.append(userInfo[0]);
-                        qDebug() << QString::fromUtf8("사용자 추가 (구버전): %1").arg(userInfo[0]);
+                        // 최구버전 호환성을 위한 처리
+                        UserInfo user;
+                        user.username = userInfo[0];
+                        user.displayName = "";
+                        user.level = 1;
+                        user.status = QString::fromUtf8("로비");
+                        user.isOnline = true;
+                        
+                        users.append(user);
+                        qDebug() << QString::fromUtf8("사용자 추가 (최구버전): %1").arg(user.username);
                     }
                 }
             }
             
-            qDebug() << QString::fromUtf8("최종 사용자 목록: %1").arg(users.join(", "));
+            qDebug() << QString::fromUtf8("최종 사용자 목록: %1명").arg(users.size());
             emit lobbyUserListReceived(users);
         }
         else if (parts[0] == "LOBBY_USER_JOINED" && parts.size() >= 2) {
@@ -650,8 +705,20 @@ namespace Blokus {
         }
         else if (parts[0] == "CHAT" && parts.size() >= 3) {
             QString username = parts[1];
-            QString message = parts.mid(2).join(":"); // 메시지에 콜론이 포함될 수 있음
-            emit chatMessageReceived(username, message);
+            QString message;
+            
+            // 새로운 형식 지원: CHAT:username:displayName:message
+            if (parts.size() >= 4) {
+                QString displayName = parts[2];
+                message = parts.mid(3).join(":"); // 메시지에 콜론이 포함될 수 있음
+                
+                // displayName 정보가 있는 경우 새로운 시그널만 발생 (중복 방지)
+                emit chatMessageReceivedWithDisplayName(username, displayName, message);
+            } else {
+                // 기존 형식 지원: CHAT:username:message
+                message = parts.mid(2).join(":"); // 메시지에 콜론이 포함될 수 있음
+                emit chatMessageReceived(username, message);
+            }
         }
         else if (parts[0] == "ROOM_INFO" && parts.size() >= 8) {
             // ROOM_INFO:방ID:방이름:호스트:현재인원:최대인원:비공개:게임중:게임모드:플레이어데이터...
@@ -659,11 +726,21 @@ namespace Blokus {
         }
         else if (parts[0] == "PLAYER_JOINED" && parts.size() >= 2) {
             QString username = parts[1];
+            QString displayName = (parts.size() >= 3) ? parts[2] : username; // displayName 포함 여부 확인
             emit playerJoined(username);
+            // displayName 정보가 있는 경우 추가 시그널 발생
+            if (parts.size() >= 3) {
+                emit playerJoinedWithDisplayName(username, displayName);
+            }
         }
         else if (parts[0] == "PLAYER_LEFT" && parts.size() >= 2) {
             QString username = parts[1];
+            QString displayName = (parts.size() >= 3) ? parts[2] : username; // displayName 포함 여부 확인
             emit playerLeft(username);
+            // displayName 정보가 있는 경우 추가 시그널 발생
+            if (parts.size() >= 3) {
+                emit playerLeftWithDisplayName(username, displayName);
+            }
         }
         else if (parts[0] == "PLAYER_READY" && parts.size() >= 3) {
             QString username = parts[1];
@@ -673,7 +750,12 @@ namespace Blokus {
         }
         else if (parts[0] == "HOST_CHANGED" && parts.size() >= 2) {
             QString newHost = parts[1];
+            QString displayName = (parts.size() >= 3) ? parts[2] : newHost; // displayName 포함 여부 확인
             emit hostChanged(newHost);
+            // displayName 정보가 있는 경우 추가 시그널 발생
+            if (parts.size() >= 3) {
+                emit hostChangedWithDisplayName(newHost, displayName);
+            }
         }
         else if (parts[0] == "GAME_STARTED") {
             emit gameStarted();
