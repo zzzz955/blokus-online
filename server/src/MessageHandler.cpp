@@ -1920,13 +1920,20 @@ namespace Blokus::Server
     void MessageHandler::handleUserSettings(const std::vector<std::string>& params)
     {
         try {
-            if (params.size() < 6) {
-                sendError("사용자 설정 업데이트에 필요한 파라미터가 부족합니다");
+            if (!session_->isAuthenticated()) {
+                sendError("인증되지 않은 사용자입니다");
                 return;
             }
 
-            if (!session_->isAuthenticated()) {
-                sendError("인증되지 않은 사용자입니다");
+            // 첫 번째 파라미터가 "request"인 경우 설정 조회 처리
+            if (!params.empty() && params[0] == "request") {
+                handleGetUserSettings(params);
+                return;
+            }
+
+            // 설정 업데이트의 경우 6개 파라미터 필요
+            if (params.size() < 6) {
+                sendError("사용자 설정 업데이트에 필요한 파라미터가 부족합니다");
                 return;
             }
 

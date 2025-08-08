@@ -86,6 +86,9 @@ namespace Blokus {
         void getUserStatsRequested(const QString& username); // 사용자 상세 정보 요청
         void addFriendRequested(const QString& username); // 친구 추가 요청
         void sendWhisperRequested(const QString& username); // 귓속말 요청
+        
+        // 설정 관련 시그널
+        void settingsRequested(); // 설정 창 열기 요청
 
     private slots:
         // UI 이벤트 핸들러
@@ -99,6 +102,9 @@ namespace Blokus {
         void onUserDoubleClicked();
         void onTabChanged(int index);
         void onCooldownTimerTick();
+        
+        // 설정 관련 슬롯
+        void onSettingsClicked();
         
         // UserInfoDialog 관련 슬롯
         void onUserInfoDialogRequested(const QString& username);
@@ -187,6 +193,7 @@ namespace Blokus {
         QLabel* m_userStatsLabel;
         QProgressBar* m_expProgressBar;
         QLabel* m_expLabel;
+        QPushButton* m_settingsButton;  // 설정 버튼
         QPushButton* m_logoutButton;
 
         // 데이터 저장소

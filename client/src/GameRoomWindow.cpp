@@ -513,6 +513,11 @@ namespace Blokus {
         m_currentTurnLabel = new QLabel();
         m_currentTurnLabel->setStyleSheet("font-size: 14px; font-weight: bold; color: #34495e;");
 
+        // 설정 버튼
+        m_settingsButton = new QPushButton(QString::fromUtf8("⚙️"));
+        m_settingsButton->setFixedSize(25, 25);
+        m_settingsButton->setToolTip("환경 설정");
+        
         // 방 나가기 버튼을 우측 상단에 배치
         m_leaveRoomButton = new QPushButton(QString::fromUtf8("🚪 방 나가기"));
         m_leaveRoomButton->setFixedSize(120, 25);
@@ -529,9 +534,12 @@ namespace Blokus {
         layout->addWidget(m_roomStatusLabel);
         layout->addStretch();
         layout->addWidget(m_currentTurnLabel);
+        layout->addWidget(m_settingsButton);
+        layout->addSpacing(5);
         layout->addWidget(m_leaveRoomButton);
 
         // 시그널 연결
+        connect(m_settingsButton, &QPushButton::clicked, this, &GameRoomWindow::onSettingsClicked);
         connect(m_leaveRoomButton, &QPushButton::clicked, this, &GameRoomWindow::onLeaveRoomClicked);
     }
 
@@ -2592,6 +2600,16 @@ namespace Blokus {
         if (m_gameBoard) {
             m_gameBoard->onAfkUnblockError(reason, message);
         }
+    }
+
+    // ========================================
+    // 설정 관련 슬롯
+    // ========================================
+
+    void GameRoomWindow::onSettingsClicked()
+    {
+        qDebug() << "Settings button clicked in game room";
+        emit settingsRequested();
     }
 
 } // namespace Blokus

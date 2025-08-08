@@ -173,8 +173,8 @@ namespace Blokus {
                 // 마지막 로그인 시간 업데이트
                 m_dbManager->updateUserLastLogin(userAccount->userId);
 
-                spdlog::info("로그인 성공: {} (ID: {})", username, userId);
-                return AuthResult(true, "로그인되었습니다", userId, sessionToken, username);
+                spdlog::info("로그인 성공: {} (ID: {})", username, userAccount->userId);
+                return AuthResult(true, "로그인되었습니다", std::to_string(userAccount->userId), sessionToken, username);
             }
             catch (const std::exception& e) {
                 spdlog::error("로그인 중 오류: {}", e.what());
@@ -201,7 +201,7 @@ namespace Blokus {
                     return AuthResult(false, "게스트 세션 생성에 실패했습니다", "", "", "");
                 }
 
-                spdlog::info("게스트 로그인: {} (ID: {})", username, userId);
+                spdlog::info("게스트 로그인: {} (ID: {})", username, 0);
                 return AuthResult(true, "게스트로 로그인되었습니다", userId, sessionToken, username);
             }
             catch (const std::exception& e) {
@@ -551,7 +551,7 @@ namespace Blokus {
                 std::lock_guard<std::mutex> lock(m_sessionsMutex);
 
                 SessionInfo sessionInfo;
-                sessionInfo.userId = userId;
+                sessionInfo.userId = std::stoi(userId);
                 sessionInfo.username = username;
                 sessionInfo.expiresAt = getSessionExpireTime();
                 sessionInfo.isValid = true;

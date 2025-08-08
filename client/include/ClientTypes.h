@@ -284,4 +284,121 @@ namespace Blokus {
         }
     }
 
+    // ========================================
+    // 사용자 설정 관련 타입들
+    // ========================================
+
+    // 테마 타입
+    enum class ThemeType {
+        Light = 0,
+        Dark = 1
+    };
+
+    // 언어 타입 (향후 확장 가능)
+    enum class LanguageType {
+        Korean = 0,
+        English = 1  // 향후 지원
+    };
+
+    // 사용자 설정 구조체 (Qt 친화적)
+    struct UserSettings {
+        // UI 설정
+        ThemeType theme = ThemeType::Dark;
+        LanguageType language = LanguageType::Korean;
+
+        // 알림 설정 (현재 비활성화, 향후 확장용)
+        bool gameInviteNotifications = true;
+        bool friendOnlineNotifications = true;
+        bool systemNotifications = true;
+
+        // 오디오 설정
+        bool bgmMute = false;               // BGM 음소거
+        int bgmVolume = 50;                 // BGM 음량 (0-100)
+        bool effectMute = false;            // 효과음 음소거
+        int effectVolume = 50;              // 효과음 음량 (0-100)
+
+        // 기본 생성자
+        UserSettings() = default;
+
+        // Qt 문자열 변환 헬퍼
+        QString getThemeString() const {
+            return (theme == ThemeType::Dark) ? "dark" : "light";
+        }
+
+        QString getLanguageString() const {
+            return (language == LanguageType::Korean) ? "korean" : "english";
+        }
+
+        void setThemeFromString(const QString& themeStr) {
+            theme = (themeStr.toLower() == "dark") ? ThemeType::Dark : ThemeType::Light;
+        }
+
+        void setLanguageFromString(const QString& langStr) {
+            language = (langStr.toLower() == "korean") ? LanguageType::Korean : LanguageType::English;
+        }
+
+        // 유효성 검증
+        bool isValid() const {
+            return (bgmVolume >= 0 && bgmVolume <= 100) &&
+                   (effectVolume >= 0 && effectVolume <= 100);
+        }
+
+        // 기본값으로 초기화
+        static UserSettings getDefaults() {
+            UserSettings defaults;
+            defaults.theme = ThemeType::Dark;
+            defaults.language = LanguageType::Korean;
+            defaults.gameInviteNotifications = true;
+            defaults.friendOnlineNotifications = true;
+            defaults.systemNotifications = true;
+            defaults.bgmMute = false;
+            defaults.bgmVolume = 50;
+            defaults.effectMute = false;
+            defaults.effectVolume = 50;
+            return defaults;
+        }
+
+        // 서버 전송용 문자열 생성
+        QString toServerString() const {
+            return QString("%1:%2:%3:%4:%5:%6")
+                .arg(getThemeString())
+                .arg(getLanguageString())
+                .arg(bgmMute ? "true" : "false")
+                .arg(bgmVolume)
+                .arg(effectMute ? "true" : "false")
+                .arg(effectVolume);
+        }
+
+        // 서버 응답에서 파싱
+        static UserSettings fromServerString(const QStringList& params) {
+            UserSettings settings;
+            if (params.size() >= 6) {
+                settings.setThemeFromString(params[0]);
+                settings.setLanguageFromString(params[1]);
+                settings.bgmMute = (params[2].toLower() == "true");
+                settings.bgmVolume = params[3].toInt();
+                settings.effectMute = (params[4].toLower() == "true");
+                settings.effectVolume = params[5].toInt();
+            }
+            return settings;
+        }
+
+        // 변경 감지 (최적화용)
+        bool operator==(const UserSettings& other) const {
+            return theme == other.theme &&
+                   language == other.language &&
+                   gameInviteNotifications == other.gameInviteNotifications &&
+                   friendOnlineNotifications == other.friendOnlineNotifications &&
+                   systemNotifications == other.systemNotifications &&
+                   bgmMute == other.bgmMute &&
+                   bgmVolume == other.bgmVolume &&
+                   effectMute == other.effectMute &&
+                   effectVolume == other.effectVolume;
+        }
+
+        bool operator!=(const UserSettings& other) const {
+            return !(*this == other);
+        }
+    };
+
 } // namespace Blokus

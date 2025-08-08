@@ -55,7 +55,15 @@ namespace Blokus::Server {
         bool hasUserAccount() const { return userAccount_.has_value(); }
         int getUserLevel() const { return userAccount_ ? userAccount_->level : 1; }
         int getUserExperience() const { return userAccount_ ? userAccount_->experiencePoints : 0; }
+        uint32_t getUserIdAsInt() const { return userAccount_ ? userAccount_->userId : 0; }
         std::string getUserStatusString() const;
+
+        // 인증 상태 확인
+        bool isAuthenticated() const { return hasUserAccount() && !userId_.empty(); }
+
+        // 사용자 설정 관리
+        const std::optional<UserSettings>& getUserSettings() const { return userSettings_; }
+        void setUserSettings(const UserSettings& settings) { userSettings_ = settings; }
 
         // ���� Ȯ�� �Լ��� (���� Session.h ���)
         bool isConnected() const { return state_ >= ConnectionState::Connected; }
@@ -125,6 +133,9 @@ namespace Blokus::Server {
         
         // 사용자 계정 정보
         std::optional<UserAccount> userAccount_;
+        
+        // 사용자 설정 정보 (세션 캐시용)
+        std::optional<UserSettings> userSettings_;
 
         // �޽��� ó��
         std::unique_ptr<MessageHandler> messageHandler_;

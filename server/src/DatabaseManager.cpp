@@ -727,14 +727,17 @@ namespace Blokus {
         // 사용자 설정 관리 구현
         // ========================================
 
-        std::optional<UserSettings> DatabaseManager::getUserSettings(uint32_t userId) {
-            auto conn = dbPool_->borrowConnection();
+        std::optional<UserSettings> DatabaseManager::getUserSettings(const std::string& userId) {
+            auto conn = dbPool_->getConnection();
             if (!conn) {
                 spdlog::error("Failed to get database connection for getUserSettings");
                 return std::nullopt;
             }
 
             try {
+                // userId를 string에서 int로 변환
+                int userIdInt = std::stoi(userId);
+                
                 pqxx::work txn(*conn);
                 
                 // 사용자 설정 조회
@@ -743,7 +746,7 @@ namespace Blokus {
                     "friend_online_notifications, system_notifications, "
                     "bgm_mute, bgm_volume, effect_mute, effect_volume "
                     "FROM user_settings WHERE user_id = $1",
-                    userId
+                    userIdInt
                 );
 
                 if (result.empty()) {
@@ -754,7 +757,7 @@ namespace Blokus {
                         "game_invite_notifications, friend_online_notifications, "
                         "system_notifications, bgm_mute, bgm_volume, effect_mute, effect_volume) "
                         "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
-                        userId, defaults.theme, defaults.language,
+                        userIdInt, defaults.theme, defaults.language,
                         defaults.gameInviteNotifications, defaults.friendOnlineNotifications,
                         defaults.systemNotifications, defaults.bgmMute, defaults.bgmVolume,
                         defaults.effectMute, defaults.effectVolume
@@ -779,30 +782,33 @@ namespace Blokus {
                 settings.effectVolume = row["effect_volume"].as<int>();
 
                 txn.commit();
+                dbPool_->returnConnection(std::move(conn));
                 spdlog::debug("Retrieved settings for user {}", userId);
                 return settings;
 
             } catch (const std::exception& e) {
                 spdlog::error("Failed to get user settings for user {}: {}", userId, e.what());
-                return std::nullopt;
-            } finally {
                 dbPool_->returnConnection(std::move(conn));
+                return std::nullopt;
             }
         }
 
-        bool DatabaseManager::updateUserSettings(uint32_t userId, const UserSettings& settings) {
+        bool DatabaseManager::updateUserSettings(const std::string& userId, const UserSettings& settings) {
             if (!settings.isValid()) {
                 spdlog::error("Invalid settings provided for user {}", userId);
                 return false;
             }
 
-            auto conn = dbPool_->borrowConnection();
+            auto conn = dbPool_->getConnection();
             if (!conn) {
                 spdlog::error("Failed to get database connection for updateUserSettings");
                 return false;
             }
 
             try {
+                // userId를 string에서 int로 변환
+                int userIdInt = std::stoi(userId);
+                
                 pqxx::work txn(*conn);
                 
                 // UPSERT (INSERT ... ON CONFLICT UPDATE)
@@ -819,7 +825,7 @@ namespace Blokus {
                     "bgm_mute = EXCLUDED.bgm_mute, bgm_volume = EXCLUDED.bgm_volume, "
                     "effect_mute = EXCLUDED.effect_mute, effect_volume = EXCLUDED.effect_volume, "
                     "updated_at = CURRENT_TIMESTAMP",
-                    userId, settings.theme, settings.language,
+                    userIdInt, settings.theme, settings.language,
                     settings.gameInviteNotifications, settings.friendOnlineNotifications,
                     settings.systemNotifications, settings.bgmMute, settings.bgmVolume,
                     settings.effectMute, settings.effectVolume
@@ -827,40 +833,43 @@ namespace Blokus {
 
                 txn.commit();
                 spdlog::info("Updated settings for user {}", userId);
+                dbPool_->returnConnection(std::move(conn));
                 return true;
 
             } catch (const std::exception& e) {
                 spdlog::error("Failed to update user settings for user {}: {}", userId, e.what());
-                return false;
-            } finally {
                 dbPool_->returnConnection(std::move(conn));
+                return false;
             }
         }
 
-        bool DatabaseManager::deleteUserSettings(uint32_t userId) {
-            auto conn = dbPool_->borrowConnection();
+        bool DatabaseManager::deleteUserSettings(const std::string& userId) {
+            auto conn = dbPool_->getConnection();
             if (!conn) {
                 spdlog::error("Failed to get database connection for deleteUserSettings");
                 return false;
             }
 
             try {
+                // userId를 string에서 int로 변환
+                int userIdInt = std::stoi(userId);
+                
                 pqxx::work txn(*conn);
                 
                 auto result = txn.exec_params(
                     "DELETE FROM user_settings WHERE user_id = $1",
-                    userId
+                    userIdInt
                 );
 
                 txn.commit();
                 spdlog::info("Deleted settings for user {} (affected rows: {})", userId, result.affected_rows());
+                dbPool_->returnConnection(std::move(conn));
                 return true;
 
             } catch (const std::exception& e) {
                 spdlog::error("Failed to delete user settings for user {}: {}", userId, e.what());
-                return false;
-            } finally {
                 dbPool_->returnConnection(std::move(conn));
+                return false;
             }
         }
 

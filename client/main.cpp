@@ -23,6 +23,7 @@
 #include "NetworkClient.h"
 #include "ClientConfigManager.h"
 #include "BGMManager.h"
+#include "UserSettingsDialog.h"
 
 using namespace Blokus;
 
@@ -35,7 +36,7 @@ class AppController : public QObject
 
 public:
     AppController()
-        : m_loginWindow(nullptr), m_lobbyWindow(nullptr), m_gameRoomWindow(nullptr), m_networkClient(nullptr), m_currentUsername(""), m_currentRoomInfo()
+        : m_loginWindow(nullptr), m_lobbyWindow(nullptr), m_gameRoomWindow(nullptr), m_networkClient(nullptr), m_currentUsername(""), m_currentRoomInfo(), m_isLoadingInitialSettings(false), m_cachedUserSettings(UserSettings::getDefaults())
     {
         initializeApplication();
         initializeConfiguration();
@@ -72,17 +73,29 @@ private slots:
 
     void handleLoginSuccess(const QString &username)
     {
-        qDebug() << QString::fromUtf8("로그인 성공! 로비로 이동: %1").arg(username);
+        qDebug() << QString::fromUtf8("로그인 성공! 사용자 설정 로딩 중: %1").arg(username);
 
         m_currentUsername = username;
 
-        // 로그인 창 숨기고 로비 창 생성
+        // 로그인 창 숨기기
         if (m_loginWindow)
         {
             m_loginWindow->hide();
         }
 
-        createLobbyWindow();
+        // 초기 설정 로딩 플래그 설정 및 사용자 설정 요청
+        m_isLoadingInitialSettings = true;
+        if (m_networkClient && m_networkClient->isConnected())
+        {
+            qDebug() << QString::fromUtf8("사용자 설정 자동 조회 시작");
+            m_networkClient->requestUserSettings();
+        }
+        else
+        {
+            qWarning() << QString::fromUtf8("네트워크 연결이 없어 기본 설정으로 로비 생성");
+            m_isLoadingInitialSettings = false;
+            createLobbyWindow();
+        }
 
         // 로그인 성공 시 서버에서 자동으로 로비 진입 및 정보 전송하므로 별도 요청 불필요
     }
@@ -553,6 +566,91 @@ private slots:
         }
     }
 
+    void onUserSettingsReceived(const QString &settingsData)
+    {
+        qDebug() << QString::fromUtf8("사용자 설정 데이터 수신: %1").arg(settingsData);
+        
+        try {
+            // 설정 데이터 파싱
+            UserSettings settings = UserSettings::fromServerString(settingsData.split(":"));
+            
+            // 설정 캐싱
+            m_cachedUserSettings = settings;
+            
+            if (m_isLoadingInitialSettings) {
+                // 초기 로딩인 경우: 설정 적용 후 로비 생성
+                qDebug() << QString::fromUtf8("초기 설정 로딩 완료 - 설정 적용 중");
+                
+                applyUserSettings(settings);
+                m_isLoadingInitialSettings = false;
+                
+                // 로비 창 생성
+                createLobbyWindow();
+                
+                // BGM 상태 전환
+                transitionToLobbyBGM();
+                
+                qDebug() << QString::fromUtf8("로비 초기화 완료");
+            } else {
+                // 설정 버튼 클릭인 경우: 기존 로직 (다이얼로그 표시)
+                QWidget *parentWindow = nullptr;
+                if (m_gameRoomWindow && m_gameRoomWindow->isVisible()) {
+                    parentWindow = m_gameRoomWindow;
+                } else if (m_lobbyWindow && m_lobbyWindow->isVisible()) {
+                    parentWindow = m_lobbyWindow;
+                }
+                
+                UserSettingsDialog *dialog = new UserSettingsDialog(parentWindow);
+                dialog->setCurrentSettings(settings);
+                dialog->setAttribute(Qt::WA_DeleteOnClose);
+                
+                // 설정 저장 시그널 연결
+                connect(dialog, &UserSettingsDialog::settingsChanged, [this](const UserSettings& newSettings) {
+                    // 설정 캐싱 업데이트
+                    m_cachedUserSettings = newSettings;
+                    
+                    // 설정 적용
+                    applyUserSettings(newSettings);
+                    
+                    // 서버 업데이트
+                    QString settingsString = newSettings.toServerString();
+                    if (m_networkClient && m_networkClient->isConnected()) {
+                        m_networkClient->updateUserSettings(settingsString);
+                    }
+                });
+                
+                dialog->show();
+            }
+            
+        } catch (const std::exception &e) {
+            qDebug() << QString::fromUtf8("설정 데이터 처리 중 오류: %1").arg(e.what());
+            
+            if (m_isLoadingInitialSettings) {
+                // 초기 로딩 실패 시 기본 설정으로 로비 생성
+                qWarning() << QString::fromUtf8("초기 설정 로딩 실패 - 기본 설정으로 진행");
+                m_isLoadingInitialSettings = false;
+                m_cachedUserSettings = UserSettings::getDefaults();
+                applyUserSettings(m_cachedUserSettings);
+                createLobbyWindow();
+                transitionToLobbyBGM();
+            } else {
+                QMessageBox::warning(nullptr, QString::fromUtf8("오류"), 
+                                   QString::fromUtf8("설정을 불러오는 중 오류가 발생했습니다."));
+            }
+        }
+    }
+
+    void onUserSettingsUpdateResult(bool success, const QString &message)
+    {
+        qDebug() << QString::fromUtf8("설정 업데이트 결과: %1, 메시지: %2")
+                        .arg(success ? "성공" : "실패").arg(message);
+        
+        if (!success) {
+            QMessageBox::warning(nullptr, QString::fromUtf8("오류"), 
+                               QString::fromUtf8("설정 저장 실패: %1").arg(message));
+        }
+    }
+
     // 방 관련 시그널 핸들러들
     void onRoomCreated(int roomId, const QString &roomName)
     {
@@ -695,6 +793,22 @@ private slots:
             // USER_STATS:사용자명 형식으로 서버에 요청
             QString message = QString("user:stats:%1").arg(username);
             m_networkClient->sendMessage(message);
+        }
+    }
+
+    void handleSettingsRequest()
+    {
+        qDebug() << QString::fromUtf8("사용자 설정 창 열기 요청");
+
+        if (m_networkClient && m_networkClient->isConnected())
+        {
+            // 서버에서 현재 설정을 가져와서 다이얼로그 표시
+            m_networkClient->requestUserSettings();
+        }
+        else
+        {
+            QMessageBox::warning(nullptr, QString::fromUtf8("오류"), 
+                               QString::fromUtf8("서버에 연결되지 않았습니다."));
         }
     }
 
@@ -919,6 +1033,36 @@ private slots:
     }
 
 private:
+    // 설정 적용 함수
+    void applyUserSettings(const UserSettings& settings)
+    {
+        qDebug() << QString::fromUtf8("사용자 설정 적용 시작: theme=%1, bgmMute=%2, bgmVolume=%3, sfxMute=%4, sfxVolume=%5")
+                        .arg(settings.theme == ThemeType::Dark ? "dark" : "light").arg(settings.bgmMute ? "true" : "false")
+                        .arg(settings.bgmVolume).arg(settings.effectMute ? "true" : "false")
+                        .arg(settings.effectVolume);
+        
+        // BGM 설정 적용
+        BGMManager& bgm = BGMManager::getInstance();
+        bgm.setBGMVolume(settings.bgmVolume / 100.0f);  // 0-100 → 0.0-1.0
+        bgm.setBGMMuted(settings.bgmMute);
+        
+        // SFX 설정 적용
+        bgm.setSFXVolume(settings.effectVolume / 100.0f);  // 0-100 → 0.0-1.0
+        bgm.setSFXMuted(settings.effectMute);
+        
+        qDebug() << QString::fromUtf8("BGM/SFX 설정 적용 완료");
+        
+        // 테마 설정 적용 (향후 구현)
+        // TODO: Dark/Light 테마 적용 로직
+        if (settings.theme == ThemeType::Dark) {
+            qDebug() << QString::fromUtf8("다크 테마 적용 (향후 구현)");
+        } else {
+            qDebug() << QString::fromUtf8("라이트 테마 적용 (향후 구현)");
+        }
+        
+        qDebug() << QString::fromUtf8("사용자 설정 적용 완료");
+    }
+
     // 🎵 BGM 상태 전환 헬퍼 함수들
     void transitionToLobbyBGM()
     {
@@ -1132,6 +1276,12 @@ private:
         connect(m_networkClient, &NetworkClient::myStatsUpdated,
                 this, &AppController::onMyStatsUpdated);
 
+        // 설정 관련 시그널
+        connect(m_networkClient, &NetworkClient::userSettingsReceived,
+                this, &AppController::onUserSettingsReceived);
+        connect(m_networkClient, &NetworkClient::userSettingsUpdateResult,
+                this, &AppController::onUserSettingsUpdateResult);
+
         // 방 관련 시그널 추가
         connect(m_networkClient, &NetworkClient::roomCreated, [this](int roomId, const QString& roomName) {
             onRoomCreated(roomId, roomName);
@@ -1233,6 +1383,8 @@ private:
                     this, &AppController::handleRefreshRoomListRequest);
             connect(m_lobbyWindow, &Blokus::LobbyWindow::getUserStatsRequested,
                     this, &AppController::handleGetUserStatsRequest);
+            connect(m_lobbyWindow, &Blokus::LobbyWindow::settingsRequested,
+                    this, &AppController::handleSettingsRequest);
 
             m_lobbyWindow->show();
             m_lobbyWindow->raise();
@@ -1291,6 +1443,8 @@ private:
                     this, &AppController::handleGameRoomChatMessage);
             connect(m_gameRoomWindow, &Blokus::GameRoomWindow::blockPlacementRequested,
                     this, &AppController::handleBlockPlacementRequest);
+            connect(m_gameRoomWindow, &Blokus::GameRoomWindow::settingsRequested,
+                    this, &AppController::handleSettingsRequest);
 
             // 게임 상태 동기화 시그널 연결 (게임 진행 중 보드 상태 및 턴 동기화)
             connect(m_networkClient, &Blokus::NetworkClient::gameStateUpdated,
@@ -1363,6 +1517,10 @@ private:
     Blokus::NetworkClient *m_networkClient;
     QString m_currentUsername;
     Blokus::GameRoomInfo m_currentRoomInfo;
+    
+    // 설정 캐싱 관련
+    bool m_isLoadingInitialSettings;
+    UserSettings m_cachedUserSettings;
 };
 
 #ifdef _WIN32

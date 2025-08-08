@@ -183,6 +183,9 @@ namespace Blokus {
         
         // AFK 관련 시그널
         void afkUnblockRequested();
+        
+        // 설정 관련 시그널
+        void settingsRequested(); // 설정 창 열기 요청
 
     public slots:
         // UI 이벤트 핸들러
@@ -206,6 +209,9 @@ namespace Blokus {
         void onReadyToggleClicked();
         void onChatSendClicked();
         void onChatReturnPressed();
+        
+        // 설정 관련 슬롯
+        void onSettingsClicked();
 
         // 플레이어 슬롯 이벤트
         void onKickPlayerRequested(PlayerColor color);
@@ -284,6 +290,7 @@ namespace Blokus {
         QLabel* m_roomNameLabel;
         QLabel* m_roomStatusLabel;
         QLabel* m_currentTurnLabel;
+        QPushButton* m_settingsButton;  // 설정 버튼
         QPushButton* m_leaveRoomButton;
         
         // 턴 타이머 UI 컴포넌트

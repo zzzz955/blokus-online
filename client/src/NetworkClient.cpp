@@ -351,6 +351,34 @@ namespace Blokus {
         qDebug() << QString::fromUtf8("AFK 해제 메시지 전송");
     }
 
+    // ========================================
+    // 설정 관련 메서드 구현
+    // ========================================
+
+    void NetworkClient::requestUserSettings()
+    {
+        if (!isConnected()) {
+            qWarning() << "Cannot request user settings: not connected to server";
+            return;
+        }
+        
+        sendMessage("user:settings:request");
+        qDebug() << "User settings request sent";
+    }
+
+    void NetworkClient::updateUserSettings(const QString& settingsData)
+    {
+        if (!isConnected()) {
+            qWarning() << "Cannot update user settings: not connected to server";
+            emit userSettingsUpdateResult(false, "서버에 연결되지 않음");
+            return;
+        }
+        
+        QString message = QString("user:settings:%1").arg(settingsData);
+        sendMessage(message);
+        qDebug() << "User settings update sent:" << settingsData;
+    }
+
     void NetworkClient::setState(ConnectionState state)
     {
         if (m_state != state) {
@@ -497,6 +525,10 @@ namespace Blokus {
                  message.startsWith("AFK_UNBLOCK_SUCCESS") ||
                  message.startsWith("AFK_STATUS_RESET:")) {
             processAfkMessage(message);
+        }
+        else if (message.startsWith("UserSettingsResponse:")) {
+            QStringList params = message.split(':');
+            processUserSettingsResponse(params);
         }
         else if (message.startsWith("version:")) {
             // 버전 메시지 특별 처리 (URL의 ":"때문에 split 제한)
@@ -927,4 +959,36 @@ namespace Blokus {
             qDebug() << QString::fromUtf8("❌ 알 수 없는 버전 응답: %1").arg(status);
         }
     }
+
+    // ========================================
+    // 사용자 설정 메시지 처리
+    // ========================================
+
+    void NetworkClient::processUserSettingsResponse(const QStringList& params)
+    {
+        if (params.size() < 2) {
+            qWarning() << "Invalid user settings response format";
+            return;
+        }
+
+        QString status = params[1]; // "success" 또는 "error"
+        
+        if (status == "success" && params.size() >= 8) {
+            // UserSettingsResponse:success:theme:language:bgm_mute:bgm_volume:sfx_mute:sfx_volume
+            QString settingsData = params.mid(2).join(":");
+            emit userSettingsReceived(settingsData);
+            emit userSettingsUpdateResult(true, "설정이 성공적으로 업데이트되었습니다");
+            
+            qDebug() << "User settings received:" << settingsData;
+        } else if (status == "error" && params.size() >= 3) {
+            QString errorMessage = params[2];
+            emit userSettingsUpdateResult(false, errorMessage);
+            
+            qWarning() << "User settings error:" << errorMessage;
+        } else {
+            qWarning() << "Invalid user settings response";
+            emit userSettingsUpdateResult(false, "잘못된 서버 응답입니다");
+        }
+    }
+
 } // namespace Blokus

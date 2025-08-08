@@ -68,6 +68,7 @@ namespace Blokus
 
                 // 유저 관련
                 {"user:stats", MessageType::UserStats},
+                {"user:settings", MessageType::UserSettings},
 
                 // 버전 관련
                 {"version:check", MessageType::VersionCheck}};
@@ -125,6 +126,8 @@ namespace Blokus
                 return "chat";
             case MessageType::UserStats:
                 return "user:stats";
+            case MessageType::UserSettings:
+                return "user:settings";
             case MessageType::VersionCheck:
                 return "version:check";
             default:

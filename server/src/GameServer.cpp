@@ -217,7 +217,7 @@ namespace Blokus::Server {
 
     AuthResult GameServer::authenticateUser(const std::string& username, const std::string& password) {
         if (!authService_) {
-            return AuthResult(false, "인증 서비스가 초기화되지 않았습니다", "", "", "");
+            return AuthResult(false, "인증 서비스가 초기화되지 않았습니다", 0, "", "");
         }
 
         return authService_->loginUser(username, password);
@@ -233,7 +233,7 @@ namespace Blokus::Server {
 
     AuthResult GameServer::loginGuest(const std::string& guestName) {
         if (!authService_) {
-            return AuthResult(false, "인증 서비스가 초기화되지 않았습니다", "", "", "");
+            return AuthResult(false, "인증 서비스가 초기화되지 않았습니다", 0, "", "");
         }
 
         return authService_->loginGuest(guestName);

@@ -61,6 +61,10 @@ namespace Blokus {
         
         // AFK 관련
         void sendAfkUnblock();
+        
+        // 설정 관련
+        void requestUserSettings();
+        void updateUserSettings(const QString& settingsData);
 
     signals:
         // 연결 상태 시그널
@@ -91,6 +95,10 @@ namespace Blokus {
         void roomListReceived(const QStringList& rooms);
         void userStatsReceived(const QString& statsJson);
         void myStatsUpdated(const QString& statsJson);
+        
+        // 설정 관련 시그널
+        void userSettingsReceived(const QString& settingsData);
+        void userSettingsUpdateResult(bool success, const QString& message);
         
         // 방 시그널
         void roomCreated(int roomId, const QString& roomName);
@@ -144,6 +152,7 @@ namespace Blokus {
         // 버전 관련 메서드
         void performVersionCheck();
         void processVersionCheckResponse(const QStringList& params);
+        void processUserSettingsResponse(const QStringList& params);
         void setupSocket();
         void cleanupSocket();
 

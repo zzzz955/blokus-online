@@ -101,13 +101,13 @@ namespace Blokus {
             // ========================================
 
             // 사용자 설정 조회 (없으면 기본값으로 생성)
-            std::optional<UserSettings> getUserSettings(uint32_t userId);
+            std::optional<UserSettings> getUserSettings(const std::string& userId);
             
             // 사용자 설정 업데이트 (없으면 생성)
-            bool updateUserSettings(uint32_t userId, const UserSettings& settings);
+            bool updateUserSettings(const std::string& userId, const UserSettings& settings);
             
             // 사용자 설정 삭제 (사용자 삭제 시 호출)
-            bool deleteUserSettings(uint32_t userId);
+            bool deleteUserSettings(const std::string& userId);
 
             // ========================================
             // 친구 시스템 (추후 확장)

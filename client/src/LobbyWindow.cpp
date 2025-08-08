@@ -456,6 +456,11 @@ namespace Blokus {
             "}"
         );
 
+        // 설정 버튼
+        m_settingsButton = new QPushButton(QString::fromUtf8("⚙️"));
+        m_settingsButton->setFixedSize(25, 25);
+        m_settingsButton->setToolTip("환경 설정");
+        
         // 로그아웃 버튼
         m_logoutButton = new QPushButton(QString::fromUtf8("로그아웃"));
         m_logoutButton->setFixedSize(80, 25);
@@ -468,10 +473,13 @@ namespace Blokus {
         mainLayout->addWidget(m_expLabel);
         mainLayout->addWidget(m_expProgressBar);
         mainLayout->addSpacing(10);
+        mainLayout->addWidget(m_settingsButton);
+        mainLayout->addSpacing(5);
         mainLayout->addWidget(m_logoutButton);
 
         updateUserStatsDisplay();
 
+        connect(m_settingsButton, &QPushButton::clicked, this, &LobbyWindow::onSettingsClicked);
         connect(m_logoutButton, &QPushButton::clicked, this, &LobbyWindow::onLogoutClicked);
     }
 
@@ -1265,6 +1273,15 @@ namespace Blokus {
         }
     }
 
+    // ========================================
+    // 설정 관련 슬롯
+    // ========================================
+
+    void LobbyWindow::onSettingsClicked()
+    {
+        qDebug() << "Settings button clicked in lobby";
+        emit settingsRequested();
+    }
 
 } // namespace Blokus
 
