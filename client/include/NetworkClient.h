@@ -177,6 +177,9 @@ namespace Blokus {
         
         // 연결 시간초과 설정
         int m_connectionTimeout;
+        
+        // 설정 요청 상태 추적
+        bool m_pendingSettingsRequest;
     };
 
 } // namespace Blokus

@@ -19,6 +19,7 @@ namespace Blokus {
         , m_state(ConnectionState::Disconnected)
         , m_currentSessionToken("")
         , m_reconnectAttempts(0)
+        , m_pendingSettingsRequest(false)
     {
         // 설정에서 네트워크 값 로드
         auto& config = ClientConfigManager::instance();
@@ -362,6 +363,7 @@ namespace Blokus {
             return;
         }
         
+        m_pendingSettingsRequest = true; // 설정 조회 요청 플래그 설정
         sendMessage("user:settings:request");
         qDebug() << "User settings request sent";
     }
@@ -976,12 +978,21 @@ namespace Blokus {
         if (status == "success" && params.size() >= 8) {
             // UserSettingsResponse:success:theme:language:bgm_mute:bgm_volume:sfx_mute:sfx_volume
             QString settingsData = params.mid(2).join(":");
-            emit userSettingsReceived(settingsData);
-            emit userSettingsUpdateResult(true, "설정이 성공적으로 업데이트되었습니다");
             
-            qDebug() << "User settings received:" << settingsData;
+            // 설정 조회 요청인지 설정 업데이트 요청인지 구분
+            // 설정 조회 요청의 경우에만 userSettingsReceived 시그널 발생
+            if (m_pendingSettingsRequest) {
+                emit userSettingsReceived(settingsData);
+                m_pendingSettingsRequest = false;
+                qDebug() << "User settings received (query):" << settingsData;
+            } else {
+                // 설정 업데이트 응답인 경우 updateResult만 발생 (모달 생성 안 함)
+                emit userSettingsUpdateResult(true, "설정이 성공적으로 업데이트되었습니다");
+                qDebug() << "User settings updated successfully:" << settingsData;
+            }
         } else if (status == "error" && params.size() >= 3) {
             QString errorMessage = params[2];
+            m_pendingSettingsRequest = false; // 에러 시에도 플래그 리셋
             emit userSettingsUpdateResult(false, errorMessage);
             
             qWarning() << "User settings error:" << errorMessage;

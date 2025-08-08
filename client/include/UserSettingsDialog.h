@@ -52,9 +52,6 @@ namespace Blokus {
         // 설정 변경 시그널
         void settingsUpdateRequested(const UserSettings& newSettings);
         void settingsChanged(const UserSettings& newSettings);  // 실시간 변경 알림
-        
-        // 테마 변경 시그널 (즉시 적용용)
-        void themeChangeRequested(ThemeType theme);
 
     public slots:
         // 외부에서 설정 업데이트
@@ -63,7 +60,6 @@ namespace Blokus {
 
     private slots:
         // UI 이벤트 핸들러
-        void onThemeChanged();
         void onLanguageChanged();
         
         // 알림 설정 (현재 비활성화)
@@ -103,7 +99,6 @@ namespace Blokus {
         void updateNotificationControls();
         
         // 미리보기 및 적용
-        void applyThemePreview();
         void applyAudioSettings();
         void startPreviewTimer();
         void stopPreviewTimer();

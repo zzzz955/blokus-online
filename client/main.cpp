@@ -604,18 +604,37 @@ private slots:
                 dialog->setCurrentSettings(settings);
                 dialog->setAttribute(Qt::WA_DeleteOnClose);
                 
-                // 설정 저장 시그널 연결
-                connect(dialog, &UserSettingsDialog::settingsChanged, [this](const UserSettings& newSettings) {
-                    // 설정 캐싱 업데이트
-                    m_cachedUserSettings = newSettings;
+                // 실시간 미리보기 시그널 연결 (서버 업데이트 없음)
+                connect(dialog, &UserSettingsDialog::settingsChanged, [this](const UserSettings& previewSettings) {
+                    // BGM/SFX 미리보기 적용 (서버 업데이트는 하지 않음)
+                    qDebug() << QString::fromUtf8("설정 미리보기 적용");
+                    applyAudioSettings(previewSettings);
+                });
+                
+                // 최종 설정 저장 시그널 연결 (확인 버튼 클릭 시)
+                connect(dialog, &UserSettingsDialog::settingsUpdateRequested, [this](const UserSettings& newSettings) {
+                    qDebug() << QString::fromUtf8("설정 업데이트 요청됨");
                     
-                    // 설정 적용
-                    applyUserSettings(newSettings);
-                    
-                    // 서버 업데이트
-                    QString settingsString = newSettings.toServerString();
-                    if (m_networkClient && m_networkClient->isConnected()) {
-                        m_networkClient->updateUserSettings(settingsString);
+                    // 캐시된 설정과 비교하여 변경점이 있는지 확인
+                    if (hasSettingsChanged(m_cachedUserSettings, newSettings)) {
+                        qDebug() << QString::fromUtf8("설정 변경점 발견 - 서버 업데이트 진행");
+                        
+                        // 설정 적용
+                        applyUserSettings(newSettings);
+                        
+                        // 설정 캐싱 업데이트
+                        m_cachedUserSettings = newSettings;
+                        
+                        // 서버 업데이트
+                        QString settingsString = newSettings.toServerString();
+                        if (m_networkClient && m_networkClient->isConnected()) {
+                            m_networkClient->updateUserSettings(settingsString);
+                        } else {
+                            QMessageBox::warning(nullptr, QString::fromUtf8("오류"), 
+                                               QString::fromUtf8("서버에 연결되지 않았습니다."));
+                        }
+                    } else {
+                        qDebug() << QString::fromUtf8("설정 변경점 없음 - 서버 요청 생략");
                     }
                 });
                 
@@ -1033,6 +1052,28 @@ private slots:
     }
 
 private:
+    // 설정 비교 함수
+    bool hasSettingsChanged(const UserSettings& oldSettings, const UserSettings& newSettings) const
+    {
+        return (oldSettings.theme != newSettings.theme ||
+                oldSettings.language != newSettings.language ||
+                oldSettings.bgmMute != newSettings.bgmMute ||
+                oldSettings.bgmVolume != newSettings.bgmVolume ||
+                oldSettings.effectMute != newSettings.effectMute ||
+                oldSettings.effectVolume != newSettings.effectVolume ||
+                oldSettings.gameInviteNotifications != newSettings.gameInviteNotifications);
+    }
+
+    // 오디오 설정만 적용 (미리보기용)
+    void applyAudioSettings(const UserSettings& settings)
+    {
+        BGMManager& bgm = BGMManager::getInstance();
+        bgm.setBGMVolume(settings.bgmVolume / 100.0f);
+        bgm.setBGMMuted(settings.bgmMute);
+        bgm.setSFXVolume(settings.effectVolume / 100.0f);
+        bgm.setSFXMuted(settings.effectMute);
+    }
+
     // 설정 적용 함수
     void applyUserSettings(const UserSettings& settings)
     {
@@ -1051,15 +1092,6 @@ private:
         bgm.setSFXMuted(settings.effectMute);
         
         qDebug() << QString::fromUtf8("BGM/SFX 설정 적용 완료");
-        
-        // 테마 설정 적용 (향후 구현)
-        // TODO: Dark/Light 테마 적용 로직
-        if (settings.theme == ThemeType::Dark) {
-            qDebug() << QString::fromUtf8("다크 테마 적용 (향후 구현)");
-        } else {
-            qDebug() << QString::fromUtf8("라이트 테마 적용 (향후 구현)");
-        }
-        
         qDebug() << QString::fromUtf8("사용자 설정 적용 완료");
     }
 

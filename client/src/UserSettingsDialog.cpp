@@ -118,13 +118,11 @@ namespace Blokus {
         m_uiGroup = new QGroupBox("UI 설정", this);
         m_uiLayout = new QGridLayout(m_uiGroup);
         
-        // 테마 설정
+        // 테마 설정 (비활성화)
         m_themeLabel = new QLabel("테마:", m_uiGroup);
         m_themeCombo = new QComboBox(m_uiGroup);
-        m_themeCombo->addItem("라이트 테마", static_cast<int>(ThemeType::Light));
-        m_themeCombo->addItem("다크 테마", static_cast<int>(ThemeType::Dark));
-        connect(m_themeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
-                this, &UserSettingsDialog::onThemeChanged);
+        m_themeCombo->addItem("시스템 기본 (향후 지원 예정)", 0);
+        m_themeCombo->setEnabled(false);  // 테마 기능 비활성화
         
         // 언어 설정
         m_languageLabel = new QLabel("언어:", m_uiGroup);
@@ -247,47 +245,9 @@ namespace Blokus {
 
     void UserSettingsDialog::setupStyles()
     {
-        // 기본 스타일 적용 (향후 테마 시스템 연동)
-        setStyleSheet(R"(
-            QGroupBox {
-                font-weight: bold;
-                border: 2px solid #cccccc;
-                border-radius: 5px;
-                margin-top: 10px;
-                padding-top: 10px;
-            }
-            
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
-            }
-            
-            QPushButton {
-                padding: 5px 15px;
-                border: 1px solid #cccccc;
-                border-radius: 3px;
-                background-color: #f0f0f0;
-            }
-            
-            QPushButton:hover {
-                background-color: #e0e0e0;
-            }
-            
-            QPushButton:pressed {
-                background-color: #d0d0d0;
-            }
-            
-            QPushButton:default {
-                border-color: #0078d4;
-                background-color: #0078d4;
-                color: white;
-            }
-            
-            QPushButton:default:hover {
-                background-color: #106ebe;
-            }
-        )");
+        // 기본 스타일은 테마 시스템에 의해 전역적으로 관리됨
+        // 개별 스타일시트를 제거하여 전역 테마 적용 보장
+        setStyleSheet("");
     }
 
     // ========================================
@@ -299,8 +259,7 @@ namespace Blokus {
         // 시그널 차단 (무한 루프 방지)
         const bool oldState = blockSignals(true);
         
-        // UI 설정 업데이트
-        m_themeCombo->setCurrentIndex(static_cast<int>(settings.theme));
+        // UI 설정 업데이트 (테마는 제거됨)
         m_languageCombo->setCurrentIndex(static_cast<int>(settings.language));
         
         // 알림 설정 업데이트
@@ -325,8 +284,7 @@ namespace Blokus {
 
     void UserSettingsDialog::updateSettingsFromUI()
     {
-        // UI에서 현재 설정 읽기
-        m_currentSettings.theme = static_cast<ThemeType>(m_themeCombo->currentData().toInt());
+        // UI에서 현재 설정 읽기 (테마는 제거됨)
         m_currentSettings.language = static_cast<LanguageType>(m_languageCombo->currentData().toInt());
         
         m_currentSettings.gameInviteNotifications = m_inviteNotificationCheck->isChecked();
@@ -358,17 +316,7 @@ namespace Blokus {
     // 슬롯 함수들
     // ========================================
 
-    void UserSettingsDialog::onThemeChanged()
-    {
-        updateSettingsFromUI();
-        m_hasUnsavedChanges = true;
-        
-        // 실시간 테마 미리보기
-        applyThemePreview();
-        emit settingsChanged(m_currentSettings);
-        
-        qDebug() << "Theme changed to:" << m_currentSettings.getThemeString();
-    }
+    // 테마 변경 함수 제거됨 (테마 기능 비활성화)
 
     void UserSettingsDialog::onLanguageChanged()
     {
@@ -438,8 +386,7 @@ namespace Blokus {
         if (hasChanges()) {
             // 원본 설정으로 복원
             updateUIFromSettings(m_originalSettings);
-            applyThemePreview();  // 테마도 복원
-            applyAudioSettings(); // 오디오도 복원
+            applyAudioSettings(); // 오디오 복원
         }
         reject();
     }
@@ -480,12 +427,7 @@ namespace Blokus {
     // 미리보기 및 적용 함수들
     // ========================================
 
-    void UserSettingsDialog::applyThemePreview()
-    {
-        // 향후 테마 시스템 구현 시 실제 테마 적용
-        emit themeChangeRequested(m_currentSettings.theme);
-        qDebug() << "Theme preview applied:" << m_currentSettings.getThemeString();
-    }
+    // 테마 미리보기 함수 제거됨 (테마 기능 비활성화)
 
     void UserSettingsDialog::applyAudioSettings()
     {
@@ -532,9 +474,10 @@ namespace Blokus {
         m_systemNotificationCheck->setEnabled(enabled);
         
         if (!enabled) {
-            m_inviteNotificationCheck->setStyleSheet("color: #888;");
-            m_friendNotificationCheck->setStyleSheet("color: #888;");
-            m_systemNotificationCheck->setStyleSheet("color: #888;");
+            // 비활성화 상태는 Qt 기본 스타일로 처리되도록 개별 스타일 제거
+            m_inviteNotificationCheck->setStyleSheet("");
+            m_friendNotificationCheck->setStyleSheet("");
+            m_systemNotificationCheck->setStyleSheet("");
         }
     }
 
