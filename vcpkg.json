@@ -6,6 +6,11 @@
     "qt5-base",
     "qt5-svg",
     "qt5-multimedia",
+    "sdl2",
+    {
+      "name": "sdl2-mixer-ext",
+      "features": ["mpg123", "libvorbis"]
+    },
     "spdlog",
     "boost-asio",
     "boost-system",

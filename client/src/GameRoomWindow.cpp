@@ -264,7 +264,7 @@ namespace Blokus {
     void PlayerSlotWidget::onKickClicked()
     {
         int ret = QMessageBox::question(this, QString::fromUtf8("플레이어 강퇴"),
-            QString::fromUtf8("%1 플레이어를 강퇴하시겠습니까?").arg(m_currentSlot.username),
+            QString::fromUtf8("%1 플레이어를 강퇴하시겠습니까?").arg(m_currentSlot.getDisplayName()),
             QMessageBox::Yes | QMessageBox::No);
 
         if (ret == QMessageBox::Yes) {
@@ -350,9 +350,10 @@ namespace Blokus {
     // GameRoomWindow 구현
     // ========================================
 
-    GameRoomWindow::GameRoomWindow(const GameRoomInfo& roomInfo, const QString& myUsername, QWidget* parent)
+    GameRoomWindow::GameRoomWindow(const GameRoomInfo& roomInfo, const QString& myUsername, const QString& displayName, QWidget* parent)
         : QMainWindow(parent)
         , m_myUsername(myUsername)
+        , m_myDisplayname(displayName)
         , m_roomInfo(roomInfo)
         , m_gameManager(nullptr)
         , m_centralWidget(nullptr)
@@ -434,14 +435,19 @@ namespace Blokus {
         int y = (screenGeometry.height() - height()) / 2;
         move(x, y);
 
+        // displayName 캐시 초기화
+        initializeDisplayNameCache();
+
         qDebug() << QString::fromUtf8("GameRoomWindow 생성 완료: 방 %1").arg(roomInfo.roomId);
     }
 
     GameRoomWindow::~GameRoomWindow()
     {
+        qDebug() << QString::fromUtf8("=== GameRoomWindow 소멸자 ===");
         if (m_gameManager) {
             delete m_gameManager;
         }
+        qDebug() << QString::fromUtf8("=== GameRoomWindow 소멸 완료 ===");
     }
 
     void GameRoomWindow::setupUI()
@@ -511,6 +517,11 @@ namespace Blokus {
         m_currentTurnLabel = new QLabel();
         m_currentTurnLabel->setStyleSheet("font-size: 14px; font-weight: bold; color: #34495e;");
 
+        // 설정 버튼
+        m_settingsButton = new QPushButton(QString::fromUtf8("⚙️"));
+        m_settingsButton->setFixedSize(45, 25);
+        m_settingsButton->setToolTip("환경 설정");
+        
         // 방 나가기 버튼을 우측 상단에 배치
         m_leaveRoomButton = new QPushButton(QString::fromUtf8("🚪 방 나가기"));
         m_leaveRoomButton->setFixedSize(120, 25);
@@ -527,9 +538,12 @@ namespace Blokus {
         layout->addWidget(m_roomStatusLabel);
         layout->addStretch();
         layout->addWidget(m_currentTurnLabel);
+        layout->addWidget(m_settingsButton);
+        layout->addSpacing(5);
         layout->addWidget(m_leaveRoomButton);
 
         // 시그널 연결
+        connect(m_settingsButton, &QPushButton::clicked, this, &GameRoomWindow::onSettingsClicked);
         connect(m_leaveRoomButton, &QPushButton::clicked, this, &GameRoomWindow::onLeaveRoomClicked);
     }
 
@@ -878,8 +892,9 @@ namespace Blokus {
     {
         m_roomNameLabel->setText(QString::fromUtf8("🏠 %1").arg(m_roomInfo.roomName));
 
+        QString hostDisplayName = getDisplayNameFromUsername(m_roomInfo.hostUsername);
         QString statusText = QString::fromUtf8("방장: %1 | %2/%3명")
-            .arg(m_roomInfo.hostUsername)
+            .arg(hostDisplayName)
             .arg(m_roomInfo.getCurrentPlayerCount())
             .arg(m_roomInfo.maxPlayers);
         m_roomStatusLabel->setText(statusText);
@@ -1529,14 +1544,17 @@ namespace Blokus {
     {
         QString timeStr = QDateTime::currentDateTime().toString("hh:mm");
 
+        // displayName 캐시에서 먼저 확인, 없으면 roomInfo에서 검색, 최종적으로 username 사용
+        QString displayName = getDisplayNameFromUsername(username);
+
         if (isSystem) {
             return QString("<span style='color: #8e44ad; font-weight: bold;'>[%1] %2: %3</span>")
-                .arg(timeStr, username, message);
+                .arg(timeStr, displayName, message);
         }
         else {
             QString colorCode = (username == m_myUsername) ? "#3498db" : "#2c3e50";
             return QString("<span style='color: %1;'>[%2] <b>%3:</b> %4</span>")
-                .arg(colorCode, timeStr, username, message);
+                .arg(colorCode, timeStr, displayName, message);
         }
     }
 
@@ -1654,6 +1672,22 @@ namespace Blokus {
         }
 
         return PlayerColor::None;
+    }
+
+    QString GameRoomWindow::getDisplayNameFromUsername(const QString& username) const
+    {
+        // 먼저 캐시에서 찾기
+        if (m_usernameToDisplayName.contains(username)) {
+            return m_usernameToDisplayName[username];
+        }
+        
+        // 캐시에 없으면 PlayerSlot에서 찾기
+        for (const auto& slot : m_roomInfo.playerSlots) {
+            if (slot.username == username) {
+                return slot.getDisplayName();
+            }
+        }
+        return username; // fallback to username if not found
     }
 
     void GameRoomWindow::showGameResults(const std::map<PlayerColor, int>& scores)
@@ -2260,7 +2294,7 @@ namespace Blokus {
 
         // 내 턴일 때 효과음 재생
         if (isMyTurn) {
-            SoundManager::getInstance().playMyTurnSound();
+            BGMManager::getInstance().playMyTurnSound();
         }
 
         // 로그 출력
@@ -2393,7 +2427,7 @@ namespace Blokus {
         if (previousTurnTimedOut) {
             addSystemMessage(QString::fromUtf8("이전 플레이어의 시간이 초과되어 턴이 넘어왔습니다."));
             // 타임아웃 효과음 재생
-            SoundManager::getInstance().playTimeOutSound();
+            BGMManager::getInstance().playTimeOutSound();
         }
         
         // 턴 타이머 시작 (게임이 시작된 상태에서만)
@@ -2405,9 +2439,10 @@ namespace Blokus {
             qDebug() << QString::fromUtf8("⏰ [TIMER_DEBUG] 타이머 시작 스킵: 게임이 시작되지 않음");
         }
         
-        // 턴 변경 알림 표시
+        // 턴 변경 알림 표시 (displayName 사용)
         bool isMyTurn = (newPlayerName == m_myUsername);
-        showTurnChangeNotification(newPlayerName, isMyTurn);
+        QString displayName = getDisplayNameFromUsername(newPlayerName);
+        showTurnChangeNotification(displayName, isMyTurn);
         
         // UI 업데이트
         updateGameControlsState();
@@ -2463,8 +2498,7 @@ namespace Blokus {
         m_isTimerActive = false;
         m_countdownTimer->stop();
 
-        // 사운드 매니저의 카운트다운도 중지
-        SoundManager::getInstance().stopCountdown();
+        // 카운트다운 중지 (BGM 기반으로는 개별 중지가 불필요 - 각 재생은 독립적)
 
         // 타이머 패널 내부 요소 숨김
         if (m_timerLabel && m_timerProgressBar) {
@@ -2513,7 +2547,8 @@ namespace Blokus {
 
     void GameRoomWindow::showTimeoutNotification(const QString& playerName)
     {
-        addSystemMessage(QString::fromUtf8("%1님의 시간이 초과되어 턴이 넘어갑니다.").arg(playerName));
+        QString displayName = getDisplayNameFromUsername(playerName);
+        addSystemMessage(QString::fromUtf8("%1님의 시간이 초과되어 턴이 넘어갑니다.").arg(displayName));
     }
 
     void GameRoomWindow::onCountdownTick()
@@ -2531,7 +2566,7 @@ namespace Blokus {
         } else {
             // 카운트다운 사운드 관리 (5초 이하일 때)
             if (m_remainingTime <= 5 && m_remainingTime > 0) {
-                SoundManager::getInstance().startCountdown(m_remainingTime);
+                BGMManager::getInstance().playCountdownSound();
             }
             
             // 디스플레이 업데이트
@@ -2545,7 +2580,7 @@ namespace Blokus {
         stopTurnTimer();
 
         // 타임아웃 효과음 재생
-        SoundManager::getInstance().playTimeOutSound();
+        BGMManager::getInstance().playTimeOutSound();
 
         qDebug() << QString::fromUtf8("⏰ 턴 타임아웃 발생");
     }
@@ -2590,6 +2625,80 @@ namespace Blokus {
         // GameBoard에 AFK 에러 알림
         if (m_gameBoard) {
             m_gameBoard->onAfkUnblockError(reason, message);
+        }
+    }
+
+    // ========================================
+    // 설정 관련 슬롯
+    // ========================================
+
+    void GameRoomWindow::onSettingsClicked()
+    {
+        qDebug() << "Settings button clicked in game room";
+        emit settingsRequested();
+    }
+
+    // ========================================
+    // displayName 지원 슬롯들
+    // ========================================
+    
+    void GameRoomWindow::onPlayerJoinedWithDisplayName(const QString& username, const QString& displayName)
+    {
+        updateDisplayNameCache(username, displayName);
+        // UI에 displayName으로 시스템 메시지 추가
+        QString displayNameToShow = displayName.isEmpty() ? username : displayName;
+        addSystemMessage(QString::fromUtf8("%1님이 입장하셨습니다.").arg(displayNameToShow));
+    }
+    
+    void GameRoomWindow::onPlayerLeftWithDisplayName(const QString& username, const QString& displayName)
+    {
+        updateDisplayNameCache(username, displayName); // 나가기 전에 마지막으로 캐시 업데이트
+        QString displayNameToShow = displayName.isEmpty() ? username : displayName;
+        addSystemMessage(QString::fromUtf8("%1님이 퇴장하셨습니다.").arg(displayNameToShow));
+        removeFromDisplayNameCache(username); // 나간 후 캐시에서 제거
+    }
+    
+    void GameRoomWindow::onHostChangedWithDisplayName(const QString& username, const QString& displayName)
+    {
+        updateDisplayNameCache(username, displayName);
+        QString displayNameToShow = displayName.isEmpty() ? username : displayName;
+        addSystemMessage(QString::fromUtf8("%1님이 방장이 되셨습니다.").arg(displayNameToShow));
+        // 룸 정보 업데이트도 필요할 수 있음
+        updateRoomInfoDisplay();
+    }
+
+    // ========================================
+    // displayName 캐시 관리 메서드들
+    // ========================================
+    
+    void GameRoomWindow::initializeDisplayNameCache()
+    {
+        // 내 displayName 먼저 캐시에 추가
+        if (!m_myUsername.isEmpty() && !m_myDisplayname.isEmpty()) {
+            m_usernameToDisplayName[m_myUsername] = m_myDisplayname;
+        }
+        
+        // 현재 방에 있는 모든 플레이어들의 displayName 캐시
+        for (const auto& slot : m_roomInfo.playerSlots) {
+            if (!slot.isEmpty() && !slot.displayName.isEmpty()) {
+                m_usernameToDisplayName[slot.username] = slot.displayName;
+                qDebug() << QString::fromUtf8("DisplayName 캐시 초기화: %1 -> %2").arg(slot.username, slot.displayName);
+            }
+        }
+    }
+    
+    void GameRoomWindow::updateDisplayNameCache(const QString& username, const QString& displayName)
+    {
+        if (!username.isEmpty() && !displayName.isEmpty()) {
+            m_usernameToDisplayName[username] = displayName;
+            qDebug() << QString::fromUtf8("DisplayName 캐시 업데이트: %1 -> %2").arg(username, displayName);
+        }
+    }
+    
+    void GameRoomWindow::removeFromDisplayNameCache(const QString& username)
+    {
+        if (m_usernameToDisplayName.remove(username) > 0) {
+            qDebug() << QString::fromUtf8("DisplayName 캐시에서 제거: %1").arg(username);
         }
     }
 

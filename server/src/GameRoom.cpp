@@ -136,16 +136,18 @@ namespace Blokus {
                 autoSelectNewHost();
                 // 새 호스트 알림 (뮤텍스 내에서 직접 브로드캐스트)
                 std::string newHostName = "";
+                std::string newHostDisplayName = "";
                 for (const auto& player : m_players) {
                     if (player.isHost()) {
                         newHostName = player.getUsername();
+                        newHostDisplayName = player.getDisplayName();
                         break;
                     }
                 }
                 if (!newHostName.empty()) {
-                    broadcastMessageLocked("HOST_CHANGED:" + newHostName);
+                    broadcastMessageLocked("HOST_CHANGED:" + newHostName + ":" + newHostDisplayName);
                     std::ostringstream hostMsg;
-                    hostMsg << newHostName << "님이 방장이 되셨습니다";
+                    hostMsg << newHostDisplayName << "님이 방장이 되셨습니다";
                     broadcastMessageLocked("SYSTEM:" + hostMsg.str());
                 }
             }
@@ -763,16 +765,38 @@ namespace Blokus {
                 return;
             }
             
+            // display_name 찾기
+            std::string displayName = username;
+            for (const auto& player : m_players) {
+                if (player.getUsername() == username) {
+                    if (auto session = player.getSession()) {
+                        displayName = session->getDisplayName();
+                    }
+                    break;
+                }
+            }
+            
             std::ostringstream oss;
-            oss << username << "님이 입장하셨습니다. 현재 인원 : " << m_players.size() << "명";
+            oss << displayName << "님이 입장하셨습니다. 현재 인원 : " << m_players.size() << "명";
             broadcastMessageLocked("SYSTEM:" + oss.str());
         }
 
         void GameRoom::broadcastPlayerLeft(const std::string& username) {
             std::lock_guard<std::mutex> lock(m_playersMutex);
             
+            // display_name 찾기 (퇴장 전에 호출되므로 여전히 플레이어 목록에 있음)
+            std::string displayName = username;
+            for (const auto& player : m_players) {
+                if (player.getUsername() == username) {
+                    if (auto session = player.getSession()) {
+                        displayName = session->getDisplayName();
+                    }
+                    break;
+                }
+            }
+            
             std::ostringstream oss;
-            oss << username << "님이 퇴장하셨습니다. 현재 인원 : " << m_players.size() << "명";
+            oss << displayName << "님이 퇴장하셨습니다. 현재 인원 : " << m_players.size() << "명";
             broadcastMessageLocked("SYSTEM:" + oss.str());
         }
 
@@ -783,11 +807,15 @@ namespace Blokus {
             broadcastMessageLocked(oss.str());
         }
 
-        void GameRoom::broadcastHostChanged(const std::string& newHostName) {
+        void GameRoom::broadcastHostChanged(const std::string& newHostName, const std::string& newHostDisplayName) {
             std::lock_guard<std::mutex> lock(m_playersMutex);
             
-            // 구조화된 메시지만 전송 (시스템 메시지는 호출하는 곳에서 처리)
-            broadcastMessageLocked("HOST_CHANGED:" + newHostName);
+            // displayName이 제공된 경우 포함하여 전송
+            std::string message = "HOST_CHANGED:" + newHostName;
+            if (!newHostDisplayName.empty()) {
+                message += ":" + newHostDisplayName;
+            }
+            broadcastMessageLocked(message);
         }
 
 
@@ -815,10 +843,16 @@ namespace Blokus {
                      << ":" << m_maxPlayers << ":" << (m_isPrivate ? "1" : "0")
                      << ":" << (m_state == RoomState::Playing ? "1" : "0") << ":클래식";
             
-            // 플레이어 데이터 추가 (userId,username,isHost,isReady,colorIndex)
+            // 플레이어 데이터 추가 (userId,username,displayName,isHost,isReady,colorIndex)
             for (const auto& player : m_players) {
+                // Get display name from session if available, fallback to username
+                std::string displayName = player.getUsername();
+                if (auto session = player.getSession()) {
+                    displayName = session->getDisplayName();
+                }
                 response << ":" << player.getUserId() << "," << player.getUsername()
-                         << "," << (player.isHost() ? "1" : "0") << "," << (player.isReady() ? "1" : "0")
+                         << "," << displayName << "," << (player.isHost() ? "1" : "0") 
+                         << "," << (player.isReady() ? "1" : "0")
                          << "," << static_cast<int>(player.getColor());
             }
             
@@ -1119,14 +1153,14 @@ namespace Blokus {
             // 시스템 메시지로도 결과 알림
             std::ostringstream systemMsg;
             if (winners.size() == 1) {
-                std::string winnerName = "";
+                std::string winnerDisplayName = "";
                 for (const auto& player : m_players) {
                     if (player.getColor() == winners[0]) {
-                        winnerName = player.getUsername();
+                        winnerDisplayName = player.getDisplayName();
                         break;
                     }
                 }
-                systemMsg << "SYSTEM:🎉 게임이 종료되었습니다! 승자: " << winnerName << "님!";
+                systemMsg << "SYSTEM:🎉 게임이 종료되었습니다! 승자: " << winnerDisplayName << "님!";
             } else if (winners.size() > 1) {
                 systemMsg << "SYSTEM:🎉 게임이 종료되었습니다! 동점 승부입니다!";
             } else {
@@ -1492,9 +1526,11 @@ namespace Blokus {
                     
                     // 현재 플레이어가 블록을 배치할 수 없으면 자동 스킵
                     std::string playerName = "";
+                    std::string playerDisplayName = "";
                     for (const auto& player : m_players) {
                         if (player.getColor() == checkPlayer) {
                             playerName = player.getUsername();
+                            playerDisplayName = player.getDisplayName();
                             break;
                         }
                     }
@@ -1505,7 +1541,7 @@ namespace Blokus {
                     // 자동 턴 스킵 알림 메시지 (최초 1번만)
                     if (m_gameStateManager->getGameLogic().needsBlockedNotification(checkPlayer)) {
                         std::ostringstream skipMsg;
-                        skipMsg << "SYSTEM:" << playerName << "님이 배치할 수 있는 블록이 없어 자동으로 턴이 넘어갑니다.";
+                        skipMsg << "SYSTEM:" << playerDisplayName << "님이 배치할 수 있는 블록이 없어 자동으로 턴이 넘어갑니다.";
                         broadcastMessageLocked(skipMsg.str());
                     }
                     
@@ -1604,8 +1640,11 @@ namespace Blokus {
                 }
                 
                 if (!playerIds.empty()) {
+                    // 무승부 여부 확인 (승자가 2명 이상인 경우)
+                    bool isDraw = winners.size() > 1;
+                    
                     // DB에 게임 결과 저장 (모든 플레이어)
-                    bool success = dbManager->saveGameResults(playerIds, scores, isWinner);
+                    bool success = dbManager->saveGameResults(playerIds, scores, isWinner, isDraw);
                     if (success) {
                         spdlog::info("✅ [DB_DEBUG] 방 {} 게임 결과가 DB에 성공적으로 저장되었습니다", m_roomId);
                         
@@ -1721,9 +1760,11 @@ namespace Blokus {
             
             // 플레이어 이름 찾기 (한 번만)
             std::string timedOutPlayerName = "";
+            std::string timedOutPlayerDisplayName = "";
             for (const auto& player : m_players) {
                 if (player.getColor() == currentPlayer) {
                     timedOutPlayerName = player.getUsername();
+                    timedOutPlayerDisplayName = player.getDisplayName();
                     break;
                 }
             }
@@ -1766,13 +1807,13 @@ namespace Blokus {
                 
                 // 시스템 메시지
                 std::ostringstream systemMsg;
-                systemMsg << "SYSTEM:" << timedOutPlayerName << "님의 시간이 초과되어 턴이 넘어갑니다.";
+                systemMsg << "SYSTEM:" << timedOutPlayerDisplayName << "님의 시간이 초과되어 턴이 넘어갑니다.";
                 broadcastMessageLocked(systemMsg.str());
                 
                 // 차단 상태 전환 알림 메시지
                 if (wasBlocked) {
                     std::ostringstream blockMsg;
-                    blockMsg << "SYSTEM:" << timedOutPlayerName << "님이 " << TIMEOUT_LIMIT 
+                    blockMsg << "SYSTEM:" << timedOutPlayerDisplayName << "님이 " << TIMEOUT_LIMIT 
                            << "회 타임아웃으로 인해 자동 턴 스킵 상태가 되었습니다.";
                     broadcastMessageLocked(blockMsg.str());
                 }

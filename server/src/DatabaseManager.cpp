@@ -135,7 +135,7 @@ namespace Blokus {
             pqxx::work txn(*conn);
             try {
                 auto result = txn.exec_params(
-                    "SELECT u.user_id, u.username, u.password_hash, "
+                    "SELECT u.user_id, u.username, u.display_name, u.password_hash, "
                     "       COALESCE(s.total_games, 0), COALESCE(s.wins, 0), COALESCE(s.losses, 0), "
                     "       COALESCE(s.draws, 0), COALESCE(s.level, 1), COALESCE(s.experience_points, 0), "
                     "       COALESCE(s.total_score, 0), COALESCE(s.best_score, 0), "
@@ -155,16 +155,17 @@ namespace Blokus {
                 UserAccount user;
                 user.userId = result[0][0].as<uint32_t>();
                 user.username = result[0][1].as<std::string>();
-                user.passwordHash = result[0][2].as<std::string>();
-                user.totalGames = result[0][3].as<int>();
-                user.wins = result[0][4].as<int>();
-                user.losses = result[0][5].as<int>();
-                user.draws = result[0][6].as<int>();
-                user.level = result[0][7].as<int>();
-                user.experiencePoints = result[0][8].as<int>();
-                user.totalScore = result[0][9].as<int>();
-                user.bestScore = result[0][10].as<int>();
-                user.isActive = result[0][11].as<bool>();
+                user.displayName = result[0][2].is_null() ? user.username : result[0][2].as<std::string>();
+                user.passwordHash = result[0][3].as<std::string>();
+                user.totalGames = result[0][4].as<int>();
+                user.wins = result[0][5].as<int>();
+                user.losses = result[0][6].as<int>();
+                user.draws = result[0][7].as<int>();
+                user.level = result[0][8].as<int>();
+                user.experiencePoints = result[0][9].as<int>();
+                user.totalScore = result[0][10].as<int>();
+                user.bestScore = result[0][11].as<int>();
+                user.isActive = result[0][12].as<bool>();
 
                 txn.commit();
                 dbPool_->returnConnection(std::move(conn));
@@ -179,6 +180,58 @@ namespace Blokus {
             }
         }
 
+        std::optional<UserAccount> DatabaseManager::getUserByDisplayName(const std::string& displayName) {
+            if (!isInitialized_) return std::nullopt;
+
+            auto conn = dbPool_->getConnection();
+            pqxx::work txn(*conn);
+            try {
+                auto result = txn.exec_params(
+                    "SELECT u.user_id, u.username, u.display_name, u.password_hash, "
+                    "       COALESCE(s.total_games, 0), COALESCE(s.wins, 0), COALESCE(s.losses, 0), "
+                    "       COALESCE(s.draws, 0), COALESCE(s.level, 1), COALESCE(s.experience_points, 0), "
+                    "       COALESCE(s.total_score, 0), COALESCE(s.best_score, 0), "
+                    "       u.is_active "
+                    "FROM users u "
+                    "LEFT JOIN user_stats s ON u.user_id = s.user_id "
+                    "WHERE LOWER(u.display_name) = LOWER($1) AND u.is_active = true",
+                    displayName
+                );
+
+                if (result.empty()) {
+                    txn.abort();
+                    dbPool_->returnConnection(std::move(conn));
+                    return std::nullopt;
+                }
+
+                UserAccount user;
+                user.userId = result[0][0].as<uint32_t>();
+                user.username = result[0][1].as<std::string>();
+                user.displayName = result[0][2].is_null() ? user.username : result[0][2].as<std::string>();
+                user.passwordHash = result[0][3].as<std::string>();
+                user.totalGames = result[0][4].as<int>();
+                user.wins = result[0][5].as<int>();
+                user.losses = result[0][6].as<int>();
+                user.draws = result[0][7].as<int>();
+                user.level = result[0][8].as<int>();
+                user.experiencePoints = result[0][9].as<int>();
+                user.totalScore = result[0][10].as<int>();
+                user.bestScore = result[0][11].as<int>();
+                user.isActive = result[0][12].as<bool>();
+
+                txn.commit();
+                dbPool_->returnConnection(std::move(conn));
+                return user;
+
+            }
+            catch (const std::exception& e) {
+                txn.abort();
+                dbPool_->returnConnection(std::move(conn));
+                spdlog::error("getUserByDisplayName 오류: {}", e.what());
+                return std::nullopt;
+            }
+        }
+
         std::optional<UserAccount> DatabaseManager::getUserById(uint32_t userId) {
             if (!isInitialized_) return std::nullopt;
 
@@ -186,9 +239,10 @@ namespace Blokus {
             pqxx::work txn(*conn);
             try {
                 auto result = txn.exec_params(
-                    "SELECT u.user_id, u.username, u.password_hash, "
+                    "SELECT u.user_id, u.username, u.display_name, u.password_hash, "
                     "       COALESCE(s.total_games, 0), COALESCE(s.wins, 0), COALESCE(s.losses, 0), "
                     "       COALESCE(s.draws, 0), COALESCE(s.level, 1), COALESCE(s.experience_points, 0), "
+                    "       COALESCE(s.total_score, 0), COALESCE(s.best_score, 0), "
                     "       u.is_active "
                     "FROM users u "
                     "LEFT JOIN user_stats s ON u.user_id = s.user_id "
@@ -205,13 +259,16 @@ namespace Blokus {
                 UserAccount user;
                 user.userId = result[0]["user_id"].as<uint32_t>();
                 user.username = result[0]["username"].as<std::string>();
+                user.displayName = result[0]["display_name"].is_null() ? user.username : result[0]["display_name"].as<std::string>();
                 user.passwordHash = result[0]["password_hash"].as<std::string>();
-                user.totalGames = result[0][3].as<int>();
-                user.wins = result[0][4].as<int>();
-                user.losses = result[0][5].as<int>();
-                user.draws = result[0][6].as<int>();
-                user.level = result[0][7].as<int>();
-                user.experiencePoints = result[0][8].as<int>();
+                user.totalGames = result[0][4].as<int>();
+                user.wins = result[0][5].as<int>();
+                user.losses = result[0][6].as<int>();
+                user.draws = result[0][7].as<int>();
+                user.level = result[0][8].as<int>();
+                user.experiencePoints = result[0][9].as<int>();
+                user.totalScore = result[0][10].as<int>();
+                user.bestScore = result[0][11].as<int>();
                 user.isActive = result[0]["is_active"].as<bool>();
 
                 txn.commit();
@@ -318,9 +375,10 @@ namespace Blokus {
             pqxx::work txn(*conn);
             try {
                 auto result = txn.exec_params(
-                    "SELECT u.user_id, u.username, u.password_hash, "
+                    "SELECT u.user_id, u.username, u.display_name, u.password_hash, "
                     "       COALESCE(s.total_games, 0), COALESCE(s.wins, 0), COALESCE(s.losses, 0), "
                     "       COALESCE(s.draws, 0), COALESCE(s.level, 1), COALESCE(s.experience_points, 0), "
+                    "       COALESCE(s.total_score, 0), COALESCE(s.best_score, 0), "
                     "       u.is_active "
                     "FROM users u "
                     "LEFT JOIN user_stats s ON u.user_id = s.user_id "
@@ -337,13 +395,16 @@ namespace Blokus {
                 UserAccount user;
                 user.userId = result[0]["user_id"].as<uint32_t>();
                 user.username = result[0]["username"].as<std::string>();
+                user.displayName = result[0]["display_name"].is_null() ? user.username : result[0]["display_name"].as<std::string>();
                 user.passwordHash = result[0]["password_hash"].as<std::string>();
-                user.totalGames = result[0][3].as<int>();
-                user.wins = result[0][4].as<int>();
-                user.losses = result[0][5].as<int>();
-                user.draws = result[0][6].as<int>();
-                user.level = result[0][7].as<int>();
-                user.experiencePoints = result[0][8].as<int>();
+                user.totalGames = result[0][4].as<int>();
+                user.wins = result[0][5].as<int>();
+                user.losses = result[0][6].as<int>();
+                user.draws = result[0][7].as<int>();
+                user.level = result[0][8].as<int>();
+                user.experiencePoints = result[0][9].as<int>();
+                user.totalScore = result[0][10].as<int>();
+                user.bestScore = result[0][11].as<int>();
                 user.isActive = result[0]["is_active"].as<bool>();
 
                 txn.commit();
@@ -468,7 +529,8 @@ namespace Blokus {
 
         bool DatabaseManager::saveGameResults(const std::vector<uint32_t>& playerIds, 
                                             const std::vector<int>& scores, 
-                                            const std::vector<bool>& isWinner) {
+                                            const std::vector<bool>& isWinner,
+                                            bool isDraw) {
             if (!isInitialized_) return false;
             
             if (playerIds.size() != scores.size() || playerIds.size() != isWinner.size()) {
@@ -483,8 +545,8 @@ namespace Blokus {
                 
                 // 모든 플레이어의 통계를 업데이트
                 for (size_t i = 0; i < playerIds.size(); ++i) {
-                    bool won = isWinner[i];
-                    bool draw = false; // 블로커스는 무승부가 없다고 가정
+                    bool won = isDraw ? false : isWinner[i]; // 무승부인 경우 승리 처리 안함
+                    bool draw = isDraw; // 무승부 여부 사용
                     int score = scores[i];
                     
                     // 해당 플레이어가 존재하는지 확인
@@ -721,6 +783,156 @@ namespace Blokus {
 
         std::vector<std::string> DatabaseManager::getOnlineUsers() {
             return {}; // 임시 구현
+        }
+
+        // ========================================
+        // 사용자 설정 관리 구현
+        // ========================================
+
+        std::optional<UserSettings> DatabaseManager::getUserSettings(const std::string& userId) {
+            auto conn = dbPool_->getConnection();
+            if (!conn) {
+                spdlog::error("Failed to get database connection for getUserSettings");
+                return std::nullopt;
+            }
+
+            try {
+                // userId를 string에서 int로 변환
+                int userIdInt = std::stoi(userId);
+                
+                pqxx::work txn(*conn);
+                
+                // 사용자 설정 조회
+                auto result = txn.exec_params(
+                    "SELECT theme, language, game_invite_notifications, "
+                    "friend_online_notifications, system_notifications, "
+                    "bgm_mute, bgm_volume, effect_mute, effect_volume "
+                    "FROM user_settings WHERE user_id = $1",
+                    userIdInt
+                );
+
+                if (result.empty()) {
+                    // 설정이 없으면 기본값으로 생성
+                    UserSettings defaults = UserSettings::getDefaults();
+                    txn.exec_params(
+                        "INSERT INTO user_settings (user_id, theme, language, "
+                        "game_invite_notifications, friend_online_notifications, "
+                        "system_notifications, bgm_mute, bgm_volume, effect_mute, effect_volume) "
+                        "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+                        userIdInt, defaults.theme, defaults.language,
+                        defaults.gameInviteNotifications, defaults.friendOnlineNotifications,
+                        defaults.systemNotifications, defaults.bgmMute, defaults.bgmVolume,
+                        defaults.effectMute, defaults.effectVolume
+                    );
+                    txn.commit();
+                    
+                    spdlog::info("Created default settings for user {}", userId);
+                    return defaults;
+                }
+
+                // 기존 설정 반환
+                auto row = result[0];
+                UserSettings settings;
+                settings.theme = row["theme"].as<std::string>();
+                settings.language = row["language"].as<std::string>();
+                settings.gameInviteNotifications = row["game_invite_notifications"].as<bool>();
+                settings.friendOnlineNotifications = row["friend_online_notifications"].as<bool>();
+                settings.systemNotifications = row["system_notifications"].as<bool>();
+                settings.bgmMute = row["bgm_mute"].as<bool>();
+                settings.bgmVolume = row["bgm_volume"].as<int>();
+                settings.effectMute = row["effect_mute"].as<bool>();
+                settings.effectVolume = row["effect_volume"].as<int>();
+
+                txn.commit();
+                dbPool_->returnConnection(std::move(conn));
+                spdlog::debug("Retrieved settings for user {}", userId);
+                return settings;
+
+            } catch (const std::exception& e) {
+                spdlog::error("Failed to get user settings for user {}: {}", userId, e.what());
+                dbPool_->returnConnection(std::move(conn));
+                return std::nullopt;
+            }
+        }
+
+        bool DatabaseManager::updateUserSettings(const std::string& userId, const UserSettings& settings) {
+            if (!settings.isValid()) {
+                spdlog::error("Invalid settings provided for user {}", userId);
+                return false;
+            }
+
+            auto conn = dbPool_->getConnection();
+            if (!conn) {
+                spdlog::error("Failed to get database connection for updateUserSettings");
+                return false;
+            }
+
+            try {
+                // userId를 string에서 int로 변환
+                int userIdInt = std::stoi(userId);
+                
+                pqxx::work txn(*conn);
+                
+                // UPSERT (INSERT ... ON CONFLICT UPDATE)
+                txn.exec_params(
+                    "INSERT INTO user_settings (user_id, theme, language, "
+                    "game_invite_notifications, friend_online_notifications, "
+                    "system_notifications, bgm_mute, bgm_volume, effect_mute, effect_volume) "
+                    "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) "
+                    "ON CONFLICT (user_id) DO UPDATE SET "
+                    "theme = EXCLUDED.theme, language = EXCLUDED.language, "
+                    "game_invite_notifications = EXCLUDED.game_invite_notifications, "
+                    "friend_online_notifications = EXCLUDED.friend_online_notifications, "
+                    "system_notifications = EXCLUDED.system_notifications, "
+                    "bgm_mute = EXCLUDED.bgm_mute, bgm_volume = EXCLUDED.bgm_volume, "
+                    "effect_mute = EXCLUDED.effect_mute, effect_volume = EXCLUDED.effect_volume, "
+                    "updated_at = CURRENT_TIMESTAMP",
+                    userIdInt, settings.theme, settings.language,
+                    settings.gameInviteNotifications, settings.friendOnlineNotifications,
+                    settings.systemNotifications, settings.bgmMute, settings.bgmVolume,
+                    settings.effectMute, settings.effectVolume
+                );
+
+                txn.commit();
+                spdlog::info("Updated settings for user {}", userId);
+                dbPool_->returnConnection(std::move(conn));
+                return true;
+
+            } catch (const std::exception& e) {
+                spdlog::error("Failed to update user settings for user {}: {}", userId, e.what());
+                dbPool_->returnConnection(std::move(conn));
+                return false;
+            }
+        }
+
+        bool DatabaseManager::deleteUserSettings(const std::string& userId) {
+            auto conn = dbPool_->getConnection();
+            if (!conn) {
+                spdlog::error("Failed to get database connection for deleteUserSettings");
+                return false;
+            }
+
+            try {
+                // userId를 string에서 int로 변환
+                int userIdInt = std::stoi(userId);
+                
+                pqxx::work txn(*conn);
+                
+                auto result = txn.exec_params(
+                    "DELETE FROM user_settings WHERE user_id = $1",
+                    userIdInt
+                );
+
+                txn.commit();
+                spdlog::info("Deleted settings for user {} (affected rows: {})", userId, result.affected_rows());
+                dbPool_->returnConnection(std::move(conn));
+                return true;
+
+            } catch (const std::exception& e) {
+                spdlog::error("Failed to delete user settings for user {}: {}", userId, e.what());
+                dbPool_->returnConnection(std::move(conn));
+                return false;
+            }
         }
 
         bool DatabaseManager::sendFriendRequest(uint32_t requesterId, uint32_t addresseeId) {

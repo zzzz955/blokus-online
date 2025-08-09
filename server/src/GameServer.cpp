@@ -217,7 +217,7 @@ namespace Blokus::Server {
 
     AuthResult GameServer::authenticateUser(const std::string& username, const std::string& password) {
         if (!authService_) {
-            return AuthResult(false, "인증 서비스가 초기화되지 않았습니다", "", "", "");
+            return AuthResult(false, "인증 서비스가 초기화되지 않았습니다", 0, "", "");
         }
 
         return authService_->loginUser(username, password);
@@ -233,7 +233,7 @@ namespace Blokus::Server {
 
     AuthResult GameServer::loginGuest(const std::string& guestName) {
         if (!authService_) {
-            return AuthResult(false, "인증 서비스가 초기화되지 않았습니다", "", "", "");
+            return AuthResult(false, "인증 서비스가 초기화되지 않았습니다", 0, "", "");
         }
 
         return authService_->loginGuest(guestName);
@@ -686,10 +686,11 @@ namespace Blokus::Server {
             for (const auto& lobbySession : lobbyUsers) {
                 if (lobbySession && lobbySession->isActive() && !lobbySession->getUsername().empty()) {
                     std::string username = lobbySession->getUsername();
+                    std::string displayName = lobbySession->getDisplayName();
                     int userLevel = lobbySession->getUserLevel();
                     std::string userStatus = lobbySession->getUserStatusString();
                     
-                    response << ":" << username << "," << userLevel << "," << userStatus;
+                    response << ":" << username << "," << displayName << "," << userLevel << "," << userStatus;
                     validUserCount++;
                 }
             }

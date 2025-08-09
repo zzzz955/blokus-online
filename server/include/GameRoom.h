@@ -137,7 +137,7 @@ namespace Blokus {
             void broadcastPlayerJoined(const std::string& username);
             void broadcastPlayerLeft(const std::string& username);
             void broadcastPlayerReady(const std::string& username, bool ready);
-            void broadcastHostChanged(const std::string& newHostName);
+            void broadcastHostChanged(const std::string& newHostName, const std::string& newHostDisplayName = "");
             void broadcastGameEnd();
             void broadcastGameState();
             void broadcastGameStateLocked(); // 데드락 방지용 내부 메서드

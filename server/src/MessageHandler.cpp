@@ -66,6 +66,10 @@ namespace Blokus::Server
         handlers_[MessageType::UserStats] = [this](const auto &params)
         { handleGetUserStats(params); };
 
+        // 사용자 설정 관련
+        handlers_[MessageType::UserSettings] = [this](const auto &params)
+        { handleUserSettings(params); };
+
         // 버전 관련
         handlers_[MessageType::VersionCheck] = [this](const auto &params)
         { handleVersionCheck(params); };
@@ -260,7 +264,25 @@ namespace Blokus::Server
                 }
             }
 
-            sendResponse("AUTH_SUCCESS:" + result.username + ":" + result.sessionToken);
+            // 완전한 사용자 정보를 ':' 구분자 형태로 전송 (기존 프로토콜 준수)
+            auto userAccountFromDB = databaseManager_->getUserByUsername(result.username);
+            if (databaseManager_ && userAccountFromDB.has_value()) {
+                // ':' 구분자 기반 프로토콜로 사용자 정보 전송
+                std::ostringstream userInfoStream;
+                userInfoStream << "AUTH_SUCCESS:" << result.username << ":" << result.sessionToken 
+                    << ":" << userAccountFromDB->displayName
+                    << ":" << userAccountFromDB->level
+                    << ":" << userAccountFromDB->totalGames
+                    << ":" << userAccountFromDB->wins
+                    << ":" << userAccountFromDB->losses
+                    << ":" << userAccountFromDB->totalScore
+                    << ":" << userAccountFromDB->bestScore
+                    << ":" << userAccountFromDB->experiencePoints;
+                sendResponse(userInfoStream.str());
+            } else {
+                // 폴백: 기본 정보만 전송 (0으로 초기화)
+                sendResponse("AUTH_SUCCESS:" + result.username + ":" + result.sessionToken + ":" + result.username + ":1:0:0:0:0:0:0");
+            }
 
             // 로그인 성공 시 자동으로 로비에 입장되므로 다른 사용자들에게 브로드캐스트
             broadcastLobbyUserJoined(result.username);
@@ -1047,7 +1069,7 @@ namespace Blokus::Server
                     const PlayerInfo *newHost = room->getPlayer(newHostId);
                     if (newHost)
                     {
-                        room->broadcastHostChanged(newHost->getUsername());
+                        room->broadcastHostChanged(newHost->getUsername(), newHost->getDisplayName());
                     }
                 }
 
@@ -1349,10 +1371,11 @@ namespace Blokus::Server
                 if (lobbySession && lobbySession->isActive() && !lobbySession->getUsername().empty())
                 {
                     std::string username = lobbySession->getUsername();
+                    std::string displayName = lobbySession->getDisplayName();
                     int userLevel = lobbySession->getUserLevel();
                     std::string userStatus = lobbySession->getUserStatusString();
 
-                    response << ":" << username << "," << userLevel << "," << userStatus;
+                    response << ":" << username << "," << displayName << "," << userLevel << "," << userStatus;
                     validUserCount++;
                 }
             }
@@ -1446,7 +1469,12 @@ namespace Blokus::Server
                 return;
             }
 
-            std::string chatMessage = "CHAT:" + username + ":" + message;
+            // Get display name from session if available, fallback to username
+            std::string displayName = username;
+            if (session_ && session_->isActive()) {
+                displayName = session_->getDisplayName();
+            }
+            std::string chatMessage = "CHAT:" + username + ":" + displayName + ":" + message;
             
             // GameServer를 통해 실제 로비에 있는 사용자에게만 브로드캐스트
             auto lobbyUsers = gameServer_->getActualLobbyUsers();
@@ -1485,8 +1513,13 @@ namespace Blokus::Server
                 return;
             }
 
-            std::string chatMessage = "CHAT:" + username + ":" + message;
-            spdlog::info("📢 방 {} 채팅 브로드캐스트: [{}] {}", currentRoomId, username, message);
+            // Get display name from session if available, fallback to username
+            std::string displayName = username;
+            if (session_ && session_->isActive()) {
+                displayName = session_->getDisplayName();
+            }
+            std::string chatMessage = "CHAT:" + username + ":" + displayName + ":" + message;
+            spdlog::info("📢 방 {} 채팅 브로드캐스트: [{}] {} ({})", currentRoomId, displayName, message, username);
 
             // GameRoom의 broadcastMessage 사용
             room->broadcastMessage(chatMessage);
@@ -1516,12 +1549,18 @@ namespace Blokus::Server
                      << ":" << room->getMaxPlayers() << ":" << (room->isPrivate() ? "1" : "0")
                      << ":" << (room->isPlaying() ? "1" : "0") << ":클래식";
 
-            // 플레이어 데이터 추가 (userId,username,isHost,isReady,colorIndex)
+            // 플레이어 데이터 추가 (userId,username,displayName,isHost,isReady,colorIndex)
             auto playerList = room->getPlayerList();
             for (const auto &player : playerList)
             {
+                // Get display name from session if available, fallback to username
+                std::string displayName = player.getUsername();
+                if (auto session = player.getSession()) {
+                    displayName = session->getDisplayName();
+                }
                 response << ":" << player.getUserId() << "," << player.getUsername()
-                         << "," << (player.isHost() ? "1" : "0") << "," << (player.isReady() ? "1" : "0")
+                         << "," << displayName << "," << (player.isHost() ? "1" : "0")
+                         << "," << (player.isReady() ? "1" : "0")
                          << "," << static_cast<int>(player.getColor());
             }
 
@@ -1551,12 +1590,17 @@ namespace Blokus::Server
                      << ":" << room->getMaxPlayers() << ":" << (room->isPrivate() ? "1" : "0")
                      << ":" << (room->isPlaying() ? "1" : "0") << ":클래식";
 
-            // 플레이어 데이터 추가 (userId,username,isHost,isReady,colorIndex)
+            // 플레이어 데이터 추가 (userId,username,displayName,isHost,isReady,colorIndex)
             auto playerList = room->getPlayerList();
             spdlog::debug("🔍 방 {} 플레이어 목록 생성 중: {}명", room->getRoomId(), playerList.size());
             for (const auto &player : playerList)
             {
-                std::string playerData = player.getUserId() + "," + player.getUsername() + "," + (player.isHost() ? "1" : "0") + "," + (player.isReady() ? "1" : "0") + "," + std::to_string(static_cast<int>(player.getColor()));
+                // Get display name from session if available, fallback to username
+                std::string displayName = player.getUsername();
+                if (auto session = player.getSession()) {
+                    displayName = session->getDisplayName();
+                }
+                std::string playerData = player.getUserId() + "," + player.getUsername() + "," + displayName + "," + (player.isHost() ? "1" : "0") + "," + (player.isReady() ? "1" : "0") + "," + std::to_string(static_cast<int>(player.getColor()));
 
                 spdlog::debug("  - 플레이어 데이터: {}", playerData);
                 response << ":" << playerData;
@@ -1618,6 +1662,7 @@ namespace Blokus::Server
         std::ostringstream response;
         response << "MY_STATS_UPDATE:{"; // 자동 업데이트용 메시지 타입
         response << "\"username\":\"" << userAccount.username << "\",";
+        response << "\"displayName\":\"" << userAccount.displayName << "\",";
         response << "\"level\":" << userAccount.level << ",";
         response << "\"totalGames\":" << userAccount.totalGames << ",";
         response << "\"wins\":" << userAccount.wins << ",";
@@ -1655,17 +1700,21 @@ namespace Blokus::Server
                 return;
             }
 
-            // 로비에서 해당 사용자의 세션 검색
+            // 로비에서 해당 사용자의 세션 검색 (username 또는 display_name으로)
             auto lobbyUsers = gameServer_->getLobbyUsers();
             std::shared_ptr<Session> targetSession = nullptr;
 
             for (const auto& lobbySession : lobbyUsers)
             {
-                if (lobbySession && lobbySession->isActive() && 
-                    lobbySession->getUsername() == targetUsername)
+                if (lobbySession && lobbySession->isActive())
                 {
-                    targetSession = lobbySession;
-                    break;
+                    // username 또는 display_name으로 매치 확인
+                    if (lobbySession->getUsername() == targetUsername ||
+                        lobbySession->getDisplayName() == targetUsername)
+                    {
+                        targetSession = lobbySession;
+                        break;
+                    }
                 }
             }
 
@@ -1688,7 +1737,14 @@ namespace Blokus::Server
                     return;
                 }
 
+                // username 또는 display_name으로 DB 검색
                 auto dbUserAccount = dbManager->getUserByUsername(targetUsername);
+                if (!dbUserAccount.has_value())
+                {
+                    // username으로 못 찾으면 display_name으로 검색
+                    dbUserAccount = dbManager->getUserByDisplayName(targetUsername);
+                }
+                
                 if (!dbUserAccount.has_value())
                 {
                     sendError("사용자 정보를 찾을 수 없습니다");
@@ -1710,6 +1766,7 @@ namespace Blokus::Server
             std::ostringstream response;
             response << "USER_STATS_RESPONSE:{";
             response << "\"username\":\"" << userAccount.username << "\",";
+            response << "\"displayName\":\"" << userAccount.displayName << "\",";
             response << "\"level\":" << userAccount.level << ",";
             response << "\"totalGames\":" << userAccount.totalGames << ",";
             response << "\"wins\":" << userAccount.wins << ",";
@@ -1908,4 +1965,122 @@ namespace Blokus::Server
                         clientVersion, ConfigManager::serverVersion, versionManager_->getDownloadURL());
         }
     }
+
+    // ========================================
+    // 사용자 설정 관련 핸들러 구현
+    // ========================================
+
+    void MessageHandler::handleUserSettings(const std::vector<std::string>& params)
+    {
+        try {
+            if (!session_->isAuthenticated()) {
+                sendError("인증되지 않은 사용자입니다");
+                return;
+            }
+
+            // 첫 번째 파라미터가 "request"인 경우 설정 조회 처리
+            if (!params.empty() && params[0] == "request") {
+                handleGetUserSettings(params);
+                return;
+            }
+
+            // 설정 업데이트의 경우 6개 파라미터 필요
+            if (params.size() < 6) {
+                sendError("사용자 설정 업데이트에 필요한 파라미터가 부족합니다");
+                return;
+            }
+
+            // 파라미터 파싱: theme:language:bgm_mute:bgm_volume:sfx_mute:sfx_volume
+            UserSettings settings;
+            settings.theme = params[0];
+            settings.language = params[1];
+            settings.bgmMute = (params[2] == "true");
+            settings.bgmVolume = std::stoi(params[3]);
+            settings.effectMute = (params[4] == "true");
+            settings.effectVolume = std::stoi(params[5]);
+
+            // 유효성 검증
+            if (!settings.isValid()) {
+                sendError("잘못된 설정값입니다");
+                return;
+            }
+
+            // 데이터베이스 업데이트
+            if (databaseManager_ && databaseManager_->updateUserSettings(session_->getUserId(), settings)) {
+                // 세션에 설정 캐싱
+                session_->setUserSettings(settings);
+                
+                // 성공 응답
+                std::string response = "UserSettingsResponse:success:" + settings.theme + ":" + 
+                                     settings.language + ":" + 
+                                     (settings.bgmMute ? "true" : "false") + ":" + 
+                                     std::to_string(settings.bgmVolume) + ":" +
+                                     (settings.effectMute ? "true" : "false") + ":" + 
+                                     std::to_string(settings.effectVolume);
+                
+                sendTextMessage(response);
+                spdlog::info("Updated settings for user {}", session_->getUsername());
+            } else {
+                sendError("설정 업데이트에 실패했습니다");
+            }
+
+        } catch (const std::exception& e) {
+            spdlog::error("Error in handleUserSettings: {}", e.what());
+            sendError("서버 오류가 발생했습니다");
+        }
+    }
+
+    void MessageHandler::handleGetUserSettings(const std::vector<std::string>& params)
+    {
+        try {
+            if (!session_->isAuthenticated()) {
+                sendError("인증되지 않은 사용자입니다");
+                return;
+            }
+
+            // 세션에서 캐싱된 설정 확인
+            auto cachedSettings = session_->getUserSettings();
+            if (cachedSettings.has_value()) {
+                const auto& settings = cachedSettings.value();
+                std::string response = "UserSettingsResponse:success:" + settings.theme + ":" + 
+                                     settings.language + ":" + 
+                                     (settings.bgmMute ? "true" : "false") + ":" + 
+                                     std::to_string(settings.bgmVolume) + ":" +
+                                     (settings.effectMute ? "true" : "false") + ":" + 
+                                     std::to_string(settings.effectVolume);
+                
+                sendTextMessage(response);
+                return;
+            }
+
+            // 데이터베이스에서 조회 (캐싱된 설정이 없는 경우)
+            if (databaseManager_) {
+                auto settings = databaseManager_->getUserSettings(session_->getUserId());
+                if (settings.has_value()) {
+                    // 세션에 캐싱
+                    session_->setUserSettings(settings.value());
+                    
+                    const auto& s = settings.value();
+                    std::string response = "UserSettingsResponse:success:" + s.theme + ":" + 
+                                         s.language + ":" + 
+                                         (s.bgmMute ? "true" : "false") + ":" + 
+                                         std::to_string(s.bgmVolume) + ":" +
+                                         (s.effectMute ? "true" : "false") + ":" + 
+                                         std::to_string(s.effectVolume);
+                    
+                    sendTextMessage(response);
+                    spdlog::debug("Retrieved settings for user {}", session_->getUsername());
+                } else {
+                    sendError("사용자 설정을 찾을 수 없습니다");
+                }
+            } else {
+                sendError("데이터베이스 연결 오류입니다");
+            }
+
+        } catch (const std::exception& e) {
+            spdlog::error("Error in handleGetUserSettings: {}", e.what());
+            sendError("서버 오류가 발생했습니다");
+        }
+    }
+    
 } // namespace Blokus::Server

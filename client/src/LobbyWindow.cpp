@@ -46,7 +46,7 @@ namespace Blokus {
         m_roomNameEdit = new QLineEdit();
         m_roomNameEdit->setPlaceholderText(QString::fromUtf8("방 이름을 입력하세요"));
         auto parent = qobject_cast<LobbyWindow*>(parentWidget());
-        m_roomNameEdit->setText(QString::fromUtf8("%1님의 방").arg(parent->getMyUsername()));
+        m_roomNameEdit->setText(QString::fromUtf8("%1님의 방").arg(parent->getMyDisplayName()));
         m_roomNameEdit->setMaxLength(30);
 
         // 게임 모드 (클래식만)
@@ -173,9 +173,10 @@ namespace Blokus {
     // LobbyWindow 구현
     // ========================================
 
-    LobbyWindow::LobbyWindow(const QString& username, QWidget* parent)
+    LobbyWindow::LobbyWindow(const QString& username, const QString displayname, QWidget* parent)
         : QMainWindow(parent)
         , m_myUsername(username)
+        , m_myDisplayName(displayname)
         , m_centralWidget(nullptr)
         , m_mainSplitter(nullptr)
         , m_leftPanel(nullptr)
@@ -231,6 +232,7 @@ namespace Blokus {
 
             // 내 정보 설정 (기본값)
             m_myUserInfo.username = username;
+            m_myUserInfo.displayName = displayname;
             m_myUserInfo.totalGames = 0;
             m_myUserInfo.wins = 0;
             m_myUserInfo.losses = 0;
@@ -268,10 +270,8 @@ namespace Blokus {
 
             // 환영 메시지
             qDebug() << QString::fromUtf8("환영 메시지 추가...");
-            addSystemMessage(QString::fromUtf8("안녕하세요, %1님! 블로커스 온라인에 오신 것을 환영합니다.").arg(username));
-
+            addSystemMessage(QString::fromUtf8("안녕하세요, %1님! 블로커스 온라인에 오신 것을 환영합니다.").arg(displayname));
             qDebug() << QString::fromUtf8("LobbyWindow 생성자 완료");
-
         }
         catch (const std::exception& e) {
             qDebug() << QString::fromUtf8("LobbyWindow 생성 중 예외: %1").arg(e.what());
@@ -427,7 +427,7 @@ namespace Blokus {
         mainLayout->setContentsMargins(10, 5, 15, 5);  // 여백 줄여서 공간 절약
 
         // 환영 메시지
-        m_welcomeLabel = new QLabel(QString::fromUtf8("🎮 %1님, 환영합니다!").arg(m_myUsername));
+        m_welcomeLabel = new QLabel(QString::fromUtf8("🎮 %1님, 환영합니다!").arg(getMyDisplayName()));
         m_welcomeLabel->setStyleSheet("font-size: 16px; font-weight: bold; color: #2c3e50;");
 
         // 사용자 통계 (한 줄로 모든 정보 표시)
@@ -458,6 +458,11 @@ namespace Blokus {
             "}"
         );
 
+        // 설정 버튼
+        m_settingsButton = new QPushButton(QString::fromUtf8("⚙️"));
+        m_settingsButton->setFixedSize(45, 25);
+        m_settingsButton->setToolTip("환경 설정");
+        
         // 로그아웃 버튼
         m_logoutButton = new QPushButton(QString::fromUtf8("로그아웃"));
         m_logoutButton->setFixedSize(80, 25);
@@ -470,10 +475,13 @@ namespace Blokus {
         mainLayout->addWidget(m_expLabel);
         mainLayout->addWidget(m_expProgressBar);
         mainLayout->addSpacing(10);
+        mainLayout->addWidget(m_settingsButton);
+        mainLayout->addSpacing(5);
         mainLayout->addWidget(m_logoutButton);
 
         updateUserStatsDisplay();
 
+        connect(m_settingsButton, &QPushButton::clicked, this, &LobbyWindow::onSettingsClicked);
         connect(m_logoutButton, &QPushButton::clicked, this, &LobbyWindow::onLogoutClicked);
     }
 
@@ -782,7 +790,7 @@ namespace Blokus {
 
             RoomInfo roomInfo = dialog.getRoomInfo();
             roomInfo.roomId = m_roomList_data.size() + 1001; // 임시 ID
-            roomInfo.hostName = m_myUsername;
+            roomInfo.hostName = getMyDisplayName();
             roomInfo.currentPlayers = 1;
 
             addSystemMessage(QString::fromUtf8("방 '%1'을(를) 생성했습니다.").arg(roomInfo.roomName));
@@ -907,16 +915,16 @@ namespace Blokus {
         int currentRow = m_userList->currentRow();
         if (currentRow < 0 || currentRow >= m_userList_data.size()) return;
         
-        // 리스트에서 현재 행의 사용자명만 추출 (식별용)
+        // 리스트에서 현재 행의 사용자 정보 추출 (username으로 서버 요청)
         const UserInfo& user = m_userList_data[currentRow];
-        QString username = user.username;
+        QString displayName = user.displayName.isEmpty() ? user.username : user.displayName;
         
-        if (username.isEmpty()) return;
+        if (user.username.isEmpty()) return;
         
-        qDebug() << QString::fromUtf8("사용자 더블클릭: %1 - 서버에 정보 요청").arg(username);
+        qDebug() << QString::fromUtf8("사용자 더블클릭: %1 - 서버에 정보 요청").arg(displayName);
         
-        // 서버에 해당 사용자의 상세 정보 요청 (서버 응답 후 showUserInfoDialog 호출될 예정)
-        emit getUserStatsRequested(username);
+        // 서버에 해당 사용자의 상세 정보 요청 (username으로 요청)
+        emit getUserStatsRequested(user.username);
     }
 
     void LobbyWindow::onTabChanged(int index)
@@ -977,7 +985,6 @@ namespace Blokus {
             // 마지막 열(모드)는 자동으로 남은 공간 차지
         }
     }
-
     // ========================================
     // 데이터 업데이트 함수들
     // ========================================
@@ -1029,6 +1036,11 @@ namespace Blokus {
     {
         m_myUserInfo = userInfo;
         updateUserStatsDisplay();
+        
+        // 환영 메시지도 업데이트
+        if (m_welcomeLabel) {
+            m_welcomeLabel->setText(QString::fromUtf8("🎮 %1님, 환영합니다!").arg(getMyDisplayName()));
+        }
     }
 
     // ========================================
@@ -1048,7 +1060,8 @@ namespace Blokus {
             if (room.isPrivate) roomName += QString::fromUtf8(" 🔒");
             m_roomTable->setItem(i, 1, new QTableWidgetItem(roomName));
 
-            m_roomTable->setItem(i, 2, new QTableWidgetItem(room.hostName));
+            QString hostDisplayName = getDisplayNameFromUsername(room.hostName);
+            m_roomTable->setItem(i, 2, new QTableWidgetItem(hostDisplayName));
             m_roomTable->setItem(i, 3, new QTableWidgetItem(
                 QString::fromUtf8("%1/%2").arg(room.currentPlayers).arg(room.maxPlayers)));
 
@@ -1094,7 +1107,8 @@ namespace Blokus {
 
             m_rankingTable->setItem(i, 0, new QTableWidgetItem(QString::number(i + 1)));
 
-            QTableWidgetItem* nameItem = new QTableWidgetItem(user.username);
+            QString displayName = user.displayName.isEmpty() ? user.username : user.displayName;
+            QTableWidgetItem* nameItem = new QTableWidgetItem(displayName);
             if (user.username == m_myUsername) {
                 nameItem->setForeground(QBrush(QColor("#3498db")));
                 nameItem->setFont(QFont(nameItem->font().family(), nameItem->font().pointSize(), QFont::Bold));
@@ -1110,9 +1124,10 @@ namespace Blokus {
     void LobbyWindow::updateUserStatsDisplay()
     {
         // 기본 통계 정보
-        QString statsText = QString::fromUtf8("레벨 %1 | %2승 %3패 | 승률 %4% | 게임 %5회")
+        QString statsText = QString::fromUtf8("레벨 %1 | %2승 %3무 %4패 | 승률 %5% | 게임 %6회")
             .arg(m_myUserInfo.level)
             .arg(m_myUserInfo.wins)
+            .arg(m_myUserInfo.draws)
             .arg(m_myUserInfo.losses)
             .arg(QString::number(m_myUserInfo.winRate, 'f', 1))
             .arg(m_myUserInfo.gamesPlayed);
@@ -1173,17 +1188,20 @@ namespace Blokus {
     {
         QString timeStr = message.timestamp.toString("hh:mm");
         QString colorCode;
+        
+        // username을 display_name으로 변환하여 표시
+        QString displayName = getDisplayNameFromUsername(message.username);
 
         switch (message.type) {
         case ChatMessage::System:
             colorCode = "#8e44ad"; // 보라색
             return QString("<span style='color: %1; font-weight: bold;'>[%2] %3: %4</span>")
-                .arg(colorCode, timeStr, message.username, message.message);
+                .arg(colorCode, timeStr, displayName, message.message);
 
         case ChatMessage::Whisper:
             colorCode = "#e67e22"; // 주황색
             return QString("<span style='color: %1; font-style: italic;'>[%2] %3: %4</span>")
-                .arg(colorCode, timeStr, message.username, message.message);
+                .arg(colorCode, timeStr, displayName, message.message);
 
         default: // Normal
             if (message.username == m_myUsername) {
@@ -1193,22 +1211,33 @@ namespace Blokus {
                 colorCode = "#2c3e50"; // 검은색 (다른 사람 메시지)
             }
             return QString("<span style='color: %1;'>[%2] <b>%3:</b> %4</span>")
-                .arg(colorCode, timeStr, message.username, message.message);
+                .arg(colorCode, timeStr, displayName, message.message);
         }
     }
 
     QString LobbyWindow::formatUserStatus(const UserInfo& user)
     {
-        // Lv.N 유저이름 (상태) 형식으로 표시
+        // Lv.N 표시명 (상태) 형식으로 표시
+        QString displayName = user.displayName.isEmpty() ? user.username : user.displayName;
         return QString::fromUtf8("🟢 Lv.%1 %2 (%3)")
                .arg(user.level)
-               .arg(user.username)
+               .arg(displayName)
                .arg(user.status);
     }
 
     QString LobbyWindow::formatRoomStatus(const RoomInfo& room)
     {
         return QString::fromUtf8("%1/%2명").arg(room.currentPlayers).arg(room.maxPlayers);
+    }
+
+    QString LobbyWindow::getDisplayNameFromUsername(const QString& username) const
+    {
+        for (const auto& user : m_userList_data) {
+            if (user.username == username) {
+                return user.displayName.isEmpty() ? user.username : user.displayName;
+            }
+        }
+        return username; // fallback to username if not found
     }
 
     // ========================================
@@ -1268,6 +1297,15 @@ namespace Blokus {
         }
     }
 
+    // ========================================
+    // 설정 관련 슬롯
+    // ========================================
+
+    void LobbyWindow::onSettingsClicked()
+    {
+        qDebug() << "Settings button clicked in lobby";
+        emit settingsRequested();
+    }
 
 } // namespace Blokus
 

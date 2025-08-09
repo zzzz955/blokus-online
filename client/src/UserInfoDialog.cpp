@@ -23,6 +23,7 @@ namespace Blokus {
         , m_basicInfoGroup(nullptr)
         , m_avatarLabel(nullptr)
         , m_usernameLabel(nullptr)
+        , m_displayNameLabel(nullptr)
         , m_statusLabel(nullptr)
         , m_statsGroup(nullptr)
         , m_totalGamesLabel(nullptr)
@@ -40,7 +41,8 @@ namespace Blokus {
         , m_backgroundClickTimer(new QTimer(this))
         , m_parentWidget(parent)
     {
-        setWindowTitle(QString::fromUtf8("%1님의 정보").arg(userInfo.username));
+        QString displayText = userInfo.displayName.isEmpty() ? userInfo.username : userInfo.displayName;
+        setWindowTitle(QString::fromUtf8("%1님의 정보").arg(displayText));
         setModal(false); // 비모달로 설정
         setWindowFlags(Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
         
@@ -132,18 +134,23 @@ namespace Blokus {
         m_avatarLabel->setAlignment(Qt::AlignCenter);
         m_avatarLabel->setText("👤");
 
-        // 사용자명 (레벨 포함)
+        // 사용자명 (로그인 ID)
         m_usernameLabel = new QLabel();
-        m_usernameLabel->setStyleSheet("font-size: 16px; font-weight: bold; color: #2c3e50;");
+        m_usernameLabel->setStyleSheet("font-size: 14px; color: #7f8c8d;");
+
+        // 표시명 (레벨 포함)
+        m_displayNameLabel = new QLabel();
+        m_displayNameLabel->setStyleSheet("font-size: 16px; font-weight: bold; color: #2c3e50;");
 
         // 상태
         m_statusLabel = new QLabel();
         m_statusLabel->setStyleSheet("font-size: 13px; color: #7f8c8d;");
 
         // 레이아웃 배치
-        layout->addWidget(m_avatarLabel, 0, 0, 3, 1);
-        layout->addWidget(m_usernameLabel, 0, 1);
-        layout->addWidget(m_statusLabel, 1, 1);
+        layout->addWidget(m_avatarLabel, 0, 0, 4, 1);
+        layout->addWidget(m_displayNameLabel, 0, 1);
+        layout->addWidget(m_usernameLabel, 1, 1);
+        layout->addWidget(m_statusLabel, 2, 1);
 
         layout->setColumnStretch(1, 1);
     }
@@ -345,12 +352,19 @@ namespace Blokus {
         qDebug() << QString::fromUtf8("UserInfoDialog::updateBasicInfoDisplay() - 사용자명: '%1', 레벨: %2")
             .arg(m_userInfo.username).arg(m_userInfo.level);
             
-        // 아바타에 첫 글자 표시
-        if (!m_userInfo.username.isEmpty()) {
-            m_avatarLabel->setText(m_userInfo.username.at(0).toUpper());
+        // 아바타에 표시명 첫 글자 표시 (표시명이 없으면 사용자명)
+        QString displayText = m_userInfo.displayName.isEmpty() ? m_userInfo.username : m_userInfo.displayName;
+        if (!displayText.isEmpty()) {
+            m_avatarLabel->setText(displayText.at(0).toUpper());
         }
         
-        m_usernameLabel->setText(QString::fromUtf8("%1 (레벨 %2)").arg(m_userInfo.username).arg(m_userInfo.level));
+        // 표시명과 레벨을 메인으로 표시
+        m_displayNameLabel->setText(QString::fromUtf8("%1 (레벨 %2)")
+            .arg(m_userInfo.displayName.isEmpty() ? m_userInfo.username : m_userInfo.displayName)
+            .arg(m_userInfo.level));
+        
+        // 로그인 ID (사용자명) 표시
+        m_usernameLabel->setText(QString::fromUtf8("로그인 ID: %1").arg(m_userInfo.username));
         
         // 상태 표시 (아이콘과 함께)
         QString statusText;

@@ -26,7 +26,7 @@
 #include "GameBoard.h"
 #include "ClientLogic.h"
 #include "ClientTypes.h"
-#include "SoundManager.h"
+#include "BGMManager.h"
 
 namespace Blokus {
 
@@ -123,7 +123,7 @@ namespace Blokus {
         Q_OBJECT
 
     public:
-        explicit GameRoomWindow(const GameRoomInfo& roomInfo, const QString& myUsername, QWidget* parent = nullptr);
+        explicit GameRoomWindow(const GameRoomInfo& roomInfo, const QString& myUsername, const QString& displayName, QWidget* parent = nullptr);
         ~GameRoomWindow();
 
         // 룸 정보 업데이트
@@ -183,6 +183,9 @@ namespace Blokus {
         
         // AFK 관련 시그널
         void afkUnblockRequested();
+        
+        // 설정 관련 시그널
+        void settingsRequested(); // 설정 창 열기 요청
 
     public slots:
         // UI 이벤트 핸들러
@@ -200,12 +203,20 @@ namespace Blokus {
         // AFK 관련 중계 슬롯 (GameBoard로 전달)
         void onGameEndedForAfk();
         void onAfkUnblockErrorForAfk(const QString& reason, const QString& message);
+        
+        // displayName 지원 슬롯들
+        void onPlayerJoinedWithDisplayName(const QString& username, const QString& displayName);
+        void onPlayerLeftWithDisplayName(const QString& username, const QString& displayName);
+        void onHostChangedWithDisplayName(const QString& username, const QString& displayName);
 
     private slots:
         void onGameStartClicked();
         void onReadyToggleClicked();
         void onChatSendClicked();
         void onChatReturnPressed();
+        
+        // 설정 관련 슬롯
+        void onSettingsClicked();
 
         // 플레이어 슬롯 이벤트
         void onKickPlayerRequested(PlayerColor color);
@@ -268,12 +279,27 @@ namespace Blokus {
         PlayerSlot* findPlayerSlot(PlayerColor color);
         PlayerSlot* findPlayerSlot(const QString& username);
         PlayerColor getNextAvailableColor() const;
+        
+        // displayName 캐시 관리 (private)
+        void removeFromDisplayNameCache(const QString& username);
+        void initializeDisplayNameCache();
+
+    public:
+        // 외부 접근이 필요한 유틸리티 함수들
+        QString getDisplayNameFromUsername(const QString& username) const;
+        
+        // displayName 캐시 관리 (외부 접근용)
+        void updateDisplayNameCache(const QString& username, const QString& displayName);
 
     private:
         // 기본 정보
         QString m_myUsername;
+        QString m_myDisplayname;
         GameRoomInfo m_roomInfo;
         GameStateManager* m_gameManager;
+        
+        // displayName 캐시 (username -> displayName 매핑)
+        QMap<QString, QString> m_usernameToDisplayName;
 
         // UI 컴포넌트들
         QWidget* m_centralWidget;
@@ -284,6 +310,7 @@ namespace Blokus {
         QLabel* m_roomNameLabel;
         QLabel* m_roomStatusLabel;
         QLabel* m_currentTurnLabel;
+        QPushButton* m_settingsButton;  // 설정 버튼
         QPushButton* m_leaveRoomButton;
         
         // 턴 타이머 UI 컴포넌트
