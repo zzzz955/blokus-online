@@ -19,6 +19,8 @@ body:
       options:
         - Client (Qt GUI)
         - Server (C++ Backend)
+        - Web (웹)
+        - DB (데이터베이스)
         - Network (통신)
         - Game Logic (게임 로직)
         - Build System (빌드/배포)

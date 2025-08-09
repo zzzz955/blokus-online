@@ -817,8 +817,9 @@ namespace Blokus {
                     txn.exec_params(
                         "INSERT INTO user_settings (user_id, theme, language, "
                         "game_invite_notifications, friend_online_notifications, "
-                        "system_notifications, bgm_mute, bgm_volume, effect_mute, effect_volume) "
-                        "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+                        "system_notifications, bgm_mute, bgm_volume, effect_mute, effect_volume, "
+                        "created_at, updated_at) "
+                        "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
                         userIdInt, defaults.theme, defaults.language,
                         defaults.gameInviteNotifications, defaults.friendOnlineNotifications,
                         defaults.systemNotifications, defaults.bgmMute, defaults.bgmVolume,
