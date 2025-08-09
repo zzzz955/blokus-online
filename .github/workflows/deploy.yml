@@ -349,6 +349,7 @@ jobs:
         SERVER_PORT=${{ secrets.SERVER_PORT }}
         SERVER_MAX_CLIENTS=${{ secrets.SERVER_MAX_CLIENTS }}
         BLOKUS_SERVER_VERSION=${{ secrets.BLOKUS_SERVER_VERSION }}
+        BLOKUS_DOWNLOAD_URL=${{ secrets.BLOKUS_DOWNLOAD_URL }}
         
         # Database Configuration
         DB_HOST=postgres
