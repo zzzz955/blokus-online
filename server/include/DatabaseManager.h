@@ -82,7 +82,8 @@ namespace Blokus {
             // 게임 결과 저장 (멀티플레이어용)
             bool saveGameResults(const std::vector<uint32_t>& playerIds, 
                                const std::vector<int>& scores, 
-                               const std::vector<bool>& isWinner);
+                               const std::vector<bool>& isWinner,
+                               bool isDraw = false);
             
             // 경험치 및 레벨 시스템
             bool updatePlayerExperience(uint32_t userId, int expGained);

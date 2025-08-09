@@ -1124,9 +1124,10 @@ namespace Blokus {
     void LobbyWindow::updateUserStatsDisplay()
     {
         // 기본 통계 정보
-        QString statsText = QString::fromUtf8("레벨 %1 | %2승 %3패 | 승률 %4% | 게임 %5회")
+        QString statsText = QString::fromUtf8("레벨 %1 | %2승 %3무 %4패 | 승률 %5% | 게임 %6회")
             .arg(m_myUserInfo.level)
             .arg(m_myUserInfo.wins)
+            .arg(m_myUserInfo.draws)
             .arg(m_myUserInfo.losses)
             .arg(QString::number(m_myUserInfo.winRate, 'f', 1))
             .arg(m_myUserInfo.gamesPlayed);

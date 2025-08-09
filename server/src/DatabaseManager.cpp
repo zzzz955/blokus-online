@@ -529,7 +529,8 @@ namespace Blokus {
 
         bool DatabaseManager::saveGameResults(const std::vector<uint32_t>& playerIds, 
                                             const std::vector<int>& scores, 
-                                            const std::vector<bool>& isWinner) {
+                                            const std::vector<bool>& isWinner,
+                                            bool isDraw) {
             if (!isInitialized_) return false;
             
             if (playerIds.size() != scores.size() || playerIds.size() != isWinner.size()) {
@@ -544,8 +545,8 @@ namespace Blokus {
                 
                 // 모든 플레이어의 통계를 업데이트
                 for (size_t i = 0; i < playerIds.size(); ++i) {
-                    bool won = isWinner[i];
-                    bool draw = false; // 블로커스는 무승부가 없다고 가정
+                    bool won = isDraw ? false : isWinner[i]; // 무승부인 경우 승리 처리 안함
+                    bool draw = isDraw; // 무승부 여부 사용
                     int score = scores[i];
                     
                     // 해당 플레이어가 존재하는지 확인

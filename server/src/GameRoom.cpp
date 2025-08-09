@@ -1640,8 +1640,11 @@ namespace Blokus {
                 }
                 
                 if (!playerIds.empty()) {
+                    // 무승부 여부 확인 (승자가 2명 이상인 경우)
+                    bool isDraw = winners.size() > 1;
+                    
                     // DB에 게임 결과 저장 (모든 플레이어)
-                    bool success = dbManager->saveGameResults(playerIds, scores, isWinner);
+                    bool success = dbManager->saveGameResults(playerIds, scores, isWinner, isDraw);
                     if (success) {
                         spdlog::info("✅ [DB_DEBUG] 방 {} 게임 결과가 DB에 성공적으로 저장되었습니다", m_roomId);
                         
