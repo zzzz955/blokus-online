@@ -1,0 +1,274 @@
+const express = require('express');
+const router = express.Router();
+const logger = require('../config/logger');
+const dbService = require('../config/database');
+const { authenticateToken } = require('../middleware/auth');
+const { validateUsername, validatePagination } = require('../middleware/validation');
+
+/**
+ * GET /api/user/profile
+ * 현재 로그인한 사용자의 프로필 조회
+ */
+router.get('/profile',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const { username } = req.user;
+
+      logger.info('User profile requested', {
+        username,
+        ip: req.ip
+      });
+
+      // 사용자 프로필 조회
+      const userProfile = await dbService.getUserByUsername(username);
+      
+      if (!userProfile) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found',
+          error: 'USER_NOT_FOUND'
+        });
+      }
+
+      // 응답 데이터 구성
+      const responseData = {
+        username: userProfile.username,
+        single_player_level: userProfile.single_player_level || 1,
+        max_stage_completed: userProfile.max_stage_completed || 0,
+        total_single_games: userProfile.total_single_games || 0,
+        single_player_score: userProfile.single_player_score || 0
+      };
+
+      logger.debug('User profile retrieved successfully', {
+        username,
+        level: responseData.single_player_level,
+        maxStage: responseData.max_stage_completed
+      });
+
+      res.json({
+        success: true,
+        message: 'User profile retrieved successfully',
+        data: responseData
+      });
+
+    } catch (error) {
+      logger.error('Failed to retrieve user profile', {
+        error: error.message,
+        username: req.user?.username,
+        stack: error.stack
+      });
+
+      res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve user profile',
+        error: 'INTERNAL_SERVER_ERROR'
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/user/stats
+ * 현재 로그인한 사용자의 상세 통계 조회
+ */
+router.get('/stats',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const { username, userId } = req.user;
+
+      logger.info('User stats requested', {
+        username,
+        ip: req.ip
+      });
+
+      // 사용자 기본 정보 조회
+      const userProfile = await dbService.getUserByUsername(username);
+      if (!userProfile) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found',
+          error: 'USER_NOT_FOUND'
+        });
+      }
+
+      // 추가 통계 조회
+      const statsQuery = `
+        SELECT 
+          COUNT(*) as total_stages_played,
+          COUNT(CASE WHEN is_completed = true THEN 1 END) as stages_completed,
+          COUNT(CASE WHEN stars_earned = 3 THEN 1 END) as perfect_stages,
+          AVG(CASE WHEN is_completed = true THEN best_score END) as average_score,
+          SUM(total_attempts) as total_attempts,
+          SUM(successful_attempts) as successful_attempts
+        FROM user_stage_progress usp
+        JOIN stages s ON usp.stage_id = s.stage_id
+        WHERE usp.user_id = $1
+      `;
+
+      const statsResult = await dbService.query(statsQuery, [userId]);
+      const stats = statsResult.rows[0] || {};
+
+      // 완료율 계산
+      const completionRate = stats.total_stages_played > 0 
+        ? Math.round((stats.stages_completed / stats.total_stages_played) * 100) 
+        : 0;
+
+      // 성공률 계산
+      const successRate = stats.total_attempts > 0
+        ? Math.round((stats.successful_attempts / stats.total_attempts) * 100)
+        : 0;
+
+      const responseData = {
+        // 기본 프로필
+        username: userProfile.username,
+        single_player_level: userProfile.single_player_level || 1,
+        max_stage_completed: userProfile.max_stage_completed || 0,
+        total_single_games: userProfile.total_single_games || 0,
+        single_player_score: userProfile.single_player_score || 0,
+
+        // 상세 통계
+        total_stages_played: parseInt(stats.total_stages_played) || 0,
+        stages_completed: parseInt(stats.stages_completed) || 0,
+        perfect_stages: parseInt(stats.perfect_stages) || 0,
+        average_score: Math.round(parseFloat(stats.average_score) || 0),
+        completion_rate: completionRate,
+        success_rate: successRate,
+        total_attempts: parseInt(stats.total_attempts) || 0,
+        successful_attempts: parseInt(stats.successful_attempts) || 0
+      };
+
+      logger.debug('User stats retrieved successfully', {
+        username,
+        totalGames: responseData.total_single_games,
+        completionRate,
+        successRate
+      });
+
+      res.json({
+        success: true,
+        message: 'User statistics retrieved successfully',
+        data: responseData
+      });
+
+    } catch (error) {
+      logger.error('Failed to retrieve user stats', {
+        error: error.message,
+        username: req.user?.username,
+        stack: error.stack
+      });
+
+      res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve user statistics',
+        error: 'INTERNAL_SERVER_ERROR'
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/user/progress
+ * 사용자의 전체 스테이지 진행도 조회 (페이지네이션 지원)
+ */
+router.get('/progress',
+  authenticateToken,
+  validatePagination,
+  async (req, res) => {
+    try {
+      const { username, userId } = req.user;
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 20;
+      const offset = (page - 1) * limit;
+
+      logger.info('User progress list requested', {
+        username,
+        page,
+        limit,
+        ip: req.ip
+      });
+
+      // 총 진행도 수 조회
+      const countQuery = `
+        SELECT COUNT(*) as total
+        FROM user_stage_progress usp
+        JOIN stages s ON usp.stage_id = s.stage_id
+        WHERE usp.user_id = $1
+      `;
+      const countResult = await dbService.query(countQuery, [userId]);
+      const totalCount = parseInt(countResult.rows[0].total);
+
+      // 진행도 목록 조회
+      const progressQuery = `
+        SELECT 
+          s.stage_number,
+          usp.is_completed,
+          usp.stars_earned,
+          usp.best_score,
+          usp.best_completion_time,
+          usp.total_attempts,
+          usp.successful_attempts,
+          usp.first_played_at,
+          usp.first_completed_at,
+          usp.last_played_at
+        FROM user_stage_progress usp
+        JOIN stages s ON usp.stage_id = s.stage_id
+        WHERE usp.user_id = $1
+        ORDER BY s.stage_number ASC
+        LIMIT $2 OFFSET $3
+      `;
+
+      const progressResult = await dbService.query(progressQuery, [userId, limit, offset]);
+
+      const responseData = {
+        progress: progressResult.rows.map(row => ({
+          stage_number: row.stage_number,
+          is_completed: row.is_completed,
+          stars_earned: row.stars_earned,
+          best_score: row.best_score,
+          best_completion_time: row.best_completion_time,
+          total_attempts: row.total_attempts,
+          successful_attempts: row.successful_attempts,
+          first_played_at: row.first_played_at,
+          first_completed_at: row.first_completed_at,
+          last_played_at: row.last_played_at
+        })),
+        pagination: {
+          page,
+          limit,
+          total: totalCount,
+          pages: Math.ceil(totalCount / limit)
+        }
+      };
+
+      logger.debug('User progress list retrieved successfully', {
+        username,
+        totalRecords: totalCount,
+        page,
+        recordsReturned: progressResult.rows.length
+      });
+
+      res.json({
+        success: true,
+        message: 'User progress retrieved successfully',
+        data: responseData
+      });
+
+    } catch (error) {
+      logger.error('Failed to retrieve user progress', {
+        error: error.message,
+        username: req.user?.username,
+        stack: error.stack
+      });
+
+      res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve user progress',
+        error: 'INTERNAL_SERVER_ERROR'
+      });
+    }
+  }
+);
+
+module.exports = router;
