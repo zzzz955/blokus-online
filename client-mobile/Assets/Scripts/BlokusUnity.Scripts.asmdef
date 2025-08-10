@@ -1,7 +1,9 @@
 {
     "name": "BlokusUnity.Scripts",
     "rootNamespace": "BlokusUnity",
-    "references": [],
+    "references": [
+        "Unity.TextMeshPro"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

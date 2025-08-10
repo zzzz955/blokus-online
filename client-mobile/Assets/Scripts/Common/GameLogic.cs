@@ -684,5 +684,50 @@ namespace BlokusUnity.Common
                 _ => 5 // 펜토미노는 모두 5점
             };
         }
+        
+        // ========================================
+        // Block 객체 기반 메서드들 (Unity용 편의 메서드)
+        // ========================================
+        
+        /// <summary>
+        /// 블록 배치 가능성 확인 (Block 객체 사용)
+        /// </summary>
+        public bool CanPlaceBlock(Block block, Position position)
+        {
+            var placement = new BlockPlacement(
+                block.Type,
+                position,
+                block.CurrentRotation,
+                block.CurrentFlipState,
+                block.Player
+            );
+            return CanPlaceBlock(placement);
+        }
+        
+        /// <summary>
+        /// 블록 배치 (Block 객체 사용)
+        /// </summary>
+        public bool PlaceBlock(Block block, Position position)
+        {
+            var placement = new BlockPlacement(
+                block.Type,
+                position,
+                block.CurrentRotation,
+                block.CurrentFlipState,
+                block.Player
+            );
+            return PlaceBlock(placement);
+        }
+        
+        /// <summary>
+        /// 셀 색상 가져오기
+        /// </summary>
+        public PlayerColor GetCellColor(Position position)
+        {
+            if (!ValidationUtility.IsValidPosition(position))
+                return PlayerColor.None;
+                
+            return board[position.row, position.col];
+        }
     }
 }

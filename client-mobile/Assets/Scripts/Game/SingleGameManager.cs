@@ -1,6 +1,8 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+using TMPro;
 using BlokusUnity.Common;
 using BlokusUnity.Data;
 
@@ -13,13 +15,12 @@ namespace BlokusUnity.Game
     public class SingleGameManager : MonoBehaviour
     {
         [Header("Game Components")]
-        [SerializeField] private GameLogic gameLogic;
-        [SerializeField] private Transform gameBoard;
-        [SerializeField] private Transform blockPalette;
+        [SerializeField] private GameBoard gameBoard;
+        [SerializeField] private BlockPalette blockPalette;
         
         [Header("UI References")]
-        [SerializeField] private UnityEngine.UI.Text scoreText;
-        [SerializeField] private UnityEngine.UI.Text timeText;
+        [SerializeField] private TMP_Text scoreText;
+        [SerializeField] private TMP_Text timeText;
         [SerializeField] private GameObject gameUI;
         [SerializeField] private GameObject resultPanel;
         
@@ -36,9 +37,15 @@ namespace BlokusUnity.Game
         private float remainingTime = 0f;
         private int undoCount = 0;
         
+        // 게임 로직
+        private GameLogic gameLogic;
+        
         // 사용 가능한 블록 리스트
         private System.Collections.Generic.List<BlockType> availableBlocks;
         private System.Collections.Generic.List<BlockType> usedBlocks;
+        
+        // 현재 선택된 블록
+        private Block selectedBlock;
         
         public static SingleGameManager Instance { get; private set; }
         
@@ -56,20 +63,44 @@ namespace BlokusUnity.Game
         
         void Start()
         {
+            // 컴포넌트 이벤트 연결
+            SetupGameComponents();
+            
             if (CurrentStage != null)
             {
                 InitializeStage(CurrentStage);
             }
             else
             {
-                Debug.LogError("CurrentStage가 설정되지 않았습니다!");
-                BackToStageSelect();
+                Debug.LogWarning("CurrentStage가 설정되지 않음. 테스트 스테이지 생성중...");
+                CreateTestStage();
+            }
+        }
+        
+        /// <summary>
+        /// 게임 컴포넌트들 이벤트 연결
+        /// </summary>
+        private void SetupGameComponents()
+        {
+            // 게임보드 이벤트 연결
+            if (gameBoard != null)
+            {
+                gameBoard.OnCellClicked += OnBoardCellClicked;
+                gameBoard.OnCellHover += OnBoardCellHover;
+                gameBoard.SetGameLogic(gameLogic);
+            }
+            
+            // 블록 팔레트 이벤트 연결
+            if (blockPalette != null)
+            {
+                blockPalette.OnBlockSelected += OnBlockSelected;
+                blockPalette.OnBlockDeselected += OnBlockDeselected;
             }
         }
         
         void Update()
         {
-            if (isGameActive && CurrentStage.timeLimit > 0)
+            if (isGameActive && CurrentStage != null && CurrentStage.timeLimit > 0)
             {
                 remainingTime -= Time.deltaTime;
                 UpdateTimeUI();
@@ -79,6 +110,39 @@ namespace BlokusUnity.Game
                     TimeUp();
                 }
             }
+        }
+        
+        /// <summary>
+        /// 테스트용 스테이지 생성
+        /// </summary>
+        private void CreateTestStage()
+        {
+            // 임시 스테이지 데이터 생성
+            var testStage = ScriptableObject.CreateInstance<StageData>();
+            testStage.stageNumber = 1;
+            testStage.stageName = "테스트 스테이지";
+            testStage.difficulty = 1;
+            testStage.optimalScore = 50;
+            testStage.timeLimit = 300; // 5분
+            testStage.maxUndoCount = 3;
+            
+            // 사용 가능한 블록 타입 설정 (처음 몇 개만)
+            testStage.availableBlocks = new System.Collections.Generic.List<BlockType>
+            {
+                BlockType.Single,
+                BlockType.Domino,
+                BlockType.TrioLine,
+                BlockType.TrioAngle,
+                BlockType.Tetro_I,
+                BlockType.Tetro_O,
+                BlockType.Tetro_T,
+                BlockType.Tetro_L
+            };
+            
+            CurrentStage = testStage;
+            InitializeStage(CurrentStage);
+            
+            Debug.Log($"테스트 스테이지 생성 완료: {testStage.availableBlocks.Count}개 블록");
         }
         
         /// <summary>
@@ -105,7 +169,9 @@ namespace BlokusUnity.Game
             
             UpdateScoreUI();
             UpdateTimeUI();
-            UpdateBlockPalette();
+            
+            // 블록 팔레트 초기화
+            InitializeBlockPalette();
             
             // 게임 시작
             isGameActive = true;
@@ -116,47 +182,12 @@ namespace BlokusUnity.Game
         }
         
         /// <summary>
-        /// 블록 배치 시도
+        /// 블록 배치 시도 (기존 메서드 - 사용 안함)
         /// </summary>
         public bool TryPlaceBlock(BlockPlacement placement)
         {
-            if (!isGameActive) return false;
-            
-            // 블록 사용 가능 여부 확인
-            if (!availableBlocks.Contains(placement.type))
-            {
-                Debug.Log("사용할 수 없는 블록입니다.");
-                return false;
-            }
-            
-            // 게임 로직으로 배치 검증
-            if (gameLogic.CanPlaceBlock(placement))
-            {
-                // 블록 배치
-                gameLogic.PlaceBlock(placement);
-                
-                // 블록을 사용된 목록으로 이동
-                availableBlocks.Remove(placement.type);
-                usedBlocks.Add(placement.type);
-                
-                // 점수 계산 (블록 크기만큼 점수 획득)
-                int blockScore = CalculateBlockScore(placement.type);
-                currentScore += blockScore;
-                
-                UpdateScoreUI();
-                UpdateBlockPalette();
-                
-                // 게임 종료 조건 체크
-                CheckGameEnd();
-                
-                Debug.Log($"블록 배치 성공! 점수: +{blockScore} (총합: {currentScore})");
-                return true;
-            }
-            else
-            {
-                Debug.Log("블록을 배치할 수 없는 위치입니다.");
-                return false;
-            }
+            // 이 메서드는 더 이상 사용하지 않음
+            return false;
         }
         
         /// <summary>
@@ -267,9 +298,86 @@ namespace BlokusUnity.Game
             }
         }
         
-        private void UpdateBlockPalette()
+        /// <summary>
+        /// 블록 팔레트 초기화
+        /// </summary>
+        private void InitializeBlockPalette()
         {
-            // TODO: 사용 가능한 블록 팔레트 UI 업데이트
+            if (blockPalette != null && availableBlocks != null)
+            {
+                blockPalette.InitializePalette(availableBlocks, PlayerColor.Blue);
+            }
+        }
+        
+        // ========================================
+        // 이벤트 처리 메서드들
+        // ========================================
+        
+        /// <summary>
+        /// 블록 선택 이벤트
+        /// </summary>
+        private void OnBlockSelected(Block block)
+        {
+            selectedBlock = block;
+            Debug.Log($"블록 선택됨: {BlockFactory.GetBlockName(block.Type)}");
+        }
+        
+        /// <summary>
+        /// 블록 선택 해제 이벤트
+        /// </summary>
+        private void OnBlockDeselected()
+        {
+            selectedBlock = null;
+            if (gameBoard != null)
+            {
+                gameBoard.ClearPreview();
+            }
+        }
+        
+        /// <summary>
+        /// 보드 셀 클릭 이벤트
+        /// </summary>
+        private void OnBoardCellClicked(Position position)
+        {
+            if (!isGameActive || selectedBlock == null) return;
+            
+            // 블록 배치 시도
+            if (gameBoard.TryPlaceBlock(selectedBlock, position))
+            {
+                // 블록 사용 처리
+                availableBlocks.Remove(selectedBlock.Type);
+                usedBlocks.Add(selectedBlock.Type);
+                
+                // 점수 업데이트
+                int blockScore = BlockFactory.GetBlockScore(selectedBlock.Type);
+                currentScore += blockScore;
+                UpdateScoreUI();
+                
+                // 팔레트에서 사용된 블록 표시
+                if (blockPalette != null)
+                {
+                    blockPalette.MarkBlockAsUsed(selectedBlock.Type);
+                }
+                
+                // 게임 종료 조건 체크
+                CheckGameEnd();
+                
+                Debug.Log($"블록 배치 성공! 점수: +{blockScore} (총합: {currentScore})");
+            }
+        }
+        
+        /// <summary>
+        /// 보드 셀 호버 이벤트
+        /// </summary>
+        private void OnBoardCellHover(Position position)
+        {
+            if (!isGameActive || selectedBlock == null) return;
+            
+            // 미리보기 표시
+            if (gameBoard != null)
+            {
+                gameBoard.SetPreview(selectedBlock, position);
+            }
         }
         
         /// <summary>

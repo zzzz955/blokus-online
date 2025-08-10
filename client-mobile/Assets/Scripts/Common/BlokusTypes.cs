@@ -462,4 +462,19 @@ namespace BlokusUnity.Common
                    pos.col >= 0 && pos.col < GameConstants.BOARD_SIZE;
         }
     }
+    
+    /// <summary>
+    /// 사용자 스테이지 진행도
+    /// </summary>
+    [System.Serializable]
+    public struct UserStageProgress
+    {
+        public int stageNumber;
+        public bool isCompleted;
+        public int starsEarned;
+        public int bestScore;
+        public int bestTime;
+        public int totalAttempts;
+        public int successfulAttempts;
+    }
 }
