@@ -564,3 +564,4 @@ single-player-api/redis_data/
 # Claude
 **CLAUDE**client-mobile/*.csproj
 client-mobile/*.sln
+CLAUDE.md
