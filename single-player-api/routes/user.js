@@ -169,12 +169,95 @@ router.get('/stats',
 );
 
 /**
+ * GET /api/user/progress/batch
+ * 사용자의 전체 스테이지 진행도 일괄 조회 (스크롤 뷰용)
+ * 스테이지 목록 화면에서 한 번만 호출하여 클라이언트에서 캐싱
+ */
+router.get('/progress/batch',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const { username, userId } = req.user;
+
+      logger.debug('User progress batch request', {
+        username,
+        userId,
+        ip: req.ip
+      });
+
+      // 사용자의 모든 스테이지 진행도 조회 (압축된 형태)
+      const progressQuery = `
+        SELECT 
+          s.stage_number,
+          COALESCE(usp.is_completed, false) as is_completed,
+          COALESCE(usp.stars_earned, 0) as stars_earned,
+          COALESCE(usp.best_score, 0) as best_score,
+          COALESCE(usp.best_completion_time, 0) as best_time,
+          COALESCE(usp.total_attempts, 0) as attempts
+        FROM stages s
+        LEFT JOIN user_stage_progress usp ON s.stage_id = usp.stage_id AND usp.user_id = $1
+        WHERE s.stage_number <= 1000
+        ORDER BY s.stage_number ASC
+      `;
+
+      const progressResult = await dbService.query(progressQuery, [userId]);
+
+      // 데이터 압축 (네트워크 효율성을 위해)
+      const compactProgress = progressResult.rows.map(row => ({
+        n: row.stage_number,           // number
+        c: row.is_completed,           // completed
+        s: row.stars_earned,           // stars
+        bs: row.best_score,            // best_score
+        bt: row.best_completion_time,  // best_time
+        a: row.total_attempts          // attempts
+      }));
+
+      // 사용자의 현재 상태 정보도 함께 제공
+      const userStats = await dbService.getUserByUsername(username);
+      const currentStatus = {
+        max_stage_completed: userStats?.max_stage_completed || 0,
+        single_player_level: userStats?.single_player_level || 1,
+        total_stars: compactProgress.reduce((sum, stage) => sum + stage.s, 0),
+        completion_count: compactProgress.filter(stage => stage.c).length
+      };
+
+      res.json({
+        success: true,
+        message: 'User progress batch retrieved successfully',
+        data: {
+          progress: compactProgress,
+          current_status: currentStatus,
+          total_count: compactProgress.length,
+          last_updated: new Date().toISOString()
+        }
+      });
+
+    } catch (error) {
+      logger.error('Failed to retrieve user progress batch', {
+        error: error.message,
+        username: req.user?.username,
+        stack: error.stack
+      });
+
+      res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve user progress batch',
+        error: 'INTERNAL_SERVER_ERROR'
+      });
+    }
+  }
+);
+
+/**
  * GET /api/user/progress
  * 사용자의 전체 스테이지 진행도 조회 (페이지네이션 지원)
  */
 router.get('/progress',
   authenticateToken,
-  validatePagination,
+  [
+    query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
+    query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be 1-100')
+  ],
   async (req, res) => {
     try {
       const { username, userId } = req.user;

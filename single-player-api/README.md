@@ -61,8 +61,12 @@ single-player-api/
 ## 🌐 API 엔드포인트
 
 ### 인증 (Authentication)
+- `POST /api/auth/login` - 사용자 로그인 (JWT 토큰 발급)
+- `POST /api/auth/register` - OAuth 회원가입 리다이렉트 (웹 페이지로 안내)
+- `POST /api/auth/guest` - 게스트 로그인 (임시 사용자)
 - `POST /api/auth/validate` - JWT 토큰 검증
 - `GET /api/auth/info` - 토큰 정보 조회
+- `POST /api/auth/refresh` - 토큰 갱신 정보
 
 ### 스테이지 (Stages)
 - `GET /api/stages/:id` - 스테이지 데이터 조회
@@ -89,6 +93,92 @@ Authorization: Bearer <jwt_token>
 JWT 토큰은 기존 TCP 서버에서 로그인 시 발급받습니다.
 
 ## 📊 사용 예시
+
+### 로그인
+```http
+POST /api/auth/login
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "password": "password123"
+}
+
+Response:
+{
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "user": {
+      "user_id": 1,
+      "username": "testuser",
+      "level": 5,
+      "single_player_level": 3,
+      "max_stage_completed": 25,
+      "stats": {
+        "total_games": 50,
+        "wins": 35,
+        "win_rate": 70
+      }
+    },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "expires_in": "7d"
+  }
+}
+```
+
+### 회원가입 (OAuth 리다이렉트)
+```http
+POST /api/auth/register
+Content-Type: application/json
+
+{
+  "app_callback": "blokus://auth/callback",
+  "user_agent": "Unity Mobile Client",
+  "device_id": "unique_device_id"
+}
+
+Response:
+{
+  "success": false,
+  "message": "Registration must be completed through web OAuth flow",
+  "error": "OAUTH_REDIRECT_REQUIRED",
+  "data": {
+    "redirect_url": "http://localhost:3000/register?callback=blokus%3A%2F%2Fauth%2Fcallback&source=mobile_app&device_id=unique_device_id",
+    "registration_type": "oauth_web",
+    "instructions": {
+      "ko": "OAuth 인증을 위해 웹 브라우저에서 회원가입을 완료해주세요.",
+      "en": "Please complete registration in web browser for OAuth authentication."
+    },
+    "flow_steps": [
+      "1. 웹 브라우저에서 OAuth 인증 (Google/Discord 등)",
+      "2. ID, 비밀번호, 닉네임 설정",
+      "3. 회원가입 완료 후 앱에서 로그인"
+    ]
+  }
+}
+```
+
+### 게스트 로그인
+```http
+POST /api/auth/guest
+
+Response:
+{
+  "success": true,
+  "message": "Guest login successful",
+  "data": {
+    "user": {
+      "user_id": 0,
+      "username": "guest_1704123456789",
+      "is_guest": true,
+      "max_stage_completed": 0
+    },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "expires_in": "7d"
+  }
+}
+```
 
 ### 스테이지 데이터 조회
 ```http

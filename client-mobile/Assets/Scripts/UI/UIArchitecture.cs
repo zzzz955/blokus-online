@@ -2,6 +2,7 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using BlokusUnity.Common;
+using BlokusUnity.UI;
 
 namespace BlokusUnity.UI
 {

@@ -1,6 +1,7 @@
 using System.Collections;
 using UnityEngine;
 using BlokusUnity.Network;
+using BlokusUnity.Common;
 
 namespace BlokusUnity.Network
 {
@@ -33,28 +34,28 @@ namespace BlokusUnity.Network
         public static NetworkManager Instance { get; private set; }
         
         // 이벤트 (MessageHandler 이벤트를 래핑)
-        public System.Action<bool> OnConnectionChanged
+        public event System.Action<bool> OnConnectionChanged
         {
-            get => networkClient?.OnConnectionChanged;
-            set { if (networkClient != null) networkClient.OnConnectionChanged = value; }
+            add { if (networkClient != null) networkClient.OnConnectionChanged += value; }
+            remove { if (networkClient != null) networkClient.OnConnectionChanged -= value; }
         }
         
-        public System.Action<bool, string> OnAuthResponse
+        public event System.Action<bool, string> OnAuthResponse
         {
-            get => messageHandler?.OnAuthResponse;
-            set { if (messageHandler != null) messageHandler.OnAuthResponse = value; }
+            add { if (messageHandler != null) messageHandler.OnAuthResponse += value; }
+            remove { if (messageHandler != null) messageHandler.OnAuthResponse -= value; }
         }
         
-        public System.Action<UserInfo> OnMyStatsUpdated
+        public event System.Action<UserInfo> OnMyStatsUpdated
         {
-            get => messageHandler?.OnMyStatsUpdated;
-            set { if (messageHandler != null) messageHandler.OnMyStatsUpdated = value; }
+            add { if (messageHandler != null) messageHandler.OnMyStatsUpdated += value; }
+            remove { if (messageHandler != null) messageHandler.OnMyStatsUpdated -= value; }
         }
         
-        public System.Action<UserInfo> OnUserStatsReceived
+        public event System.Action<UserInfo> OnUserStatsReceived
         {
-            get => messageHandler?.OnUserStatsReceived;
-            set { if (messageHandler != null) messageHandler.OnUserStatsReceived = value; }
+            add { if (messageHandler != null) messageHandler.OnUserStatsReceived += value; }
+            remove { if (messageHandler != null) messageHandler.OnUserStatsReceived -= value; }
         }
         
         void Awake()

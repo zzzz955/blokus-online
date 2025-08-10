@@ -18,8 +18,8 @@ namespace BlokusUnity.Game
         [SerializeField] private Transform blockPalette;
         
         [Header("UI References")]
-        [SerializeField] private TMPro.TextMeshProUGUI scoreText;
-        [SerializeField] private TMPro.TextMeshProUGUI timeText;
+        [SerializeField] private UnityEngine.UI.Text scoreText;
+        [SerializeField] private UnityEngine.UI.Text timeText;
         [SerializeField] private GameObject gameUI;
         [SerializeField] private GameObject resultPanel;
         
@@ -89,7 +89,7 @@ namespace BlokusUnity.Game
             Debug.Log($"스테이지 {stageData.stageNumber} 시작: {stageData.stageName}");
             
             // 게임 로직 초기화
-            gameLogic.initializeBoard();
+            gameLogic.InitializeBoard();
             
             // 초기 보드 상태 설정
             stageData.ApplyInitialBoard(gameLogic);
@@ -130,10 +130,10 @@ namespace BlokusUnity.Game
             }
             
             // 게임 로직으로 배치 검증
-            if (gameLogic.canPlaceBlock(placement))
+            if (gameLogic.CanPlaceBlock(placement))
             {
                 // 블록 배치
-                gameLogic.placeBlock(placement);
+                gameLogic.PlaceBlock(placement);
                 
                 // 블록을 사용된 목록으로 이동
                 availableBlocks.Remove(placement.type);

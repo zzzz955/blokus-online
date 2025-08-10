@@ -72,7 +72,7 @@ namespace BlokusUnity.Network
         void Start()
         {
             // NetworkClient가 늦게 초기화된 경우 대비
-            if (NetworkClient.Instance != null && NetworkClient.Instance.OnMessageReceived == null)
+            if (NetworkClient.Instance != null)
             {
                 NetworkClient.Instance.OnMessageReceived += HandleMessage;
             }

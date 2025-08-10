@@ -22,7 +22,7 @@ namespace BlokusUnity.UI
         [SerializeField] private Color unlockedColor = Color.white;
         [SerializeField] private Color completedColor = Color.green;
         [SerializeField] private Color lockedColor = Color.gray;
-        [SerializeField] private Color perfectColor = Color.gold; // 3별 완료시
+        [SerializeField] private Color perfectColor = Color.yellow; // 3별 완료시
         
         // 스테이지 정보
         private int stageNumber;

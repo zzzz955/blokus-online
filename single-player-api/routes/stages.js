@@ -3,19 +3,89 @@ const router = express.Router();
 const logger = require('../config/logger');
 const dbService = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
-const { 
-  validateStageNumber, 
-  validateStageCompletion,
-  requireJson 
-} = require('../middleware/validation');
+const { body, param, query, validationResult } = require('express-validator');
+const StageGenerator = require('../utils/stageGenerator');
+
+/**
+ * GET /api/stages/metadata
+ * 모든 스테이지 메타데이터 일괄 조회 (목록용)
+ * 로그인 성공 시 한 번만 호출하여 클라이언트에서 캐싱
+ */
+router.get('/metadata',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      logger.debug('Stage metadata batch request', {
+        userId: req.user.userId,
+        username: req.user.username
+      });
+
+      // 프로시저럴 스테이지 생성기 사용
+      const stageGenerator = new StageGenerator();
+      const stageMetadata = [];
+      
+      // 1000개 스테이지 메타데이터 생성
+      for (let i = 1; i <= 1000; i++) {
+        const stageData = stageGenerator.generateStage(i);
+        stageMetadata.push({
+          stage_number: stageData.stage_number,
+          title: stageData.title,
+          difficulty: stageData.difficulty,
+          optimal_score: stageData.optimal_score,
+          time_limit: stageData.time_limit,
+          thumbnail_url: stageData.thumbnail_url,
+          preview_description: stageData.preview_description,
+          category: stageData.category
+        });
+      }
+
+      // 압축을 위해 작은 JSON 형태로 최적화
+      const compactData = stageMetadata.map(stage => ({
+        n: stage.stage_number,          // number
+        t: stage.title,                 // title  
+        d: stage.difficulty,            // difficulty
+        o: stage.optimal_score,         // optimal_score
+        tl: stage.time_limit,          // time_limit
+        th: stage.thumbnail_url,        // thumbnail
+        desc: stage.preview_description, // description
+        cat: stage.category             // category
+      }));
+
+      res.json({
+        success: true,
+        message: 'Stage metadata retrieved successfully',
+        data: {
+          stages: compactData,
+          total_count: stageMetadata.length,
+          last_updated: new Date().toISOString()
+        }
+      });
+
+    } catch (error) {
+      logger.error('Failed to retrieve stage metadata', {
+        error: error.message,
+        userId: req.user?.userId,
+        stack: error.stack
+      });
+
+      res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve stage metadata',
+        error: 'INTERNAL_SERVER_ERROR'
+      });
+    }
+  }
+);
 
 /**
  * GET /api/stages/:stageNumber
- * 스테이지 데이터 조회
+ * 특정 스테이지 상세 데이터 조회 (게임 플레이용)
  */
 router.get('/:stageNumber', 
   authenticateToken,
-  validateStageNumber,
+  [
+    param('stageNumber').isInt({ min: 1 }).withMessage('Stage number must be a positive integer')
+  ],
   async (req, res) => {
     try {
       const stageNumber = parseInt(req.params.stageNumber);
@@ -27,19 +97,26 @@ router.get('/:stageNumber',
         ip: req.ip
       });
 
-      // 스테이지 데이터 조회
-      const stageData = await dbService.getStageData(stageNumber);
+      // 프로시저럴 스테이지 생성기로 데이터 생성
+      const stageGenerator = new StageGenerator();
+      const stageData = stageGenerator.generateStage(stageNumber);
       
-      if (!stageData) {
-        return res.status(404).json({
+      // 유효성 검증
+      const validation = stageGenerator.validateStage(stageData);
+      if (!validation.isValid) {
+        logger.error('Generated stage validation failed', {
+          stageNumber,
+          issues: validation.issues
+        });
+        
+        return res.status(500).json({
           success: false,
-          message: `Stage ${stageNumber} not found`,
-          error: 'STAGE_NOT_FOUND'
+          message: `Stage ${stageNumber} generation failed`,
+          error: 'STAGE_GENERATION_ERROR'
         });
       }
 
-      // 사용자가 해당 스테이지에 접근 가능한지 확인 (선택적)
-      // 예: 이전 스테이지를 완료해야 다음 스테이지 접근 가능
+      // 사용자 접근 권한 확인
       const userProfile = await dbService.getUserByUsername(username);
       if (userProfile && stageNumber > userProfile.max_stage_completed + 1) {
         logger.warn('Unauthorized stage access attempt', {
@@ -55,19 +132,19 @@ router.get('/:stageNumber',
         });
       }
 
-      // 응답 데이터 구성
+      // 응답 데이터 구성 (게임 플레이에 필요한 상세 데이터)
       const responseData = {
         stage_number: stageData.stage_number,
-        stage_name: stageData.stage_name || `Stage ${stageData.stage_number}`,
+        title: stageData.title,
         difficulty: stageData.difficulty,
         optimal_score: stageData.optimal_score,
         time_limit: stageData.time_limit,
-        max_undo_count: stageData.max_undo_count || 3,
-        available_blocks: stageData.available_blocks || [],
+        max_undo_count: stageData.max_undo_count,
+        available_blocks: stageData.available_blocks,
         initial_board_state: stageData.initial_board_state,
-        stage_description: stageData.stage_description,
-        stage_hints: stageData.stage_hints,
-        is_featured: stageData.is_featured || false
+        hints: stageData.hints,
+        special_rules: stageData.special_rules,
+        generation_info: stageData.generation_info // 디버깅용
       };
 
       logger.debug('Stage data retrieved successfully', {
@@ -207,8 +284,19 @@ router.post('/complete',
         });
       }
 
-      // 별점 계산
-      const starsEarned = dbService.calculateStars(score, stageData.optimal_score);
+      // 프로시저럴 스테이지 생성으로 optimal_score 가져오기
+      const stageGenerator = new StageGenerator();
+      const generatedStage = stageGenerator.generateStage(stage_number);
+      const optimalScore = generatedStage.optimal_score;
+      
+      // 별점 계산 (클라이언트와 동일한 로직)
+      let starsEarned = 0;
+      if (completed) {
+        if (score >= optimalScore * 0.9) starsEarned = 3;      // 90% 이상: 3별
+        else if (score >= optimalScore * 0.7) starsEarned = 2; // 70% 이상: 2별  
+        else if (score >= optimalScore * 0.5) starsEarned = 1; // 50% 이상: 1별
+        // 50% 미만: 0별
+      }
 
       // 기존 진행도 확인 (신기록 여부 판단용)
       const existingProgress = await dbService.getStageProgress(username, stage_number);
@@ -277,6 +365,165 @@ router.post('/complete',
       res.status(500).json({
         success: false,
         message: 'Failed to process stage completion',
+        error: 'INTERNAL_SERVER_ERROR'
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/stages/generate/batch
+ * 관리자용: 여러 스테이지 일괄 생성 및 검증
+ */
+router.post('/generate/batch',
+  authenticateToken,
+  [
+    body('start_stage').isInt({ min: 1 }).withMessage('Start stage must be a positive integer'),
+    body('count').isInt({ min: 1, max: 100 }).withMessage('Count must be 1-100'),
+    body('validate_only').optional().isBoolean().withMessage('Validate only must be boolean')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid input data',
+          error: 'VALIDATION_ERROR',
+          details: errors.array()
+        });
+      }
+
+      const { start_stage, count, validate_only = false } = req.body;
+      const { username } = req.user;
+
+      logger.info('Batch stage generation requested', {
+        startStage: start_stage,
+        count,
+        validateOnly: validate_only,
+        username,
+        ip: req.ip
+      });
+
+      // TODO: 관리자 권한 확인
+      // if (!isAdmin(username)) { return 403; }
+
+      const stageGenerator = new StageGenerator();
+      const result = stageGenerator.generateMultipleStages(start_stage, count);
+
+      // 검증만 요청한 경우
+      if (validate_only) {
+        res.json({
+          success: true,
+          message: `Validated ${count} stages`,
+          data: {
+            validation_results: result.validationResults,
+            summary: result.summary
+          }
+        });
+        return;
+      }
+
+      // 전체 생성 결과 반환
+      res.json({
+        success: true,
+        message: `Generated ${count} stages starting from ${start_stage}`,
+        data: {
+          stages: result.stages.map(stage => ({
+            stage_number: stage.stage_number,
+            title: stage.title,
+            difficulty: stage.difficulty,
+            optimal_score: stage.optimal_score,
+            generation_info: stage.generation_info
+          })),
+          validation_results: result.validationResults,
+          summary: result.summary
+        }
+      });
+
+    } catch (error) {
+      logger.error('Failed to generate batch stages', {
+        error: error.message,
+        username: req.user?.username,
+        stack: error.stack
+      });
+
+      res.status(500).json({
+        success: false,
+        message: 'Failed to generate batch stages',
+        error: 'INTERNAL_SERVER_ERROR'
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/stages/:stageNumber/preview
+ * 스테이지 미리보기 (로그인 불필요, 메타데이터만)
+ */
+router.get('/:stageNumber/preview',
+  [
+    param('stageNumber').isInt({ min: 1 }).withMessage('Stage number must be a positive integer')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid stage number',
+          error: 'VALIDATION_ERROR',
+          details: errors.array()
+        });
+      }
+
+      const stageNumber = parseInt(req.params.stageNumber);
+      
+      logger.debug('Stage preview requested', {
+        stageNumber,
+        ip: req.ip
+      });
+
+      // 프로시저럴 생성으로 미리보기 데이터 생성
+      const stageGenerator = new StageGenerator();
+      const stageData = stageGenerator.generateStage(stageNumber);
+      
+      // 미리보기용 데이터만 추출
+      const previewData = {
+        stage_number: stageData.stage_number,
+        title: stageData.title,
+        difficulty: stageData.difficulty,
+        optimal_score: stageData.optimal_score,
+        time_limit: stageData.time_limit,
+        preview_description: stageData.preview_description,
+        category: stageData.category,
+        available_blocks: stageData.available_blocks,
+        hints: stageData.hints.slice(0, 2), // 처음 2개 힌트만
+        special_rules: {
+          has_special_rules: Object.values(stageData.special_rules).some(v => 
+            v !== false && v !== 1.0 && v !== null
+          ),
+          time_pressure: stageData.special_rules.time_pressure,
+          bonus_multiplier: stageData.special_rules.bonus_multiplier
+        }
+      };
+
+      res.json({
+        success: true,
+        message: 'Stage preview retrieved successfully',
+        data: previewData
+      });
+
+    } catch (error) {
+      logger.error('Failed to retrieve stage preview', {
+        error: error.message,
+        stageNumber: req.params.stageNumber,
+        stack: error.stack
+      });
+
+      res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve stage preview',
         error: 'INTERNAL_SERVER_ERROR'
       });
     }

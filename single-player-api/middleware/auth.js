@@ -123,9 +123,10 @@ const generateToken = (payload, expiresIn = process.env.JWT_EXPIRE_IN || '7d') =
   try {
     const tokenPayload = {
       username: payload.username,
-      user_id: payload.userId,
+      user_id: payload.user_id || payload.userId, // 둘 다 지원
       iss: 'blokus-single-api',
-      iat: Math.floor(Date.now() / 1000)
+      iat: Math.floor(Date.now() / 1000),
+      is_guest: payload.is_guest || false
     };
 
     const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, {
@@ -135,7 +136,7 @@ const generateToken = (payload, expiresIn = process.env.JWT_EXPIRE_IN || '7d') =
 
     logger.debug('JWT token generated', {
       username: payload.username,
-      userId: payload.userId,
+      userId: payload.user_id || payload.userId,
       expiresIn
     });
 
@@ -143,7 +144,7 @@ const generateToken = (payload, expiresIn = process.env.JWT_EXPIRE_IN || '7d') =
   } catch (error) {
     logger.error('JWT token generation failed', {
       error: error.message,
-      payload: { username: payload.username, userId: payload.userId }
+      payload: { username: payload.username, userId: payload.user_id || payload.userId }
     });
     throw new Error('Token generation failed');
   }

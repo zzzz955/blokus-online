@@ -63,11 +63,11 @@ namespace BlokusUnity.Data
         /// </summary>
         public void ApplyInitialBoard(GameLogic gameLogic)
         {
-            gameLogic.clearBoard();
+            gameLogic.ClearBoard();
             
             foreach (var blockPlacement in initialBlocks)
             {
-                gameLogic.placeBlock(blockPlacement);
+                gameLogic.PlaceBlock(blockPlacement);
             }
         }
         
