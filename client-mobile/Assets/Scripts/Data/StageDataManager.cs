@@ -103,8 +103,7 @@ namespace BlokusUnity.Data
             if (currentSelectedStage != null && stageManager != null)
             {
                 // SingleGameManager의 static 프로퍼티에 데이터 설정
-                SingleGameManager.CurrentStage = currentSelectedStage;
-                SingleGameManager.StageManager = stageManager;
+                SingleGameManager.SetStageContext(currentSelectedStage.stageNumber, this);
                 
                 Debug.Log($"SingleGameManager에 스테이지 데이터 전달: {currentSelectedStage.stageName}");
             }

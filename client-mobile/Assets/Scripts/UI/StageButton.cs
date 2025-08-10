@@ -35,19 +35,24 @@ namespace BlokusUnity.UI
         
         public int StageNumber => stageNumber;
         
-        void Awake()
-        {
-            // 버튼 클릭 이벤트 연결
-            if (button != null)
-            {
-                button.onClick.AddListener(OnButtonClicked);
+void Awake()
+{
+    if (button == null) button = GetComponent<Button>();
+    if (backgroundImage == null) backgroundImage = GetComponent<Image>();
+
+    // Text 또는 TMP_Text 자동 할당
+    if (stageNumberText == null) {
+        stageNumberText = GetComponentInChildren<Text>();
+        if (stageNumberText == null) {
+            var tmp = GetComponentInChildren<TMPro.TMP_Text>();
+            if (tmp != null) {
+                // TMP만 있는 프리팹 지원: 필요시 래퍼 작성 or 별도 필드 추가
             }
-            
-            // 컴포넌트 자동 찾기 (Inspector에서 설정되지 않은 경우)
-            if (button == null) button = GetComponent<Button>();
-            if (backgroundImage == null) backgroundImage = GetComponent<Image>();
-            if (stageNumberText == null) stageNumberText = GetComponentInChildren<Text>();
         }
+    }
+
+    if (button != null) button.onClick.AddListener(OnButtonClicked);
+}
         
         /// <summary>
         /// 스테이지 버튼 초기화

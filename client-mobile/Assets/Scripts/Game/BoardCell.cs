@@ -1,26 +1,29 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
+using BlokusUnity.Common;
 
 namespace BlokusUnity.Game
 {
     /// <summary>
-    /// 개별 보드 셀 컴포넌트
-    /// 터치 입력 처리 및 시각적 피드백 담당
+    /// 게임보드 셀 터치/드래그 처리 컴포넌트
+    /// 모바일 터치 입력과 드래그 제스처 지원
     /// </summary>
-    public class BoardCell : MonoBehaviour
+    public class BoardCell : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerExitHandler, IDragHandler, IBeginDragHandler, IEndDragHandler
     {
         private int row;
         private int col;
-        private GameBoard parentBoard;
+        private GameBoard gameBoard;
+        private bool isDragging = false;
+        private Vector2 dragStartPosition;
         private bool isInitialized = false;
-        
-        // 터치 상태
-        private bool isPressed = false;
-        private Camera mainCamera;
-        
+        private RectTransform boardRect;
+        private float uiCellSize;
+        private int uiBoardSize;
+
         // ========================================
         // 초기화
         // ========================================
-        
+
         /// <summary>
         /// 셀 초기화
         /// </summary>
@@ -28,192 +31,169 @@ namespace BlokusUnity.Game
         {
             row = cellRow;
             col = cellCol;
-            parentBoard = board;
+            gameBoard = board;
             isInitialized = true;
-            
-            // 메인 카메라 캐싱
-            mainCamera = Camera.main;
-            if (mainCamera == null)
-            {
-                mainCamera = FindObjectOfType<Camera>();
-            }
+
+            // GameBoard에서 설정값 가져오기
+            uiBoardSize = gameBoard.GetBoardSize();
+            uiCellSize = gameBoard.CellSize;              // GameBoard에 public getter 추가 필요
+            boardRect = gameBoard.CellParent;            // GameBoard에 public RectTransform CellParent { get; } 추가
         }
-        
+
         // ========================================
-        // 마우스/터치 이벤트 (PC 테스트용)
+        // 터치 이벤트 처리
         // ========================================
-        
-        void OnMouseDown()
+
+        /// <summary>
+        /// 터치 시작
+        /// </summary>
+        public void OnPointerEnter(PointerEventData eventData)
         {
-            if (!isInitialized) return;
-            
-            isPressed = true;
-            HandleClick();
+            if (gameBoard != null) gameBoard.OnCellHoverInternal(row, col);
         }
-        
-        void OnMouseUp()
+
+        public void OnPointerDown(PointerEventData eventData)
         {
-            isPressed = false;
+            if (!isInitialized || gameBoard == null) return;
+            dragStartPosition = eventData.position;
+            isDragging = false;
+            gameBoard.OnCellClickedInternal(row, col);     // ← 이벤트 직접 호출 삭제
         }
-        
-        void OnMouseEnter()
+
+        /// <summary>
+        /// 드래그 시작
+        /// </summary>
+        public void OnBeginDrag(PointerEventData eventData)
         {
-            if (!isInitialized) return;
-            
-            HandleHover();
+            isDragging = true;
+            Debug.Log($"드래그 시작: Cell ({row}, {col})");
         }
-        
-        void OnMouseExit()
+
+        /// <summary>
+        /// 드래그 중
+        /// </summary>
+        public void OnDrag(PointerEventData eventData)
         {
-            // 호버 종료 처리 (필요시)
+            if (!isDragging || gameBoard == null) return;
+            var pos = GetCellFromScreenPosition(eventData.position);
+            if (ValidationUtility.IsValidPosition(pos))
+                gameBoard.OnCellClickedInternal(pos.row, pos.col);
+            else
+                gameBoard.ClearTouchPreview();
         }
-        
+
+        /// <summary>
+        /// 드래그 종료
+        /// </summary>
+        public void OnEndDrag(PointerEventData eventData)
+        {
+            if (!isDragging) return;
+
+            isDragging = false;
+
+            // 드래그 종료 위치에서 셀 찾기
+            Position endCell = GetCellFromScreenPosition(eventData.position);
+
+            if (ValidationUtility.IsValidPosition(endCell))
+            {
+                // 유효한 셀에서 드래그 종료시 해당 위치에 미리보기 유지
+                gameBoard.OnCellClicked?.Invoke(endCell);
+                Debug.Log($"드래그 종료: Cell ({endCell.row}, {endCell.col})");
+            }
+            else
+            {
+                // 보드 바깥에서 드래그 종료시 미리보기 취소
+                gameBoard.ClearTouchPreview();
+                Debug.Log("드래그 종료: 보드 바깥 (미리보기 취소)");
+            }
+        }
+
+        /// <summary>
+        /// 터치 종료
+        /// </summary>
+        public void OnPointerUp(PointerEventData eventData)
+        {
+            if (isDragging) return; // 드래그 중이면 처리하지 않음
+
+            // 단순 탭인 경우 처리
+            float dragDistance = Vector2.Distance(dragStartPosition, eventData.position);
+            if (dragDistance < 10f) // 10픽셀 이하 움직임은 탭으로 간주
+            {
+                Position cellPosition = new Position(row, col);
+                gameBoard.OnCellClicked?.Invoke(cellPosition);
+                Debug.Log($"탭: Cell ({row}, {col})");
+            }
+        }
+
+        /// <summary>
+        /// 포인터가 셀을 벗어남
+        /// </summary>
+        public void OnPointerExit(PointerEventData eventData)
+        {
+            // 드래그 중이 아닐 때만 호버 해제
+            if (!isDragging && gameBoard != null)
+            {
+                // 호버 해제는 드래그가 아닌 경우에만
+            }
+        }
+
         // ========================================
-        // 모바일 터치 처리
+        // 유틸리티 메서드
         // ========================================
-        
-        void Update()
-        {
-            if (!isInitialized) return;
-            
-            HandleTouch();
-        }
-        
+
         /// <summary>
-        /// 모바일 터치 입력 처리
+        /// 스크린 좌표에서 보드 셀 위치 찾기
         /// </summary>
-        private void HandleTouch()
+        private Position GetCellFromScreenPosition(Vector2 screenPos)
         {
-            // 마우스 클릭 (에디터 테스트용)
-            if (Input.GetMouseButtonDown(0))
-            {
-                CheckTouchAt(Input.mousePosition);
-            }
-            
-            // 터치 입력 처리
-            if (Input.touchCount > 0)
-            {
-                Touch touch = Input.GetTouch(0);
-                
-                if (touch.phase == TouchPhase.Began)
-                {
-                    CheckTouchAt(touch.position);
-                }
-                else if (touch.phase == TouchPhase.Moved)
-                {
-                    CheckHoverAt(touch.position);
-                }
-            }
+            if (gameBoard == null) return new Position(-1, -1);
+            // GameBoard에 ScreenToBoard(Vector2 screenPos) 공개 메서드 추가
+            return gameBoard.ScreenToBoard(screenPos);
         }
-        
+
         /// <summary>
-        /// 지정된 스크린 좌표에서 터치 확인
+        /// 로컬 좌표를 보드 좌표로 변환
         /// </summary>
-        private void CheckTouchAt(Vector2 screenPos)
+        private Position ScreenToBoard(Vector2 localPosition)
         {
-            if (mainCamera == null) return;
-            
-            Vector3 worldPos = mainCamera.ScreenToWorldPoint(screenPos);
-            worldPos.z = 0; // 2D 보정
-            
-            // 이 셀이 터치된 위치인지 확인
-            if (IsTouchingThis(worldPos))
+            if (gameBoard == null) return new Position(-1, -1);
+
+            // GameBoard의 cellParent 기준으로 좌표 변환
+            Transform cellParent = gameBoard.transform.Find("GridContainer");
+            if (cellParent == null) return new Position(-1, -1);
+
+            RectTransform parentRect = cellParent.GetComponent<RectTransform>();
+            if (parentRect == null) return new Position(-1, -1);
+
+            // 셀 크기로 나누어 행/열 계산
+            float cellSize = 25f; // GameBoard의 cellSize와 동일해야 함
+            int boardSize = 20; // GameBoard의 boardSize와 동일해야 함
+
+            Vector2 relativePos = localPosition - (Vector2)parentRect.localPosition;
+
+            int col = Mathf.FloorToInt((relativePos.x + boardSize * cellSize * 0.5f) / cellSize);
+            int row = Mathf.FloorToInt((-relativePos.y + boardSize * cellSize * 0.5f) / cellSize);
+
+            if (row >= 0 && row < boardSize && col >= 0 && col < boardSize)
             {
-                HandleClick();
+                return new Position(row, col);
             }
+
+            return new Position(-1, -1);
         }
-        
-        /// <summary>
-        /// 지정된 스크린 좌표에서 호버 확인
-        /// </summary>
-        private void CheckHoverAt(Vector2 screenPos)
-        {
-            if (mainCamera == null) return;
-            
-            Vector3 worldPos = mainCamera.ScreenToWorldPoint(screenPos);
-            worldPos.z = 0; // 2D 보정
-            
-            // 이 셀이 호버된 위치인지 확인
-            if (IsTouchingThis(worldPos))
-            {
-                HandleHover();
-            }
-        }
-        
-        /// <summary>
-        /// 월드 좌표가 이 셀을 터치하는지 확인
-        /// </summary>
-        private bool IsTouchingThis(Vector3 worldPos)
-        {
-            Collider2D collider = GetComponent<Collider2D>();
-            if (collider != null)
-            {
-                return collider.OverlapPoint(worldPos);
-            }
-            
-            // 콜라이더가 없으면 거리 기반 체크
-            float distance = Vector3.Distance(transform.position, worldPos);
-            return distance < 0.5f; // 셀 크기의 절반 정도
-        }
-        
-        // ========================================
-        // 이벤트 처리
-        // ========================================
-        
-        /// <summary>
-        /// 클릭 이벤트 처리
-        /// </summary>
-        private void HandleClick()
-        {
-            if (parentBoard != null)
-            {
-                parentBoard.OnCellClickedInternal(row, col);
-            }
-            
-            // 시각적 피드백 (선택적)
-            StartCoroutine(ShowClickFeedback());
-        }
-        
-        /// <summary>
-        /// 호버 이벤트 처리
-        /// </summary>
-        private void HandleHover()
-        {
-            if (parentBoard != null)
-            {
-                parentBoard.OnCellHoverInternal(row, col);
-            }
-        }
-        
-        /// <summary>
-        /// 클릭 피드백 애니메이션
-        /// </summary>
-        private System.Collections.IEnumerator ShowClickFeedback()
-        {
-            SpriteRenderer renderer = GetComponent<SpriteRenderer>();
-            if (renderer == null) yield break;
-            
-            Color originalColor = renderer.color;
-            
-            // 밝게 깜빡임
-            renderer.color = Color.white;
-            yield return new WaitForSeconds(0.1f);
-            
-            renderer.color = originalColor;
-        }
-        
+
         // ========================================
         // 공개 메서드
         // ========================================
-        
+
         /// <summary>
-        /// 셀 좌표 가져오기
+        /// 현재 셀의 위치 정보
         /// </summary>
-        public (int row, int col) GetCoordinates()
+        public Position GetPosition()
         {
-            return (row, col);
+            return new Position(row, col);
         }
-        
+
         /// <summary>
         /// 셀이 초기화되었는지 확인
         /// </summary>

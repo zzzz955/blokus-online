@@ -1,261 +1,104 @@
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 using BlokusUnity.Common;
 
 namespace BlokusUnity.Game
 {
     /// <summary>
-    /// 개별 블록 버튼 컴포넌트
-    /// 블록 팔레트에서 사용되는 각 블록의 UI 표현
+    /// 팔레트 내 개별 블록 버튼(UI). 클릭 시 BlockPalette로 전달.
     /// </summary>
-    public class BlockButton : MonoBehaviour
+    [RequireComponent(typeof(RectTransform))]
+    [RequireComponent(typeof(Button))]
+    [RequireComponent(typeof(Image))]
+    public sealed class BlockButton : MonoBehaviour
     {
-        private Block block;
-        private BlockPalette parentPalette;
-        private Button button;
-        private Image backgroundImage;
-        private bool isInitialized = false;
-        
-        // ========================================
-        // 초기화
-        // ========================================
-        
-        /// <summary>
-        /// 블록 버튼 초기화
-        /// </summary>
-        public void Initialize(Block blockData, BlockPalette palette)
+        [Header("Optional")]
+        [SerializeField] private TMP_Text label; // 프리팹에 없으면 런타임에 생성
+
+        public BlockType Type { get; private set; }
+        public PlayerColor Player { get; private set; }
+
+        private Button _btn;
+        private Image _img;
+        private BlockPalette _owner;
+
+        private void Awake()
         {
-            block = blockData;
-            parentPalette = palette;
-            
-            SetupComponents();
-            SetupButton();
-            
-            isInitialized = true;
-        }
-        
-        /// <summary>
-        /// 필요한 컴포넌트들 설정
-        /// </summary>
-        private void SetupComponents()
-        {
-            button = GetComponent<Button>();
-            if (button == null)
+            _btn = GetComponent<Button>();
+            _img = GetComponent<Image>();
+
+            _btn.onClick.RemoveAllListeners();
+            _btn.onClick.AddListener(OnClick);
+
+            // 라벨 없으면 자동 생성
+            if (label == null)
             {
-                button = gameObject.AddComponent<Button>();
-            }
-            
-            backgroundImage = GetComponent<Image>();
-            if (backgroundImage == null)
-            {
-                backgroundImage = gameObject.AddComponent<Image>();
+                var go = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
+                var rt = (RectTransform)go.transform;
+                rt.SetParent(transform, false);
+                rt.anchorMin = Vector2.zero;
+                rt.anchorMax = Vector2.one;
+                rt.offsetMin = new Vector2(8, 8);
+                rt.offsetMax = new Vector2(-8, -8);
+                label = go.GetComponent<TextMeshProUGUI>();
+                label.alignment = TextAlignmentOptions.Center;
+                label.fontSize = 24;
+                label.color = Color.black;
+                label.raycastTarget = false;
             }
         }
-        
-        /// <summary>
-        /// 버튼 이벤트 설정
-        /// </summary>
-        private void SetupButton()
+
+        public void Init(BlockPalette owner, BlockType type, PlayerColor player, Color baseColor, string title = null)
         {
-            if (button != null)
+            _owner = owner;
+            Type = type;
+            Player = player;
+
+            // 버튼 배경색 (플레이어 컬러로 식별감 강화)
+            if (_img != null)
             {
-                button.onClick.RemoveAllListeners();
-                button.onClick.AddListener(OnButtonClicked);
+                _img.raycastTarget = true;
+                _img.color = GetPlayerTint(player);
+            }
+
+            if (label != null)
+            {
+                label.text = string.IsNullOrEmpty(title) ? ShortName(type) : title;
+            }
+
+            // 고정 사이즈 (레이아웃 기준)
+            var rt = (RectTransform)transform;
+            rt.sizeDelta = new Vector2(160f, 160f);
+        }
+
+        public void SetInteractable(bool on)
+        {
+            if (_btn != null) _btn.interactable = on;
+            if (_img != null)
+            {
+                var c = _img.color; c.a = on ? 1f : 0.45f; _img.color = c;
             }
         }
-        
-        // ========================================
-        // 버튼 이벤트
-        // ========================================
-        
-        /// <summary>
-        /// 버튼 클릭 이벤트
-        /// </summary>
-        private void OnButtonClicked()
+
+        private void OnClick()
         {
-            if (!isInitialized || parentPalette == null || block == null)
-                return;
-            
-            parentPalette.OnBlockButtonClicked(block.Type);
-            
-            // 시각적 피드백
-            StartCoroutine(ClickFeedback());
+            Debug.Log($"[BlockButton] Click: {Type}");
+            _owner?.NotifyButtonClicked(Type, Player);
         }
-        
-        /// <summary>
-        /// 클릭 피드백 애니메이션
-        /// </summary>
-        private System.Collections.IEnumerator ClickFeedback()
+
+        private static string ShortName(BlockType t) => t.ToString().Replace("BlockType.", "").Replace("Pento_", "P_").Replace("Tetro_", "T_").Replace("Trio", "Tr_");
+
+        private static Color GetPlayerTint(PlayerColor p)
         {
-            if (backgroundImage == null) yield break;
-            
-            Color originalColor = backgroundImage.color;
-            
-            // 크기 애니메이션
-            Vector3 originalScale = transform.localScale;
-            
-            // 작게 → 크게
-            transform.localScale = originalScale * 0.95f;
-            yield return new WaitForSeconds(0.05f);
-            
-            transform.localScale = originalScale * 1.05f;
-            yield return new WaitForSeconds(0.05f);
-            
-            transform.localScale = originalScale;
-        }
-        
-        // ========================================
-        // 시각적 업데이트
-        // ========================================
-        
-        /// <summary>
-        /// 버튼 배경 색상 설정
-        /// </summary>
-        public void SetButtonColor(Color color)
-        {
-            if (backgroundImage != null)
+            return p switch
             {
-                backgroundImage.color = color;
-            }
-        }
-        
-        /// <summary>
-        /// 블록 시각 새로고침
-        /// </summary>
-        public void RefreshVisual()
-        {
-            if (!isInitialized || block == null) return;
-            
-            // 기존 블록 셀들 제거
-            ClearBlockCells();
-            
-            // 새로운 블록 모양으로 다시 그리기
-            RedrawBlock();
-        }
-        
-        /// <summary>
-        /// 기존 블록 셀들 정리
-        /// </summary>
-        private void ClearBlockCells()
-        {
-            // "Cell_" 로 시작하는 자식 오브젝트들 제거
-            for (int i = transform.childCount - 1; i >= 0; i--)
-            {
-                Transform child = transform.GetChild(i);
-                if (child.name.StartsWith("Cell_"))
-                {
-                    DestroyImmediate(child.gameObject);
-                }
-            }
-        }
-        
-        /// <summary>
-        /// 블록 다시 그리기
-        /// </summary>
-        private void RedrawBlock()
-        {
-            var shape = block.GetCurrentShape();
-            var boundingRect = block.GetBoundingRect();
-            
-            foreach (var pos in shape)
-            {
-                CreateBlockCell(pos, boundingRect);
-            }
-        }
-        
-        /// <summary>
-        /// 블록 셀 생성
-        /// </summary>
-        private void CreateBlockCell(Position pos, Block.BoundingRect bounds)
-        {
-            GameObject cellObj = new GameObject($"Cell_{pos.row}_{pos.col}", typeof(RectTransform));
-            cellObj.transform.SetParent(transform, false);
-            
-            var image = cellObj.AddComponent<Image>();
-            image.color = GetBlockColor();
-            
-            var rectTransform = cellObj.GetComponent<RectTransform>();
-            
-            // 블록 크기 및 스케일 설정
-            float cellSize = 20f; // 기본 셀 크기
-            float blockScale = 0.8f; // 버튼 내 블록 스케일
-            
-            // 중앙 정렬을 위한 위치 계산
-            float cellX = (pos.col - bounds.width * 0.5f + 0.5f) * cellSize * blockScale;
-            float cellY = (pos.row - bounds.height * 0.5f + 0.5f) * cellSize * blockScale;
-            
-            rectTransform.anchoredPosition = new Vector2(cellX, -cellY); // Y 좌표 반전 (UI 좌표계)
-            rectTransform.sizeDelta = Vector2.one * cellSize * blockScale;
-        }
-        
-        /// <summary>
-        /// 블록 색상 가져오기
-        /// </summary>
-        private Color GetBlockColor()
-        {
-            if (block == null) return Color.white;
-            
-            return block.Player switch
-            {
-                PlayerColor.Blue => Color.blue,
-                PlayerColor.Yellow => Color.yellow,
-                PlayerColor.Red => Color.red,
-                PlayerColor.Green => Color.green,
+                PlayerColor.Blue   => new Color(0.35f, 0.60f, 1.00f, 1f),
+                PlayerColor.Yellow => new Color(1.00f, 0.85f, 0.30f, 1f),
+                PlayerColor.Red    => new Color(1.00f, 0.40f, 0.40f, 1f),
+                PlayerColor.Green  => new Color(0.40f, 0.90f, 0.55f, 1f),
                 _ => Color.white
             };
-        }
-        
-        // ========================================
-        // 유틸리티
-        // ========================================
-        
-        /// <summary>
-        /// 버튼이 초기화되었는지 확인
-        /// </summary>
-        public bool IsInitialized()
-        {
-            return isInitialized;
-        }
-        
-        /// <summary>
-        /// 연결된 블록 가져오기
-        /// </summary>
-        public Block GetBlock()
-        {
-            return block;
-        }
-        
-        /// <summary>
-        /// 버튼 활성화/비활성화
-        /// </summary>
-        public void SetInteractable(bool interactable)
-        {
-            if (button != null)
-            {
-                button.interactable = interactable;
-            }
-            
-            // 시각적 피드백
-            if (backgroundImage != null)
-            {
-                backgroundImage.color = interactable ? Color.white : Color.gray;
-            }
-        }
-        
-        /// <summary>
-        /// 블록 정보 툴팁 표시 (향후 확장용)
-        /// </summary>
-        public void ShowTooltip()
-        {
-            if (block != null)
-            {
-                string tooltip = $"{BlockFactory.GetBlockName(block.Type)}\n" +
-                               $"크기: {block.GetSize()}칸\n" +
-                               $"점수: {BlockFactory.GetBlockScore(block.Type)}점";
-                
-                Debug.Log($"블록 정보: {tooltip}");
-                // TODO: 실제 툴팁 UI 구현
-            }
         }
     }
 }
