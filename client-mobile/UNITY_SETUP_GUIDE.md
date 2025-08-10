@@ -1,7 +1,3 @@
-# We'll append UI prefab setup and Inspector connection examples to the existing guide, then save as file again.
-
-extended_guide = """# Unity Blokus Mobile - Setup & Architecture Guide
-
 이 문서는 현재까지 진행된 **프로젝트 구조, 씬 구성, 변경 내역**을 정리한 가이드입니다.
 
 ---
@@ -185,9 +181,3 @@ SingleGameplayScene
 
 이 가이드는 현재까지의 구현 사항을 반영한 것이며, 이후 네트워크 연동 및 스테이지 데이터 확장 시 추가 업데이트 예정입니다.
 """
-
-file_path = "/mnt/data/UNITY_SETUP_GUIDE.md"
-with open(file_path, "w", encoding="utf-8") as f:
-    f.write(extended_guide)
-
-file_path

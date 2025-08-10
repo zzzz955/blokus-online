@@ -31,12 +31,15 @@ namespace BlokusUnity.Game
         [SerializeField] private Color greenColor = Color.green;
 
         [Header("터치 UI")]
-
         // === Action Buttons (우측 상단 패널) ===
         [SerializeField] private RectTransform actionButtonPanel;
         [SerializeField] private UnityEngine.UI.Button rotateButton;
         [SerializeField] private UnityEngine.UI.Button flipButton;
         [SerializeField] private UnityEngine.UI.Button placeButton;
+        [SerializeField] private Sprite uiFallbackSprite;
+
+        [Header("스킨")]
+        [SerializeField] private BlockSkin skin;
 
         // 내부 상태
         private GameLogic gameLogic;
@@ -60,14 +63,11 @@ namespace BlokusUnity.Game
 
         private bool initialized = false;
 
-        // GameBoard.cs — 필드의 안전한 노출
+        // 안전한 노출
         public float CellSize => cellSize;
         public int BoardSize => boardSize;
-        public RectTransform CellParent => cellParent; // RectTransform 타입으로 선언 권장
+        public RectTransform CellParent => cellParent;
 
-        // ========================================
-        // Unity lifecycle
-        // ========================================
         private void Awake()
         {
             if (gameLogic == null) gameLogic = new GameLogic();
@@ -94,13 +94,19 @@ namespace BlokusUnity.Game
             // 중앙 정렬
             cellParent.anchorMin = cellParent.anchorMax = new Vector2(0.5f, 0.5f);
             cellParent.anchoredPosition = Vector2.zero;
-            cellParent.localScale = Vector3.one; // 스케일 고정
+            cellParent.localScale = Vector3.one;
 
             CreateBoardCells();
             RefreshBoard();
 
             // --- Action Buttons 초기화 ---
-            if (actionButtonPanel != null) actionButtonPanel.gameObject.SetActive(false);
+            if (actionButtonPanel != null)
+            {
+                // ★ 패널 배경이 보드 클릭을 가로채지 않도록 차단
+                var bg = actionButtonPanel.GetComponent<Image>();
+                if (bg != null) bg.raycastTarget = false;
+                actionButtonPanel.gameObject.SetActive(false);
+            }
             if (rotateButton != null)
             {
                 rotateButton.onClick.RemoveAllListeners();
@@ -118,6 +124,18 @@ namespace BlokusUnity.Game
             }
         }
 
+        public void OnCellClickedInternal(int row, int col)
+        {
+            var pos = new Position(row, col);
+            OnCellClicked?.Invoke(pos);
+        }
+
+        public void OnCellHoverInternal(int row, int col)
+        {
+            var pos = new Position(row, col);
+            OnCellHover?.Invoke(pos);
+        }
+
         // ========================================
         // 외부 연동
         // ========================================
@@ -128,7 +146,6 @@ namespace BlokusUnity.Game
         }
 
         public GameLogic GetGameLogic() => gameLogic;
-
         public int GetBoardSize() => boardSize;
 
         public void ClearBoard()
@@ -140,11 +157,9 @@ namespace BlokusUnity.Game
 
         public Position ScreenToBoard(Vector2 screenPos)
         {
-            // cellParent 기준 스크린 → 로컬
             var cam = GetComponentInParent<Canvas>()?.worldCamera ?? Camera.main;
             RectTransformUtility.ScreenPointToLocalPointInRectangle(cellParent, screenPos, cam, out var local);
 
-            // 중앙 기준 그리드 좌표 환산(이미 구현해둔 로직 재사용)
             float x0 = -(boardSize * 0.5f - 0.5f) * cellSize;
             float y0 = +(boardSize * 0.5f - 0.5f) * cellSize;
             int col = Mathf.FloorToInt((local.x - x0) / cellSize);
@@ -164,7 +179,7 @@ namespace BlokusUnity.Game
                 Debug.LogError("CellParent(RectTransform)가 없습니다.");
                 return;
             }
-
+            EnsureFallbackSprite();
             cellObjects = new GameObject[boardSize, boardSize];
             cellImages = new Image[boardSize, boardSize];
             cellRects = new RectTransform[boardSize, boardSize];
@@ -194,11 +209,14 @@ namespace BlokusUnity.Game
 
                 // 메인(배경) 이미지
                 var bg = cellObj.AddComponent<Image>();
-                bg.color = Color.white;
-                bg.type = Image.Type.Sliced;
+                bg.sprite = uiFallbackSprite;        // ★추가
+                bg.type = Image.Type.Simple;
+                bg.color = Color.white;             // 기본 빈칸색
 
-                // 테두리
+
+                // 테두리 + Inner
                 CreateCellBorder(cellObj);
+
                 // 클릭 감지용 버튼
                 cellObj.AddComponent<Button>().targetGraphic = bg;
             }
@@ -208,22 +226,18 @@ namespace BlokusUnity.Game
             rect.sizeDelta = new Vector2(cellSize, cellSize);
             rect.localScale = Vector3.one;
 
-            // 보드 중앙 기준 배치 (UI Y축 위가 +)
+            // 중앙 기준 배치(UI 상단이 +Y)
             rect.anchoredPosition = new Vector2(
                 (col - boardSize * 0.5f + 0.5f) * cellSize,
-                (boardSize * 0.5f - 0.5f - row) * cellSize // 행 증가가 화면 아래로 내려가도록
+                (boardSize * 0.5f - 0.5f - row) * cellSize
             );
 
-            // Inner Image 찾기(프리팹/기본 생성 모두 대응)
+            // Inner Image 획득
             Image inner = cellObj.transform.Find("Border/Inner")?.GetComponent<Image>();
-            if (inner == null)
-            {
-                // 프리팹 구조가 다르면, 자기 자신 Image를 사용
-                inner = cellObj.GetComponent<Image>();
-            }
+            if (inner == null) inner = cellObj.GetComponent<Image>();
             inner.color = emptyColor;
 
-            // 클릭/호버 전달 컴포넌트
+            // 클릭/호버 전달
             var bc = cellObj.GetComponent<BoardCell>();
             if (bc == null) bc = cellObj.AddComponent<BoardCell>();
             bc.Initialize(row, col, this);
@@ -239,6 +253,8 @@ namespace BlokusUnity.Game
             borderObj.transform.SetParent(cellObj.transform, false);
 
             var borderImage = borderObj.AddComponent<Image>();
+            borderImage.sprite = uiFallbackSprite; // ★추가
+            borderImage.type = Image.Type.Simple;
             borderImage.color = gridLineColor;
 
             var borderRect = borderObj.GetComponent<RectTransform>();
@@ -251,6 +267,8 @@ namespace BlokusUnity.Game
             innerObj.transform.SetParent(borderObj.transform, false);
 
             var innerImage = innerObj.AddComponent<Image>();
+            innerImage.sprite = uiFallbackSprite; // ★추가
+            innerImage.type = Image.Type.Simple;
             innerImage.color = emptyColor;
 
             var innerRect = innerObj.GetComponent<RectTransform>();
@@ -268,13 +286,11 @@ namespace BlokusUnity.Game
             if (cellImages == null) return;
 
             for (int r = 0; r < boardSize; r++)
-            {
                 for (int c = 0; c < boardSize; c++)
                 {
                     var color = gameLogic.GetBoardCell(r, c);
                     UpdateCellVisual(r, c, color);
                 }
-            }
         }
 
         private void UpdateCellVisual(int row, int col, PlayerColor color)
@@ -293,29 +309,23 @@ namespace BlokusUnity.Game
         }
 
         // ========================================
-        // 배치/프리뷰
+        // 배치/프리뷰 + (첫 수 4코너 허용 오버라이드)
         // ========================================
         public bool TryPlaceBlock(Block block, Position position)
         {
-            if (block == null || !ValidationUtility.IsValidPosition(position))
-                return false;
+            if (block == null || !ValidationUtility.IsValidPosition(position)) return false;
 
-            if (gameLogic.CanPlaceBlock(block, position))
-            {
-                var placement = new BlockPlacement(
-                    block.Type, position, block.CurrentRotation, block.CurrentFlipState, block.Player
-                );
+            // 보드 밖이면 실패
+            if (!CanPlaceWithinBoard(block, position)) return false;
 
-                gameLogic.PlaceBlock(placement);
-                RefreshBoard();
-
-                OnBlockPlaced?.Invoke(block, position);
-                Debug.Log($"블록 배치 성공: {block.Type} @ ({position.row},{position.col})");
-                return true;
-            }
-
-            Debug.LogWarning($"블록 배치 실패: {block?.Type} @ ({position.row},{position.col})");
-            return false;
+            // 원래 규칙으로 가능 → 그대로 PlaceBlock
+            if (!gameLogic.CanPlaceBlock(block, position)) return false;
+            var placement = new BlockPlacement(block.Type, position, block.CurrentRotation, block.CurrentFlipState, block.Player);
+            var ok = gameLogic.PlaceBlock(placement);   // bool이면 그대로, void면 호출 후 RefreshBoard로 확인
+            if (!ok) return false;                      // (PlaceBlock이 bool일 때만)
+            RefreshBoard();
+            OnBlockPlaced?.Invoke(block, position);
+            return true;
         }
 
         public void SetPreview(Block block, Position position)
@@ -334,6 +344,7 @@ namespace BlokusUnity.Game
 
             var cells = previewBlock.GetAbsolutePositions(previewPosition);
             bool canPlace = gameLogic.CanPlaceBlock(previewBlock, previewPosition);
+            ShowActionButtons(canPlace);
             var col = canPlace ? previewColor : invalidColor;
 
             foreach (var pos in cells)
@@ -361,7 +372,6 @@ namespace BlokusUnity.Game
                 if (!ValidationUtility.IsValidPosition(pos)) continue;
                 if (pos.row >= boardSize || pos.col >= boardSize) continue;
 
-                // 빈 칸만 원복
                 if (gameLogic.GetCellColor(pos) == PlayerColor.None)
                 {
                     var img = cellImages[pos.row, pos.col];
@@ -404,10 +414,11 @@ namespace BlokusUnity.Game
         {
             if (pendingBlock == null || !ValidationUtility.IsValidPosition(pendingPosition)) return;
 
-            pendingBlock.RotateClockwise();
-            // 프리뷰 다시 그리기
-            SetPreview(pendingBlock, pendingPosition);
+            // ★ 먼저 이전 프리뷰 지우기
+            ClearPreview();
 
+            pendingBlock.RotateClockwise();
+            SetPreview(pendingBlock, pendingPosition);
             bool canPlace = gameLogic.CanPlaceBlock(pendingBlock, pendingPosition);
             ShowActionButtons(canPlace);
         }
@@ -416,9 +427,11 @@ namespace BlokusUnity.Game
         {
             if (pendingBlock == null || !ValidationUtility.IsValidPosition(pendingPosition)) return;
 
+            // ★ 먼저 이전 프리뷰 지우기
+            ClearPreview();
+
             pendingBlock.FlipHorizontal();
             SetPreview(pendingBlock, pendingPosition);
-
             bool canPlace = gameLogic.CanPlaceBlock(pendingBlock, pendingPosition);
             ShowActionButtons(canPlace);
         }
@@ -437,60 +450,15 @@ namespace BlokusUnity.Game
                 ClearPreview();
                 HideActionButtons();
 
-                // 배치 성공 이벤트 발생
                 OnBlockPlaced?.Invoke(pendingBlock, pendingPosition);
             }
             else
             {
                 Debug.LogError("블록 배치 확정 실패!");
+                // ★ 실패 후에도 UI/입력 정상화
+                ClearPreview();
+                HideActionButtons();
             }
-        }
-
-        // ========================================
-        // 클릭/호버 진입점 (BoardCell에서 호출)
-        // ========================================
-        public void OnCellClickedInternal(int row, int col)
-        {
-            var pos = new Position(row, col);
-            OnCellClicked?.Invoke(pos);
-        }
-
-        public void OnCellHoverInternal(int row, int col)
-        {
-            var pos = new Position(row, col);
-            OnCellHover?.Invoke(pos);
-        }
-
-        // ========================================
-        // 월드↔보드(선택적, UI 기준 보정)
-        // ========================================
-        // UI 전용으로는 아래가 꼭 필요하지 않지만, 외부에서 월드 좌표로 호출할 수 있어 안전하게 유지.
-        public Position WorldToBoard(Vector3 worldPos)
-        {
-            // cellParent 기준 로컬 좌표로 변환
-            RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                cellParent, RectTransformUtility.WorldToScreenPoint(null, worldPos), null, out var local
-            );
-
-            // 중앙 기준 그리드 좌표 환산
-            float x0 = -(boardSize * 0.5f - 0.5f) * cellSize;
-            float y0 = +(boardSize * 0.5f - 0.5f) * cellSize;
-
-            int col = Mathf.FloorToInt((local.x - x0) / cellSize);
-            int row = Mathf.FloorToInt((y0 - local.y) / cellSize);
-
-            col = Mathf.Clamp(col, 0, boardSize - 1);
-            row = Mathf.Clamp(row, 0, boardSize - 1);
-            return new Position(row, col);
-        }
-
-        public Vector3 BoardToWorld(Position boardPos)
-        {
-            var local = new Vector2(
-                (boardPos.col - boardSize * 0.5f + 0.5f) * cellSize,
-                (boardSize * 0.5f - 0.5f - boardPos.row) * cellSize
-            );
-            return cellParent.TransformPoint(local);
         }
 
         // ===== 액션 버튼 표시/숨김/위치 =====
@@ -517,6 +485,23 @@ namespace BlokusUnity.Game
             actionButtonPanel.gameObject.SetActive(false);
         }
 
+        private Vector3 BoardToWorld(Position p)
+        {
+            // 안전 체크 후 해당 셀 RectTransform의 월드 좌표(중심) 반환
+            if (cellRects != null &&
+                p.row >= 0 && p.row < boardSize &&
+                p.col >= 0 && p.col < boardSize &&
+                cellRects[p.row, p.col] != null)
+            {
+                return cellRects[p.row, p.col].TransformPoint(Vector3.zero);
+                // (pivot이 0.5,0.5일 때 중심 좌표)
+            }
+
+            // 폴백: 보드 중심
+            if (cellParent != null) return cellParent.TransformPoint(Vector3.zero);
+            return transform.TransformPoint(Vector3.zero);
+        }
+
         private void PositionActionButtonsAtBlock()
         {
             if (!actionButtonsVisible || actionButtonPanel == null || pendingBlock == null) return;
@@ -538,10 +523,10 @@ namespace BlokusUnity.Game
             }
             if (minRow == int.MaxValue) return;
 
-            // 블록 우측 상단 기준점 (minRow, maxCol) 근처
+            // 블록 우측 상단 근처
             Vector3 targetWorldPos = BoardToWorld(new Position(minRow, maxCol));
 
-            // Canvas 좌표로 변환
+            // Canvas 좌표로 변환/적용
             Canvas canvas = GetComponentInParent<Canvas>();
             if (canvas == null) return;
 
@@ -554,12 +539,25 @@ namespace BlokusUnity.Game
                 Vector2 screenPos = uiCamera.WorldToScreenPoint(targetWorldPos);
                 if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screenPos, uiCamera, out var localPos))
                 {
-                    // 버튼 오프셋 (셀 크기 비례)
                     Vector2 buttonOffset = new Vector2(cellSize * 1.2f, -cellSize * 0.6f);
                     buttonRect.anchoredPosition = localPos + buttonOffset;
                 }
             }
         }
 
+        private void EnsureFallbackSprite()
+        {
+            if (uiFallbackSprite != null) return;
+            var tex = Texture2D.whiteTexture; // 내장 화이트
+            uiFallbackSprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
+        }
+
+        private bool CanPlaceWithinBoard(Block block, Position position)
+        {
+            foreach (var p in block.GetAbsolutePositions(position))
+                if (p.row < 0 || p.col < 0 || p.row >= boardSize || p.col >= boardSize)
+                    return false;
+            return true;
+        }
     }
 }

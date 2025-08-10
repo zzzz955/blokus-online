@@ -8,7 +8,7 @@ namespace BlokusUnity.Game
     /// 게임보드 셀 터치/드래그 처리 컴포넌트
     /// 모바일 터치 입력과 드래그 제스처 지원
     /// </summary>
-    public class BoardCell : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerExitHandler, IDragHandler, IBeginDragHandler, IEndDragHandler
+    public class BoardCell : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerEnterHandler, IPointerExitHandler, IDragHandler, IBeginDragHandler, IEndDragHandler
     {
         private int row;
         private int col;
@@ -57,7 +57,7 @@ namespace BlokusUnity.Game
             if (!isInitialized || gameBoard == null) return;
             dragStartPosition = eventData.position;
             isDragging = false;
-            gameBoard.OnCellClickedInternal(row, col);     // ← 이벤트 직접 호출 삭제
+            Debug.Log($"BoardCell 클릭: ({row}, {col})");
         }
 
         /// <summary>
@@ -121,7 +121,7 @@ namespace BlokusUnity.Game
             {
                 Position cellPosition = new Position(row, col);
                 gameBoard.OnCellClicked?.Invoke(cellPosition);
-                Debug.Log($"탭: Cell ({row}, {col})");
+                Debug.Log($"BoardCell 탭 완료: ({row}, {col})");
             }
         }
 

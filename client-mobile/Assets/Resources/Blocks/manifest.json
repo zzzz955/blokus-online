@@ -1,0 +1,568 @@
+[
+  {
+    "name": "MONO",
+    "file": "/mnt/data/blokus_sprites/sprite_MONO.png",
+    "size": [
+      256,
+      256
+    ],
+    "cells": [
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  {
+    "name": "DUO",
+    "file": "/mnt/data/blokus_sprites/sprite_DUO.png",
+    "size": [
+      256,
+      140
+    ],
+    "cells": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ]
+  },
+  {
+    "name": "TRIO_I",
+    "file": "/mnt/data/blokus_sprites/sprite_TRIO_I.png",
+    "size": [
+      255,
+      101
+    ],
+    "cells": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        2
+      ]
+    ]
+  },
+  {
+    "name": "TRIO_L",
+    "file": "/mnt/data/blokus_sprites/sprite_TRIO_L.png",
+    "size": [
+      256,
+      256
+    ],
+    "cells": [
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        1,
+        1
+      ]
+    ]
+  },
+  {
+    "name": "TETRO_I",
+    "file": "/mnt/data/blokus_sprites/sprite_TETRO_I.png",
+    "size": [
+      256,
+      82
+    ],
+    "cells": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        0,
+        3
+      ]
+    ]
+  },
+  {
+    "name": "TETRO_O",
+    "file": "/mnt/data/blokus_sprites/sprite_TETRO_O.png",
+    "size": [
+      256,
+      256
+    ],
+    "cells": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        1,
+        1
+      ]
+    ]
+  },
+  {
+    "name": "TETRO_L",
+    "file": "/mnt/data/blokus_sprites/sprite_TETRO_L.png",
+    "size": [
+      178,
+      255
+    ],
+    "cells": [
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        2,
+        0
+      ],
+      [
+        2,
+        1
+      ]
+    ]
+  },
+  {
+    "name": "TETRO_T",
+    "file": "/mnt/data/blokus_sprites/sprite_TETRO_T.png",
+    "size": [
+      255,
+      178
+    ],
+    "cells": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        1,
+        1
+      ]
+    ]
+  },
+  {
+    "name": "TETRO_Z",
+    "file": "/mnt/data/blokus_sprites/sprite_TETRO_Z.png",
+    "size": [
+      255,
+      178
+    ],
+    "cells": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        2
+      ]
+    ]
+  },
+  {
+    "name": "PENTO_F",
+    "file": "/mnt/data/blokus_sprites/sprite_PENTO_F.png",
+    "size": [
+      255,
+      255
+    ],
+    "cells": [
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        2,
+        0
+      ]
+    ]
+  },
+  {
+    "name": "PENTO_I",
+    "file": "/mnt/data/blokus_sprites/sprite_PENTO_I.png",
+    "size": [
+      254,
+      70
+    ],
+    "cells": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        0,
+        4
+      ]
+    ]
+  },
+  {
+    "name": "PENTO_L",
+    "file": "/mnt/data/blokus_sprites/sprite_PENTO_L.png",
+    "size": [
+      140,
+      256
+    ],
+    "cells": [
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        2,
+        0
+      ],
+      [
+        3,
+        0
+      ],
+      [
+        3,
+        1
+      ]
+    ]
+  },
+  {
+    "name": "PENTO_P",
+    "file": "/mnt/data/blokus_sprites/sprite_PENTO_P.png",
+    "size": [
+      178,
+      255
+    ],
+    "cells": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        2,
+        0
+      ]
+    ]
+  },
+  {
+    "name": "PENTO_N",
+    "file": "/mnt/data/blokus_sprites/sprite_PENTO_N.png",
+    "size": [
+      140,
+      256
+    ],
+    "cells": [
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        3,
+        1
+      ]
+    ]
+  },
+  {
+    "name": "PENTO_T",
+    "file": "/mnt/data/blokus_sprites/sprite_PENTO_T.png",
+    "size": [
+      255,
+      255
+    ],
+    "cells": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        2,
+        1
+      ]
+    ]
+  },
+  {
+    "name": "PENTO_U",
+    "file": "/mnt/data/blokus_sprites/sprite_PENTO_U.png",
+    "size": [
+      255,
+      178
+    ],
+    "cells": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        2
+      ]
+    ]
+  },
+  {
+    "name": "PENTO_V",
+    "file": "/mnt/data/blokus_sprites/sprite_PENTO_V.png",
+    "size": [
+      255,
+      255
+    ],
+    "cells": [
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        2,
+        0
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        2,
+        2
+      ]
+    ]
+  },
+  {
+    "name": "PENTO_W",
+    "file": "/mnt/data/blokus_sprites/sprite_PENTO_W.png",
+    "size": [
+      255,
+      255
+    ],
+    "cells": [
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        2,
+        2
+      ]
+    ]
+  },
+  {
+    "name": "PENTO_X",
+    "file": "/mnt/data/blokus_sprites/sprite_PENTO_X.png",
+    "size": [
+      255,
+      255
+    ],
+    "cells": [
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        2,
+        1
+      ]
+    ]
+  },
+  {
+    "name": "PENTO_Y",
+    "file": "/mnt/data/blokus_sprites/sprite_PENTO_Y.png",
+    "size": [
+      140,
+      256
+    ],
+    "cells": [
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        2,
+        0
+      ],
+      [
+        3,
+        0
+      ],
+      [
+        1,
+        1
+      ]
+    ]
+  },
+  {
+    "name": "PENTO_Z",
+    "file": "/mnt/data/blokus_sprites/sprite_PENTO_Z.png",
+    "size": [
+      256,
+      140
+    ],
+    "cells": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        1,
+        3
+      ]
+    ]
+  }
+]

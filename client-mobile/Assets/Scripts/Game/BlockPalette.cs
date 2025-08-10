@@ -41,7 +41,7 @@ namespace BlokusUnity.Game
                 var fitter = blockContainer.GetComponent<ContentSizeFitter>();
                 if (fitter == null) fitter = blockContainer.gameObject.AddComponent<ContentSizeFitter>();
                 fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
-                fitter.verticalFit   = ContentSizeFitter.FitMode.Unconstrained;
+                fitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
             }
         }
 
@@ -68,13 +68,25 @@ namespace BlokusUnity.Game
                 _buttons[type] = btn;
             }
 
+            // ★ 초기 프레임 레이아웃 타이밍 이슈 방지
+            LayoutRebuilder.ForceRebuildLayoutImmediate(blockContainer); // 여기서 생성 완료 직후 리빌드 :contentReference[oaicite:7]{index=7}
+
             Debug.Log($"[BlockPalette] 초기화 완료: {blocks.Count}개 블록, Player={player}");
         }
 
         public void MarkBlockAsUsed(BlockType type)
         {
-            if (_buttons.TryGetValue(type, out var btn))
-                btn.SetInteractable(false);
+            if (_buttons.TryGetValue(type, out var btn) && btn != null)
+            {
+                // 완전히 숨기기
+                btn.gameObject.SetActive(false); // 또는 Destroy(btn.gameObject);
+
+                _buttons.Remove(type);
+
+                // 레이아웃 갱신
+                if (blockContainer != null)
+                    LayoutRebuilder.ForceRebuildLayoutImmediate(blockContainer);
+            }
 
             if (_selectedType.HasValue && _selectedType.Value.Equals(type))
             {
@@ -100,7 +112,7 @@ namespace BlokusUnity.Game
         {
             if (_selectedBlock == null) return;
             if (clockwise) _selectedBlock.RotateClockwise();
-            else           _selectedBlock.RotateCounterClockwise();
+            else _selectedBlock.RotateCounterClockwise();
             OnBlockSelected?.Invoke(_selectedBlock);
         }
 
@@ -108,7 +120,7 @@ namespace BlokusUnity.Game
         {
             if (_selectedBlock == null) return;
             if (vertical) _selectedBlock.FlipVertical();
-            else          _selectedBlock.FlipHorizontal();
+            else _selectedBlock.FlipHorizontal();
             OnBlockSelected?.Invoke(_selectedBlock);
         }
 
@@ -130,8 +142,8 @@ namespace BlokusUnity.Game
             {
                 go = Instantiate(blockButtonPrefab, blockContainer);
                 if (go.GetComponent<BlockButton>() == null) go.AddComponent<BlockButton>();
-                if (go.GetComponent<Button>() == null)      go.AddComponent<Button>();
-                if (go.GetComponent<Image>() == null)       go.AddComponent<Image>();
+                if (go.GetComponent<Button>() == null) go.AddComponent<Button>();
+                if (go.GetComponent<Image>() == null) go.AddComponent<Image>();
             }
             else
             {
@@ -141,10 +153,14 @@ namespace BlokusUnity.Game
                 rt.sizeDelta = new Vector2(160f, 160f);
 
                 var img = go.GetComponent<Image>();
+                img.sprite = Resources.FindObjectsOfTypeAll<Sprite>()?.Length > 0 ? img.sprite : null; // 생략 가능
                 img.color = Color.white;
+                img.raycastTarget = true;
 
                 var btn = go.GetComponent<Button>();
+                btn.targetGraphic = img; // targetGraphic 명시적 설정
                 btn.transition = Selectable.Transition.ColorTint;
+                btn.interactable = true; // 강제 활성화
             }
 
             var bb = go.GetComponent<BlockButton>();
@@ -152,10 +168,10 @@ namespace BlokusUnity.Game
 
             var le = go.GetComponent<LayoutElement>();
             if (le == null) le = go.AddComponent<LayoutElement>();
-            le.preferredWidth  = 160f;
+            le.preferredWidth = 160f;
             le.preferredHeight = 160f;
-            le.flexibleWidth   = 0f;
-            le.flexibleHeight  = 0f;
+            le.flexibleWidth = 0f;
+            le.flexibleHeight = 0f;
 
             return bb;
         }

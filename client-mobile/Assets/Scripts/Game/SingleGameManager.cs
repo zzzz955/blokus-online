@@ -36,6 +36,7 @@ namespace BlokusUnity.Game
         private List<BlockType> initialBlocks;
         // 배치 히스토리(Undo용) — 최신 배치가 리스트 끝
         private readonly List<BlockPlacement> placements = new();
+        private Block _currentSelectedBlock; // 현재 선택된 블록
         public int RemainingUndo { get; private set; }
         public System.Action<int> OnUndoCountChanged;
         public System.Action<int /*score*/> OnGameFinished;
@@ -62,12 +63,32 @@ namespace BlokusUnity.Game
                 StageManager = FindObjectOfType<BlokusUnity.Data.StageDataManager>();
         }
 
+        private void Start()
+        {
+            // 테스트용으로 자동 초기화
+            if (!IsInitialized)
+            {
+                Debug.Log("[SingleGameManager] 자동 초기화 시작");
+                var testPayload = new StagePayload
+                {
+                    StageName = "Test Stage",
+                    BoardSize = 20,
+                    AvailableBlocks = DefaultBlockSet()
+                };
+                Init(testPayload);
+            }
+        }
+
         private void OnDestroy()
         {
             if (Instance == this) Instance = null;
 
             if (blockPalette != null) blockPalette.OnBlockSelected -= OnBlockSelectedFromPalette;
-            if (gameBoard != null) gameBoard.OnBlockPlaced -= OnBlockPlacedToBoard;
+            if (gameBoard != null) 
+            {
+                gameBoard.OnBlockPlaced -= OnBlockPlacedToBoard;
+                gameBoard.OnCellClicked -= OnBoardCellClicked;
+            }
         }
 
         // ===== Public API =====
@@ -98,6 +119,7 @@ namespace BlokusUnity.Game
             // 이벤트 연결
             blockPalette.OnBlockSelected += OnBlockSelectedFromPalette;
             gameBoard.OnBlockPlaced += OnBlockPlacedToBoard;
+            gameBoard.OnCellClicked += OnBoardCellClicked;
 
             Debug.Log($"[SingleGame] Start - Stage: {payload.StageName ?? "Unknown"}, Board: {payload.BoardSize}");
             startTimeRealtime = Time.realtimeSinceStartup;
@@ -137,9 +159,25 @@ namespace BlokusUnity.Game
         // ===== Handlers =====
         private void OnBlockSelectedFromPalette(Block block)
         {
-            var half = Mathf.FloorToInt((payload?.BoardSize ?? 20) * 0.5f);
-            var pos = new Position(half, half);
-            gameBoard.SetTouchPreview(block, pos);
+            Debug.Log($"[SingleGameManager] 블록 선택됨: {block.Type}");
+            _currentSelectedBlock = block; // 선택된 블록 저장
+        }
+
+        private void OnBoardCellClicked(Position pos)
+        {
+            Debug.Log($"[SingleGameManager] 보드 클릭: ({pos.row}, {pos.col})");
+            
+            if (_currentSelectedBlock != null)
+            {
+                Debug.Log($"[SingleGameManager] 블록 미리보기 설정: {_currentSelectedBlock.Type} at ({pos.row}, {pos.col})");
+                gameBoard.SetTouchPreview(_currentSelectedBlock, pos);
+            }
+            else
+            {
+                Debug.LogWarning("[SingleGameManager] 선택된 블록이 없습니다. 먼저 팔레트에서 블록을 선택하세요.");
+                // 블록이 선택되지 않았을 때도 기존 미리보기 클리어
+                gameBoard.ClearTouchPreview();
+            }
         }
 
         private void OnBlockPlacedToBoard(Block block, Position pos)
