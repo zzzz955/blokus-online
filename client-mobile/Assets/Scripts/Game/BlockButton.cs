@@ -42,18 +42,30 @@ namespace BlokusUnity.Game
             return sWhiteSprite;
         }
 
-        // 플레이어 컬러
+        // 플레이어 컬러 (GameBoard와 동일한 색상 사용)
         private Color PlayerTint(PlayerColor p)
         {
-            if (skin != null) return skin.GetTint(p);
-            return p switch
+            // Debug.Log($"[BlockButton] PlayerTint 호출 - Player: {p}");
+            
+            if (skin != null)
             {
-                PlayerColor.Blue => new Color(0.35f, 0.60f, 1.00f, 1f),
-                PlayerColor.Yellow => new Color(1.00f, 0.85f, 0.30f, 1f),
-                PlayerColor.Red => new Color(1.00f, 0.40f, 0.40f, 1f),
-                PlayerColor.Green => new Color(0.40f, 0.90f, 0.55f, 1f),
+                Color skinColor = skin.GetTint(p);
+                // Debug.Log($"[BlockButton] 스킨 색상 사용: {skinColor}");
+                return skinColor;
+            }
+            
+            // Unity 기본 색상 직접 사용 (GameBoard와 동일)
+            Color finalColor = p switch
+            {
+                PlayerColor.Blue => Color.blue,      // (0, 0, 1, 1) - 밝은 파란색
+                PlayerColor.Yellow => Color.yellow,  // (1, 1, 0, 1) - 밝은 노란색
+                PlayerColor.Red => Color.red,        // (1, 0, 0, 1) - 밝은 빨간색
+                PlayerColor.Green => Color.green,    // (0, 1, 0, 1) - 밝은 초록색
                 _ => Color.white
             };
+            
+            Debug.Log($"[BlockButton] 기본 색상 사용: {finalColor}");
+            return finalColor;
         }
 
         private void Awake()
@@ -87,6 +99,8 @@ namespace BlokusUnity.Game
             _owner = owner;
             Type = type;
             Player = player;
+            
+            // Debug.Log($"[BlockButton] Init - Type: {type}, Player: {player}, PlayerTint: {PlayerTint(player)}");
 
             // 버튼 루트 이미지: 클릭 영역 + 투명 배경
             if (_img != null)
@@ -119,7 +133,7 @@ namespace BlokusUnity.Game
             {
                 var ch = transform.GetChild(i);
                 if (ch != null && ch.name == "BlockVisual")
-                    DestroyImmediate(ch.gameObject);
+                    Destroy(ch.gameObject);
             }
 
             // (옵션) PNG 썸네일 모드 — 기본은 off
@@ -149,8 +163,12 @@ namespace BlokusUnity.Game
                 img.sprite = spr;
                 img.type = Image.Type.Simple;
                 img.preserveAspect = true;          // 비율 유지
-                img.color = PlayerTint(player);    // 흰 PNG면 플레이어 색으로 틴트
+                
+                Color spriteColor = PlayerTint(player);
+                img.color = spriteColor;    // 흰 PNG면 플레이어 색으로 틴트
                 img.raycastTarget = false;
+                
+                // Debug.Log($"[BlockButton] PNG 썸네일 색상 설정 - 블록색상: {spriteColor}");
 
                 return;
             }
@@ -178,9 +196,28 @@ namespace BlokusUnity.Game
             containerRect.sizeDelta = new Vector2(blockWidth * previewCellSize, blockHeight * previewCellSize);
 
             Color blockColor = PlayerTint(player);
+            // Debug.Log($"[BlockButton] CreateBlockVisualization - Player: {player}, FinalColor: {blockColor}");
 
             foreach (var pos in positions)
             {
+                // 먼저 테두리를 생성 (뒤에 렌더링됨)
+                var borderObj = new GameObject($"Border_{pos.row}_{pos.col}", typeof(RectTransform), typeof(Image));
+                borderObj.transform.SetParent(visualContainer.transform, false);
+                
+                var borderRect = borderObj.GetComponent<RectTransform>();
+                borderRect.sizeDelta = new Vector2(previewCellSize + 2f, previewCellSize + 2f);
+                borderRect.anchoredPosition = new Vector2(
+                    (pos.col - minCol - blockWidth * 0.5f + 0.5f) * previewCellSize,
+                    (blockHeight * 0.5f - 0.5f - (pos.row - minRow)) * previewCellSize
+                );
+
+                var borderImage = borderObj.GetComponent<Image>();
+                borderImage.sprite = White1x1();
+                borderImage.type = Image.Type.Simple;
+                borderImage.color = Color.black; // 검정색 테두리
+                borderImage.raycastTarget = false;
+
+                // 그 다음 셀을 생성 (앞에 렌더링되어 테두리 위에 표시됨)
                 var cellObj = new GameObject($"Cell_{pos.row}_{pos.col}", typeof(RectTransform), typeof(Image));
                 cellObj.transform.SetParent(visualContainer.transform, false);
 
@@ -194,22 +231,8 @@ namespace BlokusUnity.Game
                 var cellImage = cellObj.GetComponent<Image>();
                 cellImage.sprite = White1x1();
                 cellImage.type = Image.Type.Simple;
-                cellImage.color = blockColor;
+                cellImage.color = blockColor; // 블록 색상이 정상적으로 보임
                 cellImage.raycastTarget = false;
-
-                // 테두리(얇게)
-                var borderObj = new GameObject("Border", typeof(RectTransform), typeof(Image));
-                borderObj.transform.SetParent(cellObj.transform, false);
-                var borderRect = borderObj.GetComponent<RectTransform>();
-                borderRect.anchorMin = borderRect.anchorMax = new Vector2(0.5f, 0.5f);
-                borderRect.anchoredPosition = Vector2.zero;
-                borderRect.sizeDelta = cellRect.sizeDelta + Vector2.one * 2f;
-
-                var borderImage = borderObj.GetComponent<Image>();
-                borderImage.sprite = White1x1();
-                borderImage.type = Image.Type.Simple;
-                borderImage.color = Color.black;
-                borderImage.raycastTarget = false;
             }
         }
 
@@ -287,7 +310,7 @@ namespace BlokusUnity.Game
                 if (!string.IsNullOrEmpty(k)) sSpriteIndex[k] = spr;
             }
             useStaticIndexBuilt = true;
-            Debug.Log("[BlockButton] Loaded sprites: " + (sSpriteIndex?.Count ?? 0));
+            // Debug.Log("[BlockButton] Loaded sprites: " + (sSpriteIndex?.Count ?? 0));
         }
 
         public void SetInteractable(bool on)

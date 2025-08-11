@@ -79,7 +79,7 @@ namespace BlokusUnity.UI
         // 씬 이름 상수
         public const string MAIN_SCENE = "MainScene";
         public const string GAMEPLAY_SCENE = "GameplayScene";
-        
+
         /// <summary>
         /// 권장 씬 분리 전략
         /// </summary>
@@ -106,7 +106,7 @@ namespace BlokusUnity.UI
             4. 데이터 보존: 사용자 정보, 설정 등 영구 보존
             */
         }
-        
+
         /// <summary>
         /// UI 전환이 씬 전환보다 좋은 이유
         /// </summary>
@@ -128,7 +128,7 @@ namespace BlokusUnity.UI
             - 즉시 반응하는 UI
             */
         }
-        
+
         /// <summary>
         /// 언제 씬을 분리할지 결정
         /// </summary>
@@ -180,32 +180,32 @@ public abstract class BaseUIPanel : MonoBehaviour
     [Header("Panel Settings")]
     public UIState panelType;
     public bool startActive = false;
-    
+
     protected CanvasGroup canvasGroup;
     protected bool isAnimating = false;
-    
+
     protected virtual void Awake()
     {
         canvasGroup = GetComponent<CanvasGroup>();
         if (canvasGroup == null)
             canvasGroup = gameObject.AddComponent<CanvasGroup>();
     }
-    
+
     protected virtual void Start()
     {
         if (!startActive)
             Hide(false);
     }
-    
+
     /// <summary>
     /// 패널 표시 (애니메이션 옵션)
     /// </summary>
     public virtual void Show(bool animated = true)
     {
         if (isAnimating) return;
-        
+
         gameObject.SetActive(true);
-        
+
         if (animated)
         {
             StartCoroutine(FadeIn());
@@ -216,14 +216,14 @@ public abstract class BaseUIPanel : MonoBehaviour
             canvasGroup.interactable = true;
         }
     }
-    
+
     /// <summary>
     /// 패널 숨기기 (애니메이션 옵션)
     /// </summary>
     public virtual void Hide(bool animated = true)
     {
         if (isAnimating) return;
-        
+
         if (animated)
         {
             StartCoroutine(FadeOut());
@@ -235,44 +235,46 @@ public abstract class BaseUIPanel : MonoBehaviour
             gameObject.SetActive(false);
         }
     }
-    
+
     protected virtual IEnumerator FadeIn()
     {
         isAnimating = true;
         canvasGroup.alpha = 0f;
         canvasGroup.interactable = false;
-        
+        canvasGroup.blocksRaycasts = true;   // 보일 때는 차단 ON (패널 내부만 클릭)
+
         float duration = 0.3f;
         float elapsed = 0f;
-        
+
         while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
             canvasGroup.alpha = Mathf.Lerp(0f, 1f, elapsed / duration);
             yield return null;
         }
-        
+
         canvasGroup.alpha = 1f;
-        canvasGroup.interactable = true;
+        canvasGroup.interactable = true;     // 최종 인터랙션 ON
         isAnimating = false;
     }
-    
+
     protected virtual IEnumerator FadeOut()
     {
         isAnimating = true;
-        canvasGroup.interactable = false;
-        
+        canvasGroup.interactable = false;    // 내부 버튼 비활성
+        canvasGroup.blocksRaycasts = false;  // 🔑 외부 클릭 막지 않도록 즉시 OFF
+
         float duration = 0.3f;
         float elapsed = 0f;
         float startAlpha = canvasGroup.alpha;
-        
+
         while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
             canvasGroup.alpha = Mathf.Lerp(startAlpha, 0f, elapsed / duration);
             yield return null;
         }
-        
+
         canvasGroup.alpha = 0f;
         gameObject.SetActive(false);
         isAnimating = false;

@@ -678,7 +678,7 @@ namespace BlokusUnity.Common
         /// <summary>
         /// 블록 점수 계산
         /// </summary>
-        private int GetBlockScore(BlockType blockType)
+        public int GetBlockScore(BlockType blockType)
         {
             return blockType switch
             {

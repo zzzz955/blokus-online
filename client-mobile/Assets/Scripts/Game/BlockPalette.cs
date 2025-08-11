@@ -24,25 +24,36 @@ namespace BlokusUnity.Game
         private BlockType? _selectedType;
         private Block _selectedBlock;
 
-        private void OnValidate()
+        private void Awake()
         {
-            // Content 설정 자동 보정 (개발 편의)
-            if (blockContainer != null)
+            if (blockContainer == null)
             {
-                var hl = blockContainer.GetComponent<HorizontalLayoutGroup>();
-                if (hl == null) hl = blockContainer.gameObject.AddComponent<HorizontalLayoutGroup>();
-                hl.spacing = 16;
-                hl.childAlignment = TextAnchor.UpperLeft;
-                hl.childControlWidth = true;
-                hl.childControlHeight = true;
-                hl.childForceExpandWidth = false;
-                hl.childForceExpandHeight = false;
-
-                var fitter = blockContainer.GetComponent<ContentSizeFitter>();
-                if (fitter == null) fitter = blockContainer.gameObject.AddComponent<ContentSizeFitter>();
-                fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
-                fitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
+                Debug.LogError("[BlockPalette] blockContainer(Content)가 연결되지 않았습니다.");
+                return;
             }
+
+            // 이미 GridLayoutGroup이 있으면, 아무 레이아웃도 추가/수정하지 않는다.
+            var grid = blockContainer.GetComponent<GridLayoutGroup>();
+            if (grid != null)
+            {
+                Debug.Log("[BlockPalette] GridLayoutGroup 감지됨 → 자동 레이아웃 보정 생략");
+                return;
+            }
+
+            // Grid가 없을 때만, 기존 방식(Horizontal + Fitter) 보정 수행
+            var hl = blockContainer.GetComponent<HorizontalLayoutGroup>();
+            if (hl == null) hl = blockContainer.gameObject.AddComponent<HorizontalLayoutGroup>();
+            hl.childAlignment = TextAnchor.UpperLeft;
+            hl.spacing = 8f;
+            hl.childControlWidth = true;
+            hl.childControlHeight = true;
+            hl.childForceExpandWidth = false;
+            hl.childForceExpandHeight = false;
+
+            var fitter = blockContainer.GetComponent<ContentSizeFitter>();
+            if (fitter == null) fitter = blockContainer.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            fitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
         }
 
         public void InitializePalette(List<BlockType> blocks, PlayerColor player)
@@ -78,10 +89,8 @@ namespace BlokusUnity.Game
         {
             if (_buttons.TryGetValue(type, out var btn) && btn != null)
             {
-                // 완전히 숨기기
-                btn.gameObject.SetActive(false); // 또는 Destroy(btn.gameObject);
-
-                _buttons.Remove(type);
+                // 완전히 숨기기 (딕셔너리에서는 제거하지 않음)
+                btn.gameObject.SetActive(false);
 
                 // 레이아웃 갱신
                 if (blockContainer != null)
@@ -95,6 +104,63 @@ namespace BlokusUnity.Game
             }
         }
 
+        /// <summary>
+        /// 사용된 블록을 다시 사용 가능하게 복원 (Undo용)
+        /// </summary>
+        public void RestoreBlock(BlockType type)
+        {
+            if (_buttons.ContainsKey(type))
+            {
+                // 이미 딕셔너리에 있으면 비활성 → 활성만 처리하는 로직이 있다면 여기서 살리면 됨.
+                var btn = _buttons[type];
+                btn.gameObject.SetActive(true);
+                return;
+            }
+
+            if (blockContainer == null)
+            {
+                Debug.LogError("[BlockPalette] blockContainer가 비어 있습니다.");
+                return;
+            }
+            if (blockButtonPrefab == null)
+            {
+                Debug.LogError("[BlockPalette] blockButtonPrefab이 비어 있습니다. 프리팹을 반드시 연결하세요.");
+                return;
+            }
+
+            // 프리팹 복원
+            var go = Instantiate(blockButtonPrefab, blockContainer);
+            var blockButton = go.GetComponent<BlockButton>();
+            if (blockButton == null)
+            {
+                Debug.LogError("[BlockPalette] 프리팹에 BlockButton 컴포넌트가 없습니다.");
+                Destroy(go);
+                return;
+            }
+
+            // 정상 시각화 초기화
+            blockButton.Init(this, type, _player, Color.white, type.ToString());
+
+            // 정렬: enum 순으로 삽입 (초기 팔레트와 유사한 순서 보장)
+            int insertIndex = blockContainer.childCount - 1;
+            for (int i = 0; i < blockContainer.childCount - 1; i++)
+            {
+                var other = blockContainer.GetChild(i).GetComponent<BlockButton>();
+                if (other == null) continue;
+                if ((int)other.Type > (int)type)
+                {
+                    insertIndex = i;
+                    break;
+                }
+            }
+            go.transform.SetSiblingIndex(insertIndex);
+
+            _buttons[type] = blockButton;
+
+            LayoutRebuilder.ForceRebuildLayoutImmediate(blockContainer);
+            Debug.Log($"[BlockPalette] 블록 복원됨: {type} (index={insertIndex})");
+        }
+
         internal void NotifyButtonClicked(BlockType type, PlayerColor player)
         {
             OnBlockButtonClicked(type);
@@ -104,7 +170,7 @@ namespace BlokusUnity.Game
         {
             _selectedType = blockType;
             _selectedBlock = new Block(blockType, _player);
-            Debug.Log($"[BlockPalette] Select: {blockType}");
+            // Debug.Log($"[BlockPalette] Select: {blockType}");
             OnBlockSelected?.Invoke(_selectedBlock);
         }
 

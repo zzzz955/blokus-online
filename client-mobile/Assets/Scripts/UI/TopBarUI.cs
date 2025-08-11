@@ -16,6 +16,7 @@ namespace BlokusUnity.UI
         [SerializeField] private Button undoButton;
         [SerializeField] private TMP_Text undoCountText;   // 또는 Text
         [SerializeField] private Button exitButton;
+        [SerializeField] private ConfirmationModal confirmationModal;
 
         [Header("Config")]
         [SerializeField] private string mainSceneName = "MainScene";
@@ -25,20 +26,34 @@ namespace BlokusUnity.UI
         {
             if (undoButton != null)
             {
+                // 🔒 중복 방지: Inspector 이벤트도 비워두고, 여기서만 연결
                 undoButton.onClick.RemoveAllListeners();
                 undoButton.onClick.AddListener(OnClickUndo);
             }
 
-            if (exitButton != null)
+            // 모달 자동 찾기(활성 오브젝트 우선)
+            if (confirmationModal == null)
             {
-                exitButton.onClick.RemoveAllListeners();
-                exitButton.onClick.AddListener(OnClickExit);
+                var active = FindObjectOfType<ConfirmationModal>();
+                if (active != null) confirmationModal = active;
+                else
+                {
+                    // 비활성까지 검색(비활성은 Show가 안 먹으니, 찾으면 루트 활성화 필요)
+                    var all = Resources.FindObjectsOfTypeAll<ConfirmationModal>();
+                    if (all != null && all.Length > 0)
+                    {
+                        confirmationModal = all[0];
+                        // 모달이 비활성 GameObject라면 활성화
+                        if (!confirmationModal.gameObject.activeInHierarchy)
+                            confirmationModal.gameObject.SetActive(true);
+                    }
+                }
             }
         }
 
         private void OnEnable()
         {
-            var gm = SingleGameManager.Instance;
+            var gm = BlokusUnity.Game.SingleGameManager.Instance;
             if (gm != null)
             {
                 gm.OnUndoCountChanged -= RefreshUndo;
@@ -49,7 +64,7 @@ namespace BlokusUnity.UI
 
         private void OnDisable()
         {
-            var gm = SingleGameManager.Instance;
+            var gm = BlokusUnity.Game.SingleGameManager.Instance;
             if (gm != null) gm.OnUndoCountChanged -= RefreshUndo;
         }
 
@@ -66,17 +81,43 @@ namespace BlokusUnity.UI
             timerText.text = (h > 0) ? $"{h:00}:{m:00}:{s:00}" : $"{m:00}:{s:00}";
         }
 
-        private void RefreshUndo(int remaining)
+        private void RefreshUndo(int remain)
         {
-            if (undoCountText != null) undoCountText.text = $"x{remaining}";
-            if (undoButton != null) undoButton.interactable = remaining > 0;
+            if (undoCountText != null) undoCountText.text = $"UNDO {remain}";
+            if (undoButton != null) undoButton.interactable = remain > 0;
         }
+private void OnClickUndo()
+{
+    var gm = BlokusUnity.Game.SingleGameManager.Instance;
+    if (gm == null) return;
 
-        private void OnClickUndo()
-        {
-            var gm = SingleGameManager.Instance;
-            if (gm != null) gm.OnUndoMove();
-        }
+    if (gm.RemainingUndo <= 0) { Debug.Log("[TopBarUI] Undo 불가 - 남은 횟수 없음"); return; }
+    if (!gm.CanUndo())         { Debug.Log("[TopBarUI] Undo 불가 - 되돌릴 배치 없음"); return; }
+
+    if (undoButton != null) undoButton.interactable = false;
+
+    if (confirmationModal != null)
+    {
+        confirmationModal.ShowUndoConfirmation(
+            onConfirm: () =>
+            {
+                gm.OnUndoMove();
+                if (undoButton != null) undoButton.interactable = true;
+            },
+            onCancel: () =>
+            {
+                if (undoButton != null) undoButton.interactable = true;
+            }
+        );
+    }
+    else
+    {
+        Debug.LogWarning("[TopBarUI] ConfirmationModal이 없습니다. 바로 Undo 실행");
+        gm.OnUndoMove();
+        if (undoButton != null) undoButton.interactable = true;
+    }
+}
+
 
         private void OnClickExit()
         {

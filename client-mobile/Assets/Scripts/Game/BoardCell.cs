@@ -57,7 +57,7 @@ namespace BlokusUnity.Game
             if (!isInitialized || gameBoard == null) return;
             dragStartPosition = eventData.position;
             isDragging = false;
-            Debug.Log($"BoardCell 클릭: ({row}, {col})");
+            // Debug.Log($"BoardCell 클릭: ({row}, {col})");
         }
 
         /// <summary>
@@ -66,7 +66,7 @@ namespace BlokusUnity.Game
         public void OnBeginDrag(PointerEventData eventData)
         {
             isDragging = true;
-            Debug.Log($"드래그 시작: Cell ({row}, {col})");
+            // Debug.Log($"드래그 시작: Cell ({row}, {col})");
         }
 
         /// <summary>
@@ -98,13 +98,13 @@ namespace BlokusUnity.Game
             {
                 // 유효한 셀에서 드래그 종료시 해당 위치에 미리보기 유지
                 gameBoard.OnCellClicked?.Invoke(endCell);
-                Debug.Log($"드래그 종료: Cell ({endCell.row}, {endCell.col})");
+                // Debug.Log($"드래그 종료: Cell ({endCell.row}, {endCell.col})");
             }
             else
             {
                 // 보드 바깥에서 드래그 종료시 미리보기 취소
                 gameBoard.ClearTouchPreview();
-                Debug.Log("드래그 종료: 보드 바깥 (미리보기 취소)");
+                // Debug.Log("드래그 종료: 보드 바깥 (미리보기 취소)");
             }
         }
 
@@ -121,7 +121,7 @@ namespace BlokusUnity.Game
             {
                 Position cellPosition = new Position(row, col);
                 gameBoard.OnCellClicked?.Invoke(cellPosition);
-                Debug.Log($"BoardCell 탭 완료: ({row}, {col})");
+                // Debug.Log($"BoardCell 탭 완료: ({row}, {col})");
             }
         }
 

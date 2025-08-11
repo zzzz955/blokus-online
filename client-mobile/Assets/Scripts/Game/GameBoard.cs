@@ -67,10 +67,43 @@ namespace BlokusUnity.Game
         public float CellSize => cellSize;
         public int BoardSize => boardSize;
         public RectTransform CellParent => cellParent;
+        
+        /// <summary>
+        /// 플레이어 색상 반환 (BlockButton과 색상 통일을 위함)
+        /// 블록 스킨이 설정되어 있으면 스킨 색상을 우선 사용
+        /// </summary>
+        public Color GetPlayerColor(PlayerColor player)
+        {
+            // 스킨이 설정되어 있으면 스킨 색상 사용
+            if (skin != null)
+            {
+                return skin.GetTint(player);
+            }
+            
+            // 기본 색상 사용
+            return player switch
+            {
+                PlayerColor.Blue => blueColor,
+                PlayerColor.Yellow => yellowColor,
+                PlayerColor.Red => redColor,
+                PlayerColor.Green => greenColor,
+                _ => Color.white
+            };
+        }
 
         private void Awake()
         {
             if (gameLogic == null) gameLogic = new GameLogic();
+            
+            // ActionButtonPanel을 즉시 숨김 (Inspector에서 활성화되어 있을 수 있음)
+            if (actionButtonPanel != null)
+            {
+                // ActionButtonPanel 크기 강제 설정 (Canvas 전체 크기로 잘못 설정되는 문제 해결)
+                actionButtonPanel.sizeDelta = new Vector2(200f, 100f);
+                actionButtonPanel.gameObject.SetActive(false);
+                actionButtonsVisible = false;
+                Debug.Log($"[GameBoard] Awake에서 ActionButtonPanel 강제 숨김 및 크기 설정: {actionButtonPanel.sizeDelta}");
+            }
         }
 
         private void Start()
@@ -105,7 +138,16 @@ namespace BlokusUnity.Game
                 // ★ 패널 배경이 보드 클릭을 가로채지 않도록 차단
                 var bg = actionButtonPanel.GetComponent<Image>();
                 if (bg != null) bg.raycastTarget = false;
+                
+                // 초기에는 숨김 상태
                 actionButtonPanel.gameObject.SetActive(false);
+                actionButtonsVisible = false;
+                
+                Debug.Log("[GameBoard] ActionButtonPanel 초기화 완료 - 숨김 상태로 설정");
+            }
+            else
+            {
+                Debug.LogError("[GameBoard] ActionButtonPanel이 Inspector에서 연결되지 않았습니다!");
             }
             if (rotateButton != null)
             {
@@ -153,6 +195,16 @@ namespace BlokusUnity.Game
             gameLogic.ClearBoard();
             RefreshBoard();
             ClearTouchPreview();
+        }
+
+        /// <summary>
+        /// 보드만 클리어 (터치 미리보기는 건드리지 않음) - Undo 전용
+        /// </summary>
+        public void ClearBoardOnly()
+        {
+            gameLogic.ClearBoard();
+            RefreshBoard();
+            // ClearTouchPreview() 호출하지 않음 - Undo에서 UI 충돌 방지
         }
 
         public Position ScreenToBoard(Vector2 screenPos)
@@ -285,12 +337,20 @@ namespace BlokusUnity.Game
         {
             if (cellImages == null) return;
 
+            int nonEmptyCount = 0;
+            
             for (int r = 0; r < boardSize; r++)
                 for (int c = 0; c < boardSize; c++)
                 {
                     var color = gameLogic.GetBoardCell(r, c);
                     UpdateCellVisual(r, c, color);
+                    
+                    // 비어있지 않은 셀 카운트
+                    if (color != PlayerColor.None)
+                        nonEmptyCount++;
                 }
+                
+            Debug.Log($"[GameBoard] RefreshBoard 완료 - 채워진 셀 수: {nonEmptyCount}");
         }
 
         private void UpdateCellVisual(int row, int col, PlayerColor color)
@@ -344,7 +404,6 @@ namespace BlokusUnity.Game
 
             var cells = previewBlock.GetAbsolutePositions(previewPosition);
             bool canPlace = gameLogic.CanPlaceBlock(previewBlock, previewPosition);
-            ShowActionButtons(canPlace);
             var col = canPlace ? previewColor : invalidColor;
 
             foreach (var pos in cells)
@@ -359,7 +418,7 @@ namespace BlokusUnity.Game
                     if (img != null) img.color = col;
                 }
             }
-            PositionActionButtonsAtBlock();
+            // PositionActionButtonsAtBlock() 제거 - ShowActionButtons에서 이미 처리됨
         }
 
         public void ClearPreview()
@@ -386,28 +445,49 @@ namespace BlokusUnity.Game
         // 터치 경로(미리보기 + 확정 버튼)
         public void SetTouchPreview(Block block, Position position)
         {
+            Debug.Log($"[GameBoard] SetTouchPreview 호출됨 - Block: {block?.Type}, Position: ({position.row}, {position.col})");
+            
             if (block == null || !ValidationUtility.IsValidPosition(position))
             {
+                Debug.Log("[GameBoard] SetTouchPreview - 잘못된 블록 또는 위치로 인한 클리어");
                 ClearTouchPreview();
                 return;
             }
 
-            SetPreview(block, position);
-
+            // 이전 상태 완전 클리어
+            ClearPreview();
+            HideActionButtons();
+            
+            // 새로운 블록 설정
             pendingBlock = block;
             pendingPosition = position;
             hasPendingPlacement = true;
+            
+            // Debug.Log($"[GameBoard] pendingBlock 설정됨: {pendingBlock.Type} at ({pendingPosition.row}, {pendingPosition.col})");
 
+            // 미리보기 표시
+            SetPreview(block, position);
+
+            // 배치 가능 여부 확인 및 액션 버튼 표시
             bool canPlace = gameLogic.CanPlaceBlock(block, position);
+            // Debug.Log($"[GameBoard] 블록 배치 가능 여부: {canPlace}");
+            
             ShowActionButtons(canPlace);
 
-            Debug.Log($"터치 미리보기: {block.Type} @ ({position.row},{position.col}) - {(canPlace ? "가능" : "불가")}");
+            // Debug.Log($"터치 미리보기 완료: {block.Type} @ ({position.row},{position.col}) - {(canPlace ? "가능" : "불가")}");
         }
 
         public void ClearTouchPreview()
         {
             ClearPreview();
             HideActionButtons();
+            
+            // 펜딩 상태 초기화
+            pendingBlock = null;
+            pendingPosition = new Position(-1, -1);
+            hasPendingPlacement = false;
+            
+            Debug.Log("[GameBoard] 터치 미리보기 클리어 - ActionButtonPanel 숨김");
         }
 
         private void OnRotatePendingBlock()
@@ -420,6 +500,8 @@ namespace BlokusUnity.Game
             pendingBlock.RotateClockwise();
             SetPreview(pendingBlock, pendingPosition);
             bool canPlace = gameLogic.CanPlaceBlock(pendingBlock, pendingPosition);
+            
+            // 배치 가능성에 따른 버튼 상태 업데이트
             ShowActionButtons(canPlace);
         }
 
@@ -433,6 +515,8 @@ namespace BlokusUnity.Game
             pendingBlock.FlipHorizontal();
             SetPreview(pendingBlock, pendingPosition);
             bool canPlace = gameLogic.CanPlaceBlock(pendingBlock, pendingPosition);
+            
+            // 배치 가능성에 따른 버튼 상태 업데이트
             ShowActionButtons(canPlace);
         }
 
@@ -449,13 +533,11 @@ namespace BlokusUnity.Game
                 Debug.Log($"블록 배치 확정 완료: {pendingBlock.Type} at ({pendingPosition.row}, {pendingPosition.col})");
                 ClearPreview();
                 HideActionButtons();
-
-                OnBlockPlaced?.Invoke(pendingBlock, pendingPosition);
+                // OnBlockPlaced 이벤트는 TryPlaceBlock()에서 이미 호출됨 (중복 제거)
             }
             else
             {
                 Debug.LogError("블록 배치 확정 실패!");
-                // ★ 실패 후에도 UI/입력 정상화
                 ClearPreview();
                 HideActionButtons();
             }
@@ -464,9 +546,18 @@ namespace BlokusUnity.Game
         // ===== 액션 버튼 표시/숨김/위치 =====
         private void ShowActionButtons(bool canPlace)
         {
-            if (actionButtonPanel == null) return;
+            if (actionButtonPanel == null)
+            {
+                Debug.LogError("[GameBoard] ActionButtonPanel이 연결되지 않았습니다! Inspector에서 ActionButtonPanel을 연결해주세요.");
+                return;
+            }
+            
+            Vector2 beforePosition = actionButtonPanel.anchoredPosition;
+            
             actionButtonsVisible = true;
             actionButtonPanel.gameObject.SetActive(true);
+            
+            // Debug.Log($"[GameBoard] ★ ActionButtonPanel 표시됨 ★ - 배치 가능: {canPlace}, 현재 위치: {beforePosition}");
 
             if (placeButton != null)
             {
@@ -476,11 +567,16 @@ namespace BlokusUnity.Game
             }
 
             PositionActionButtonsAtBlock();
+            
+            Vector2 afterPosition = actionButtonPanel.anchoredPosition;
+            // Debug.Log($"[GameBoard] ★ ActionButtonPanel 위치 업데이트 완료 ★ - {beforePosition} → {afterPosition}");
         }
 
         private void HideActionButtons()
         {
             if (actionButtonPanel == null) return;
+            
+            // Debug.Log("[GameBoard] ActionButtonPanel 숨김 처리");
             actionButtonsVisible = false;
             actionButtonPanel.gameObject.SetActive(false);
         }
@@ -504,7 +600,13 @@ namespace BlokusUnity.Game
 
         private void PositionActionButtonsAtBlock()
         {
-            if (!actionButtonsVisible || actionButtonPanel == null || pendingBlock == null) return;
+            if (!actionButtonsVisible || actionButtonPanel == null || pendingBlock == null)
+            {
+                Debug.LogWarning($"[GameBoard] ActionButtonPanel 위치 설정 실패 - actionButtonsVisible: {actionButtonsVisible}, actionButtonPanel: {actionButtonPanel != null}, pendingBlock: {pendingBlock != null}");
+                return;
+            }
+
+            // Debug.Log($"[GameBoard] ActionButtonPanel 위치 계산 시작 - 블록: {pendingBlock.Type}, 위치: ({pendingPosition.row}, {pendingPosition.col})");
 
             // 펜딩 블록 경계 계산
             var blockPositions = pendingBlock.GetAbsolutePositions(pendingPosition);
@@ -523,7 +625,7 @@ namespace BlokusUnity.Game
             }
             if (minRow == int.MaxValue) return;
 
-            // 블록 우측 상단 근처
+            // 블록의 가장 우측 상단 셀의 우측상단 가장자리 계산
             Vector3 targetWorldPos = BoardToWorld(new Position(minRow, maxCol));
 
             // Canvas 좌표로 변환/적용
@@ -539,8 +641,52 @@ namespace BlokusUnity.Game
                 Vector2 screenPos = uiCamera.WorldToScreenPoint(targetWorldPos);
                 if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screenPos, uiCamera, out var localPos))
                 {
-                    Vector2 buttonOffset = new Vector2(cellSize * 1.2f, -cellSize * 0.6f);
-                    buttonRect.anchoredPosition = localPos + buttonOffset;
+                    // 우측상단 가장자리에 패널이 위치하도록 오프셋 조정
+                    // X: 셀의 우측 가장자리 + 패널 너비의 절반
+                    // Y: 셀의 상단 가장자리 + 패널 높이의 절반
+                    Vector2 buttonOffset = new Vector2(
+                        cellSize * 0.5f + (buttonRect.sizeDelta.x * 0.5f) + 10f, // 10f는 여백
+                        cellSize * 0.5f + (buttonRect.sizeDelta.y * 0.5f) + 10f  // 10f는 여백
+                    );
+                    
+                    Vector2 currentPosition = buttonRect.anchoredPosition;
+                    Vector2 targetPosition = localPos + buttonOffset;
+                    
+                    // Debug.Log($"[GameBoard] ActionButtonPanel 위치 변경 - 현재: {currentPosition} → 목표: {targetPosition}");
+                    
+                    // 화면 경계 내에 패널이 위치하도록 보정
+                    Vector2 canvasSize = canvasRect.sizeDelta;
+                    Vector2 panelHalfSize = buttonRect.sizeDelta * 0.5f;
+                    
+                    // Debug.Log($"[GameBoard] 클램핑 계산 - Canvas크기: {canvasSize}, Panel크기: {buttonRect.sizeDelta}, Panel반크기: {panelHalfSize}");
+                    
+                    // 클램핑 범위가 너무 작으면 클램핑 없이 직접 사용
+                    Vector2 clampedPosition = targetPosition;
+                    
+                    // Canvas 크기가 유효한 경우에만 클램핑 적용
+                    if (canvasSize.x > 100 && canvasSize.y > 100) // 최소 크기 체크
+                    {
+                        float minX = -canvasSize.x * 0.5f + panelHalfSize.x;
+                        float maxX = canvasSize.x * 0.5f - panelHalfSize.x;
+                        float minY = -canvasSize.y * 0.5f + panelHalfSize.y;
+                        float maxY = canvasSize.y * 0.5f - panelHalfSize.y;
+                        
+                        // Debug.Log($"[GameBoard] 클램핑 범위 - X: {minX} ~ {maxX}, Y: {minY} ~ {maxY}");
+                        
+                        clampedPosition = new Vector2(
+                            Mathf.Clamp(targetPosition.x, minX, maxX),
+                            Mathf.Clamp(targetPosition.y, minY, maxY)
+                        );
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[GameBoard] Canvas 크기가 잘못됨, 클램핑 없이 직접 사용: {canvasSize}");
+                    }
+                    
+                    // 실제 위치 설정
+                    buttonRect.anchoredPosition = clampedPosition;
+                    
+                    // Debug.Log($"[GameBoard] ActionButtonPanel 위치 설정 완료 - 최종: {clampedPosition}, 클램핑 전: {targetPosition}");
                 }
             }
         }
