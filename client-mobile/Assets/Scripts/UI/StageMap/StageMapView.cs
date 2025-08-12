@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 using BlokusUnity.Game;
 using BlokusUnity.Data;
 
@@ -16,8 +17,8 @@ namespace BlokusUnity.UI
         [SerializeField] private Transform stageButtonParent;
         [SerializeField] private GameObject stageButtonPrefab;
         [SerializeField] private ScrollRect scrollRect;
-        [SerializeField] private Text progressText;
-        [SerializeField] private Text totalStarsText;
+        [SerializeField] private TextMeshProUGUI progressText;
+        [SerializeField] private TextMeshProUGUI totalStarsText;
         [SerializeField] private Button backButton;
 
         [Header("스테이지 설정")]
@@ -28,8 +29,10 @@ namespace BlokusUnity.UI
         private List<StageButton> stageButtons = new List<StageButton>();
         private StageProgressManager progressManager;
 
-        void Awake()
+        protected override void Awake()
         {
+            base.Awake();
+            
             // Back 버튼 이벤트 연결
             if (backButton != null)
             {
@@ -37,8 +40,10 @@ namespace BlokusUnity.UI
             }
         }
 
-        void Start()
+        protected override void Start()
         {
+            base.Start();
+            
             progressManager = StageProgressManager.Instance;
             if (progressManager != null)
             {

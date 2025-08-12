@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 using BlokusUnity.Game;
 
 namespace BlokusUnity.UI
@@ -12,8 +13,8 @@ namespace BlokusUnity.UI
     {
         [Header("UI 컴포넌트")]
         [SerializeField] private Button button;
-        [SerializeField] private Text stageNumberText;
-        [SerializeField] private Text starsText;
+        [SerializeField] private TextMeshProUGUI stageNumberText;
+        [SerializeField] private TextMeshProUGUI starsText;
         [SerializeField] private Image backgroundImage;
         [SerializeField] private Image lockIcon;
         [SerializeField] private Image[] starIcons; // 3개의 별 아이콘
@@ -40,15 +41,9 @@ void Awake()
     if (button == null) button = GetComponent<Button>();
     if (backgroundImage == null) backgroundImage = GetComponent<Image>();
 
-    // Text 또는 TMP_Text 자동 할당
+    // TextMeshProUGUI 자동 할당
     if (stageNumberText == null) {
-        stageNumberText = GetComponentInChildren<Text>();
-        if (stageNumberText == null) {
-            var tmp = GetComponentInChildren<TMPro.TMP_Text>();
-            if (tmp != null) {
-                // TMP만 있는 프리팹 지원: 필요시 래퍼 작성 or 별도 필드 추가
-            }
-        }
+        stageNumberText = GetComponentInChildren<TextMeshProUGUI>();
     }
 
     if (button != null) button.onClick.AddListener(OnButtonClicked);
