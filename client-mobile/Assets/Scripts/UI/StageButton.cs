@@ -14,12 +14,25 @@ namespace BlokusUnity.UI
         [Header("UI 컴포넌트")]
         [SerializeField] private Button button;
         [SerializeField] private TextMeshProUGUI stageNumberText;
-        [SerializeField] private TextMeshProUGUI starsText;
         [SerializeField] private Image backgroundImage;
         [SerializeField] private Image lockIcon;
-        [SerializeField] private Image[] starIcons; // 3개의 별 아이콘
+        [SerializeField] private Image[] starIcons; // 3개의 별 아이콘 (프리팹에서 할당)
         
-        [Header("상태별 색상")]
+        [Header("별 스프라이트")]
+        [SerializeField] private Sprite activeStar; // 활성화된 별 이미지
+        [SerializeField] private Sprite inactiveStar; // 비활성화된 별 이미지
+        
+        [Header("별 색상 설정 (Fallback)")]
+        [SerializeField] private Color activeStarColor = Color.yellow;
+        [SerializeField] private Color inactiveStarColor = Color.gray;
+        
+        [Header("상태별 스프라이트")]
+        [SerializeField] private Sprite unlockedSprite; // 해금 상태 이미지
+        [SerializeField] private Sprite lockedSprite; // 잠김 상태 이미지
+        [SerializeField] private Sprite completedSprite; // 완료 상태 이미지
+        [SerializeField] private Sprite perfectSprite; // 3별 완료 상태 이미지
+        
+        [Header("상태별 색상 (Fallback)")]
         [SerializeField] private Color unlockedColor = Color.white;
         [SerializeField] private Color completedColor = Color.green;
         [SerializeField] private Color lockedColor = Color.gray;
@@ -38,15 +51,35 @@ namespace BlokusUnity.UI
         
 void Awake()
 {
+    Debug.Log($"=== StageButton Awake: {gameObject.name} ===");
+    
     // Inspector에서 할당된 컴포넌트들을 사용
     // null 체크만 수행하고 자동 할당은 하지 않음
+    
+    // 컴포넌트 할당 상태 확인
+    Debug.Log($"Button: {button != null}");
+    Debug.Log($"StageNumberText: {stageNumberText != null}");
+    Debug.Log($"BackgroundImage: {backgroundImage != null}");
+    Debug.Log($"LockIcon: {lockIcon != null}");
+    
     if (button != null)
     {
         button.onClick.AddListener(OnButtonClicked);
+        Debug.Log("Button onClick 리스너 등록 완료");
     }
     else
     {
-        Debug.LogWarning($"StageButton {gameObject.name}: Button 컴포넌트가 할당되지 않았습니다!");
+        Debug.LogError($"StageButton {gameObject.name}: Button 컴포넌트가 할당되지 않았습니다!");
+    }
+    
+    // stageNumberText 기본값 설정 (초기 표시용)
+    if (stageNumberText != null)
+    {
+        if (stageNumberText.text == "New Text" || string.IsNullOrEmpty(stageNumberText.text))
+        {
+            stageNumberText.text = "?";
+            Debug.Log("stageNumberText 기본값 설정: ?");
+        }
     }
 }
 
@@ -58,21 +91,28 @@ void Awake()
         /// <param name="clickCallback">클릭시 호출될 콜백</param>
         public void Initialize(int stageNum, System.Action<int> clickCallback)
         {
+            Debug.Log($"=== StageButton Initialize: 스테이지 {stageNum} ===");
+            
             stageNumber = stageNum;
             onClickCallback = clickCallback;
             
             // 스테이지 번호 표시 (null 체크)
             if (stageNumberText != null)
             {
-                stageNumberText.text = stageNumber.ToString();
+                string newText = stageNumber.ToString();
+                stageNumberText.text = newText;
+                Debug.Log($"스테이지 번호 설정: {newText}");
+                Debug.Log($"설정 후 텍스트 확인: '{stageNumberText.text}'");
             }
             else
             {
-                Debug.LogWarning($"StageButton {stageNumber}: stageNumberText가 할당되지 않았습니다!");
+                Debug.LogError($"StageButton {stageNumber}: stageNumberText가 할당되지 않았습니다!");
             }
             
             // 초기 상태: 잠김
             UpdateState(false, null);
+            
+            Debug.Log($"Initialize 완료: 스테이지 {stageNumber}");
         }
         
         /// <summary>
@@ -92,8 +132,8 @@ void Awake()
                 button.interactable = isUnlocked;
             }
             
-            // 배경색 변경
-            UpdateBackgroundColor();
+            // 배경 이미지 변경
+            UpdateBackgroundImage();
             
             // 별 아이콘 업데이트
             UpdateStarIcons();
@@ -106,9 +146,9 @@ void Awake()
         }
         
         /// <summary>
-        /// 배경색 업데이트
+        /// 배경 이미지 업데이트 (스프라이트 우선, 색상 폴백)
         /// </summary>
-        private void UpdateBackgroundColor()
+        private void UpdateBackgroundImage()
         {
             if (backgroundImage == null) 
             {
@@ -116,56 +156,123 @@ void Awake()
                 return;
             }
             
-            Color targetColor;
+            Sprite targetSprite = null;
+            Color targetColor = Color.white;
             
+            // 상태에 따른 스프라이트 선택
             if (!isUnlocked)
             {
+                targetSprite = lockedSprite;
                 targetColor = lockedColor;
             }
             else if (isCompleted)
             {
-                targetColor = starsEarned >= 3 ? perfectColor : completedColor;
+                if (starsEarned >= 3)
+                {
+                    targetSprite = perfectSprite;
+                    targetColor = perfectColor;
+                }
+                else
+                {
+                    targetSprite = completedSprite;
+                    targetColor = completedColor;
+                }
             }
             else
             {
+                targetSprite = unlockedSprite;
                 targetColor = unlockedColor;
             }
             
-            backgroundImage.color = targetColor;
+            // 스프라이트가 있으면 스프라이트 사용, 없으면 색상만 변경
+            if (targetSprite != null)
+            {
+                backgroundImage.sprite = targetSprite;
+                backgroundImage.color = Color.white; // 스프라이트 사용시 색상 취소
+                Debug.Log($"스테이지 {stageNumber}: 스프라이트 설정 - {targetSprite.name}");
+            }
+            else
+            {
+                // 스프라이트가 없으면 색상만 변경 (Fallback)
+                backgroundImage.color = targetColor;
+                Debug.Log($"스테이지 {stageNumber}: 색상 설정 - {targetColor}");
+            }
         }
         
         /// <summary>
-        /// 별 아이콘들 업데이트
+        /// 별 아이콘들 업데이트 (스프라이트 우선, 색상 폴백)
         /// </summary>
         private void UpdateStarIcons()
         {
-            if (starIcons == null || starIcons.Length == 0) return;
+            if (starIcons == null || starIcons.Length == 0) 
+            {
+                Debug.Log($"스테이지 {stageNumber}: starIcons 배열이 비어있습니다.");
+                return;
+            }
+            
+            Debug.Log($"스테이지 {stageNumber}: 별 아이콘 업데이트 - 획득한 별: {starsEarned}/{starIcons.Length}");
             
             for (int i = 0; i < starIcons.Length; i++)
             {
                 if (starIcons[i] != null)
                 {
-                    // 획득한 별 개수만큼 활성화
-                    bool shouldShow = isCompleted && (i < starsEarned);
-                    starIcons[i].gameObject.SetActive(shouldShow);
+                    // 모든 별 아이콘을 표시 (활성화/비활성화 상태로)
+                    starIcons[i].gameObject.SetActive(true);
                     
-                    // 별 색상 조정 (선택사항)
-                    if (shouldShow)
+                    // 획득한 별 개수에 따른 스프라이트 및 색상 설정
+                    bool shouldActivate = isCompleted && (i < starsEarned);
+                    
+                    if (shouldActivate)
                     {
-                        starIcons[i].color = Color.yellow;
+                        // 활성화된 별
+                        if (activeStar != null)
+                        {
+                            starIcons[i].sprite = activeStar;
+                            starIcons[i].color = Color.white; // 스프라이트 사용시 색상 취소
+                        }
+                        else
+                        {
+                            // 스프라이트가 없으면 색상만 변경
+                            starIcons[i].color = activeStarColor;
+                        }
+                        Debug.Log($"별 {i+1}: 활성화됨");
                     }
+                    else
+                    {
+                        // 비활성화된 별
+                        if (inactiveStar != null)
+                        {
+                            starIcons[i].sprite = inactiveStar;
+                            starIcons[i].color = Color.white; // 스프라이트 사용시 색상 취소
+                        }
+                        else
+                        {
+                            // 스프라이트가 없으면 색상만 변경
+                            starIcons[i].color = inactiveStarColor;
+                        }
+                        Debug.Log($"별 {i+1}: 비활성화됨");
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning($"스테이지 {stageNumber}: starIcons[{i}]가 null입니다!");
                 }
             }
         }
         
         /// <summary>
-        /// 잠금 아이콘 업데이트
+        /// 잠금 아이콘 업데이트 (선택적 사용)
         /// </summary>
         private void UpdateLockIcon()
         {
             if (lockIcon != null)
             {
                 lockIcon.gameObject.SetActive(!isUnlocked);
+                Debug.Log($"스테이지 {stageNumber}: 잠금 아이콘 {(!isUnlocked ? "표시" : "숨김")}");
+            }
+            else
+            {
+                Debug.Log($"스테이지 {stageNumber}: lockIcon이 할당되지 않음 (상태별 스프라이트를 사용하세요)");
             }
         }
         
@@ -174,27 +281,11 @@ void Awake()
         /// </summary>
         private void UpdateTexts(UserStageProgress progress)
         {
-            // 별 개수 텍스트 (별도 Text 컴포넌트가 있는 경우)
-            if (starsText != null)
-            {
-                if (isCompleted)
-                {
-                    starsText.text = $"{starsEarned}/3 ★";
-                }
-                else if (isUnlocked)
-                {
-                    starsText.text = ""; // 빈 텍스트
-                }
-                else
-                {
-                    starsText.text = "🔒"; // 잠금 이모지
-                }
-            }
-            
             // 스테이지 번호 텍스트 색상 조정
             if (stageNumberText != null)
             {
                 stageNumberText.color = isUnlocked ? Color.black : Color.white;
+                Debug.Log($"스테이지 {stageNumber}: 텍스트 색상 설정 - {(isUnlocked ? "Black (Unlocked)" : "White (Locked)")}");
             }
         }
         
