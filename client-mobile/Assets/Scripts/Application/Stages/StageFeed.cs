@@ -1,29 +1,25 @@
 using System.Collections.Generic;
 using UnityEngine;
+using BlokusUnity.Common;
 
 namespace BlokusUnity.Application.Stages
 {
     /// <summary>
-    /// 캔디크러시 사가 스타일의 뱀 모양 스테이지 경로 생성기
-    /// 지그재그 패턴으로 스테이지들을 배치하고 경로를 관리
+    /// 캔디크러시 사가 스타일의 곡선 스테이지 경로 생성기
+    /// 한 줄에 하나씩 스테이지를 배치하고 베지어 곡선으로 연결
     /// </summary>
     public class StageFeed : MonoBehaviour
     {
         [Header("레이아웃 설정")]
-        [SerializeField] private int stagesPerRow = 5;
-        [SerializeField] private float stageSpacing = 120f;
-        [SerializeField] private float rowSpacing = 150f;
+        [SerializeField] private float stageVerticalSpacing = 180f; // 간격 더 넓게
+        [SerializeField] private float maxHorizontalOffset = 300f; // 좌우 범위도 더 넓게
         [SerializeField] private int totalStages = 100;
+        [SerializeField] private AnimationCurve horizontalPattern; // 에디터에서 패턴 조정 가능
         
-        [Header("경로 설정")]
-        [SerializeField] private bool drawConnectionLines = true;
-        [SerializeField] private LineRenderer connectionLinePrefab;
-        [SerializeField] private Transform connectionLinesParent;
         
         // 캐시된 경로 데이터
         private Dictionary<int, Vector2> stagePositions = new Dictionary<int, Vector2>();
         private List<Vector2> pathPoints = new List<Vector2>();
-        private List<LineRenderer> connectionLines = new List<LineRenderer>();
         
         // 이벤트
         public System.Action OnPathGenerated;
@@ -38,8 +34,6 @@ namespace BlokusUnity.Application.Stages
         /// </summary>
         public void GeneratePath()
         {
-            ClearPath();
-            
             stagePositions.Clear();
             pathPoints.Clear();
             
@@ -51,108 +45,55 @@ namespace BlokusUnity.Application.Stages
                 pathPoints.Add(position);
             }
             
-            // 연결선 생성
-            if (drawConnectionLines && connectionLinePrefab != null)
-            {
-                CreateConnectionLines();
-            }
-            
             OnPathGenerated?.Invoke();
             
-            Debug.Log($"스테이지 경로 생성 완료: {totalStages}개 스테이지");
         }
         
         /// <summary>
-        /// 특정 스테이지의 월드 좌표 계산
+        /// 특정 스테이지의 월드 좌표 계산 (캔디크러시 사가 스타일)
         /// </summary>
         private Vector2 CalculateStagePosition(int stageNumber)
         {
-            // 0-based 인덱스로 변환
-            int index = stageNumber - 1;
+            // Y 좌표: 한 줄에 하나씩, 위에서 아래로
+            float y = -(stageNumber - 1) * stageVerticalSpacing;
             
-            // 몇 번째 행인지 계산
-            int rowIndex = index / stagesPerRow;
-            
-            // 행 내에서의 위치 계산
-            int posInRow = index % stagesPerRow;
-            
-            // 짝수 행은 왼쪽→오른쪽, 홀수 행은 오른쪽→왼쪽
-            bool isEvenRow = (rowIndex % 2 == 0);
-            
-            float x, y;
-            
-            if (isEvenRow)
-            {
-                // 왼쪽에서 오른쪽으로 (0, 1, 2, 3, 4)
-                x = posInRow * stageSpacing;
-            }
-            else
-            {
-                // 오른쪽에서 왼쪽으로 (4, 3, 2, 1, 0)
-                x = (stagesPerRow - 1 - posInRow) * stageSpacing;
-            }
-            
-            // Y 좌표는 위에서 아래로 (음수 방향)
-            y = -rowIndex * rowSpacing;
+            // X 좌표: 곡선 경로 패턴
+            float x = CalculateXPosition(stageNumber);
             
             return new Vector2(x, y);
         }
         
         /// <summary>
-        /// 스테이지 간 연결선 생성
+        /// X 위치 계산 - 캔디크러시 사가 스타일 곡선 패턴
         /// </summary>
-        private void CreateConnectionLines()
+        private float CalculateXPosition(int stageNumber)
         {
-            if (connectionLinesParent == null)
+            // Animation Curve가 설정되어 있으면 사용
+            if (horizontalPattern != null && horizontalPattern.length > 0)
             {
-                connectionLinesParent = transform;
+                float curveInput = (stageNumber - 1) / 100f; // 0~1 범위로 정규화
+                return horizontalPattern.Evaluate(curveInput) * maxHorizontalOffset;
             }
             
-            for (int stage = 1; stage < totalStages; stage++)
+            // 기본 패턴: 사인파 + 무작위성
+            float normalizedStage = (stageNumber - 1) / 10f; // 주기 조정
+            
+            // 기본 사인파 패턴
+            float sinePattern = Mathf.Sin(normalizedStage * 0.8f) * maxHorizontalOffset * 0.7f;
+            
+            // 약간의 무작위성 추가 (시드 기반으로 일관성 유지)
+            System.Random random = new System.Random(stageNumber * 1337);
+            float randomOffset = ((float)random.NextDouble() - 0.5f) * maxHorizontalOffset * 0.5f;
+            
+            // 가끔 큰 변화 주기
+            if (stageNumber % 7 == 0)
             {
-                if (stagePositions.ContainsKey(stage) && stagePositions.ContainsKey(stage + 1))
-                {
-                    CreateConnectionLine(stagePositions[stage], stagePositions[stage + 1]);
-                }
+                randomOffset *= 1.5f;
             }
+            
+            return sinePattern + randomOffset;
         }
         
-        /// <summary>
-        /// 개별 연결선 생성
-        /// </summary>
-        private void CreateConnectionLine(Vector2 from, Vector2 to)
-        {
-            if (connectionLinePrefab == null) return;
-            
-            GameObject lineObj = Instantiate(connectionLinePrefab.gameObject, connectionLinesParent);
-            LineRenderer line = lineObj.GetComponent<LineRenderer>();
-            
-            if (line != null)
-            {
-                line.positionCount = 2;
-                line.useWorldSpace = false;
-                line.SetPosition(0, new Vector3(from.x, from.y, 0));
-                line.SetPosition(1, new Vector3(to.x, to.y, 0));
-                
-                connectionLines.Add(line);
-            }
-        }
-        
-        /// <summary>
-        /// 기존 경로 데이터 정리
-        /// </summary>
-        private void ClearPath()
-        {
-            // 기존 연결선들 제거
-            foreach (var line in connectionLines)
-            {
-                if (line != null)
-                {
-                    DestroyImmediate(line.gameObject);
-                }
-            }
-            connectionLines.Clear();
-        }
         
         // ========================================
         // Public API
@@ -197,13 +138,13 @@ namespace BlokusUnity.Application.Stages
         }
         
         /// <summary>
-        /// 특정 스테이지가 속한 행 계산
+        /// 특정 스테이지가 속한 행 계산 (캔디크러시 스타일에서는 스테이지 번호와 동일)
         /// </summary>
         public int GetStageRow(int stageNumber)
         {
             if (!IsValidStage(stageNumber)) return -1;
             
-            return (stageNumber - 1) / stagesPerRow;
+            return stageNumber; // 한 줄에 하나씩
         }
         
         /// <summary>
@@ -211,8 +152,7 @@ namespace BlokusUnity.Application.Stages
         /// </summary>
         public float GetTotalHeight()
         {
-            int totalRows = Mathf.CeilToInt((float)totalStages / stagesPerRow);
-            return (totalRows - 1) * rowSpacing + 100f; // 여유 공간 추가
+            return (totalStages - 1) * stageVerticalSpacing + 200f; // 여유 공간 추가
         }
         
         /// <summary>
@@ -220,7 +160,7 @@ namespace BlokusUnity.Application.Stages
         /// </summary>
         public float GetTotalWidth()
         {
-            return (stagesPerRow - 1) * stageSpacing + 100f; // 여유 공간 추가
+            return maxHorizontalOffset * 2f + 200f; // 좌우 최대 범위 + 여유 공간
         }
         
         // ========================================

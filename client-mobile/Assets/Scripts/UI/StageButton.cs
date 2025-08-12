@@ -47,7 +47,36 @@ void Awake()
     }
 
     if (button != null) button.onClick.AddListener(OnButtonClicked);
+    
+    // 스테이지 번호 텍스트를 버튼 아래쪽으로 이동
+    PositionStageNumberBelow();
 }
+
+        /// <summary>
+        /// 스테이지 번호 텍스트를 버튼 아래쪽으로 위치 조정
+        /// </summary>
+        private void PositionStageNumberBelow()
+        {
+            if (stageNumberText == null) return;
+            
+            RectTransform textRect = stageNumberText.GetComponent<RectTransform>();
+            if (textRect == null) return;
+            
+            // 버튼의 RectTransform 가져오기
+            RectTransform buttonRect = GetComponent<RectTransform>();
+            if (buttonRect == null) return;
+            
+            // 스테이지 번호 텍스트를 버튼 아래쪽으로 위치 조정
+            textRect.anchorMin = new Vector2(0.5f, 0f);  // 하단 중앙
+            textRect.anchorMax = new Vector2(0.5f, 0f);  // 하단 중앙
+            textRect.pivot = new Vector2(0.5f, 1f);      // 텍스트의 상단을 기준점으로
+            textRect.anchoredPosition = new Vector2(0f, -10f); // 버튼 아래 10px
+            
+            // 텍스트 정렬을 중앙으로 설정
+            stageNumberText.alignment = TMPro.TextAlignmentOptions.Center;
+            
+            Debug.Log($"스테이지 번호 텍스트 위치 조정: {stageNumberText.name}");
+        }
         
         /// <summary>
         /// 스테이지 버튼 초기화
@@ -169,7 +198,7 @@ void Awake()
             {
                 if (isCompleted)
                 {
-                    starsText.text = $"{starsEarned}/3 ⭐";
+                    starsText.text = $"{starsEarned}/3 ★";
                 }
                 else if (isUnlocked)
                 {

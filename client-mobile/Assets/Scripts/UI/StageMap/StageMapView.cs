@@ -134,7 +134,7 @@ namespace BlokusUnity.UI
             {
                 int earnedStars = progressManager.GetTotalStarsEarned();
                 int maxStars = totalStages * 3; // 총 가능한 별 개수
-                totalStarsText.text = $"별: {earnedStars}/{maxStars} ⭐";
+                totalStarsText.text = $"별: {earnedStars}/{maxStars} ★";
             }
 
             // 각 스테이지 버튼 상태 업데이트

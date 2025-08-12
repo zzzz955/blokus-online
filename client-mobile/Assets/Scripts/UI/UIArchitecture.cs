@@ -204,17 +204,34 @@ public abstract class BaseUIPanel : MonoBehaviour
     {
         if (isAnimating) return;
 
+        Debug.Log($"=== BaseUIPanel Show 시작: {gameObject.name} ===");
+        Debug.Log($"CanvasGroup null? {canvasGroup == null}");
+        Debug.Log($"Animated: {animated}");
+
         gameObject.SetActive(true);
 
         if (animated)
         {
+            Debug.Log("애니메이션 모드로 FadeIn 시작");
             StartCoroutine(FadeIn());
         }
         else
         {
-            canvasGroup.alpha = 1f;
-            canvasGroup.interactable = true;
+            Debug.Log("즉시 표시 모드");
+            if (canvasGroup != null)
+            {
+                canvasGroup.alpha = 1f;
+                canvasGroup.interactable = true;
+                canvasGroup.blocksRaycasts = true;
+                Debug.Log($"CanvasGroup 설정 완료: Alpha={canvasGroup.alpha}, Interactable={canvasGroup.interactable}");
+            }
+            else
+            {
+                Debug.LogWarning($"{gameObject.name}에 CanvasGroup이 없습니다!");
+            }
         }
+        
+        Debug.Log($"GameObject Active: {gameObject.activeInHierarchy}");
     }
 
     /// <summary>
@@ -230,8 +247,11 @@ public abstract class BaseUIPanel : MonoBehaviour
         }
         else
         {
-            canvasGroup.alpha = 0f;
-            canvasGroup.interactable = false;
+            if (canvasGroup != null)
+            {
+                canvasGroup.alpha = 0f;
+                canvasGroup.interactable = false;
+            }
             gameObject.SetActive(false);
         }
     }
