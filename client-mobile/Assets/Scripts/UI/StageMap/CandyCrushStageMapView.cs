@@ -574,8 +574,9 @@ namespace BlokusUnity.UI
                     };
                 }
                 
+                Debug.Log($"[DEBUG] ShowStageInfo 호출 직전: stageNumber={stageNumber}");
                 stageInfoModal.ShowStageInfo(stageData, userProgress);
-                Debug.Log($"스테이지 {stageNumber} 정보 모달 표시");
+                Debug.Log($"[DEBUG] ShowStageInfo 호출 완료");
             }
             else
             {
@@ -614,10 +615,14 @@ namespace BlokusUnity.UI
         /// </summary>
         private StageData CreateTestStageData(int stageNumber)
         {
+            Debug.Log($"[DEBUG] CreateTestStageData 호출됨: stageNumber={stageNumber}");
+            
             var stageData = ScriptableObject.CreateInstance<StageData>();
             stageData.stageNumber = stageNumber;
             stageData.stageName = $"테스트 스테이지 {stageNumber}";
             stageData.stageDescription = $"이것은 테스트용 스테이지 {stageNumber}번입니다. 블록을 배치하여 목표 점수를 달성해보세요!";
+            
+            Debug.Log($"[DEBUG] StageData 생성됨: stageNumber={stageData.stageNumber}, stageName={stageData.stageName}");
             stageData.difficulty = Mathf.Max(1, Mathf.CeilToInt(stageNumber / 10f));
             
             // 별점 시스템 설정

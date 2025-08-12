@@ -80,8 +80,8 @@ namespace BlokusUnity.UI
                 playButton.onClick.AddListener(OnPlayButtonClicked);
             }
             
-            // 초기 상태로 숨김
-            HideModal();
+            // 초기 상태로 숨김 (Awake에서는 데이터 초기화하지 않음)
+            // gameObject.SetActive(false)는 Awake에서 호출하면 위험하므로 생략
         }
         
         void OnDestroy()
@@ -92,19 +92,14 @@ namespace BlokusUnity.UI
             }
         }
         
-        /// <summary>
-        /// 스테이지 정보 모달 표시
-        /// </summary>
-        public void ShowStageInfo(StageData stageData, StageProgress progress)
-        {
-            ShowStageInfoInternal(stageData, progress);
-        }
         
         /// <summary>
         /// 스테이지 정보 모달 표시 (UserStageProgress 오버로드)
         /// </summary>
         public void ShowStageInfo(StageData stageData, UserStageProgress userProgress)
         {
+            Debug.Log($"[DEBUG] ShowStageInfo 호출됨: stageData={stageData?.stageNumber}, userProgress={userProgress?.stageNumber}");
+            
             if (stageData == null)
             {
                 Debug.LogError("표시할 스테이지 데이터가 없습니다!");
@@ -113,6 +108,8 @@ namespace BlokusUnity.UI
             
             currentStageData = stageData;
             currentStageNumber = stageData.stageNumber;
+            
+            Debug.Log($"[DEBUG] currentStageNumber 설정됨: {currentStageNumber}");
             
             // UserStageProgress를 StageProgress로 변환
             if (userProgress != null)
@@ -132,32 +129,13 @@ namespace BlokusUnity.UI
             // UI 업데이트
             UpdateModalUI();
             
-            // 모달 표시 - 전체 GameObject 활성화
-            gameObject.SetActive(true);
-            
+            // 로그 먼저 출력 (gameObject.SetActive 전에)
             Debug.Log($"스테이지 {currentStageNumber} 정보 모달 표시");
+            
+            // 모달 표시 - 전체 GameObject 활성화 (마지막에)
+            gameObject.SetActive(true);
         }
         
-        private void ShowStageInfoInternal(StageData stageData, StageProgress progress)
-        {
-            if (stageData == null)
-            {
-                Debug.LogError("표시할 스테이지 데이터가 없습니다!");
-                return;
-            }
-            
-            currentStageData = stageData;
-            currentProgress = progress;
-            currentStageNumber = stageData.stageNumber;
-            
-            // UI 업데이트
-            UpdateModalUI();
-            
-            // 모달 표시 - 전체 GameObject 활성화
-            gameObject.SetActive(true);
-            
-            // 중복 로그 제거 (상위 메서드에서 이미 출력됨)
-        }
         
         /// <summary>
         /// 모달 UI 업데이트
