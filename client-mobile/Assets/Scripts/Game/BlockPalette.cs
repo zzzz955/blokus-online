@@ -23,6 +23,7 @@ namespace BlokusUnity.Game
 
         private BlockType? _selectedType;
         private Block _selectedBlock;
+        private BlockButton _currentSelectedButton; // 현재 선택된 버튼 참조
 
         private void Awake()
         {
@@ -97,10 +98,17 @@ namespace BlokusUnity.Game
                     LayoutRebuilder.ForceRebuildLayoutImmediate(blockContainer);
             }
 
+            // 선택된 블록이 사용된 경우 선택 상태 해제
             if (_selectedType.HasValue && _selectedType.Value.Equals(type))
             {
+                if (_currentSelectedButton != null)
+                {
+                    _currentSelectedButton.SetSelected(false);
+                    _currentSelectedButton = null;
+                }
                 _selectedType = null;
                 _selectedBlock = null;
+                Debug.Log($"[BlockPalette] 블록 {type} 사용됨 - 선택 상태 해제");
             }
         }
 
@@ -114,6 +122,14 @@ namespace BlokusUnity.Game
                 // 이미 딕셔너리에 있으면 비활성 → 활성만 처리하는 로직이 있다면 여기서 살리면 됨.
                 var btn = _buttons[type];
                 btn.gameObject.SetActive(true);
+                
+                // 복원된 블록이 이전에 선택된 상태였다면 선택 상태 유지
+                if (_selectedType.HasValue && _selectedType.Value.Equals(type))
+                {
+                    btn.SetSelected(true);
+                    _currentSelectedButton = btn;
+                    Debug.Log($"[BlockPalette] 복원된 블록 {type} 선택 상태 유지 (딕셔너리 존재)");
+                }
                 return;
             }
 
@@ -157,6 +173,14 @@ namespace BlokusUnity.Game
 
             _buttons[type] = blockButton;
 
+            // 복원된 블록이 이전에 선택된 상태였다면 선택 상태 유지
+            if (_selectedType.HasValue && _selectedType.Value.Equals(type))
+            {
+                blockButton.SetSelected(true);
+                _currentSelectedButton = blockButton;
+                Debug.Log($"[BlockPalette] 복원된 블록 {type} 선택 상태 유지");
+            }
+
             LayoutRebuilder.ForceRebuildLayoutImmediate(blockContainer);
             Debug.Log($"[BlockPalette] 블록 복원됨: {type} (index={insertIndex})");
         }
@@ -168,9 +192,24 @@ namespace BlokusUnity.Game
 
         public void OnBlockButtonClicked(BlockType blockType)
         {
+            // 이전 선택 블록 해제
+            if (_currentSelectedButton != null)
+            {
+                _currentSelectedButton.SetSelected(false);
+            }
+            
+            // 새로운 블록 선택
             _selectedType = blockType;
             _selectedBlock = new Block(blockType, _player);
-            // Debug.Log($"[BlockPalette] Select: {blockType}");
+            
+            // 선택된 버튼에 시각적 피드백 적용
+            if (_buttons.TryGetValue(blockType, out var selectedButton))
+            {
+                selectedButton.SetSelected(true);
+                _currentSelectedButton = selectedButton;
+            }
+            
+            Debug.Log($"[BlockPalette] 블록 선택: {blockType} - 연한 레몬색 배경 표시");
             OnBlockSelected?.Invoke(_selectedBlock);
         }
 
@@ -179,6 +218,7 @@ namespace BlokusUnity.Game
             if (_selectedBlock == null) return;
             if (clockwise) _selectedBlock.RotateClockwise();
             else _selectedBlock.RotateCounterClockwise();
+            Debug.Log($"[BlockPalette] 선택된 블록 {_selectedType} 회전 - {(clockwise ? "시계방향" : "반시계방향")}");
             OnBlockSelected?.Invoke(_selectedBlock);
         }
 
@@ -187,11 +227,19 @@ namespace BlokusUnity.Game
             if (_selectedBlock == null) return;
             if (vertical) _selectedBlock.FlipVertical();
             else _selectedBlock.FlipHorizontal();
+            Debug.Log($"[BlockPalette] 선택된 블록 {_selectedType} 플립 - {(vertical ? "수직" : "수평")}");
             OnBlockSelected?.Invoke(_selectedBlock);
         }
 
         private void Clear()
         {
+            // 선택 상태 초기화
+            if (_currentSelectedButton != null)
+            {
+                _currentSelectedButton.SetSelected(false);
+                _currentSelectedButton = null;
+            }
+            
             _buttons.Clear();
             _selectedType = null;
             _selectedBlock = null;

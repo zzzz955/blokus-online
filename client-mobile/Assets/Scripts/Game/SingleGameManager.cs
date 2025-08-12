@@ -237,7 +237,7 @@ namespace BlokusUnity.Game
 
                 if (gameBoard != null)
                 {
-                    Debug.Log("[SingleGameManager] GameBoard.SetTouchPreview 호출");
+                    // Debug.Log("[SingleGameManager] GameBoard.SetTouchPreview 호출");
                     gameBoard.SetTouchPreview(_currentSelectedBlock, pos);
                 }
                 else
@@ -341,10 +341,9 @@ namespace BlokusUnity.Game
         {
             Debug.Log($"[SingleGame] Undo 보드 재구성 시작 - placements 개수: {placements.Count}");
             
-            // 로직/보드 리셋
+            // 로직 리셋 (UI 업데이트 없이)
             logic = new BlokusUnity.Common.GameLogic();
-            gameBoard.SetGameLogic(logic);          // RefreshBoard() 호출됨
-            gameBoard.ClearBoardOnly();             // RefreshBoard() 호출됨
+            gameBoard.SetGameLogic(logic);
 
             // 히스토리 재적용 (보드 상태만)
             foreach (var p in placements)
@@ -352,7 +351,8 @@ namespace BlokusUnity.Game
                 logic.PlaceBlock(p);
             }
 
-            // RefreshBoard() 제거 - 이미 SetGameLogic()과 ClearBoardOnly()에서 호출됨
+            // ★ 블록 재적용 후 UI 업데이트 필수
+            gameBoard.RefreshBoard();
             Debug.Log("[SingleGame] Undo 보드 재구성 완료");
         }
 

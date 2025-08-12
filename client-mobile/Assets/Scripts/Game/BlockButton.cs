@@ -30,6 +30,11 @@ namespace BlokusUnity.Game
         private Button _btn;
         private Image _img;
         private BlockPalette _owner;
+        
+        // 선택 상태 표시를 위한 필드들
+        private bool _isSelected = false;
+        private Color _originalBackgroundColor;
+        private readonly Color _selectedColor = new Color(1f, 1f, 0.7f, 0.8f); // 연한 레몬색 (투명도 80%)
 
         // 1x1 white sprite (UI Image는 Source Sprite가 있어야 색이 보임)
         private static Sprite sWhiteSprite;
@@ -109,7 +114,8 @@ namespace BlokusUnity.Game
                 _img.type = Image.Type.Simple;
                 _img.preserveAspect = true;
                 _img.raycastTarget = true;
-                _img.color = new Color(1, 1, 1, 0); // 투명(시각화는 자식에 그림)
+                _originalBackgroundColor = new Color(1, 1, 1, 0); // 투명 배경 색상 저장
+                _img.color = _originalBackgroundColor;
             }
 
             // 라벨 표시 여부
@@ -316,9 +322,33 @@ namespace BlokusUnity.Game
         public void SetInteractable(bool on)
         {
             if (_btn != null) _btn.interactable = on;
-            if (_img != null)
+            if (_img != null && !_isSelected) // 선택 상태가 아닐 때만 투명도 조절
             {
-                var c = _img.color; c.a = on ? 1f : 0.45f; _img.color = c;
+                var c = _img.color; c.a = on ? (_originalBackgroundColor.a) : 0.45f; _img.color = c;
+            }
+        }
+        
+        /// <summary>
+        /// 블록 선택 상태를 설정합니다.
+        /// </summary>
+        /// <param name="selected">선택 상태 여부</param>
+        public void SetSelected(bool selected)
+        {
+            if (_img == null) return;
+            
+            _isSelected = selected;
+            
+            if (selected)
+            {
+                // 선택 상태: 연한 레몬색 배경
+                _img.color = _selectedColor;
+                Debug.Log($"[BlockButton] 블록 {Type} 선택됨 - 배경색: {_selectedColor}");
+            }
+            else
+            {
+                // 선택 해제: 원래 투명 배경으로 복원
+                _img.color = _originalBackgroundColor;
+                Debug.Log($"[BlockButton] 블록 {Type} 선택 해제됨 - 배경색: {_originalBackgroundColor}");
             }
         }
 

@@ -445,7 +445,7 @@ namespace BlokusUnity.Game
         // 터치 경로(미리보기 + 확정 버튼)
         public void SetTouchPreview(Block block, Position position)
         {
-            Debug.Log($"[GameBoard] SetTouchPreview 호출됨 - Block: {block?.Type}, Position: ({position.row}, {position.col})");
+            // Debug.Log($"[GameBoard] SetTouchPreview 호출됨 - Block: {block?.Type}, Position: ({position.row}, {position.col})");
             
             if (block == null || !ValidationUtility.IsValidPosition(position))
             {
