@@ -524,7 +524,7 @@ namespace BlokusUnity.UI
                 return;
             }
             
-            // StageInfoModal 재확인 (OnEnable에서 찾았지만 혹시 모르니 재시도)
+            // StageInfoModal 재확인
             if (stageInfoModal == null)
             {
                 Debug.LogWarning("StageInfoModal이 없습니다. 다시 찾아보겠습니다...");
@@ -532,63 +532,47 @@ namespace BlokusUnity.UI
                 
                 if (stageInfoModal == null)
                 {
-                    Debug.LogError("StageInfoModal을 찾을 수 없어서 테스트 로그만 출력합니다.");
-                    // 기존 테스트 로그 출력 (fallback)
-                    var testStageData = GetStageData(stageNumber);
-                    Debug.Log($"[FALLBACK] 스테이지 {stageNumber} 정보:");
-                    Debug.Log($"- 이름: {testStageData.stageName}");
-                    Debug.Log($"- 설명: {testStageData.stageDescription}");
-                    Debug.Log($"- 난이도: {testStageData.difficulty}");
-                    Debug.Log($"- 목표 점수: ★{testStageData.oneStar} ★★{testStageData.twoStar} ★★★{testStageData.threeStar}");
+                    Debug.LogError("StageInfoModal을 찾을 수 없습니다!");
                     return;
                 }
             }
             
             // 스테이지 정보 모달 표시
-            if (stageInfoModal != null)
+            var stageData = GetStageData(stageNumber);
+            if (stageData == null)
             {
-                var stageData = GetStageData(stageNumber);
-                var progress = progressManager?.GetCachedStageProgress(stageNumber);
-                
-                // StageProgress를 UserStageProgress로 변환
-                UserStageProgress userProgress = null;
-                if (progress != null)
+                Debug.LogError($"스테이지 {stageNumber} 데이터를 로드할 수 없습니다!");
+                return;
+            }
+            
+            var progress = progressManager?.GetCachedStageProgress(stageNumber);
+            
+            // StageProgress를 UserStageProgress로 변환
+            UserStageProgress userProgress = null;
+            if (progress != null)
+            {
+                userProgress = new UserStageProgress
                 {
-                    userProgress = new UserStageProgress
-                    {
-                        stageNumber = stageNumber,
-                        isCompleted = progress.isCompleted,
-                        bestScore = progress.bestScore,
-                        starsEarned = CalculateStarsEarned(progress.bestScore, stageData) // 별점 계산 추가
-                    };
-                }
-                else
-                {
-                    // 진행도가 없는 경우 기본값
-                    userProgress = new UserStageProgress
-                    {
-                        stageNumber = stageNumber,
-                        isCompleted = false,
-                        bestScore = 0,
-                        starsEarned = 0
-                    };
-                }
-                
-                Debug.Log($"[DEBUG] ShowStageInfo 호출 직전: stageNumber={stageNumber}");
-                stageInfoModal.ShowStageInfo(stageData, userProgress);
-                Debug.Log($"[DEBUG] ShowStageInfo 호출 완료");
+                    stageNumber = stageNumber,
+                    isCompleted = progress.isCompleted,
+                    bestScore = progress.bestScore,
+                    starsEarned = CalculateStarsEarned(progress.bestScore, stageData)
+                };
             }
             else
             {
-                // 모달이 없으면 경고 로그 후 테스트용으로 로그만 출력
-                Debug.LogWarning($"StageInfoModal을 찾을 수 없습니다. 스테이지 {stageNumber} 정보:");
-                var testStageData = GetStageData(stageNumber);
-                Debug.Log($"- 이름: {testStageData.stageName}");
-                Debug.Log($"- 설명: {testStageData.stageDescription}");
-                Debug.Log($"- 난이도: {testStageData.difficulty}");
-                Debug.Log($"- 목표 점수: ★{testStageData.oneStar} ★★{testStageData.twoStar} ★★★{testStageData.threeStar}");
-                Debug.Log("실제로는 여기서 모달이 표시되어야 합니다.");
+                // 진행도가 없는 경우 기본값
+                userProgress = new UserStageProgress
+                {
+                    stageNumber = stageNumber,
+                    isCompleted = false,
+                    bestScore = 0,
+                    starsEarned = 0
+                };
             }
+            
+            Debug.Log($"스테이지 {stageNumber} 모달 표시");
+            stageInfoModal.ShowStageInfo(stageData, userProgress);
         }
         
         /// <summary>
@@ -606,38 +590,11 @@ namespace BlokusUnity.UI
                 }
             }
             
-            // 기본 테스트 데이터 반환
-            return CreateTestStageData(stageNumber);
+            // StageDataManager가 없거나 실패시 null 반환
+            Debug.LogWarning($"스테이지 {stageNumber} 데이터를 가져올 수 없습니다.");
+            return null;
         }
         
-        /// <summary>
-        /// 테스트 스테이지 데이터 생성
-        /// </summary>
-        private StageData CreateTestStageData(int stageNumber)
-        {
-            Debug.Log($"[DEBUG] CreateTestStageData 호출됨: stageNumber={stageNumber}");
-            
-            var stageData = ScriptableObject.CreateInstance<StageData>();
-            stageData.stageNumber = stageNumber;
-            stageData.stageName = $"테스트 스테이지 {stageNumber}";
-            stageData.stageDescription = $"이것은 테스트용 스테이지 {stageNumber}번입니다. 블록을 배치하여 목표 점수를 달성해보세요!";
-            
-            Debug.Log($"[DEBUG] StageData 생성됨: stageNumber={stageData.stageNumber}, stageName={stageData.stageName}");
-            stageData.difficulty = Mathf.Max(1, Mathf.CeilToInt(stageNumber / 10f));
-            
-            // 별점 시스템 설정
-            int baseScore = 100 + (stageNumber * 10);
-            stageData.oneStar = baseScore;
-            stageData.twoStar = baseScore + 50;
-            stageData.threeStar = baseScore + 100;
-            stageData.optimalScore = stageData.threeStar;
-            
-            // 제약 조건 설정
-            stageData.maxUndoCount = 5; // 되돌리기 5회
-            stageData.timeLimit = 0; // 무제한
-            
-            return stageData;
-        }
         
         /// <summary>
         /// 스테이지 시작

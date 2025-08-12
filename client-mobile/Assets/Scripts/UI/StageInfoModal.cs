@@ -388,46 +388,13 @@ namespace BlokusUnity.UI
             // 모달 숨기기
             HideModal();
             
-            // 테스트 환경에서는 씬 로드 대신 로그만 출력
-            if (UnityEngine.Application.isEditor)
-            {
-                Debug.Log($"[테스트 모드] 스테이지 {currentStageNumber} 플레이 버튼 클릭됨");
-                Debug.Log($"실제 게임에서는 SingleGameplayScene으로 이동합니다.");
-                Debug.Log($"현재는 SingleGameplayScene이 빌드 설정에 없어서 테스트 모드로 동작합니다.");
-                
-                // 테스트용 성공 메시지 표시
-                StartCoroutine(ShowTestSuccessMessage());
-                return;
-            }
-            
-            // 게임 시작 (실제 빌드에서만)
+            // 게임 시작
             if (UIManager.Instance != null)
             {
                 UIManager.Instance.OnStageSelected(currentStageNumber);
             }
         }
         
-        /// <summary>
-        /// 테스트 성공 메시지 표시
-        /// </summary>
-        private System.Collections.IEnumerator ShowTestSuccessMessage()
-        {
-            Debug.Log("=== 스테이지 정보 모달 테스트 성공 ===");
-            Debug.Log("✅ 모달이 정상적으로 표시됨");
-            Debug.Log("✅ 스테이지 정보가 올바르게 로드됨");
-            Debug.Log("✅ 테스트 데이터가 정확하게 계산됨");
-            Debug.Log("✅ 플레이 버튼이 정상 동작함");
-            Debug.Log("🎮 실제 게임에서는 여기서 SingleGameplayScene으로 전환됩니다.");
-            
-            yield return new WaitForSeconds(2f);
-            
-            // 모달을 다시 표시하여 테스트 가능하게 함
-            if (currentStageData != null)
-            {
-                Debug.Log("테스트 편의를 위해 모달을 다시 표시합니다.");
-                gameObject.SetActive(true);
-            }
-        }
         
         /// <summary>
         /// 모달 숨기기

@@ -38,45 +38,18 @@ namespace BlokusUnity.UI
         
 void Awake()
 {
-    if (button == null) button = GetComponent<Button>();
-    if (backgroundImage == null) backgroundImage = GetComponent<Image>();
-
-    // TextMeshProUGUI 자동 할당
-    if (stageNumberText == null) {
-        stageNumberText = GetComponentInChildren<TextMeshProUGUI>();
+    // Inspector에서 할당된 컴포넌트들을 사용
+    // null 체크만 수행하고 자동 할당은 하지 않음
+    if (button != null)
+    {
+        button.onClick.AddListener(OnButtonClicked);
     }
-
-    if (button != null) button.onClick.AddListener(OnButtonClicked);
-    
-    // 스테이지 번호 텍스트를 버튼 아래쪽으로 이동
-    PositionStageNumberBelow();
+    else
+    {
+        Debug.LogWarning($"StageButton {gameObject.name}: Button 컴포넌트가 할당되지 않았습니다!");
+    }
 }
 
-        /// <summary>
-        /// 스테이지 번호 텍스트를 버튼 아래쪽으로 위치 조정
-        /// </summary>
-        private void PositionStageNumberBelow()
-        {
-            if (stageNumberText == null) return;
-            
-            RectTransform textRect = stageNumberText.GetComponent<RectTransform>();
-            if (textRect == null) return;
-            
-            // 버튼의 RectTransform 가져오기
-            RectTransform buttonRect = GetComponent<RectTransform>();
-            if (buttonRect == null) return;
-            
-            // 스테이지 번호 텍스트를 버튼 아래쪽으로 위치 조정
-            textRect.anchorMin = new Vector2(0.5f, 0f);  // 하단 중앙
-            textRect.anchorMax = new Vector2(0.5f, 0f);  // 하단 중앙
-            textRect.pivot = new Vector2(0.5f, 1f);      // 텍스트의 상단을 기준점으로
-            textRect.anchoredPosition = new Vector2(0f, -10f); // 버튼 아래 10px
-            
-            // 텍스트 정렬을 중앙으로 설정
-            stageNumberText.alignment = TMPro.TextAlignmentOptions.Center;
-            
-            Debug.Log($"스테이지 번호 텍스트 위치 조정: {stageNumberText.name}");
-        }
         
         /// <summary>
         /// 스테이지 버튼 초기화
@@ -88,10 +61,14 @@ void Awake()
             stageNumber = stageNum;
             onClickCallback = clickCallback;
             
-            // 스테이지 번호 표시
+            // 스테이지 번호 표시 (null 체크)
             if (stageNumberText != null)
             {
                 stageNumberText.text = stageNumber.ToString();
+            }
+            else
+            {
+                Debug.LogWarning($"StageButton {stageNumber}: stageNumberText가 할당되지 않았습니다!");
             }
             
             // 초기 상태: 잠김
@@ -133,7 +110,11 @@ void Awake()
         /// </summary>
         private void UpdateBackgroundColor()
         {
-            if (backgroundImage == null) return;
+            if (backgroundImage == null) 
+            {
+                Debug.LogWarning($"StageButton {stageNumber}: backgroundImage가 할당되지 않았습니다!");
+                return;
+            }
             
             Color targetColor;
             
