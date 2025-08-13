@@ -3,7 +3,7 @@ const router = express.Router();
 const logger = require('../config/logger');
 const { authenticateToken, decodeToken, generateToken } = require('../middleware/auth');
 const { body, validationResult } = require('express-validator');
-const bcrypt = require('bcrypt');
+const argon2 = require('argon2');
 const dbService = require('../config/database');
 
 /**
@@ -67,7 +67,7 @@ router.post('/login',
       const user = userResult.rows[0];
 
       // 비밀번호 검증
-      const isValidPassword = await bcrypt.compare(password, user.password_hash);
+      const isValidPassword = await argon2.verify(user.password_hash, password);
 
       if (!isValidPassword) {
         logger.warn('Login failed - invalid password', { username, ip: req.ip });

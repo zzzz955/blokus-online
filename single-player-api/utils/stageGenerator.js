@@ -409,7 +409,7 @@ class StageGenerator {
         
         // 십자 모양으로 장애물 배치
         const positions = [
-          {x, y}, {x+1, y}, {x-1, y}, {x, y+1}, {x, y-1}
+          {x, y}, {x: x+1, y}, {x: x-1, y}, {x, y: y+1}, {x, y: y-1}
         ];
         
         for (const pos of positions) {

@@ -204,6 +204,13 @@ public abstract class BaseUIPanel : MonoBehaviour
     {
         if (isAnimating) return;
 
+        // Null 체크 추가
+        if (gameObject == null)
+        {
+            Debug.LogError($"BaseUIPanel Show 실패: gameObject가 null입니다! 클래스: {this.GetType().Name}");
+            return;
+        }
+
         Debug.Log($"=== BaseUIPanel Show 시작: {gameObject.name} ===");
         Debug.Log($"CanvasGroup null? {canvasGroup == null}");
         Debug.Log($"Animated: {animated}");

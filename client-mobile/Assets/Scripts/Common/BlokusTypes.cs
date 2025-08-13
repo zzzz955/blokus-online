@@ -464,17 +464,29 @@ namespace BlokusUnity.Common
     }
     
     /// <summary>
-    /// 사용자 스테이지 진행도
+    /// 사용자 스테이지 진행도 - API 응답 구조에 맞게 업데이트
     /// </summary>
     [System.Serializable]
     public struct UserStageProgress
     {
-        public int stageNumber;
-        public bool isCompleted;
-        public int starsEarned;
-        public int bestScore;
-        public int bestTime;
-        public int totalAttempts;
-        public int successfulAttempts;
+        public int stage_number;
+        public bool is_completed;
+        public int stars_earned;
+        public int best_score;
+        public int best_completion_time;
+        public int total_attempts;
+        public int successful_attempts;
+        public string first_played_at;
+        public string first_completed_at;
+        public string last_played_at;
+        
+        // Unity에서 사용하기 위한 편의 프로퍼티
+        public int stageNumber => stage_number;
+        public bool isCompleted => is_completed;
+        public int starsEarned => stars_earned;
+        public int bestScore => best_score;
+        public int bestTime => best_completion_time;
+        public int totalAttempts => total_attempts;
+        public int successfulAttempts => successful_attempts;
     }
 }

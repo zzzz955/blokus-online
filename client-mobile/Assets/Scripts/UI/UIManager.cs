@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using BlokusUnity.Common;
 using BlokusUnity.Data;
+using BlokusUnity.UI.Messages;
 
 namespace BlokusUnity.UI
 {
@@ -35,8 +36,20 @@ namespace BlokusUnity.UI
                 Instance = this;
                 Debug.Log("UIManager 싱글톤 설정 완료");
                 
-                DontDestroyOnLoad(gameObject);
+                // 루트 GameObject인지 확인하고 DontDestroyOnLoad 적용
+                if (transform.parent == null)
+                {
+                    DontDestroyOnLoad(gameObject);
+                    Debug.Log("UIManager DontDestroyOnLoad 적용됨");
+                }
+                else
+                {
+                    Debug.LogWarning("UIManager가 루트 GameObject가 아닙니다. DontDestroyOnLoad를 적용할 수 없습니다.");
+                    Debug.Log($"UIManager 부모: {transform.parent.name}");
+                }
+                
                 InitializePanels();
+                InitializeSystemMessageManager();
                 
                 Debug.Log("UIManager Awake 완료");
             }
@@ -76,20 +89,37 @@ namespace BlokusUnity.UI
                 { UIState.Loading, loadingPanel }
             };
             
-            // 패널 연결 상태 확인
+            // 패널 연결 상태 확인 (강화된 로깅)
             Debug.Log($"Login Panel: {loginPanel != null}");
-            if (loginPanel != null) Debug.Log($"Login Panel Name: {loginPanel.name}");
+            if (loginPanel != null) 
+            {
+                Debug.Log($"Login Panel Name: {loginPanel.name}");
+                Debug.Log($"Login Panel Type: {loginPanel.GetType().Name}");
+                Debug.Log($"Login Panel GameObject null?: {loginPanel.gameObject == null}");
+            }
             
             Debug.Log($"ModeSelection Panel: {modeSelectionPanel != null}");
-            if (modeSelectionPanel != null) Debug.Log($"ModeSelection Panel Name: {modeSelectionPanel.name}");
+            if (modeSelectionPanel != null) 
+            {
+                Debug.Log($"ModeSelection Panel Name: {modeSelectionPanel.name}");
+                Debug.Log($"ModeSelection Panel GameObject null?: {modeSelectionPanel.gameObject == null}");
+            }
             
             Debug.Log($"StageSelect Panel: {stageSelectPanel != null}");
-            if (stageSelectPanel != null) Debug.Log($"StageSelect Panel Name: {stageSelectPanel.name}");
+            if (stageSelectPanel != null) 
+            {
+                Debug.Log($"StageSelect Panel Name: {stageSelectPanel.name}");
+                Debug.Log($"StageSelect Panel GameObject null?: {stageSelectPanel.gameObject == null}");
+            }
             
             Debug.Log($"Lobby Panel: {lobbyPanel != null}");
             Debug.Log($"GameRoom Panel: {gameRoomPanel != null}");
             Debug.Log($"Loading Panel: {loadingPanel != null}");
-            if (loadingPanel != null) Debug.Log($"Loading Panel Name: {loadingPanel.name}");
+            if (loadingPanel != null) 
+            {
+                Debug.Log($"Loading Panel Name: {loadingPanel.name}");
+                Debug.Log($"Loading Panel GameObject null?: {loadingPanel.gameObject == null}");
+            }
             
             Debug.Log("InitializePanels 완료");
 
@@ -106,6 +136,28 @@ namespace BlokusUnity.UI
                     Debug.Log($"LoginPanel은 startActive=true이므로 숨기지 않음");
                 }
             }
+        }
+
+        /// <summary>
+        /// SystemMessageManager 초기화
+        /// </summary>
+        private void InitializeSystemMessageManager()
+        {
+            Debug.Log("=== InitializeSystemMessageManager 시작 ===");
+            
+            // SystemMessageManager가 없으면 생성
+            if (SystemMessageManager.Instance == null)
+            {
+                GameObject messageManagerObj = new GameObject("SystemMessageManager");
+                messageManagerObj.AddComponent<SystemMessageManager>();
+                Debug.Log("SystemMessageManager 자동 생성됨");
+            }
+            else
+            {
+                Debug.Log("SystemMessageManager 이미 존재함");
+            }
+            
+            Debug.Log("InitializeSystemMessageManager 완료");
         }
 
         /// <summary>
@@ -139,6 +191,13 @@ namespace BlokusUnity.UI
                 if (newPanel == null)
                 {
                     Debug.LogWarning($"Panel is null for state: {state}. 해당 Panel이 생성되지 않았거나 연결되지 않았습니다.");
+                    return;
+                }
+                
+                // gameObject null 체크 추가
+                if (newPanel.gameObject == null)
+                {
+                    Debug.LogError($"Panel gameObject is null for state: {state}. Panel: {newPanel.GetType().Name}");
                     return;
                 }
                 

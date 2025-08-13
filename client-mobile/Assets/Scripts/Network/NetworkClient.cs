@@ -252,7 +252,7 @@ namespace BlokusUnity.Network
         /// <summary>
         /// 서버로 메시지 전송
         /// </summary>
-        public bool SendMessage(string message)
+        public new bool SendMessage(string message)
         {
             if (!isConnected || streamWriter == null)
             {

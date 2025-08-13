@@ -5,97 +5,170 @@ using BlokusUnity.Common;
 namespace BlokusUnity.Data
 {
     /// <summary>
-    /// 싱글플레이 스테이지 데이터
-    /// ScriptableObject로 관리하여 에디터에서 쉽게 편집 가능
+    /// 싱글플레이 스테이지 데이터 - API 서버에서 생성된 데이터 구조
+    /// 이전 ScriptableObject 방식에서 API 기반으로 변경
     /// </summary>
-    [CreateAssetMenu(fileName = "Stage_", menuName = "Blokus/Stage Data")]
-    public class StageData : ScriptableObject
+    [System.Serializable]
+    public class StageData
     {
-        [Header("Stage Info")]
-        public int stageNumber;
-        public string stageName = "스테이지";
-        public string stageDescription = "블록을 최대한 많이 배치하세요!";
+        // API 응답 데이터 구조에 맞게 업데이트
+        public int stage_number;
+        public string title;
+        public int difficulty;
+        public int optimal_score;
+        public int time_limit;
+        public int max_undo_count;
+        public int[] available_blocks;
+        public InitialBoardState initial_board_state;
+        public string[] hints;
+        public SpecialRules special_rules;
+        public GenerationInfo generation_info;
         
-        [Header("Difficulty")]
-        [Range(1, 5)]
-        public int difficulty = 1;
-        public Sprite stageIcon;
+        // Unity에서 사용을 위한 편의 프로퍼티
+        public int stageNumber => stage_number;
+        public string stageName => title;
+        public string stageDescription => $"스테이지 {stage_number}"; // 기본 설명
+        public int optimalScore => optimal_score;
+        public int timeLimit => time_limit;
+        public int maxUndoCount => max_undo_count;
         
-        [Header("Board Setup")]
-        [Tooltip("초기 보드 상태 (미리 배치된 블록들)")]
-        public List<BlockPlacement> initialBlocks = new List<BlockPlacement>();
+        // 별점 기준 점수들 (계산된 값)
+        public int threeStar => optimal_score; // 100%
+        public int twoStar => Mathf.RoundToInt(optimal_score * 0.7f); // 70%
+        public int oneStar => Mathf.RoundToInt(optimal_score * 0.5f); // 50%
         
-        [Header("Player Blocks")]
-        [Tooltip("플레이어가 사용할 수 있는 블록 타입들")]
-        public List<BlockType> availableBlocks = new List<BlockType>();
-        
-        [Header("Scoring")]
-        [Tooltip("이론상 최고 점수 (별 3개 기준)")]
-        public int optimalScore = 100;
-        
-        [Tooltip("별점 기준 점수")]
-        public int threeStar = 100;  // 100%
-        public int twoStar = 80;     // 80%
-        public int oneStar = 50;     // 50%
-        
-        [Header("Game Rules")]
-        [Tooltip("제한 시간 (0이면 무제한)")]
-        public int timeLimit = 0;
-        
-        [Tooltip("최대 실행취소 횟수")]
-        public int maxUndoCount = 3;
-        
-        /// <summary>
-        /// 점수에 따른 별점 계산
-        /// </summary>
-        public int CalculateStarRating(int playerScore)
+        // 사용 가능한 블록들 (BlockType 리스트로 변환)
+        public System.Collections.Generic.List<BlokusUnity.Common.BlockType> availableBlocks
         {
-            float percentage = (float)playerScore / optimalScore * 100f;
-            
-            if (percentage >= threeStar) return 3;
-            if (percentage >= twoStar) return 2;
-            if (percentage >= oneStar) return 1;
-            return 0;
+            get
+            {
+                var blockList = new System.Collections.Generic.List<BlokusUnity.Common.BlockType>();
+                if (available_blocks != null)
+                {
+                    foreach (var blockId in available_blocks)
+                    {
+                        blockList.Add((BlokusUnity.Common.BlockType)blockId);
+                    }
+                }
+                return blockList;
+            }
         }
         
         /// <summary>
-        /// 보드에 초기 블록들 배치
+        /// 점수에 따른 별점 계산 - API 서버와 동일한 로직
+        /// </summary>
+        public int CalculateStarRating(int playerScore)
+        {
+            float percentage = (float)playerScore / optimal_score;
+            
+            if (percentage >= 0.9f) return 3;      // 90% 이상: 3별
+            if (percentage >= 0.7f) return 2;      // 70% 이상: 2별  
+            if (percentage >= 0.5f) return 1;      // 50% 이상: 1별
+            return 0;                               // 50% 미만: 0별
+        }
+        
+        /// <summary>
+        /// 보드에 초기 블록들 배치 - API 데이터 구조 사용
         /// </summary>
         public void ApplyInitialBoard(GameLogic gameLogic)
         {
             gameLogic.ClearBoard();
             
-            foreach (var blockPlacement in initialBlocks)
+            if (initial_board_state?.placements != null)
             {
-                gameLogic.PlaceBlock(blockPlacement);
+                foreach (var placement in initial_board_state.placements)
+                {
+                    var blockPlacement = new BlockPlacement(
+                        (BlockType)placement.block_type,
+                        new Position(placement.row, placement.col),
+                        (Rotation)placement.rotation,
+                        (FlipState)placement.flip_state,
+                        (PlayerColor)placement.color
+                    );
+                    gameLogic.PlaceBlock(blockPlacement);
+                }
             }
         }
         
         /// <summary>
-        /// 개발용: 스테이지 검증
+        /// 개발용: 스테이지 검증 - API 데이터 기반
         /// </summary>
-        [ContextMenu("Validate Stage")]
-        private void ValidateStage()
+        public bool ValidateStage()
         {
-            if (availableBlocks.Count == 0)
+            bool isValid = true;
+            
+            if (available_blocks == null || available_blocks.Length == 0)
             {
-                Debug.LogWarning($"Stage {stageNumber}: 사용 가능한 블록이 없습니다!");
+                Debug.LogWarning($"Stage {stage_number}: 사용 가능한 블록이 없습니다!");
+                isValid = false;
             }
             
-            if (optimalScore <= 0)
+            if (optimal_score <= 0)
             {
-                Debug.LogWarning($"Stage {stageNumber}: 최적 점수가 설정되지 않았습니다!");
+                Debug.LogWarning($"Stage {stage_number}: 최적 점수가 설정되지 않았습니다!");
+                isValid = false;
             }
             
-            // 초기 블록 배치 유효성 검사
-            // TODO: GameLogic으로 검증
+            if (string.IsNullOrEmpty(title))
+            {
+                Debug.LogWarning($"Stage {stage_number}: 스테이지 이름이 비어있습니다!");
+                isValid = false;
+            }
             
-            Debug.Log($"Stage {stageNumber} 검증 완료");
+            Debug.Log($"Stage {stage_number} 검증 {(isValid ? "성공" : "실패")}");
+            return isValid;
         }
     }
     
     /// <summary>
-    /// 스테이지 진행 상황 저장
+    /// API 데이터에서 사용되는 초기 보드 상태 구조
+    /// </summary>
+    [System.Serializable]
+    public class InitialBoardState
+    {
+        public BlockPlacementData[] placements;
+    }
+    
+    /// <summary>
+    /// API에서 사용되는 블록 배치 데이터
+    /// </summary>
+    [System.Serializable]
+    public class BlockPlacementData
+    {
+        public int block_type;
+        public int row;
+        public int col;
+        public int rotation;
+        public int flip_state;
+        public int color;
+    }
+    
+    /// <summary>
+    /// API에서 사용되는 특별 규칙 구조
+    /// </summary>
+    [System.Serializable]
+    public class SpecialRules
+    {
+        public bool time_pressure;
+        public float bonus_multiplier;
+        public bool limited_blocks;
+        public int max_block_placements;
+    }
+    
+    /// <summary>
+    /// API에서 사용되는 생성 정보 구조
+    /// </summary>
+    [System.Serializable]
+    public class GenerationInfo
+    {
+        public string algorithm;
+        public string seed;
+        public float complexity_score;
+        public bool is_solvable;
+    }
+    
+    /// <summary>
+    /// 스테이지 진행 상황 저장 - API 데이터에 맞게 업데이트
     /// </summary>
     [System.Serializable]
     public class StageProgress
@@ -128,23 +201,37 @@ namespace BlokusUnity.Data
     }
     
     /// <summary>
-    /// 전체 스테이지 관리자
+    /// 전체 스테이지 관리자 - API 기반으로 업데이트 (더 이상 ScriptableObject 사용 안함)
     /// </summary>
-    [CreateAssetMenu(fileName = "StageManager", menuName = "Blokus/Stage Manager")]
-    public class StageManager : ScriptableObject
+    [System.Serializable]
+    public class StageManager
     {
-        [Header("All Stages")]
-        public List<StageData> allStages = new List<StageData>();
-        
-        [Header("Progress Data")]
+        public Dictionary<int, StageData> cachedStageData = new Dictionary<int, StageData>();
         public List<StageProgress> stageProgresses = new List<StageProgress>();
         
         /// <summary>
-        /// 스테이지 데이터 가져오기
+        /// 스테이지 데이터 가져오기 (캐시에서)
         /// </summary>
         public StageData GetStageData(int stageNumber)
         {
-            return allStages.Find(stage => stage.stageNumber == stageNumber);
+            if (cachedStageData.TryGetValue(stageNumber, out StageData stageData))
+            {
+                return stageData;
+            }
+            
+            // 캐시에 없으면 null 반환 (API에서 로드 해야 함)
+            return null;
+        }
+        
+        /// <summary>
+        /// 스테이지 데이터 캐시에 추가
+        /// </summary>
+        public void CacheStageData(StageData stageData)
+        {
+            if (stageData != null)
+            {
+                cachedStageData[stageData.stage_number] = stageData;
+            }
         }
         
         /// <summary>

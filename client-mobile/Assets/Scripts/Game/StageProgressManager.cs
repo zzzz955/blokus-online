@@ -326,7 +326,7 @@ namespace BlokusUnity.Game
             if (completed && BlokusUnity.Network.HttpApiClient.Instance != null)
             {
                 // HTTP API를 통한 스테이지 완료 보고
-                BlokusUnity.Network.HttpApiClient.Instance.CompleteStage(stageNumber, stars, score, (int)time);
+                BlokusUnity.Network.HttpApiClient.Instance.CompleteStage(stageNumber, score, (int)time, completed);
             }
             else if (!completed)
             {

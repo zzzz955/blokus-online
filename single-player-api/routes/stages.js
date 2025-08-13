@@ -3,6 +3,7 @@ const router = express.Router();
 const logger = require('../config/logger');
 const dbService = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
+const { validateStageNumber, requireJson, validateStageCompletion } = require('../middleware/validation');
 const { body, param, query, validationResult } = require('express-validator');
 const StageGenerator = require('../utils/stageGenerator');
 

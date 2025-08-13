@@ -4,6 +4,7 @@ const logger = require('../config/logger');
 const dbService = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 const { validateUsername, validatePagination } = require('../middleware/validation');
+const { query } = require('express-validator');
 
 /**
  * GET /api/user/profile
