@@ -861,14 +861,14 @@ namespace BlokusUnity.UI
             // Layout 시스템과 뷰포트 업데이트 완료 대기
             yield return new WaitForSeconds(0.1f);
             
-            // 도전해야 할 스테이지 계산 (클리어한 다음 스테이지)
+            // 도전해야 할 스테이지 계산 (현재 플레이 가능한 가장 높은 스테이지)
             int challengeStage = 1;
             if (progressManager != null)
             {
                 int maxUnlocked = progressManager.GetMaxUnlockedStage();
                 
-                // 이미 모든 언락된 스테이지를 클리어했다면 다음 스테이지가 도전 스테이지
-                challengeStage = Mathf.Min(maxUnlocked + 1, stageFeed.GetTotalStages());
+                // 현재 언락된 가장 높은 스테이지가 도전 스테이지
+                challengeStage = maxUnlocked;
                 
                 // 스테이지 1은 항상 도전 가능하므로 최소값 보장
                 challengeStage = Mathf.Max(1, challengeStage);
