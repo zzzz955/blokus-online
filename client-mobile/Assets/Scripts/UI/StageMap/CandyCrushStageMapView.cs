@@ -1,10 +1,17 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using BlokusUnity.Application.Stages;
 using BlokusUnity.Game;
 using BlokusUnity.Data;
+using BlokusUnity.Network;
+using DataStageData = BlokusUnity.Data.StageData;
+using NetworkStageData = BlokusUnity.Network.StageData;
+using ApiStageData = BlokusUnity.Network.HttpApiClient.StageData;
+using GameUserStageProgress = BlokusUnity.Game.UserStageProgress;
+using NetworkUserStageProgress = BlokusUnity.Network.UserStageProgress;
 
 namespace BlokusUnity.UI
 {
@@ -68,6 +75,9 @@ namespace BlokusUnity.UI
             {
                 scrollRect.onValueChanged.AddListener(OnScrollValueChanged);
             }
+            
+            // API 이벤트 구독
+            SetupApiEventHandlers();
         }
         
         protected void OnEnable()
@@ -111,6 +121,9 @@ namespace BlokusUnity.UI
         
         void OnDestroy()
         {
+            // API 이벤트 정리
+            CleanupApiEventHandlers();
+            
             // 이벤트 해제
             if (progressManager != null)
             {
@@ -482,10 +495,10 @@ namespace BlokusUnity.UI
             bool shouldShow = true; // 항상 표시
             
             // StageProgress를 UserStageProgress로 변환 (StageButton 호환성)
-            UserStageProgress userProgress = null;
+            GameUserStageProgress userProgress = null;
             if (progress != null)
             {
-                userProgress = new UserStageProgress
+                userProgress = new GameUserStageProgress
                 {
                     stageNumber = stageNumber,
                     isCompleted = progress.isCompleted,
@@ -496,7 +509,7 @@ namespace BlokusUnity.UI
             else if (!isUnlocked)
             {
                 // 잠겨있고 진행도가 없는 스테이지도 기본값으로 표시
-                userProgress = new UserStageProgress
+                userProgress = new GameUserStageProgress
                 {
                     stageNumber = stageNumber,
                     isCompleted = false,
@@ -541,6 +554,15 @@ namespace BlokusUnity.UI
             var stageData = GetStageData(stageNumber);
             if (stageData == null)
             {
+                // API 요청을 보낸 경우 (pendingStageNumber가 설정됨) 대기 메시지 표시
+                if (pendingStageNumber == stageNumber)
+                {
+                    Debug.Log($"스테이지 {stageNumber} 데이터 로딩 중...");
+                    // TODO: 로딩 인디케이터 표시
+                    return;
+                }
+                
+                // API 요청도 실패한 경우
                 Debug.LogError($"스테이지 {stageNumber} 데이터를 로드할 수 없습니다!");
                 return;
             }
@@ -548,10 +570,10 @@ namespace BlokusUnity.UI
             var progress = progressManager?.GetCachedStageProgress(stageNumber);
             
             // StageProgress를 UserStageProgress로 변환
-            UserStageProgress userProgress = null;
+            GameUserStageProgress userProgress = null;
             if (progress != null)
             {
-                userProgress = new UserStageProgress
+                userProgress = new GameUserStageProgress
                 {
                     stageNumber = stageNumber,
                     isCompleted = progress.isCompleted,
@@ -562,7 +584,7 @@ namespace BlokusUnity.UI
             else
             {
                 // 진행도가 없는 경우 기본값
-                userProgress = new UserStageProgress
+                userProgress = new GameUserStageProgress
                 {
                     stageNumber = stageNumber,
                     isCompleted = false,
@@ -575,23 +597,211 @@ namespace BlokusUnity.UI
             stageInfoModal.ShowStageInfo(stageData, userProgress);
         }
         
+        // 대기 중인 스테이지 번호 (API 응답 대기)
+        private int pendingStageNumber = 0;
+        
         /// <summary>
-        /// 스테이지 데이터 가져오기
+        /// API 이벤트 핸들러 설정
         /// </summary>
-        private StageData GetStageData(int stageNumber)
+        private void SetupApiEventHandlers()
         {
-            // StageDataManager를 통해 스테이지 데이터 가져오기
+            if (HttpApiClient.Instance != null)
+            {
+                HttpApiClient.Instance.OnStageDataReceived += OnStageDataReceived;
+                HttpApiClient.Instance.OnStageProgressReceived += OnStageProgressReceived;
+                Debug.Log("[CandyCrushStageMapView] API 이벤트 핸들러 설정 완료");
+            }
+            else
+            {
+                // HttpApiClient가 늦게 초기화될 수 있으므로 재시도
+                Invoke(nameof(SetupApiEventHandlers), 1f);
+            }
+        }
+        
+        /// <summary>
+        /// API 이벤트 핸들러 정리
+        /// </summary>
+        private void CleanupApiEventHandlers()
+        {
+            if (HttpApiClient.Instance != null)
+            {
+                HttpApiClient.Instance.OnStageDataReceived -= OnStageDataReceived;
+                HttpApiClient.Instance.OnStageProgressReceived -= OnStageProgressReceived;
+            }
+        }
+        
+        /// <summary>
+        /// API에서 스테이지 데이터 수신 처리
+        /// </summary>
+        private void OnStageDataReceived(ApiStageData stageData)
+        {
+            if (stageData == null) return;
+            
+            Debug.Log($"[CandyCrushStageMapView] API에서 스테이지 {stageData.stage_number} 데이터 수신");
+            
+            // StageDataManager 캐시에 저장
+            if (StageDataManager.Instance?.GetStageManager() != null)
+            {
+                // API.StageData를 Data.StageData로 변환
+                var convertedStageData = ConvertApiToDataStageData(stageData);
+                StageDataManager.Instance.GetStageManager().CacheStageData(convertedStageData);
+                
+                // 모달이 이 스테이지를 기다리고 있었다면 표시
+                ShowStageInfoModalIfReady(stageData.stage_number);
+            }
+        }
+        
+        /// <summary>
+        /// API에서 스테이지 진행도 수신 처리
+        /// </summary>
+        private void OnStageProgressReceived(BlokusUnity.Network.UserStageProgress progress)
+        {
+            if (progress == null) return;
+            
+            Debug.Log($"[CandyCrushStageMapView] API에서 스테이지 {progress.stageNumber} 진행도 수신");
+            
+            // UserDataCache에 저장되므로 별도 처리 불필요
+        }
+        
+        /// <summary>
+        /// API.StageData를 Data.StageData로 변환
+        /// </summary>
+        private DataStageData ConvertApiToDataStageData(ApiStageData apiStageData)
+        {
+            return new DataStageData
+            {
+                stage_number = apiStageData.stage_number,
+                title = apiStageData.title,
+                difficulty = apiStageData.difficulty,
+                optimal_score = apiStageData.optimal_score,
+                time_limit = apiStageData.time_limit ?? 0,
+                max_undo_count = apiStageData.max_undo_count,
+                available_blocks = apiStageData.available_blocks ?? new int[0],
+                hints = apiStageData.hints ?? new string[0],
+                // initial_board_state, special_rules는 필요시 추가 변환
+                initial_board_state = null,
+                special_rules = new BlokusUnity.Data.SpecialRules(),
+                generation_info = new BlokusUnity.Data.GenerationInfo()
+            };
+        }
+        
+        /// <summary>
+        /// 스테이지 데이터가 준비되면 모달 표시
+        /// </summary>
+        private void ShowStageInfoModalIfReady(int stageNumber)
+        {
+            if (pendingStageNumber == stageNumber)
+            {
+                pendingStageNumber = 0; // 대기 해제
+                
+                Debug.Log($"[CandyCrushStageMapView] API 응답 받음. 모달 표시 재시도: 스테이지 {stageNumber}");
+                
+                // 직접 모달 표시 (OnStageButtonClicked 재호출 대신)
+                ShowStageModalDirectly(stageNumber);
+            }
+        }
+        
+        /// <summary>
+        /// 스테이지 모달 직접 표시 (API 응답 후)
+        /// </summary>
+        private void ShowStageModalDirectly(int stageNumber)
+        {
+            // 잠금 상태 확인
+            if (!progressManager.IsStageUnlocked(stageNumber))
+            {
+                ShowUnlockedRequiredMessage(stageNumber);
+                return;
+            }
+            
+            // StageInfoModal 재확인
+            if (stageInfoModal == null)
+            {
+                Debug.LogWarning("StageInfoModal이 없습니다. 다시 찾아보겠습니다...");
+                EnsureStageInfoModalReference();
+                
+                if (stageInfoModal == null)
+                {
+                    Debug.LogError("StageInfoModal을 찾을 수 없습니다!");
+                    return;
+                }
+            }
+            
+            // 스테이지 데이터 가져오기 (이제 캐시에 있어야 함)
+            var stageData = GetStageData(stageNumber);
+            if (stageData == null)
+            {
+                Debug.LogError($"스테이지 {stageNumber} 데이터를 캐시에서 찾을 수 없습니다!");
+                return;
+            }
+            
+            var progress = progressManager?.GetCachedStageProgress(stageNumber);
+            
+            // StageProgress를 UserStageProgress로 변환
+            GameUserStageProgress userProgress = null;
+            if (progress != null)
+            {
+                userProgress = new GameUserStageProgress
+                {
+                    stageNumber = stageNumber,
+                    isCompleted = progress.isCompleted,
+                    bestScore = progress.bestScore,
+                    starsEarned = CalculateStarsEarned(progress.bestScore, stageData)
+                };
+            }
+            else
+            {
+                // 진행도가 없는 경우 기본값
+                userProgress = new GameUserStageProgress
+                {
+                    stageNumber = stageNumber,
+                    isCompleted = false,
+                    bestScore = 0,
+                    starsEarned = 0
+                };
+            }
+            
+            Debug.Log($"[CandyCrushStageMapView] 스테이지 {stageNumber} 모달 표시 시도");
+            stageInfoModal.ShowStageInfo(stageData, userProgress);
+        }
+        
+        /// <summary>
+        /// 스테이지 데이터 가져오기 (API 통합)
+        /// </summary>
+        private DataStageData GetStageData(int stageNumber)
+        {
+            // 1. 먼저 캐시에서 확인
             if (StageDataManager.Instance != null)
             {
                 var stageManager = StageDataManager.Instance.GetStageManager();
                 if (stageManager != null)
                 {
-                    return stageManager.GetStageData(stageNumber);
+                    var cachedData = stageManager.GetStageData(stageNumber);
+                    if (cachedData != null)
+                    {
+                        return cachedData;
+                    }
                 }
             }
             
-            // StageDataManager가 없거나 실패시 null 반환
-            Debug.LogWarning($"스테이지 {stageNumber} 데이터를 가져올 수 없습니다.");
+            // 2. 캐시에 없으면 API에서 요청
+            if (HttpApiClient.Instance != null)
+            {
+                if (!HttpApiClient.Instance.IsAuthenticated())
+                {
+                    Debug.LogWarning($"API 인증이 되어있지 않습니다. 스테이지 {stageNumber} 데이터를 요청할 수 없습니다.");
+                    return null;
+                }
+                
+                Debug.Log($"[CandyCrushStageMapView] 스테이지 {stageNumber} API 요청");
+                HttpApiClient.Instance.GetStageData(stageNumber);
+                
+                // 비동기 요청이므로 현재는 null 반환하고 대기 상태로 설정
+                pendingStageNumber = stageNumber;
+                return null;
+            }
+            
+            // 3. API 클라이언트도 없으면 오류
+            Debug.LogError($"HttpApiClient를 찾을 수 없습니다. 스테이지 {stageNumber} 데이터를 로드할 수 없습니다.");
             return null;
         }
         
@@ -608,7 +818,7 @@ namespace BlokusUnity.UI
         /// <summary>
         /// 별점 계산 (점수 기반)
         /// </summary>
-        private int CalculateStarsEarned(int score, StageData stageData)
+        private int CalculateStarsEarned(int score, DataStageData stageData)
         {
             if (score <= 0 || stageData == null) return 0;
             

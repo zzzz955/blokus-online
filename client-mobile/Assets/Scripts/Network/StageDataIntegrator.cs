@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using BlokusUnity.Common;
 using BlokusUnity.Data;
@@ -7,6 +8,7 @@ using BlokusUnity.Game;
 using BlokusUnity.Network;
 using NetworkStageData = BlokusUnity.Network.StageData;
 using NetworkUserStageProgress = BlokusUnity.Network.UserStageProgress;
+using ApiStageData = BlokusUnity.Network.HttpApiClient.StageData;
 
 namespace BlokusUnity.Network
 {
@@ -267,17 +269,20 @@ namespace BlokusUnity.Network
         // API 이벤트 핸들러들
         // ========================================
         
-        private void HandleApiStageDataReceived(NetworkStageData stageData)
+        private void HandleApiStageDataReceived(ApiStageData apiStageData)
         {
-            Debug.Log($"API에서 스테이지 {stageData.stageNumber} 데이터 수신: {stageData.stageName}");
+            Debug.Log($"API에서 스테이지 {apiStageData.stage_number} 데이터 수신: {apiStageData.title}");
+            
+            // API StageData를 Network StageData로 변환
+            NetworkStageData networkStageData = ConvertApiToNetworkStageData(apiStageData);
             
             // 캐시에 저장
             if (UserDataCache.Instance != null)
             {
-                UserDataCache.Instance.SetStageData(stageData);
+                UserDataCache.Instance.SetStageData(networkStageData);
             }
             
-            HandleStageDataReady(stageData);
+            HandleStageDataReady(networkStageData);
         }
         
         private void HandleApiStageProgressReceived(NetworkUserStageProgress progress)
@@ -331,6 +336,32 @@ namespace BlokusUnity.Network
         // ========================================
         // 데이터 변환 헬퍼들
         // ========================================
+        
+        /// <summary>
+        /// API StageData를 Network StageData로 변환
+        /// </summary>
+        private NetworkStageData ConvertApiToNetworkStageData(ApiStageData apiData)
+        {
+            List<BlockType> availableBlocks = null;
+            if (apiData.available_blocks != null)
+            {
+                availableBlocks = apiData.available_blocks.Select(id => (BlockType)id).ToList();
+            }
+            
+            return new NetworkStageData
+            {
+                stageNumber = apiData.stage_number,
+                stageName = apiData.title,
+                difficulty = apiData.difficulty,
+                optimalScore = apiData.optimal_score,
+                timeLimit = apiData.time_limit,
+                maxUndoCount = apiData.max_undo_count,
+                availableBlocks = availableBlocks,
+                initialBoardStateJson = apiData.initial_board_state != null ? 
+                    UnityEngine.JsonUtility.ToJson(apiData.initial_board_state) : null,
+                stageDescription = apiData.stage_description
+            };
+        }
         
         /// <summary>
         /// API 스테이지 데이터를 Unity 게임용 StagePayload로 변환

@@ -28,7 +28,7 @@ namespace BlokusUnity.Network
         // 싱글톤
         public static HttpApiClient Instance { get; private set; }
         
-        // 이벤트
+        // 이벤트 - API 응답용 StageData 사용
         public event System.Action<StageData> OnStageDataReceived;
         public event System.Action<UserStageProgress> OnStageProgressReceived;
         public event System.Action<bool, string> OnStageCompleteResponse;
@@ -649,7 +649,30 @@ namespace BlokusUnity.Network
             public int remaining_time;
         }
         
-        // 스테이지 관련 데이터 구조체들
+        // 스테이지 관련 데이터 구조체들 - API 응답 구조에 맞춤
+        [System.Serializable]
+        public class StageData
+        {
+            public int stage_number;
+            public string title;
+            public int difficulty;
+            public int optimal_score;
+            public int? time_limit;
+            public int max_undo_count;
+            public int[] available_blocks;
+            public InitialBoardStateApi initial_board_state;
+            public string[] hints;
+            public string stage_description;
+            public bool is_featured;
+        }
+        
+        [System.Serializable]
+        public class InitialBoardStateApi
+        {
+            public object[] pre;
+            public int[] obsIdx;
+        }
+        
         [System.Serializable]
         public class StageMetadataResponse
         {
