@@ -233,34 +233,5 @@ namespace BlokusUnity.Game
                 image.color = canPlace ? placeEnabledColor : placeDisabledColor;
             }
         }
-
-        /// <summary>
-        /// 수동으로 연결 설정 (Inspector에서 드래그 드롭으로 연결 시)
-        /// </summary>
-        public void SetReferences(BlockPalette palette, GameBoard board, SingleGameManager manager)
-        {
-            blockPalette = palette;
-            gameBoard = board;
-            gameManager = manager;
-
-            Debug.Log("[ActionButtonController] 컴포넌트 참조 수동 설정 완료");
-        }
-
-        /// <summary>
-        /// 모든 버튼 숨기기
-        /// </summary>
-        public void HideAllButtons()
-        {
-            gameObject.SetActive(false);
-        }
-
-        /// <summary>
-        /// 모든 버튼 표시
-        /// </summary>
-        public void ShowAllButtons()
-        {
-            gameObject.SetActive(true);
-            UpdateButtonStates();
-        }
     }
 }

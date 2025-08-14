@@ -35,8 +35,6 @@ namespace BlokusUnity.Utils
                 available_blocks = new int[0], // 메타데이터에는 포함되지 않음
                 initial_board_state = null, // 메타데이터에는 포함되지 않음
                 hints = new string[0], // 메타데이터에는 포함되지 않음
-                special_rules = new SpecialRules(), // 기본값
-                generation_info = new GenerationInfo() // 기본값
             };
         }
         

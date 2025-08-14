@@ -209,24 +209,24 @@ namespace BlokusUnity.Game
         /// </summary>
         public void CompleteStage(StageData stageData, int playerScore, float completionTime)
         {
-            int stars = CalculateStars(playerScore, stageData.optimalScore);
+            int stars = CalculateStars(playerScore, stageData.optimal_score);
             
             // 실패한 경우 (0별)
             if (stars == 0)
             {
-                Debug.Log($"스테이지 {stageData.stageNumber} 실패 (점수: {playerScore}/{stageData.optimalScore})");
+                Debug.Log($"스테이지 {stageData.stage_number} 실패 (점수: {playerScore}/{stageData.optimal_score})");
                 // 실패해도 기록은 남김 (시도 횟수 등)
-                UpdateStageProgressOnServer(stageData.stageNumber, false, 0, playerScore, completionTime);
+                UpdateStageProgressOnServer(stageData.stage_number, false, 0, playerScore, completionTime);
                 return;
             }
             
             // 성공한 경우
-            Debug.Log($"스테이지 {stageData.stageNumber} 클리어! (점수: {playerScore}, 별: {stars}개)");
+            Debug.Log($"스테이지 {stageData.stage_number} 클리어! (점수: {playerScore}, 별: {stars}개)");
             
             // 캐시 업데이트
-            var progress = GetCachedStageProgress(stageData.stageNumber) ?? new UserStageProgress
+            var progress = GetCachedStageProgress(stageData.stage_number) ?? new UserStageProgress
             {
-                stageNumber = stageData.stageNumber
+                stageNumber = stageData.stage_number
             };
             
             bool isNewRecord = playerScore > progress.bestScore;
@@ -238,19 +238,19 @@ namespace BlokusUnity.Game
             progress.totalAttempts++;
             progress.successfulAttempts++;
             
-            CacheStageProgress(stageData.stageNumber, progress);
+            CacheStageProgress(stageData.stage_number, progress);
             
             // 다음 스테이지 언락 (첫 클리어시에만)
             if (isFirstClear)
             {
-                UnlockNextStage(stageData.stageNumber);
+                UnlockNextStage(stageData.stage_number);
             }
             
             // 서버에 업데이트 전송
-            UpdateStageProgressOnServer(stageData.stageNumber, true, stars, playerScore, completionTime);
+            UpdateStageProgressOnServer(stageData.stage_number, true, stars, playerScore, completionTime);
             
             // UI 이벤트 발생
-            OnStageCompleted?.Invoke(stageData.stageNumber, stars, isNewRecord, isFirstClear);
+            OnStageCompleted?.Invoke(stageData.stage_number, stars, isNewRecord, isFirstClear);
         }
         
         // ========================================

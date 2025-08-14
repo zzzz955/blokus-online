@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using BlokusUnity.Common;
+using System;
 
 namespace BlokusUnity.Data
 {
@@ -23,22 +24,12 @@ namespace BlokusUnity.Data
         public string[] hints;
         public string stage_description;
         public string thumbnail_url;  // API에서 받아오는 썸네일 이미지 URL
-        public SpecialRules special_rules;
-        public GenerationInfo generation_info;
-        
-        // Unity에서 사용을 위한 편의 프로퍼티
-        public int stageNumber => stage_number;
-        public string stageName => title;
-        public string stageDescription => string.IsNullOrEmpty(stage_description) ? $"스테이지 {stage_number}" : stage_description;
-        public int optimalScore => optimal_score;
-        public int timeLimit => time_limit;
-        public int maxUndoCount => max_undo_count;
-        
+
         // 별점 기준 점수들 (계산된 값)
         public int threeStar => optimal_score; // 100%
         public int twoStar => Mathf.RoundToInt(optimal_score * 0.7f); // 70%
         public int oneStar => Mathf.RoundToInt(optimal_score * 0.5f); // 50%
-        
+
         // 사용 가능한 블록들 (BlockType 리스트로 변환)
         public System.Collections.Generic.List<BlokusUnity.Common.BlockType> availableBlocks
         {
@@ -55,27 +46,27 @@ namespace BlokusUnity.Data
                 return blockList;
             }
         }
-        
+
         /// <summary>
         /// 점수에 따른 별점 계산 - API 서버와 동일한 로직
         /// </summary>
         public int CalculateStarRating(int playerScore)
         {
             float percentage = (float)playerScore / optimal_score;
-            
+
             if (percentage >= 0.9f) return 3;      // 90% 이상: 3별
             if (percentage >= 0.7f) return 2;      // 70% 이상: 2별  
             if (percentage >= 0.5f) return 1;      // 50% 이상: 1별
             return 0;                               // 50% 미만: 0별
         }
-        
+
         /// <summary>
         /// 보드에 초기 블록들 배치 - API 데이터 구조 사용
         /// </summary>
         public void ApplyInitialBoard(GameLogic gameLogic)
         {
             gameLogic.ClearBoard();
-            
+
             if (initial_board_state?.placements != null)
             {
                 foreach (var placement in initial_board_state.placements)
@@ -91,34 +82,39 @@ namespace BlokusUnity.Data
                 }
             }
         }
-        
+
         /// <summary>
         /// 개발용: 스테이지 검증 - API 데이터 기반
         /// </summary>
         public bool ValidateStage()
         {
             bool isValid = true;
-            
+
             if (available_blocks == null || available_blocks.Length == 0)
             {
                 Debug.LogWarning($"Stage {stage_number}: 사용 가능한 블록이 없습니다!");
                 isValid = false;
             }
-            
+
             if (optimal_score <= 0)
             {
                 Debug.LogWarning($"Stage {stage_number}: 최적 점수가 설정되지 않았습니다!");
                 isValid = false;
             }
-            
+
             if (string.IsNullOrEmpty(title))
             {
                 Debug.LogWarning($"Stage {stage_number}: 스테이지 이름이 비어있습니다!");
                 isValid = false;
             }
-            
+
             Debug.Log($"Stage {stage_number} 검증 {(isValid ? "성공" : "실패")}");
             return isValid;
+        }
+
+        public string GetAbsoluteThumbnailUrl(string baseUrl) 
+        {
+            return baseUrl + thumbnail_url;
         }
     }
     

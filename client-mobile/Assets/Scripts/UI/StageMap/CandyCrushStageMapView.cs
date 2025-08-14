@@ -8,8 +8,7 @@ using BlokusUnity.Game;
 using BlokusUnity.Data;
 using BlokusUnity.Network;
 using DataStageData = BlokusUnity.Data.StageData;
-using NetworkStageData = BlokusUnity.Network.StageData;
-using ApiStageData = BlokusUnity.Network.HttpApiClient.StageData;
+using ApiStageData = BlokusUnity.Network.HttpApiClient.ApiStageData;
 using GameUserStageProgress = BlokusUnity.Game.UserStageProgress;
 using NetworkUserStageProgress = BlokusUnity.Network.UserStageProgress;
 
@@ -679,9 +678,7 @@ namespace BlokusUnity.UI
                 available_blocks = apiStageData.available_blocks ?? new int[0],
                 hints = apiStageData.hints ?? new string[0],
                 // initial_board_state, special_rules는 필요시 추가 변환
-                initial_board_state = null,
-                special_rules = new BlokusUnity.Data.SpecialRules(),
-                generation_info = new BlokusUnity.Data.GenerationInfo()
+                initial_board_state = null
             };
         }
         

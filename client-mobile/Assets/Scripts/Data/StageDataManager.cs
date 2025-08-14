@@ -17,19 +17,19 @@ namespace BlokusUnity.Data
     {
         [Header("API Integration")]
         [SerializeField] private bool enableApiIntegration = true;
-        
+
         [Header("서버 통합 설정")]
         [SerializeField] private bool useServerData = true;
         [SerializeField] private bool fallbackToLocalData = true;
         [SerializeField] private bool autoRequestMissingStages = true;
-        
+
         // 싱글톤 인스턴스
         public static StageDataManager Instance { get; private set; }
-        
+
         // 현재 선택된 스테이지 (API 데이터 기반)  
         private StageData currentSelectedStage;
         private int currentSelectedStageNumber;
-        
+
         // API 기반 스테이지 매니저
         private StageManager apiStageManager;
 
@@ -39,7 +39,7 @@ namespace BlokusUnity.Data
             if (Instance == null)
             {
                 Instance = this;
-                
+
                 // 루트 GameObject인지 확인하고 DontDestroyOnLoad 적용
                 if (transform.parent == null)
                 {
@@ -49,7 +49,7 @@ namespace BlokusUnity.Data
                 {
                     Debug.LogWarning("StageDataManager가 루트 GameObject가 아닙니다. DontDestroyOnLoad를 적용할 수 없습니다.");
                 }
-                
+
                 SetupCacheEventHandlers();
                 Debug.Log("StageDataManager 초기화 완료");
             }
@@ -115,28 +115,27 @@ namespace BlokusUnity.Data
         public void SelectStage(int stageNumber)
         {
             currentSelectedStageNumber = stageNumber;
-            
+
             // 1. 서버 데이터부터 시도
             if (useServerData && TryLoadServerStageData(stageNumber))
             {
                 return;
             }
-            
+
             // 2. 로컬 StageManager 데이터 시도
             if (fallbackToLocalData && TryLoadLocalStageData(stageNumber))
             {
                 return;
             }
-            
+
             // 3. 서버에서 데이터 요청
             if (autoRequestMissingStages && RequestStageDataFromServer(stageNumber))
             {
                 return;
             }
-            
+
             // 4. 최후의 수단: 테스트 스테이지 생성
-            Debug.LogWarning($"스테이지 {stageNumber} 데이터를 찾을 수 없어 테스트 스테이지를 생성합니다.");
-            CreateTestStage(stageNumber);
+            Debug.LogWarning($"스테이지 {stageNumber} 데이터를 찾을 수 없습니다.");
         }
 
         /// <summary>
@@ -153,8 +152,8 @@ namespace BlokusUnity.Data
             {
                 // 메타데이터를 기반으로 StageData 생성 (이미 변환됨)
                 currentSelectedStage = BlokusUnity.Utils.ApiDataConverter.ConvertCompactMetadata(metadata);
-                
-                Debug.Log($"API 메타데이터에서 스테이지 {stageNumber} 선택: {currentSelectedStage.stageName}");
+
+                Debug.Log($"API 메타데이터에서 스테이지 {stageNumber} 선택");
                 return true;
             }
 
@@ -164,7 +163,7 @@ namespace BlokusUnity.Data
             {
                 // NetworkStageData를 직접 StageData로 변환 (동일한 구조)
                 currentSelectedStage = ConvertNetworkToStageData(cachedStageData);
-                Debug.Log($"캐시된 API 데이터에서 스테이지 {stageNumber} 선택: {currentSelectedStage.stageName}");
+                Debug.Log($"캐시된 API 데이터에서 스테이지 {stageNumber} 선택");
                 return true;
             }
 
@@ -179,11 +178,11 @@ namespace BlokusUnity.Data
             if (apiStageManager != null && enableApiIntegration)
             {
                 var apiStageData = apiStageManager.GetStageData(stageNumber);
-                
+
                 if (apiStageData != null)
                 {
                     currentSelectedStage = apiStageData;
-                    Debug.Log($"API 캐시에서 스테이지 {stageNumber} 선택: {currentSelectedStage.stageName}");
+                    Debug.Log($"API 캐시에서 스테이지 {stageNumber} 선택");
                     return true;
                 }
             }
@@ -199,18 +198,15 @@ namespace BlokusUnity.Data
             if (HttpApiClient.Instance != null && UserDataCache.Instance.IsLoggedIn() && enableApiIntegration)
             {
                 Debug.Log($"API 서버에 스테이지 {stageNumber} 데이터 요청");
-                
+
                 // 스테이지 메타데이터가 없으면 전체 목록 요청
                 if (UserDataCache.Instance.GetStageMetadata() == null)
                 {
                     HttpApiClient.Instance.GetStageList();
                 }
-                
+
                 // 구체적인 스테이지 데이터 요청
                 HttpApiClient.Instance.GetStageData(stageNumber);
-                
-                // 임시로 테스트 스테이지 생성하고 서버 응답을 기다림
-                CreateTestStage(stageNumber);
                 return true;
             }
 
@@ -249,44 +245,14 @@ namespace BlokusUnity.Data
             if (currentSelectedStage != null)
             {
                 // SingleGameManager의 static 프로퍼티에 데이터 설정
-                SingleGameManager.SetStageContext(currentSelectedStage.stageNumber, this);
-                
-                Debug.Log($"SingleGameManager에 API 스테이지 데이터 전달: {currentSelectedStage.stageName}");
+                SingleGameManager.SetStageContext(currentSelectedStage.stage_number, this);
+
+                Debug.Log($"SingleGameManager에 API 스테이지 데이터 전달: {currentSelectedStage.stage_number}");
             }
             else
             {
                 Debug.LogError("전달할 스테이지 데이터가 없습니다!");
             }
-        }
-
-        /// <summary>
-        /// 테스트용 스테이지 생성 (개발 중)
-        /// </summary>
-        private void CreateTestStage(int stageNumber)
-        {
-            // 런타임에서 스테이지 데이터 생성 (개발용)
-            var testBlocks = new int[21];
-            for (int i = 1; i <= 21; i++)
-            {
-                testBlocks[i-1] = i;
-            }
-            
-            currentSelectedStage = new StageData
-            {
-                stage_number = stageNumber,
-                title = $"테스트 스테이지 {stageNumber}",
-                difficulty = 1,
-                optimal_score = 100,
-                time_limit = 300, // 5분
-                max_undo_count = 3,
-                available_blocks = testBlocks,
-                initial_board_state = null,
-                hints = new string[] { "테스트용 스테이지입니다." },
-                special_rules = new SpecialRules(),
-                generation_info = new GenerationInfo()
-            };
-            
-            Debug.Log($"테스트 스테이지 {stageNumber} 생성됨");
         }
 
         // ========================================
@@ -299,12 +265,12 @@ namespace BlokusUnity.Data
         private void OnServerStageDataUpdated(NetworkStageData serverStageData)
         {
             Debug.Log($"서버 스테이지 데이터 업데이트: {serverStageData.stageNumber}");
-            
+
             // 현재 선택된 스테이지가 업데이트된 경우 다시 로드
             if (currentSelectedStageNumber == serverStageData.stageNumber)
             {
                 currentSelectedStage = ConvertNetworkToStageData(serverStageData);
-                Debug.Log($"현재 스테이지 데이터 업데이트: {currentSelectedStage.stageName}");
+                Debug.Log($"현재 스테이지 데이터 업데이트: {currentSelectedStage.stage_number}");
             }
         }
 
@@ -314,7 +280,7 @@ namespace BlokusUnity.Data
         private void OnStageProgressUpdated(NetworkUserStageProgress progress)
         {
             Debug.Log($"API 스테이지 진행도 업데이트: {progress.stageNumber} (별: {progress.starsEarned})");
-            
+
             // API 기반 StageManager 업데이트
             if (apiStageManager != null && enableApiIntegration)
             {
@@ -322,7 +288,7 @@ namespace BlokusUnity.Data
                 if (localProgress != null)
                 {
                     localProgress.UpdateProgress(progress.bestScore, progress.starsEarned);
-                    
+
                     // 완료된 경우 다음 스테이지 언락
                     if (progress.isCompleted)
                     {
@@ -342,26 +308,26 @@ namespace BlokusUnity.Data
         public void CompleteStage(int stageNumber, int score, int stars, int completionTime = 0)
         {
             Debug.Log($"API 스테이지 {stageNumber} 완료 처리: {score}점, {stars}별");
-            
+
             // 1. API 기반 StageManager 업데이트
             if (apiStageManager != null && enableApiIntegration)
             {
                 var progress = apiStageManager.GetStageProgress(stageNumber);
                 progress.UpdateProgress(score, stars);
-                
+
                 // 다음 스테이지 언락
                 apiStageManager.UnlockNextStage(stageNumber);
             }
-            
+
             // 2. UserDataCache 업데이트
             if (UserDataCache.Instance != null)
             {
                 var cacheProgress = UserDataCache.Instance.GetStageProgress(stageNumber);
-                
+
                 // 새로운 기록인지 확인
                 bool isNewBest = score > cacheProgress.bestScore;
                 bool isFirstComplete = !cacheProgress.isCompleted;
-                
+
                 // 진행도 업데이트
                 var updatedProgress = new NetworkUserStageProgress
                 {
@@ -374,10 +340,10 @@ namespace BlokusUnity.Data
                     successfulAttempts = cacheProgress.successfulAttempts + 1,
                     lastPlayedAt = System.DateTime.Now
                 };
-                
+
                 UserDataCache.Instance.SetStageProgress(updatedProgress);
             }
-            
+
             // 3. API 서버에 완료 보고
             if (HttpApiClient.Instance != null && UserDataCache.Instance.IsLoggedIn() && enableApiIntegration)
             {
@@ -391,7 +357,7 @@ namespace BlokusUnity.Data
         public void FailStage(int stageNumber)
         {
             Debug.Log($"스테이지 {stageNumber} 실패 처리");
-            
+
             // UserDataCache 업데이트 (시도 횟수만 증가)
             if (UserDataCache.Instance != null)
             {
@@ -407,7 +373,7 @@ namespace BlokusUnity.Data
                     successfulAttempts = cacheProgress.successfulAttempts,
                     lastPlayedAt = System.DateTime.Now
                 };
-                
+
                 UserDataCache.Instance.SetStageProgress(updatedProgress);
             }
         }
@@ -431,12 +397,9 @@ namespace BlokusUnity.Data
                 max_undo_count = networkStage.maxUndoCount,
                 available_blocks = networkStage.availableBlocks?.Select(bt => (int)bt).ToArray() ?? new int[0],
                 initial_board_state = null, // TODO: JSON 파싱 구현
-                hints = new string[0],
-                special_rules = new SpecialRules(),
-                generation_info = new GenerationInfo()
+                hints = new string[0]
             };
         }
-        
 
         /// <summary>
         /// API 기반 스테이지 언락 상태 확인
@@ -445,21 +408,21 @@ namespace BlokusUnity.Data
         {
             if (stageNumber == 1)
                 return true; // 첫 스테이지는 항상 언락
-            
+
             // API 서버 진행도 확인
             if (UserDataCache.Instance != null && enableApiIntegration)
             {
                 int maxCleared = UserDataCache.Instance.GetMaxClearedStage();
                 return stageNumber <= maxCleared + 1; // 다음 스테이지까지 언락
             }
-            
+
             // API StageManager 확인
             if (apiStageManager != null)
             {
                 var progress = apiStageManager.GetStageProgress(stageNumber);
                 return progress.isUnlocked;
             }
-            
+
             // 기본값: 순차적 언락 시스템 (첫 10개 스테이지)
             return stageNumber <= 10;
         }
@@ -474,7 +437,7 @@ namespace BlokusUnity.Data
             {
                 return UserDataCache.Instance.GetStageProgress(stageNumber);
             }
-            
+
             // API StageManager 진행도 폴백
             if (apiStageManager != null)
             {
@@ -485,7 +448,7 @@ namespace BlokusUnity.Data
                     return ConvertLocalProgressToNetwork(localProgress, stageNumber);
                 }
             }
-            
+
             // 기본 진행도 반환
             return new NetworkUserStageProgress
             {
@@ -522,10 +485,9 @@ namespace BlokusUnity.Data
         {
             string apiStatus = enableApiIntegration ? "활성" : "비활성";
             string serverStatus = useServerData ? "활성" : "비활성";
-            string currentStage = currentSelectedStage != null ? $"{currentSelectedStageNumber}: {currentSelectedStage.stageName}" : "없음";
             string cacheInfo = UserDataCache.Instance?.GetCacheStatusInfo() ?? "없음";
-            
-            return $"API연동: {apiStatus}, 서버연동: {serverStatus}, 현재스테이지: {currentStage}, 캐시: {cacheInfo}";
+
+            return $"API연동: {apiStatus}, 서버연동: {serverStatus}, 캐시: {cacheInfo}";
         }
 
         /// <summary>
@@ -536,13 +498,13 @@ namespace BlokusUnity.Data
             if (HttpApiClient.Instance != null && UserDataCache.Instance.IsLoggedIn() && enableApiIntegration)
             {
                 Debug.Log($"API 서버에서 스테이지 {stageNumber} 데이터 새로고침");
-                
+
                 // 스테이지 메타데이터 새로고침
                 HttpApiClient.Instance.GetStageList();
-                
+
                 // 구체적인 스테이지 데이터 새로고침
                 HttpApiClient.Instance.GetStageData(stageNumber);
-                
+
                 // 사용자 진행도 새로고침
                 HttpApiClient.Instance.GetUserProgress(stageNumber);
             }

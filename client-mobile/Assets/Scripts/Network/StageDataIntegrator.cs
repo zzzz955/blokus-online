@@ -8,7 +8,7 @@ using BlokusUnity.Game;
 using BlokusUnity.Network;
 using NetworkStageData = BlokusUnity.Network.StageData;
 using NetworkUserStageProgress = BlokusUnity.Network.UserStageProgress;
-using ApiStageData = BlokusUnity.Network.HttpApiClient.StageData;
+using ApiStageData = BlokusUnity.Network.HttpApiClient.ApiStageData;
 
 namespace BlokusUnity.Network
 {

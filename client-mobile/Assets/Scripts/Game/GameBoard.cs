@@ -680,7 +680,7 @@ namespace BlokusUnity.Game
                     }
                     else
                     {
-                        Debug.LogWarning($"[GameBoard] Canvas 크기가 잘못됨, 클램핑 없이 직접 사용: {canvasSize}");
+                        // Debug.LogWarning($"[GameBoard] Canvas 크기가 잘못됨, 클램핑 없이 직접 사용: {canvasSize}");
                     }
                     
                     // 실제 위치 설정

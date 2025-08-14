@@ -59,21 +59,8 @@ namespace BlokusUnity.Game
 
         public void InitializePalette(List<BlockType> blocks, PlayerColor player)
         {
-            if (blockContainer == null)
-            {
-                Debug.LogError("[BlockPalette] blockContainer(Content)가 연결되지 않았습니다.");
-                return;
-            }
-
             _player = player;
             Clear();
-
-            if (blocks == null || blocks.Count == 0)
-            {
-                Debug.LogWarning("[BlockPalette] 블록 리스트가 비어있습니다.");
-                return;
-            }
-
             foreach (var type in blocks)
             {
                 var btn = CreateButton(type, player);
@@ -133,17 +120,6 @@ namespace BlokusUnity.Game
                 return;
             }
 
-            if (blockContainer == null)
-            {
-                Debug.LogError("[BlockPalette] blockContainer가 비어 있습니다.");
-                return;
-            }
-            if (blockButtonPrefab == null)
-            {
-                Debug.LogError("[BlockPalette] blockButtonPrefab이 비어 있습니다. 프리팹을 반드시 연결하세요.");
-                return;
-            }
-
             // 프리팹 복원
             var go = Instantiate(blockButtonPrefab, blockContainer);
             var blockButton = go.GetComponent<BlockButton>();
@@ -178,7 +154,6 @@ namespace BlokusUnity.Game
             {
                 blockButton.SetSelected(true);
                 _currentSelectedButton = blockButton;
-                Debug.Log($"[BlockPalette] 복원된 블록 {type} 선택 상태 유지");
             }
 
             LayoutRebuilder.ForceRebuildLayoutImmediate(blockContainer);
@@ -209,7 +184,7 @@ namespace BlokusUnity.Game
                 _currentSelectedButton = selectedButton;
             }
             
-            Debug.Log($"[BlockPalette] 블록 선택: {blockType} - 연한 레몬색 배경 표시");
+            // Debug.Log($"[BlockPalette] 블록 선택: {blockType}");
             OnBlockSelected?.Invoke(_selectedBlock);
         }
 
@@ -218,7 +193,7 @@ namespace BlokusUnity.Game
             if (_selectedBlock == null) return;
             if (clockwise) _selectedBlock.RotateClockwise();
             else _selectedBlock.RotateCounterClockwise();
-            Debug.Log($"[BlockPalette] 선택된 블록 {_selectedType} 회전 - {(clockwise ? "시계방향" : "반시계방향")}");
+            // Debug.Log($"[BlockPalette] 선택된 블록 {_selectedType} 회전 - {(clockwise ? "시계방향" : "반시계방향")}");
             OnBlockSelected?.Invoke(_selectedBlock);
         }
 
@@ -227,7 +202,7 @@ namespace BlokusUnity.Game
             if (_selectedBlock == null) return;
             if (vertical) _selectedBlock.FlipVertical();
             else _selectedBlock.FlipHorizontal();
-            Debug.Log($"[BlockPalette] 선택된 블록 {_selectedType} 플립 - {(vertical ? "수직" : "수평")}");
+            // Debug.Log($"[BlockPalette] 선택된 블록 {_selectedType} 플립 - {(vertical ? "수직" : "수평")}");
             OnBlockSelected?.Invoke(_selectedBlock);
         }
 

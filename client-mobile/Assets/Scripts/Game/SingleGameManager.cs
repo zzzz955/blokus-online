@@ -182,7 +182,7 @@ namespace BlokusUnity.Game
                 {
                     // TODO: GameLogic에 장애물 설정 메서드가 있다면 호출
                     // logic.SetObstacle(obstaclePos);
-                    Debug.Log($"[SingleGame] 장애물 설정: ({obstaclePos.row}, {obstaclePos.col})");
+                    // Debug.Log($"[SingleGame] 장애물 설정: ({obstaclePos.row}, {obstaclePos.col})");
                 }
                 Debug.Log($"[SingleGame] 장애물 {initialBoard.obstacles.Count}개 적용됨");
             }
@@ -198,11 +198,11 @@ namespace BlokusUnity.Game
                     {
                         // 배치 히스토리에 추가 (Undo 대상에서 제외하려면 별도 리스트 관리 필요)
                         placements.Add(placement);
-                        Debug.Log($"[SingleGame] 사전 배치 블록: {placement.type} at ({placement.position.row}, {placement.position.col})");
+                        // Debug.Log($"[SingleGame] 사전 배치 블록: {placement.type} at ({placement.position.row}, {placement.position.col})");
                     }
                     else
                     {
-                        Debug.LogWarning($"[SingleGame] 사전 배치 블록 실패: {placement.type} at ({placement.position.row}, {placement.position.col})");
+                        // Debug.LogWarning($"[SingleGame] 사전 배치 블록 실패: {placement.type} at ({placement.position.row}, {placement.position.col})");
                     }
                 }
                 Debug.Log($"[SingleGame] 사전 배치 블록 {initialBoard.preplaced.Count}개 중 {placements.Count}개 적용됨");
@@ -295,7 +295,7 @@ namespace BlokusUnity.Game
         {
             if (block != null)
             {
-                Debug.Log($"[SingleGameManager] 블록 선택됨: {block.Type}");
+                // Debug.Log($"[SingleGameManager] 블록 선택됨: {block.Type}");
                 _currentSelectedBlock = block; // 선택된 블록 저장
             }
             else
@@ -303,7 +303,7 @@ namespace BlokusUnity.Game
                 // Undo 진행 중이면 ClearTouchPreview 호출 안함 (UI 충돌 방지)
                 if (!_undoInProgress)
                 {
-                    Debug.Log("[SingleGameManager] 블록 선택 해제됨");
+                    // Debug.Log("[SingleGameManager] 블록 선택 해제됨");
                     _currentSelectedBlock = null;
                     // 기존 미리보기와 ActionButtonPanel 클리어
                     gameBoard?.ClearTouchPreview();
@@ -313,12 +313,12 @@ namespace BlokusUnity.Game
 
         private void OnBoardCellClicked(Position pos)
         {
-            Debug.Log($"[SingleGameManager] 보드 클릭: ({pos.row}, {pos.col})");
-            Debug.Log($"[SingleGameManager] 현재 선택된 블록: {(_currentSelectedBlock?.Type.ToString() ?? "없음")}");
+            // Debug.Log($"[SingleGameManager] 보드 클릭: ({pos.row}, {pos.col})");
+            // Debug.Log($"[SingleGameManager] 현재 선택된 블록: {(_currentSelectedBlock?.Type.ToString() ?? "없음")}");
 
             if (_currentSelectedBlock != null)
             {
-                Debug.Log($"[SingleGameManager] 블록 미리보기 설정 시도: {_currentSelectedBlock.Type} at ({pos.row}, {pos.col})");
+                // Debug.Log($"[SingleGameManager] 블록 미리보기 설정 시도: {_currentSelectedBlock.Type} at ({pos.row}, {pos.col})");
 
                 if (gameBoard != null)
                 {
@@ -428,7 +428,7 @@ namespace BlokusUnity.Game
 
         private void RebuildBoardOnlyFromPlacements()
         {
-            Debug.Log($"[SingleGame] Undo 보드 재구성 시작 - placements 개수: {placements.Count}");
+            // Debug.Log($"[SingleGame] Undo 보드 재구성 시작 - placements 개수: {placements.Count}");
             
             // 로직 리셋 (UI 업데이트 없이)
             logic = new BlokusUnity.Common.GameLogic();
@@ -442,7 +442,7 @@ namespace BlokusUnity.Game
 
             // ★ 블록 재적용 후 UI 업데이트 필수
             gameBoard.RefreshBoard();
-            Debug.Log("[SingleGame] Undo 보드 재구성 완료");
+            // Debug.Log("[SingleGame] Undo 보드 재구성 완료");
         }
 
     }

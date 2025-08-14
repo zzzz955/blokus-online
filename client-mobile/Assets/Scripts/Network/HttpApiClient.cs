@@ -15,6 +15,7 @@ namespace BlokusUnity.Network
     {
         [Header("API 서버 설정")]
         [SerializeField] private string apiBaseUrl = "http://localhost:8080/api";
+        public string ApiBaseUrl => apiBaseUrl;
         [SerializeField] private int requestTimeoutSeconds = 10;
         
         // 인증 토큰
@@ -29,7 +30,7 @@ namespace BlokusUnity.Network
         public static HttpApiClient Instance { get; private set; }
         
         // 이벤트 - API 응답용 StageData 사용
-        public event System.Action<StageData> OnStageDataReceived;
+        public event System.Action<ApiStageData> OnStageDataReceived;
         public event System.Action<UserStageProgress> OnStageProgressReceived;
         public event System.Action<bool, string> OnStageCompleteResponse;
         public event System.Action<UserProfile> OnUserProfileReceived;
@@ -389,7 +390,7 @@ namespace BlokusUnity.Network
         /// </summary>
         public void GetStageData(int stageNumber)
         {
-            StartCoroutine(SendGetRequest<StageData>(
+            StartCoroutine(SendGetRequest<ApiStageData>(
                 $"stages/{stageNumber}",
                 response => OnStageDataReceived?.Invoke(response),
                 error => Debug.LogWarning($"스테이지 {stageNumber} 데이터 요청 실패: {error}")
@@ -651,7 +652,7 @@ namespace BlokusUnity.Network
         
         // 스테이지 관련 데이터 구조체들 - API 응답 구조에 맞춤
         [System.Serializable]
-        public class StageData
+        public class ApiStageData
         {
             public int stage_number;
             public string title;

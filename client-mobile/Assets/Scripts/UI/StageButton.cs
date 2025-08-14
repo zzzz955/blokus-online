@@ -51,25 +51,14 @@ namespace BlokusUnity.UI
         
 void Awake()
 {
-    Debug.Log($"=== StageButton Awake: {gameObject.name} ===");
-    
-    // Inspector에서 할당된 컴포넌트들을 사용
-    // null 체크만 수행하고 자동 할당은 하지 않음
-    
-    // 컴포넌트 할당 상태 확인
-    Debug.Log($"Button: {button != null}");
-    Debug.Log($"StageNumberText: {stageNumberText != null}");
-    Debug.Log($"BackgroundImage: {backgroundImage != null}");
-    Debug.Log($"LockIcon: {lockIcon != null}");
-    
     if (button != null)
     {
         button.onClick.AddListener(OnButtonClicked);
-        Debug.Log("Button onClick 리스너 등록 완료");
+        // // debug.Log("Button onClick 리스너 등록 완료");
     }
     else
     {
-        Debug.LogError($"StageButton {gameObject.name}: Button 컴포넌트가 할당되지 않았습니다!");
+        // debug.LogError($"StageButton {gameObject.name}: Button 컴포넌트가 할당되지 않았습니다!");
     }
     
     // stageNumberText 기본값 설정 (초기 표시용)
@@ -78,7 +67,7 @@ void Awake()
         if (stageNumberText.text == "New Text" || string.IsNullOrEmpty(stageNumberText.text))
         {
             stageNumberText.text = "?";
-            Debug.Log("stageNumberText 기본값 설정: ?");
+            // // debug.Log("stageNumberText 기본값 설정: ?");
         }
     }
 }
@@ -91,7 +80,7 @@ void Awake()
         /// <param name="clickCallback">클릭시 호출될 콜백</param>
         public void Initialize(int stageNum, System.Action<int> clickCallback)
         {
-            Debug.Log($"=== StageButton Initialize: 스테이지 {stageNum} ===");
+            // // debug.Log($"=== StageButton Initialize: 스테이지 {stageNum} ===");
             
             stageNumber = stageNum;
             onClickCallback = clickCallback;
@@ -101,18 +90,18 @@ void Awake()
             {
                 string newText = stageNumber.ToString();
                 stageNumberText.text = newText;
-                Debug.Log($"스테이지 번호 설정: {newText}");
-                Debug.Log($"설정 후 텍스트 확인: '{stageNumberText.text}'");
+                // // debug.Log($"스테이지 번호 설정: {newText}");
+                // // debug.Log($"설정 후 텍스트 확인: '{stageNumberText.text}'");
             }
             else
             {
-                Debug.LogError($"StageButton {stageNumber}: stageNumberText가 할당되지 않았습니다!");
+                // // debug.LogError($"StageButton {stageNumber}: stageNumberText가 할당되지 않았습니다!");
             }
             
             // 초기 상태: 잠김
             UpdateState(false, null);
             
-            Debug.Log($"Initialize 완료: 스테이지 {stageNumber}");
+            // // debug.Log($"Initialize 완료: 스테이지 {stageNumber}");
         }
         
         /// <summary>
@@ -152,7 +141,7 @@ void Awake()
         {
             if (backgroundImage == null) 
             {
-                Debug.LogWarning($"StageButton {stageNumber}: backgroundImage가 할당되지 않았습니다!");
+                // debug.LogWarning($"StageButton {stageNumber}: backgroundImage가 할당되지 않았습니다!");
                 return;
             }
             
@@ -189,13 +178,13 @@ void Awake()
             {
                 backgroundImage.sprite = targetSprite;
                 backgroundImage.color = Color.white; // 스프라이트 사용시 색상 취소
-                Debug.Log($"스테이지 {stageNumber}: 스프라이트 설정 - {targetSprite.name}");
+                // debug.Log($"스테이지 {stageNumber}: 스프라이트 설정 - {targetSprite.name}");
             }
             else
             {
                 // 스프라이트가 없으면 색상만 변경 (Fallback)
                 backgroundImage.color = targetColor;
-                Debug.Log($"스테이지 {stageNumber}: 색상 설정 - {targetColor}");
+                // debug.Log($"스테이지 {stageNumber}: 색상 설정 - {targetColor}");
             }
         }
         
@@ -206,11 +195,11 @@ void Awake()
         {
             if (starIcons == null || starIcons.Length == 0) 
             {
-                Debug.Log($"스테이지 {stageNumber}: starIcons 배열이 비어있습니다.");
+                // debug.Log($"스테이지 {stageNumber}: starIcons 배열이 비어있습니다.");
                 return;
             }
             
-            Debug.Log($"스테이지 {stageNumber}: 별 아이콘 업데이트 - 획득한 별: {starsEarned}/{starIcons.Length}");
+            // debug.Log($"스테이지 {stageNumber}: 별 아이콘 업데이트 - 획득한 별: {starsEarned}/{starIcons.Length}");
             
             for (int i = 0; i < starIcons.Length; i++)
             {
@@ -235,7 +224,7 @@ void Awake()
                             // 스프라이트가 없으면 색상만 변경
                             starIcons[i].color = activeStarColor;
                         }
-                        Debug.Log($"별 {i+1}: 활성화됨");
+                        // debug.Log($"별 {i+1}: 활성화됨");
                     }
                     else
                     {
@@ -250,12 +239,12 @@ void Awake()
                             // 스프라이트가 없으면 색상만 변경
                             starIcons[i].color = inactiveStarColor;
                         }
-                        Debug.Log($"별 {i+1}: 비활성화됨");
+                        // debug.Log($"별 {i+1}: 비활성화됨");
                     }
                 }
                 else
                 {
-                    Debug.LogWarning($"스테이지 {stageNumber}: starIcons[{i}]가 null입니다!");
+                    // debug.LogWarning($"스테이지 {stageNumber}: starIcons[{i}]가 null입니다!");
                 }
             }
         }
@@ -268,11 +257,11 @@ void Awake()
             if (lockIcon != null)
             {
                 lockIcon.gameObject.SetActive(!isUnlocked);
-                Debug.Log($"스테이지 {stageNumber}: 잠금 아이콘 {(!isUnlocked ? "표시" : "숨김")}");
+                // debug.Log($"스테이지 {stageNumber}: 잠금 아이콘 {(!isUnlocked ? "표시" : "숨김")}");
             }
             else
             {
-                Debug.Log($"스테이지 {stageNumber}: lockIcon이 할당되지 않음 (상태별 스프라이트를 사용하세요)");
+                // debug.Log($"스테이지 {stageNumber}: lockIcon이 할당되지 않음 (상태별 스프라이트를 사용하세요)");
             }
         }
         
@@ -285,7 +274,7 @@ void Awake()
             if (stageNumberText != null)
             {
                 stageNumberText.color = isUnlocked ? Color.black : Color.white;
-                Debug.Log($"스테이지 {stageNumber}: 텍스트 색상 설정 - {(isUnlocked ? "Black (Unlocked)" : "White (Locked)")}");
+                // debug.Log($"스테이지 {stageNumber}: 텍스트 색상 설정 - {(isUnlocked ? "Black (Unlocked)" : "White (Locked)")}");
             }
         }
         
@@ -319,7 +308,7 @@ void Awake()
         private void PlayClickEffect()
         {
             // TODO: 사운드 재생, 스케일 애니메이션 등
-            Debug.Log($"스테이지 {stageNumber} 버튼 클릭");
+            // debug.Log($"스테이지 {stageNumber} 버튼 클릭");
             
             // 간단한 스케일 애니메이션 (예시)
             StartCoroutine(ScaleAnimation());
@@ -331,7 +320,7 @@ void Awake()
         private void PlayLockedClickEffect()
         {
             // TODO: 잠김 사운드, 흔들림 애니메이션 등
-            Debug.Log($"스테이지 {stageNumber} 잠김 - 클릭 불가");
+            // debug.Log($"스테이지 {stageNumber} 잠김 - 클릭 불가");
             
             // 간단한 흔들림 애니메이션 (예시)
             StartCoroutine(ShakeAnimation());

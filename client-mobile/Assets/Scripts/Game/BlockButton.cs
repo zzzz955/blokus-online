@@ -69,7 +69,7 @@ namespace BlokusUnity.Game
                 _ => Color.white
             };
             
-            Debug.Log($"[BlockButton] 기본 색상 사용: {finalColor}");
+            // Debug.Log($"[BlockButton] 기본 색상 사용: {finalColor}");
             return finalColor;
         }
 
@@ -342,13 +342,13 @@ namespace BlokusUnity.Game
             {
                 // 선택 상태: 연한 레몬색 배경
                 _img.color = _selectedColor;
-                Debug.Log($"[BlockButton] 블록 {Type} 선택됨 - 배경색: {_selectedColor}");
+                // Debug.Log($"[BlockButton] 블록 {Type} 선택됨 - 배경색: {_selectedColor}");
             }
             else
             {
                 // 선택 해제: 원래 투명 배경으로 복원
                 _img.color = _originalBackgroundColor;
-                Debug.Log($"[BlockButton] 블록 {Type} 선택 해제됨 - 배경색: {_originalBackgroundColor}");
+                // Debug.Log($"[BlockButton] 블록 {Type} 선택 해제됨 - 배경색: {_originalBackgroundColor}");
             }
         }
 
