@@ -153,10 +153,10 @@ namespace BlokusUnity.Common
             foreach (var block in preplaced)
             {
                 var placement = new BlockPlacement(
-                    BlockType.MONO, // Default block type, will be determined by game logic
+                    BlockType.Single, // Default block type, will be determined by game logic
                     new Position(block.x, block.y),
-                    Rotation.Rot0, // Default rotation
-                    FlipState.None, // Default flip state
+                    Rotation.Degree_0, // Default rotation
+                    FlipState.Normal, // Default flip state
                     (PlayerColor)block.color
                 );
                 result.Add(placement);
@@ -195,10 +195,10 @@ namespace BlokusUnity.Common
                 if (blockArray.Length >= 3)
                 {
                     var placement = new BlockPlacement(
-                        BlockType.MONO, // Default block type
+                        BlockType.Single, // Default block type
                         new Position(blockArray[0], blockArray[1]),
-                        Rotation.Rot0, // Default rotation
-                        FlipState.None, // Default flip state
+                        Rotation.Degree_0, // Default rotation
+                        FlipState.Normal, // Default flip state
                         (PlayerColor)blockArray[2]
                     );
                     result.Add(placement);

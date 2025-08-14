@@ -3,6 +3,8 @@ using UnityEngine;
 using UnityEngine.UI;
 using BlokusUnity.Network;
 using BlokusUnity.Data;
+using NetworkUserStageProgress = BlokusUnity.Network.UserStageProgress;
+using GameUserStageProgress = BlokusUnity.Game.UserStageProgress;
 
 namespace BlokusUnity.UI
 {
@@ -216,25 +218,14 @@ namespace BlokusUnity.UI
             bool isUnlocked = StageDataIntegrator.Instance?.IsStageUnlocked(stageInfo.n) ?? (stageInfo.n == 1);
             
             // 사용자 진행도 정보 가져오기 (캐시에서)
-            var userProgress = UserDataCache.Instance?.GetStageProgress(stageInfo.n);
-            int starsEarned = userProgress?.starsEarned ?? 0;
-            int bestScore = userProgress?.bestScore ?? 0;
-            bool isCompleted = userProgress?.isCompleted ?? false;
+            var networkProgress = UserDataCache.Instance?.GetStageProgress(stageInfo.n);
+            var gameProgress = ConvertToGameUserProgress(networkProgress);
             
-            // 스테이지 버튼 설정
-            stageButton.SetupStageButton(
-                stageInfo.n,           // stageNumber
-                stageInfo.t,           // title
-                stageInfo.d,           // difficulty
-                stageInfo.o,           // optimalScore
-                starsEarned,
-                bestScore,
-                isCompleted,
-                isUnlocked
-            );
+            // StageButton 초기화 (별도 파일의 StageButton 인터페이스 사용)
+            stageButton.Initialize(stageInfo.n, HandleStageButtonClicked);
             
-            // 클릭 이벤트 연결
-            stageButton.OnStageButtonClicked += HandleStageButtonClicked;
+            // 상태 업데이트
+            stageButton.UpdateState(isUnlocked, gameProgress);
             
             stageButtons.Add(stageButton);
         }
@@ -246,30 +237,20 @@ namespace BlokusUnity.UI
         {
             foreach (var button in stageButtons)
             {
-                if (button != null)
+                if (button != null && button.gameObject != null)
                 {
-                    button.OnStageButtonClicked -= HandleStageButtonClicked;
-                    if (button.gameObject != null)
-                    {
-                        Destroy(button.gameObject);
-                    }
+                    Destroy(button.gameObject);
                 }
             }
             stageButtons.Clear();
         }
         
         /// <summary>
-        /// 스테이지 버튼 클릭 처리
+        /// 스테이지 버튼 클릭 처리 (별도 파일의 StageButton 콜백)
         /// </summary>
-        private void HandleStageButtonClicked(int stageNumber, bool isUnlocked)
+        private void HandleStageButtonClicked(int stageNumber)
         {
-            if (!isUnlocked)
-            {
-                Debug.LogWarning($"[StageSelection] 스테이지 {stageNumber}은 아직 잠겨있습니다!");
-                // TODO: 잠긴 스테이지 알림 UI 표시
-                return;
-            }
-            
+            // 언락 상태는 StageButton에서 이미 확인함
             Debug.Log($"[StageSelection] 스테이지 {stageNumber} 선택됨");
             
             // 선택된 스테이지 번호를 PlayerPrefs에 저장 (부트스트랩에서 사용)
@@ -297,134 +278,37 @@ namespace BlokusUnity.UI
             var stageButton = stageButtons.Find(btn => btn.StageNumber == stageNumber);
             if (stageButton != null)
             {
+                // 언락 상태 확인
+                bool isUnlocked = StageDataIntegrator.Instance?.IsStageUnlocked(stageNumber) ?? (stageNumber == 1);
+                
                 // 캐시에서 최신 진행도 가져와서 업데이트
-                var userProgress = UserDataCache.Instance?.GetStageProgress(stageNumber);
-                if (userProgress != null)
-                {
-                    stageButton.UpdateProgress(
-                        userProgress.starsEarned,
-                        userProgress.bestScore,
-                        userProgress.isCompleted
-                    );
-                }
-            }
-        }
-    }
-    
-    /// <summary>
-    /// 개별 스테이지 버튼 컴포넌트
-    /// </summary>
-    public class StageButton : MonoBehaviour
-    {
-        [Header("UI References")]
-        [SerializeField] private Button button;
-        [SerializeField] private Text stageNumberText;
-        [SerializeField] private Text titleText;
-        [SerializeField] private Text difficultyText;
-        [SerializeField] private Text starsText;
-        [SerializeField] private Text bestScoreText;
-        [SerializeField] private Image lockIcon;
-        [SerializeField] private Image completedIcon;
-        
-        public int StageNumber { get; private set; }
-        
-        // 이벤트
-        public event System.Action<int, bool> OnStageButtonClicked; // stageNumber, isUnlocked
-        
-        void Awake()
-        {
-            if (button == null) button = GetComponent<Button>();
-            if (button != null)
-            {
-                button.onClick.AddListener(OnButtonClicked);
+                var networkProgress = UserDataCache.Instance?.GetStageProgress(stageNumber);
+                var gameProgress = ConvertToGameUserProgress(networkProgress);
+                
+                // 상태 업데이트 (별도 파일의 StageButton 인터페이스 사용)
+                stageButton.UpdateState(isUnlocked, gameProgress);
             }
         }
         
         /// <summary>
-        /// 스테이지 버튼 설정
+        /// 네트워크 진행도를 게임 진행도로 변환
         /// </summary>
-        public void SetupStageButton(int stageNumber, string title, int difficulty, int optimalScore, 
-                                   int starsEarned, int bestScore, bool isCompleted, bool isUnlocked)
+        private GameUserStageProgress ConvertToGameUserProgress(NetworkUserStageProgress networkProgress)
         {
-            StageNumber = stageNumber;
+            if (networkProgress == null) return null;
             
-            // 기본 정보 설정
-            if (stageNumberText != null)
-                stageNumberText.text = stageNumber.ToString();
-            
-            if (titleText != null)
-                titleText.text = title;
-            
-            if (difficultyText != null)
-                difficultyText.text = $"난이도: {difficulty}";
-            
-            // 진행도 정보 설정
-            UpdateProgress(starsEarned, bestScore, isCompleted);
-            
-            // 잠김 상태 설정
-            SetLockedState(!isUnlocked);
-        }
-        
-        /// <summary>
-        /// 진행도 업데이트
-        /// </summary>
-        public void UpdateProgress(int starsEarned, int bestScore, bool isCompleted)
-        {
-            if (starsText != null)
+            return new GameUserStageProgress
             {
-                string starDisplay = "";
-                for (int i = 0; i < 3; i++)
-                {
-                    starDisplay += i < starsEarned ? "⭐" : "☆";
-                }
-                starsText.text = starDisplay;
-            }
-            
-            if (bestScoreText != null)
-            {
-                bestScoreText.text = bestScore > 0 ? $"최고: {bestScore}점" : "미플레이";
-            }
-            
-            if (completedIcon != null)
-            {
-                completedIcon.gameObject.SetActive(isCompleted);
-            }
-        }
-        
-        /// <summary>
-        /// 잠김 상태 설정
-        /// </summary>
-        public void SetLockedState(bool isLocked)
-        {
-            if (button != null)
-            {
-                button.interactable = !isLocked;
-            }
-            
-            if (lockIcon != null)
-            {
-                lockIcon.gameObject.SetActive(isLocked);
-            }
-            
-            // 잠긴 스테이지는 반투명하게 표시
-            if (isLocked)
-            {
-                var canvasGroup = GetComponent<CanvasGroup>();
-                if (canvasGroup == null)
-                {
-                    canvasGroup = gameObject.AddComponent<CanvasGroup>();
-                }
-                canvasGroup.alpha = 0.5f;
-            }
-        }
-        
-        /// <summary>
-        /// 버튼 클릭 처리
-        /// </summary>
-        private void OnButtonClicked()
-        {
-            bool isUnlocked = button != null && button.interactable;
-            OnStageButtonClicked?.Invoke(StageNumber, isUnlocked);
+                stageNumber = networkProgress.stageNumber,
+                isCompleted = networkProgress.isCompleted,
+                starsEarned = networkProgress.starsEarned,
+                bestScore = networkProgress.bestScore,
+                bestCompletionTime = networkProgress.bestCompletionTime,
+                totalAttempts = networkProgress.totalAttempts,
+                successfulAttempts = networkProgress.successfulAttempts,
+                firstPlayedAt = networkProgress.firstPlayedAt,
+                lastPlayedAt = networkProgress.lastPlayedAt
+            };
         }
     }
 }
