@@ -65,6 +65,7 @@ export default function Header() {
     { name: '대시보드', href: '/admin/dashboard' },
     { name: '공지', href: '/admin/announcements' },
     { name: '패치', href: '/admin/patch-notes' },
+    { name: '스테이지', href: '/admin/stages' },
     { name: '후기', href: '/admin/testimonials' },
     { name: '게시글', href: '/admin/posts' },
     { name: '통계', href: '/admin/stats' },

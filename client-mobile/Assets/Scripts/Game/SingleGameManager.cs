@@ -128,12 +128,16 @@ namespace BlokusUnity.Game
             logic = new GameLogic();
             placements.Clear();
 
-            RemainingUndo = Mathf.Max(0, maxUndo);
+            // API 데이터가 있으면 최대 언두 횟수 적용
+            RemainingUndo = Mathf.Max(0, payload.MaxUndoCount > 0 ? payload.MaxUndoCount : maxUndo);
             OnUndoCountChanged?.Invoke(RemainingUndo);
 
             // GameBoard 세팅
             gameBoard.SetGameLogic(logic);
             gameBoard.ClearBoard();
+
+            // 초기 보드 상태 적용 (장애물, 사전 배치된 블록 등)
+            ApplyInitialBoardState(payload.InitialBoard);
 
             // 블록 세팅
             var blocks = (payload.AvailableBlocks != null && payload.AvailableBlocks.Length > 0)
@@ -151,15 +155,96 @@ namespace BlokusUnity.Game
             gameBoard.OnBlockPlaced += OnBlockPlacedToBoard;
             gameBoard.OnCellClicked += OnBoardCellClicked;
 
-            Debug.Log($"[SingleGame] Start - Stage: {payload.StageName ?? "Unknown"}, Board: {payload.BoardSize}");
+            Debug.Log($"[SingleGame] Start - Stage: {payload.StageName ?? "Unknown"} (#{payload.StageNumber}), " +
+                     $"Board: {payload.BoardSize}, Difficulty: {payload.Difficulty}, " +
+                     $"TimeLimit: {(payload.TimeLimit > 0 ? payload.TimeLimit + "s" : "무제한")}, " +
+                     $"MaxUndo: {RemainingUndo}");
+            
             startTimeRealtime = Time.realtimeSinceStartup;
             IsInitialized = true;
+        }
+        
+        /// <summary>
+        /// 초기 보드 상태 적용 (API에서 받은 장애물과 사전 배치 블록들)
+        /// </summary>
+        private void ApplyInitialBoardState(InitialBoardData initialBoard)
+        {
+            if (initialBoard == null)
+            {
+                Debug.Log("[SingleGame] 초기 보드 상태 데이터가 없습니다. 빈 보드로 시작합니다.");
+                return;
+            }
+            
+            // 장애물 적용
+            if (initialBoard.obstacles != null && initialBoard.obstacles.Count > 0)
+            {
+                foreach (var obstaclePos in initialBoard.obstacles)
+                {
+                    // TODO: GameLogic에 장애물 설정 메서드가 있다면 호출
+                    // logic.SetObstacle(obstaclePos);
+                    Debug.Log($"[SingleGame] 장애물 설정: ({obstaclePos.row}, {obstaclePos.col})");
+                }
+                Debug.Log($"[SingleGame] 장애물 {initialBoard.obstacles.Count}개 적용됨");
+            }
+            
+            // 사전 배치된 블록들 적용
+            if (initialBoard.preplaced != null && initialBoard.preplaced.Count > 0)
+            {
+                foreach (var placement in initialBoard.preplaced)
+                {
+                    // 게임 로직에 블록 배치
+                    bool placed = logic.PlaceBlock(placement);
+                    if (placed)
+                    {
+                        // 배치 히스토리에 추가 (Undo 대상에서 제외하려면 별도 리스트 관리 필요)
+                        placements.Add(placement);
+                        Debug.Log($"[SingleGame] 사전 배치 블록: {placement.type} at ({placement.position.row}, {placement.position.col})");
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[SingleGame] 사전 배치 블록 실패: {placement.type} at ({placement.position.row}, {placement.position.col})");
+                    }
+                }
+                Debug.Log($"[SingleGame] 사전 배치 블록 {initialBoard.preplaced.Count}개 중 {placements.Count}개 적용됨");
+            }
         }
 
         public void OnExitRequested()
         {
             Debug.Log($"[SingleGame] ExitRequested - elapsed={ElapsedSeconds}s");
-            // TODO: 여기서 네트워크 업로드/세이브 등 필요한 후처리
+            
+            // 현재 점수 계산
+            var scores = logic?.CalculateScores();
+            int currentScore = scores?.ContainsKey(playerColor) == true ? scores[playerColor] : 0;
+            
+            // 스테이지 완료 보고 (완료되지 않은 상태로)
+            ReportStageCompletion(currentScore, false);
+        }
+        
+        /// <summary>
+        /// 스테이지 완료 보고
+        /// </summary>
+        private void ReportStageCompletion(int score, bool completed)
+        {
+            // 현재 스테이지 번호 확인
+            int stageNumber = CurrentStage;
+            if (stageNumber <= 0)
+            {
+                Debug.LogWarning("[SingleGame] 스테이지 번호를 확인할 수 없어 완료 보고를 건너뜁니다.");
+                return;
+            }
+            
+            // StageDataIntegrator를 통한 완료 보고
+            var integrator = BlokusUnity.Network.StageDataIntegrator.Instance;
+            if (integrator != null)
+            {
+                integrator.ReportStageCompletion(stageNumber, score, ElapsedSeconds, completed);
+                Debug.Log($"[SingleGame] 스테이지 {stageNumber} 완료 보고: 점수={score}, 시간={ElapsedSeconds}s, 완료={completed}");
+            }
+            else
+            {
+                Debug.LogWarning("[SingleGame] StageDataIntegrator를 찾을 수 없어 완료 보고를 건너뜁니다.");
+            }
         }
 
         /// <summary>
@@ -290,6 +375,10 @@ namespace BlokusUnity.Game
                 var scores = logic.CalculateScores();
                 int myScore = scores.ContainsKey(playerColor) ? scores[playerColor] : 0;
                 Debug.Log($"[SingleGame] Finished. Score={myScore}");
+                
+                // 스테이지 완료 보고 (성공)
+                ReportStageCompletion(myScore, true);
+                
                 OnGameFinished?.Invoke(myScore);
             }
         }

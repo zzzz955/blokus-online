@@ -5,7 +5,6 @@ const dbService = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 const { validateStageNumber, requireJson, validateStageCompletion } = require('../middleware/validation');
 const { body, param, query, validationResult } = require('express-validator');
-const StageGenerator = require('../utils/stageGenerator');
 
 /**
  * GET /api/stages/metadata
@@ -21,24 +20,29 @@ router.get('/metadata',
         username: req.user.username
       });
 
-      // 프로시저럴 스테이지 생성기 사용
-      const stageGenerator = new StageGenerator();
-      const stageMetadata = [];
-      
-      // 1000개 스테이지 메타데이터 생성
-      for (let i = 1; i <= 1000; i++) {
-        const stageData = stageGenerator.generateStage(i);
-        stageMetadata.push({
-          stage_number: stageData.stage_number,
-          title: stageData.title,
-          difficulty: stageData.difficulty,
-          optimal_score: stageData.optimal_score,
-          time_limit: stageData.time_limit,
-          thumbnail_url: stageData.thumbnail_url,
-          preview_description: stageData.preview_description,
-          category: stageData.category
-        });
-      }
+      // 데이터베이스에서 모든 활성 스테이지 조회
+      const query = `
+        SELECT 
+          stage_number,
+          CONCAT('스테이지 ', stage_number) as title,
+          difficulty,
+          optimal_score,
+          time_limit,
+          thumbnail_url,
+          stage_description as preview_description,
+          CASE 
+            WHEN stage_number <= 50 THEN 'tutorial'
+            WHEN stage_number <= 200 THEN 'basic'
+            WHEN stage_number <= 600 THEN 'intermediate'
+            ELSE 'advanced'
+          END as category
+        FROM stages
+        WHERE is_active = true
+        ORDER BY stage_number ASC
+      `;
+
+      const result = await dbService.query(query);
+      const stageMetadata = result.rows;
 
       // 압축을 위해 작은 JSON 형태로 최적화
       const compactData = stageMetadata.map(stage => ({
@@ -47,8 +51,8 @@ router.get('/metadata',
         d: stage.difficulty,            // difficulty
         o: stage.optimal_score,         // optimal_score
         tl: stage.time_limit,          // time_limit
-        th: stage.thumbnail_url,        // thumbnail
-        desc: stage.preview_description, // description
+        th: stage.thumbnail_url || `${process.env.WEB_SERVER_URL || 'http://localhost:3000'}/api/thumbnails/stage-${stage.stage_number}`,
+        desc: stage.preview_description || `${stage.stage_number}번째 블로쿠스 퍼즐에 도전하세요!`,
         cat: stage.category             // category
       }));
 
@@ -98,22 +102,19 @@ router.get('/:stageNumber',
         ip: req.ip
       });
 
-      // 프로시저럴 스테이지 생성기로 데이터 생성
-      const stageGenerator = new StageGenerator();
-      const stageData = stageGenerator.generateStage(stageNumber);
+      // 데이터베이스에서 스테이지 데이터 조회
+      const stageData = await dbService.getStageData(stageNumber);
       
-      // 유효성 검증
-      const validation = stageGenerator.validateStage(stageData);
-      if (!validation.isValid) {
-        logger.error('Generated stage validation failed', {
+      if (!stageData) {
+        logger.warn('Stage not found', {
           stageNumber,
-          issues: validation.issues
+          username
         });
         
-        return res.status(500).json({
+        return res.status(404).json({
           success: false,
-          message: `Stage ${stageNumber} generation failed`,
-          error: 'STAGE_GENERATION_ERROR'
+          message: `Stage ${stageNumber} not found`,
+          error: 'STAGE_NOT_FOUND'
         });
       }
 
@@ -133,19 +134,24 @@ router.get('/:stageNumber',
         });
       }
 
+      // 힌트 배열 처리 (텍스트를 배열로 변환)
+      const hints = stageData.stage_hints ? 
+        stageData.stage_hints.split('\n').filter(hint => hint.trim()) : 
+        ['블록을 전략적으로 배치하세요.'];
+
       // 응답 데이터 구성 (게임 플레이에 필요한 상세 데이터)
       const responseData = {
         stage_number: stageData.stage_number,
-        title: stageData.title,
+        title: stageData.stage_name || `스테이지 ${stageData.stage_number}`,
         difficulty: stageData.difficulty,
         optimal_score: stageData.optimal_score,
         time_limit: stageData.time_limit,
         max_undo_count: stageData.max_undo_count,
         available_blocks: stageData.available_blocks,
         initial_board_state: stageData.initial_board_state,
-        hints: stageData.hints,
-        special_rules: stageData.special_rules,
-        generation_info: stageData.generation_info // 디버깅용
+        hints: hints,
+        stage_description: stageData.stage_description,
+        is_featured: stageData.is_featured
       };
 
       logger.debug('Stage data retrieved successfully', {
@@ -285,10 +291,8 @@ router.post('/complete',
         });
       }
 
-      // 프로시저럴 스테이지 생성으로 optimal_score 가져오기
-      const stageGenerator = new StageGenerator();
-      const generatedStage = stageGenerator.generateStage(stage_number);
-      const optimalScore = generatedStage.optimal_score;
+      // 데이터베이스에서 optimal_score 가져오기
+      const optimalScore = stageData.optimal_score;
       
       // 별점 계산 (클라이언트와 동일한 로직)
       let starsEarned = 0;
@@ -373,15 +377,15 @@ router.post('/complete',
 );
 
 /**
- * POST /api/stages/generate/batch
- * 관리자용: 여러 스테이지 일괄 생성 및 검증
+ * GET /api/stages/batch
+ * 관리자용: 여러 스테이지 메타데이터 일괄 조회
  */
-router.post('/generate/batch',
+router.get('/batch',
   authenticateToken,
   [
-    body('start_stage').isInt({ min: 1 }).withMessage('Start stage must be a positive integer'),
-    body('count').isInt({ min: 1, max: 100 }).withMessage('Count must be 1-100'),
-    body('validate_only').optional().isBoolean().withMessage('Validate only must be boolean')
+    query('start_stage').optional().isInt({ min: 1 }).withMessage('Start stage must be a positive integer'),
+    query('count').optional().isInt({ min: 1, max: 100 }).withMessage('Count must be 1-100'),
+    query('include_inactive').optional().isBoolean().withMessage('Include inactive must be boolean')
   ],
   async (req, res) => {
     try {
@@ -389,19 +393,21 @@ router.post('/generate/batch',
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
-          message: 'Invalid input data',
+          message: 'Invalid query parameters',
           error: 'VALIDATION_ERROR',
           details: errors.array()
         });
       }
 
-      const { start_stage, count, validate_only = false } = req.body;
+      const start_stage = parseInt(req.query.start_stage) || 1;
+      const count = parseInt(req.query.count) || 50;
+      const include_inactive = req.query.include_inactive === 'true';
       const { username } = req.user;
 
-      logger.info('Batch stage generation requested', {
+      logger.info('Batch stage data requested', {
         startStage: start_stage,
         count,
-        validateOnly: validate_only,
+        includeInactive: include_inactive,
         username,
         ip: req.ip
       });
@@ -409,41 +415,82 @@ router.post('/generate/batch',
       // TODO: 관리자 권한 확인
       // if (!isAdmin(username)) { return 403; }
 
-      const stageGenerator = new StageGenerator();
-      const result = stageGenerator.generateMultipleStages(start_stage, count);
+      // 데이터베이스에서 스테이지 배치 조회
+      const query = `
+        SELECT 
+          stage_number,
+          stage_name,
+          difficulty,
+          optimal_score,
+          time_limit,
+          max_undo_count,
+          array_length(available_blocks, 1) as block_count,
+          is_active,
+          is_featured,
+          created_at,
+          updated_at
+        FROM stages
+        WHERE stage_number >= $1 
+          AND stage_number < $2
+          ${include_inactive ? '' : 'AND is_active = true'}
+        ORDER BY stage_number ASC
+      `;
 
-      // 검증만 요청한 경우
-      if (validate_only) {
-        res.json({
-          success: true,
-          message: `Validated ${count} stages`,
-          data: {
-            validation_results: result.validationResults,
-            summary: result.summary
-          }
-        });
-        return;
+      const result = await dbService.query(query, [start_stage, start_stage + count]);
+      const stages = result.rows;
+
+      // 통계 정보 계산
+      const summary = {
+        total_stages: stages.length,
+        active_stages: stages.filter(s => s.is_active).length,
+        inactive_stages: stages.filter(s => !s.is_active).length,
+        featured_stages: stages.filter(s => s.is_featured).length,
+        difficulty_distribution: {},
+        avg_optimal_score: 0
+      };
+
+      // 난이도별 분포 계산
+      stages.forEach(stage => {
+        const diff = stage.difficulty;
+        summary.difficulty_distribution[diff] = (summary.difficulty_distribution[diff] || 0) + 1;
+      });
+
+      // 평균 최적 점수 계산
+      if (stages.length > 0) {
+        summary.avg_optimal_score = Math.round(
+          stages.reduce((sum, stage) => sum + stage.optimal_score, 0) / stages.length
+        );
       }
 
-      // 전체 생성 결과 반환
       res.json({
         success: true,
-        message: `Generated ${count} stages starting from ${start_stage}`,
+        message: `Retrieved ${stages.length} stages from ${start_stage}`,
         data: {
-          stages: result.stages.map(stage => ({
+          stages: stages.map(stage => ({
             stage_number: stage.stage_number,
-            title: stage.title,
+            title: stage.stage_name || `스테이지 ${stage.stage_number}`,
             difficulty: stage.difficulty,
             optimal_score: stage.optimal_score,
-            generation_info: stage.generation_info
+            time_limit: stage.time_limit,
+            max_undo_count: stage.max_undo_count,
+            block_count: stage.block_count,
+            is_active: stage.is_active,
+            is_featured: stage.is_featured,
+            created_at: stage.created_at,
+            updated_at: stage.updated_at
           })),
-          validation_results: result.validationResults,
-          summary: result.summary
+          summary: summary,
+          query_info: {
+            start_stage,
+            count_requested: count,
+            count_returned: stages.length,
+            include_inactive
+          }
         }
       });
 
     } catch (error) {
-      logger.error('Failed to generate batch stages', {
+      logger.error('Failed to retrieve batch stage data', {
         error: error.message,
         username: req.user?.username,
         stack: error.stack
@@ -451,7 +498,7 @@ router.post('/generate/batch',
 
       res.status(500).json({
         success: false,
-        message: 'Failed to generate batch stages',
+        message: 'Failed to retrieve batch stage data',
         error: 'INTERNAL_SERVER_ERROR'
       });
     }
@@ -485,27 +532,42 @@ router.get('/:stageNumber/preview',
         ip: req.ip
       });
 
-      // 프로시저럴 생성으로 미리보기 데이터 생성
-      const stageGenerator = new StageGenerator();
-      const stageData = stageGenerator.generateStage(stageNumber);
+      // 데이터베이스에서 스테이지 데이터 조회
+      const stageData = await dbService.getStageData(stageNumber);
+      
+      if (!stageData) {
+        return res.status(404).json({
+          success: false,
+          message: `Stage ${stageNumber} not found`,
+          error: 'STAGE_NOT_FOUND'
+        });
+      }
+
+      // 힌트 배열 처리
+      const hints = stageData.stage_hints ? 
+        stageData.stage_hints.split('\n').filter(hint => hint.trim()).slice(0, 2) : 
+        ['블록을 전략적으로 배치하세요.'];
+      
+      // 카테고리 결정
+      const category = stageNumber <= 50 ? 'tutorial' :
+                      stageNumber <= 200 ? 'basic' :
+                      stageNumber <= 600 ? 'intermediate' : 'advanced';
       
       // 미리보기용 데이터만 추출
       const previewData = {
         stage_number: stageData.stage_number,
-        title: stageData.title,
+        title: stageData.stage_name || `스테이지 ${stageData.stage_number}`,
         difficulty: stageData.difficulty,
         optimal_score: stageData.optimal_score,
         time_limit: stageData.time_limit,
-        preview_description: stageData.preview_description,
-        category: stageData.category,
+        preview_description: stageData.stage_description || `${stageNumber}번째 블로쿠스 퍼즐에 도전하세요!`,
+        category: category,
         available_blocks: stageData.available_blocks,
-        hints: stageData.hints.slice(0, 2), // 처음 2개 힌트만
+        hints: hints,
         special_rules: {
-          has_special_rules: Object.values(stageData.special_rules).some(v => 
-            v !== false && v !== 1.0 && v !== null
-          ),
-          time_pressure: stageData.special_rules.time_pressure,
-          bonus_multiplier: stageData.special_rules.bonus_multiplier
+          has_special_rules: stageData.max_undo_count !== 5 || stageData.time_limit !== 300,
+          time_pressure: stageData.time_limit < 300,
+          bonus_multiplier: 1.0 // TODO: 추후 구현 가능
         }
       };
 
