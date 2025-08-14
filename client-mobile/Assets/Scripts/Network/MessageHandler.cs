@@ -761,6 +761,7 @@ namespace BlokusUnity.Network
         public List<BlokusUnity.Common.BlockType> availableBlocks;
         public string initialBoardStateJson; // JSONB 데이터 문자열
         public string stageDescription;
+        public string thumbnail_url; // 썸네일 이미지 URL
         
         /// <summary>
         /// 난이도 텍스트 반환

@@ -664,6 +664,7 @@ namespace BlokusUnity.Network
             public string[] hints;
             public string stage_description;
             public bool is_featured;
+            public string thumbnail_url;  // DB stages 테이블의 thumbnail_url 필드
         }
         
         [System.Serializable]

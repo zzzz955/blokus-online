@@ -21,13 +21,15 @@ namespace BlokusUnity.Data
         public int[] available_blocks;
         public InitialBoardState initial_board_state;
         public string[] hints;
+        public string stage_description;
+        public string thumbnail_url;  // API에서 받아오는 썸네일 이미지 URL
         public SpecialRules special_rules;
         public GenerationInfo generation_info;
         
         // Unity에서 사용을 위한 편의 프로퍼티
         public int stageNumber => stage_number;
         public string stageName => title;
-        public string stageDescription => $"스테이지 {stage_number}"; // 기본 설명
+        public string stageDescription => string.IsNullOrEmpty(stage_description) ? $"스테이지 {stage_number}" : stage_description;
         public int optimalScore => optimal_score;
         public int timeLimit => time_limit;
         public int maxUndoCount => max_undo_count;

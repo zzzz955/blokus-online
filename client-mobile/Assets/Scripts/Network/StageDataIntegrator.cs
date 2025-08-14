@@ -359,7 +359,8 @@ namespace BlokusUnity.Network
                 availableBlocks = availableBlocks,
                 initialBoardStateJson = apiData.initial_board_state != null ? 
                     UnityEngine.JsonUtility.ToJson(apiData.initial_board_state) : null,
-                stageDescription = apiData.stage_description
+                stageDescription = apiData.stage_description,
+                thumbnail_url = apiData.thumbnail_url
             };
         }
         

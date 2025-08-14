@@ -37,7 +37,15 @@ namespace BlokusUnity.UI
         [SerializeField] private Transform availableBlocksParent;
         [SerializeField] private GameObject blockIconPrefab;
         
-        [Header("색상 설정")]
+        [Header("별 스프라이트 (StageButton과 동일)")]
+        [SerializeField] private Sprite activeStar; // 활성화된 별 이미지
+        [SerializeField] private Sprite inactiveStar; // 비활성화된 별 이미지
+        
+        [Header("블록 아이콘 스프라이트")]
+        [SerializeField] private Sprite[] blockSprites = new Sprite[21]; // 21개 블록 타입별 스프라이트
+        [SerializeField] private Sprite defaultBlockSprite; // 기본 블록 스프라이트 (폴백)
+        
+        [Header("색상 설정 (Fallback)")]
         [SerializeField] private Color activeStarColor = Color.yellow;
         [SerializeField] private Color inactiveStarColor = Color.gray;
         [SerializeField] private Color[] difficultyColors = { Color.green, Color.yellow, new Color(1f, 0.5f, 0f), Color.red };
@@ -63,6 +71,9 @@ namespace BlokusUnity.UI
                 Destroy(gameObject);
                 return;
             }
+            
+            // 한글 폰트 문제 확인 및 로깅
+            CheckFontIssues();
             
             // 버튼 이벤트 연결
             if (backgroundButton != null)
@@ -199,11 +210,15 @@ namespace BlokusUnity.UI
         }
         
         /// <summary>
-        /// 별점 표시 업데이트
+        /// 별점 표시 업데이트 (StageButton과 동일한 방식)
         /// </summary>
         private void UpdateStarDisplay()
         {
-            if (starImages == null || starImages.Length == 0) return;
+            if (starImages == null || starImages.Length == 0) 
+            {
+                Debug.LogWarning("StageInfoModal: starImages 배열이 비어있습니다.");
+                return;
+            }
             
             int earnedStars = 0;
             if (currentProgress != null)
@@ -220,12 +235,43 @@ namespace BlokusUnity.UI
                 }
             }
             
+            Debug.Log($"StageInfoModal: 별점 업데이트 - 획득한 별: {earnedStars}/{starImages.Length}");
+            
+            // StageButton과 동일한 방식으로 별 스프라이트/색상 적용
             for (int i = 0; i < starImages.Length; i++)
             {
                 if (starImages[i] != null)
                 {
-                    bool isActive = i < earnedStars;
-                    starImages[i].color = isActive ? activeStarColor : inactiveStarColor;
+                    bool shouldActivate = i < earnedStars;
+                    
+                    if (shouldActivate)
+                    {
+                        // 활성화된 별 - 스프라이트 우선, 색상 폴백
+                        if (activeStar != null)
+                        {
+                            starImages[i].sprite = activeStar;
+                            starImages[i].color = Color.white; // 스프라이트 사용시 색상 취소
+                        }
+                        else
+                        {
+                            // 스프라이트가 없으면 색상만 변경
+                            starImages[i].color = activeStarColor;
+                        }
+                    }
+                    else
+                    {
+                        // 비활성화된 별 - 스프라이트 우선, 색상 폴백
+                        if (inactiveStar != null)
+                        {
+                            starImages[i].sprite = inactiveStar;
+                            starImages[i].color = Color.white; // 스프라이트 사용시 색상 취소
+                        }
+                        else
+                        {
+                            // 스프라이트가 없으면 색상만 변경
+                            starImages[i].color = inactiveStarColor;
+                        }
+                    }
                 }
             }
         }
@@ -300,13 +346,138 @@ namespace BlokusUnity.UI
         /// </summary>
         private void UpdateBoardThumbnail()
         {
-            if (boardThumbnail != null && thumbnailPlaceholder != null)
+            if (boardThumbnail == null || thumbnailPlaceholder == null) return;
+            
+            // API에서 thumbnail_url이 제공되면 이미지 로딩 시도  
+            if (currentStageData != null && !string.IsNullOrEmpty(currentStageData.thumbnail_url))
             {
-                // TODO: 실제 게임 보드 썸네일 생성 로직
-                // 현재는 플레이스홀더만 표시
+                Debug.Log($"스테이지 {currentStageData.stageNumber}: 썸네일 URL 로딩 시도 - {currentStageData.thumbnail_url}");
+                LoadThumbnailFromUrl(currentStageData.thumbnail_url);
+                return;
+            }
+            
+            // 초기 보드 상태가 있으면 썸네일 생성 시도
+            if (currentStageData != null && currentStageData.initial_board_state?.placements != null && currentStageData.initial_board_state.placements.Length > 0)
+            {
+                Debug.Log($"스테이지 {currentStageData.stageNumber}: 초기 보드 상태 있음 ({currentStageData.initial_board_state.placements.Length}개 블록)");
+                GenerateSimpleThumbnail();
+            }
+            else
+            {
+                // 초기 보드 상태가 없으면 플레이스홀더 표시
+                Debug.Log($"스테이지 {currentStageData?.stageNumber}: 초기 보드 상태 없음 - 플레이스홀더 표시");
                 boardThumbnail.gameObject.SetActive(false);
                 thumbnailPlaceholder.SetActive(true);
+                UpdateThumbnailPlaceholder();
             }
+        }
+        
+        /// <summary>
+        /// URL에서 썸네일 이미지 로딩
+        /// </summary>
+        private void LoadThumbnailFromUrl(string url)
+        {
+            // 개발환경에서는 localhost, 프로덕션에서는 실제 호스트
+            string fullUrl = url.StartsWith("http") ? url : $"http://localhost:3000{url}";
+            
+            Debug.Log($"[StageInfoModal] 썸네일 로딩 시작: {fullUrl}");
+            StartCoroutine(LoadThumbnailCoroutine(fullUrl));
+        }
+        
+        /// <summary>
+        /// 썸네일 이미지 로딩 코루틴
+        /// </summary>
+        private System.Collections.IEnumerator LoadThumbnailCoroutine(string url)
+        {
+            using (UnityEngine.Networking.UnityWebRequest www = UnityEngine.Networking.UnityWebRequestTexture.GetTexture(url))
+            {
+                www.timeout = 10; // 10초 타임아웃
+                yield return www.SendWebRequest();
+                
+                if (www.result == UnityEngine.Networking.UnityWebRequest.Result.Success)
+                {
+                    Texture2D texture = ((UnityEngine.Networking.DownloadHandlerTexture)www.downloadHandler).texture;
+                    if (texture != null)
+                    {
+                        boardThumbnail.texture = texture;
+                        boardThumbnail.gameObject.SetActive(true);
+                        thumbnailPlaceholder.SetActive(false);
+                        Debug.Log($"썸네일 로딩 성공: {url}");
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning($"썸네일 로딩 실패: {url} - {www.error}");
+                    // 실패시 플레이스홀더 표시
+                    boardThumbnail.gameObject.SetActive(false);
+                    thumbnailPlaceholder.SetActive(true);
+                    UpdateThumbnailPlaceholder();
+                }
+            }
+        }
+        
+        /// <summary>
+        /// 간단한 썸네일 생성 (임시 구현)
+        /// </summary>
+        private void GenerateSimpleThumbnail()
+        {
+            // TODO: 실제 보드 렌더링 로직 구현
+            // 현재는 단순히 보드가 있다는 표시만
+            boardThumbnail.gameObject.SetActive(true);
+            thumbnailPlaceholder.SetActive(false);
+            
+            // RawImage에 간단한 패턴 생성 (임시)
+            if (boardThumbnail.texture == null)
+            {
+                // 기본 체크무늬 패턴 생성
+                Texture2D simpleTexture = CreateSimpleBoardTexture();
+                boardThumbnail.texture = simpleTexture;
+            }
+        }
+        
+        /// <summary>
+        /// 썸네일 플레이스홀더 업데이트
+        /// </summary>
+        private void UpdateThumbnailPlaceholder()
+        {
+            if (thumbnailPlaceholder != null)
+            {
+                TextMeshProUGUI placeholderText = thumbnailPlaceholder.GetComponentInChildren<TextMeshProUGUI>();
+                if (placeholderText != null)
+                {
+                    if (currentStageData != null)
+                    {
+                        placeholderText.text = $"스테이지 {currentStageData.stageNumber}\n빈 보드";
+                    }
+                    else
+                    {
+                        placeholderText.text = "보드 미리보기\n준비 중...";
+                    }
+                }
+            }
+        }
+        
+        /// <summary>
+        /// 간단한 보드 텍스처 생성 (임시)
+        /// </summary>
+        private Texture2D CreateSimpleBoardTexture()
+        {
+            int size = 64; // 작은 썸네일 크기
+            Texture2D texture = new Texture2D(size, size);
+            
+            // 체크무늬 패턴
+            for (int x = 0; x < size; x++)
+            {
+                for (int y = 0; y < size; y++)
+                {
+                    bool isEven = (x / 8 + y / 8) % 2 == 0;
+                    Color color = isEven ? new Color(0.9f, 0.9f, 0.9f) : new Color(0.7f, 0.7f, 0.7f);
+                    texture.SetPixel(x, y, color);
+                }
+            }
+            
+            texture.Apply();
+            return texture;
         }
         
         /// <summary>
@@ -338,25 +509,64 @@ namespace BlokusUnity.UI
         }
         
         /// <summary>
-        /// 개별 블록 아이콘 생성
+        /// 개별 블록 아이콘 생성 (스프라이트 우선, 색상 폴백)
         /// </summary>
         private void CreateBlockIcon(BlokusUnity.Common.BlockType blockType)
         {
             GameObject iconObj = Instantiate(blockIconPrefab, availableBlocksParent);
             
-            // TODO: 블록 타입에 따른 실제 아이콘 설정
+            // 블록 스프라이트 적용 (1-based index를 0-based로 변환)
+            int blockIndex = (int)blockType - 1; // BlockType은 1부터 시작
+            
+            // 블록 이미지 설정
             Image iconImage = iconObj.GetComponent<Image>();
             if (iconImage != null)
             {
-                // 임시로 색상만 설정 (나중에 실제 블록 스프라이트로 교체)
-                iconImage.color = GetBlockTypeColor(blockType);
+                if (blockIndex >= 0 && blockIndex < blockSprites.Length && blockSprites[blockIndex] != null)
+                {
+                    // 블록별 전용 스프라이트 사용
+                    iconImage.sprite = blockSprites[blockIndex];
+                    iconImage.color = Color.white; // 스프라이트 원본 색상 사용
+                    Debug.Log($"블록 {blockType}: 전용 스프라이트 적용 ({blockSprites[blockIndex].name})");
+                }
+                else if (defaultBlockSprite != null)
+                {
+                    // 기본 블록 스프라이트 사용하고 색상 변경
+                    iconImage.sprite = defaultBlockSprite;
+                    iconImage.color = GetBlockTypeColor(blockType);
+                    Debug.Log($"블록 {blockType}: 기본 스프라이트 + 색상 적용");
+                }
+                else
+                {
+                    // 스프라이트가 없으면 색상만 설정 (Fallback)
+                    iconImage.color = GetBlockTypeColor(blockType);
+                    Debug.Log($"블록 {blockType}: 색상만 적용 (Fallback)");
+                }
             }
             
-            // 툴팁이나 라벨 설정
+            // 블록 번호 라벨 (선택사항)
             TextMeshProUGUI labelText = iconObj.GetComponentInChildren<TextMeshProUGUI>();
             if (labelText != null)
             {
-                labelText.text = ((int)blockType).ToString();
+                // 블록 번호 표시 또는 숨김 (스프라이트가 있으면 숨김)
+                bool hasSprite = (blockIndex >= 0 && blockIndex < blockSprites.Length && blockSprites[blockIndex] != null) || defaultBlockSprite != null;
+                
+                if (hasSprite)
+                {
+                    labelText.gameObject.SetActive(false); // 스프라이트가 있으면 번호 숨김
+                }
+                else
+                {
+                    labelText.text = blockType.ToString().Replace("Type", ""); // "Type01" → "01"
+                    labelText.gameObject.SetActive(true);
+                }
+            }
+            
+            // 블록 아이콘 크기 조정 (선택사항)
+            RectTransform iconRect = iconObj.GetComponent<RectTransform>();
+            if (iconRect != null)
+            {
+                iconRect.sizeDelta = new Vector2(32, 32); // 적당한 크기로 설정
             }
         }
         
@@ -454,6 +664,102 @@ namespace BlokusUnity.UI
         public bool IsShowing()
         {
             return gameObject.activeInHierarchy;
+        }
+        
+        // ========================================
+        // 폰트 문제 해결 관련
+        // ========================================
+        
+        /// <summary>
+        /// 한글 폰트 문제 확인 및 로깅
+        /// </summary>
+        private void CheckFontIssues()
+        {
+            // 모든 TextMeshProUGUI 컴포넌트 확인
+            TextMeshProUGUI[] textComponents = {
+                stageNumberText, stageNameText, stageDescriptionText,
+                difficultyText, bestScoreText, targetScoreText,
+                maxUndoText, timeLimitText
+            };
+            
+            bool hasKoreanFontIssue = false;
+            
+            foreach (var textComponent in textComponents)
+            {
+                if (textComponent != null)
+                {
+                    var fontAsset = textComponent.font;
+                    if (fontAsset != null)
+                    {
+                        // 폰트 에셋 정보 로깅
+                        Debug.Log($"TextMeshPro Component: {textComponent.name}, Font: {fontAsset.name}, " +
+                                 $"Character Count: {fontAsset.characterTable?.Count ?? 0}");
+                        
+                        // 한글 문자가 포함되어 있는지 확인 (간단한 검사)
+                        bool hasKoreanChars = HasKoreanCharacters(fontAsset);
+                        if (!hasKoreanChars)
+                        {
+                            Debug.LogWarning($"⚠️ {textComponent.name}: 한글 문자가 포함되지 않은 폰트를 사용하고 있습니다. " +
+                                           $"폰트: {fontAsset.name}");
+                            hasKoreanFontIssue = true;
+                        }
+                    }
+                    else
+                    {
+                        Debug.LogError($"❌ {textComponent.name}: 폰트 에셋이 할당되지 않았습니다!");
+                        hasKoreanFontIssue = true;
+                    }
+                }
+            }
+            
+            if (hasKoreanFontIssue)
+            {
+                Debug.LogError("🚨 한글 폰트 문제 감지됨!\n" +
+                              "해결 방법:\n" +
+                              "1. Window → TextMeshPro → Font Asset Creator 열기\n" +
+                              "2. 한글을 지원하는 폰트 선택 (예: NotoSansCJK)\n" +
+                              "3. Character Set: Unicode Range (Hex)\n" +
+                              "4. Character Sequence (Hex): AC00-D7AF (한글 완성형)\n" +
+                              "5. Atlas Resolution: 2048x2048 또는 4096x4096\n" +
+                              "6. Generate Font Atlas 클릭\n" +
+                              "7. Save를 눌러 새 Font Asset 생성\n" +
+                              "8. TextMeshPro 컴포넌트에 새 Font Asset 할당");
+            }
+            else
+            {
+                Debug.Log("✅ 폰트 확인 완료: 한글 지원 폰트가 설정되어 있습니다.");
+            }
+        }
+        
+        /// <summary>
+        /// 폰트 에셋에 한글 문자가 포함되어 있는지 확인
+        /// </summary>
+        private bool HasKoreanCharacters(TMPro.TMP_FontAsset fontAsset)
+        {
+            if (fontAsset.characterTable == null || fontAsset.characterTable.Count == 0)
+                return false;
+                
+            // 한글 완성형 범위 확인 (가-힣: U+AC00-U+D7AF)
+            foreach (var character in fontAsset.characterTable)
+            {
+                uint unicode = character.unicode;
+                if (unicode >= 0xAC00 && unicode <= 0xD7AF) // 한글 완성형 범위
+                {
+                    return true;
+                }
+            }
+            
+            // 한글 자모 범위도 확인 (ㄱ-ㅎ, ㅏ-ㅣ: U+3131-U+318E)
+            foreach (var character in fontAsset.characterTable)
+            {
+                uint unicode = character.unicode;
+                if (unicode >= 0x3131 && unicode <= 0x318E) // 한글 자모 범위
+                {
+                    return true;
+                }
+            }
+            
+            return false;
         }
     }
 }
