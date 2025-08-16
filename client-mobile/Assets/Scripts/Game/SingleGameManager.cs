@@ -71,18 +71,141 @@ namespace BlokusUnity.Game
 
         private void Start()
         {
-            // 테스트용으로 자동 초기화
+            // 실제 스테이지 데이터로 초기화
             if (!IsInitialized)
             {
-                Debug.Log("[SingleGameManager] 자동 초기화 시작");
-                var testPayload = new StagePayload
+                Debug.Log("[SingleGameManager] 스테이지 데이터 기반 초기화 시작");
+                
+                // StageDataManager에서 현재 스테이지 데이터 가져오기
+                if (StageManager != null)
                 {
-                    StageName = "Test Stage",
-                    BoardSize = 20,
-                    AvailableBlocks = DefaultBlockSet()
-                };
-                Init(testPayload);
+                    var stageData = StageManager.GetCurrentStageData();
+                    if (stageData != null)
+                    {
+                        Debug.Log($"[SingleGameManager] 스테이지 {stageData.stage_number} 데이터로 초기화");
+                        var stagePayload = ConvertStageDataToPayload(stageData);
+                        Init(stagePayload);
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[SingleGameManager] 현재 스테이지 데이터가 없음 - 테스트 모드로 초기화");
+                        InitializeWithTestData();
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning("[SingleGameManager] StageDataManager가 없음 - 테스트 모드로 초기화");
+                    InitializeWithTestData();
+                }
             }
+        }
+        
+        /// <summary>
+        /// 테스트용 초기화 (폴백)
+        /// </summary>
+        private void InitializeWithTestData()
+        {
+            Debug.Log("[SingleGameManager] 테스트 데이터로 자동 초기화");
+            var testPayload = new StagePayload
+            {
+                StageName = "Test Stage",
+                StageNumber = 1,
+                BoardSize = 20,
+                Difficulty = 1,
+                TimeLimit = 0,
+                MaxUndoCount = 3,
+                AvailableBlocks = GetMinimalBlockSet()
+            };
+            Init(testPayload);
+        }
+        
+        /// <summary>
+        /// StageData를 StagePayload로 변환
+        /// </summary>
+        private StagePayload ConvertStageDataToPayload(BlokusUnity.Data.StageData stageData)
+        {
+            var payload = new StagePayload
+            {
+                StageNumber = stageData.stage_number,
+                StageName = !string.IsNullOrEmpty(stageData.stage_description) ? 
+                    stageData.stage_description : $"스테이지 {stageData.stage_number}",
+                BoardSize = 20, // 기본 보드 크기
+                Difficulty = stageData.difficulty,
+                TimeLimit = stageData.time_limit,
+                MaxUndoCount = stageData.max_undo_count > 0 ? stageData.max_undo_count : 3,
+                ParScore = stageData.optimal_score
+            };
+            
+            // 사용 가능한 블록 설정
+            if (stageData.available_blocks != null && stageData.available_blocks.Length > 0)
+            {
+                var blockTypes = new List<BlockType>();
+                foreach (var blockInt in stageData.available_blocks)
+                {
+                    if (blockInt >= 1 && blockInt <= 21 && System.Enum.IsDefined(typeof(BlockType), (byte)blockInt))
+                    {
+                        blockTypes.Add((BlockType)(byte)blockInt);
+                    }
+                }
+                payload.AvailableBlocks = blockTypes.ToArray();
+                Debug.Log($"[SingleGameManager] 스테이지 {stageData.stage_number} 전용 블록 {blockTypes.Count}개 설정: [{string.Join(", ", blockTypes)}]");
+            }
+            else
+            {
+                // ⚠️ 수정: 스테이지 데이터에 available_blocks가 없으면 기본 튜토리얼 블록만 사용
+                // 모든 21개 블록 대신 제한된 블록 세트 사용
+                payload.AvailableBlocks = GetMinimalBlockSet();
+                Debug.LogWarning($"[SingleGameManager] 스테이지 {stageData.stage_number}에 available_blocks 데이터가 없음 - 최소 블록 세트 사용: {payload.AvailableBlocks.Length}개");
+            }
+            
+            // 초기 보드 상태 설정
+            if (stageData.initial_board_state != null)
+            {
+                // StageData.InitialBoardState를 StagePayload.InitialBoardData로 변환
+                payload.InitialBoard = ConvertInitialBoardState(stageData.initial_board_state);
+            }
+            
+            Debug.Log($"[SingleGameManager] StagePayload 생성 완료: " +
+                     $"스테이지={payload.StageNumber}, 난이도={payload.Difficulty}, " +
+                     $"제한시간={payload.TimeLimit}, 최대언두={payload.MaxUndoCount}, " +
+                     $"블록수={payload.AvailableBlocks?.Length ?? 0}");
+            
+            return payload;
+        }
+        
+        /// <summary>
+        /// StageData.InitialBoardState를 StagePayload.InitialBoardData로 변환
+        /// </summary>
+        private BlokusUnity.Common.InitialBoardData ConvertInitialBoardState(BlokusUnity.Data.InitialBoardState boardState)
+        {
+            if (boardState == null)
+                return null;
+            
+            var placements = boardState.GetPlacements();
+            if (placements == null || placements.Length == 0)
+                return null;
+            
+            var result = new BlokusUnity.Common.InitialBoardData
+            {
+                obstacles = new System.Collections.Generic.List<Position>(),
+                preplaced = new System.Collections.Generic.List<BlockPlacement>()
+            };
+            
+            // 배치 데이터를 BlockPlacement로 변환
+            foreach (var placement in placements)
+            {
+                var blockPlacement = new BlockPlacement(
+                    (BlockType)(byte)placement.block_type,
+                    new Position(placement.row, placement.col),
+                    (Rotation)(byte)placement.rotation,
+                    (FlipState)(byte)placement.flip_state,
+                    (PlayerColor)(byte)placement.color
+                );
+                result.preplaced.Add(blockPlacement);
+            }
+            
+            Debug.Log($"[SingleGameManager] 초기 보드 상태 변환 완료: 사전배치 블록 {result.preplaced.Count}개");
+            return result;
         }
 
         private void OnDestroy()
@@ -142,7 +265,7 @@ namespace BlokusUnity.Game
             // 블록 세팅
             var blocks = (payload.AvailableBlocks != null && payload.AvailableBlocks.Length > 0)
                 ? new List<BlockType>(payload.AvailableBlocks)
-                : new List<BlockType>(DefaultBlockSet());
+                : new List<BlockType>(GetMinimalBlockSet());
             initialBlocks = blocks;
 
             blockPalette.InitializePalette(
@@ -222,7 +345,7 @@ namespace BlokusUnity.Game
         }
         
         /// <summary>
-        /// 스테이지 완료 보고
+        /// 스테이지 완료 보고 (결과를 user_stage_progress에 저장)
         /// </summary>
         private void ReportStageCompletion(int score, bool completed)
         {
@@ -234,16 +357,41 @@ namespace BlokusUnity.Game
                 return;
             }
             
-            // StageDataIntegrator를 통한 완료 보고
+            // 별점 계산 (완료된 경우에만)
+            int stars = 0;
+            if (completed && payload != null && payload.ParScore > 0)
+            {
+                stars = BlokusUnity.Utils.ApiDataConverter.CalculateStars(score, payload.ParScore);
+                Debug.Log($"[SingleGame] 별점 계산: {score}/{payload.ParScore} = {stars}별");
+            }
+            
+            // StageDataManager를 통한 직접 완료 보고
+            if (StageManager != null)
+            {
+                if (completed)
+                {
+                    StageManager.CompleteStage(stageNumber, score, stars, ElapsedSeconds);
+                    Debug.Log($"[SingleGame] ✅ 스테이지 {stageNumber} 완료 보고: " +
+                             $"점수={score}, 별점={stars}, 시간={ElapsedSeconds}s");
+                }
+                else
+                {
+                    StageManager.FailStage(stageNumber);
+                    Debug.Log($"[SingleGame] ❌ 스테이지 {stageNumber} 포기/실패 보고: " +
+                             $"점수={score}, 시간={ElapsedSeconds}s");
+                }
+            }
+            else
+            {
+                Debug.LogWarning("[SingleGame] StageDataManager를 찾을 수 없어 완료 보고를 건너뜁니다.");
+            }
+            
+            // 추가적으로 StageDataIntegrator도 호출 (기존 연동 유지)
             var integrator = BlokusUnity.Network.StageDataIntegrator.Instance;
             if (integrator != null)
             {
                 integrator.ReportStageCompletion(stageNumber, score, ElapsedSeconds, completed);
-                Debug.Log($"[SingleGame] 스테이지 {stageNumber} 완료 보고: 점수={score}, 시간={ElapsedSeconds}s, 완료={completed}");
-            }
-            else
-            {
-                Debug.LogWarning("[SingleGame] StageDataIntegrator를 찾을 수 없어 완료 보고를 건너뜁니다.");
+                Debug.Log($"[SingleGame] StageDataIntegrator 백업 호출 완료");
             }
         }
 
@@ -369,18 +517,58 @@ namespace BlokusUnity.Game
             // 팔레트 사용 표시
             blockPalette.MarkBlockAsUsed(block.Type);
 
-            // 종료 체크
-            if (logic.IsGameFinished())
+            // 게임 종료 조건 체크 (블록 팔레트 기반)
+            CheckGameEndConditions();
+        }
+
+        /// <summary>
+        /// 게임 종료 조건 체크 (사용자 요구사항 기반)
+        /// 1. 블록 팔레트에 블록이 존재하지 않는 경우
+        /// 2. 블록 팔레트에 블록이 존재하나 모든 블록이 배치 불가능한 경우
+        /// </summary>
+        private void CheckGameEndConditions()
+        {
+            if (blockPalette == null || logic == null)
             {
-                var scores = logic.CalculateScores();
-                int myScore = scores.ContainsKey(playerColor) ? scores[playerColor] : 0;
-                Debug.Log($"[SingleGame] Finished. Score={myScore}");
-                
-                // 스테이지 완료 보고 (성공)
-                ReportStageCompletion(myScore, true);
-                
-                OnGameFinished?.Invoke(myScore);
+                return;
             }
+
+            // 조건 1: 사용 가능한 블록이 없는 경우
+            if (!blockPalette.HasAvailableBlocks())
+            {
+                Debug.Log("[SingleGame] 게임 종료 - 사용 가능한 블록이 없음");
+                EndGame("모든 블록 사용 완료");
+                return;
+            }
+
+            // 조건 2: 남은 블록들이 모두 배치 불가능한 경우
+            var availableBlocks = blockPalette.GetAvailableBlocks();
+            if (!logic.CanPlaceAnyBlock(playerColor, availableBlocks))
+            {
+                Debug.Log($"[SingleGame] 게임 종료 - 남은 {availableBlocks.Count}개 블록 모두 배치 불가능");
+                EndGame("더 이상 블록을 배치할 수 없음");
+                return;
+            }
+
+            // 게임 계속 진행
+            Debug.Log($"[SingleGame] 게임 계속 - 사용 가능한 블록: {blockPalette.GetAvailableBlockCount()}개");
+        }
+
+        /// <summary>
+        /// 게임 종료 처리
+        /// </summary>
+        private void EndGame(string reason)
+        {
+            var scores = logic.CalculateScores();
+            int myScore = scores.ContainsKey(playerColor) ? scores[playerColor] : 0;
+            
+            Debug.Log($"[SingleGame] 게임 종료: {reason}, 최종 점수: {myScore}");
+            
+            // 스테이지 완료 보고 (성공)
+            ReportStageCompletion(myScore, true);
+            
+            // 게임 종료 이벤트 발생
+            OnGameFinished?.Invoke(myScore);
         }
 
         // ===== Helpers =====
@@ -423,6 +611,30 @@ namespace BlokusUnity.Game
                 BlockType.Pento_F, BlockType.Pento_I, BlockType.Pento_L, BlockType.Pento_N,
                 BlockType.Pento_P, BlockType.Pento_T, BlockType.Pento_U, BlockType.Pento_V,
                 BlockType.Pento_W, BlockType.Pento_X, BlockType.Pento_Y, BlockType.Pento_Z
+            };
+        }
+        
+        /// <summary>
+        /// 스테이지 데이터에 available_blocks가 없을 때 사용할 최소 블록 세트
+        /// 튜토리얼이나 기본 스테이지에 적합한 제한된 블록들만 포함
+        /// </summary>
+        private static BlockType[] GetMinimalBlockSet()
+        {
+            return new[]
+            {
+                // 기본 블록들 (1-4칸)
+                BlockType.Single,
+                BlockType.Domino,
+                BlockType.TrioLine,
+                BlockType.TrioAngle,
+                BlockType.Tetro_I,
+                BlockType.Tetro_O,
+                BlockType.Tetro_T,
+                BlockType.Tetro_L,
+                // 몇 개의 기본 펜토미노만 포함 (복잡도 제한)
+                BlockType.Pento_I,
+                BlockType.Pento_L,
+                BlockType.Pento_T
             };
         }
 

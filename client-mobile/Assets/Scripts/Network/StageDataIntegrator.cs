@@ -345,7 +345,9 @@ namespace BlokusUnity.Network
             List<BlockType> availableBlocks = null;
             if (apiData.available_blocks != null)
             {
-                availableBlocks = apiData.available_blocks.Select(id => (BlockType)id).ToList();
+                availableBlocks = apiData.available_blocks
+                    .Where(id => id >= 1 && id <= 21)
+                    .Select(id => (BlockType)(byte)id).ToList();
             }
             
             return new NetworkStageData

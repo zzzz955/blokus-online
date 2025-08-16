@@ -14,13 +14,14 @@ namespace BlokusUnity.Data
     {
         // API 응답 데이터 구조에 맞게 업데이트
         public int stage_number;
+        public string stage_title;
         public int difficulty;
         public int optimal_score;
         public int time_limit;
         public int max_undo_count;
         public int[] available_blocks;
         public InitialBoardState initial_board_state;
-        public string[] hints;
+        public string hints;
         public string stage_description;
         public string thumbnail_url;  // API에서 받아오는 썸네일 이미지 URL
 
@@ -39,7 +40,10 @@ namespace BlokusUnity.Data
                 {
                     foreach (var blockId in available_blocks)
                     {
-                        blockList.Add((BlokusUnity.Common.BlockType)blockId);
+                        if (blockId >= 1 && blockId <= 21)
+                        {
+                            blockList.Add((BlokusUnity.Common.BlockType)(byte)blockId);
+                        }
                     }
                 }
                 return blockList;
@@ -60,25 +64,29 @@ namespace BlokusUnity.Data
         }
 
         /// <summary>
-        /// 보드에 초기 블록들 배치 - API 데이터 구조 사용
+        /// 보드에 초기 블록들 배치 - INTEGER[] 형식 사용
         /// </summary>
         public void ApplyInitialBoard(GameLogic gameLogic)
         {
             gameLogic.ClearBoard();
 
-            if (initial_board_state?.placements != null)
+            if (initial_board_state != null)
             {
-                foreach (var placement in initial_board_state.placements)
+                var placements = initial_board_state.GetPlacements();
+                
+                foreach (var placement in placements)
                 {
                     var blockPlacement = new BlockPlacement(
-                        (BlockType)placement.block_type,
+                        (BlockType)(byte)placement.block_type,
                         new Position(placement.row, placement.col),
-                        (Rotation)placement.rotation,
-                        (FlipState)placement.flip_state,
-                        (PlayerColor)placement.color
+                        (Rotation)(byte)placement.rotation,
+                        (FlipState)(byte)placement.flip_state,
+                        (PlayerColor)(byte)placement.color
                     );
                     gameLogic.PlaceBlock(blockPlacement);
                 }
+                
+                Debug.Log($"초기 보드 배치 완료: {placements.Length}개 블록 (INTEGER[] 형식)");
             }
         }
 
@@ -113,11 +121,59 @@ namespace BlokusUnity.Data
     
     /// <summary>
     /// API 데이터에서 사용되는 초기 보드 상태 구조
+    /// INTEGER[] 형식 사용
     /// </summary>
     [System.Serializable]
     public class InitialBoardState
     {
-        public BlockPlacementData[] placements;
+        // INTEGER[] format from database migration
+        // Format: color_index * 400 + (row * 20 + col)
+        // Colors: 검정(0), 파랑(1), 노랑(2), 빨강(3), 초록(4)
+        public int[] boardPositions;
+        
+        /// <summary>
+        /// Get placement data from INTEGER[] format
+        /// </summary>
+        public BlockPlacementData[] GetPlacements()
+        {
+            if (boardPositions == null || boardPositions.Length == 0)
+                return new BlockPlacementData[0];
+            
+            return ConvertIntegerArrayToPlacements();
+        }
+        
+        /// <summary>
+        /// Convert INTEGER[] format to BlockPlacementData array
+        /// </summary>
+        private BlockPlacementData[] ConvertIntegerArrayToPlacements()
+        {
+            var placementList = new List<BlockPlacementData>();
+            
+            foreach (int encoded in boardPositions)
+            {
+                // Decode: color_index * 400 + (row * 20 + col)
+                int colorIndex = encoded / 400;
+                int position = encoded % 400;
+                int col = position % 20;
+                int row = position / 20;
+                
+                // Create placement data
+                // Single-cell blocks (obstacles or preset pieces)
+                var placement = new BlockPlacementData
+                {
+                    block_type = 1, // Single cell block type
+                    row = row,
+                    col = col,
+                    rotation = 0,
+                    flip_state = 0,
+                    color = colorIndex
+                };
+                
+                placementList.Add(placement);
+            }
+            
+            return placementList.ToArray();
+        }
     }
     
     /// <summary>

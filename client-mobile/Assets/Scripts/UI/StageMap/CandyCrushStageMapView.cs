@@ -24,71 +24,71 @@ namespace BlokusUnity.UI
         [SerializeField] private ScrollRect scrollRect;
         [SerializeField] private RectTransform contentTransform;
         [SerializeField] private RectTransform viewportTransform;
-        
+
         [Header("스테이지 시스템")]
         [SerializeField] private StageFeed stageFeed;
         [SerializeField] private StageButtonPool buttonPool;
-        
+
         [Header("UI 컴포넌트")]
         [SerializeField] private TextMeshProUGUI progressText;
         [SerializeField] private TextMeshProUGUI totalStarsText;
         [SerializeField] private Button backButton;
         [SerializeField] private Button refreshButton;
         [SerializeField] private StageInfoModal stageInfoModal; // Inspector에서 직접 할당
-        
+
         [Header("성능 설정")]
         [SerializeField] private float viewportBuffer = 200f; // 뷰포트 확장 영역
         [SerializeField] private float updateInterval = 0.1f; // 업데이트 간격
         [SerializeField] private float topPadding = 100f; // 1번 스테이지 위 여백
-        
+
         // 스테이지 관리
         private Dictionary<int, StageButton> activeButtons = new Dictionary<int, StageButton>();
         private StageProgressManager progressManager;
-        
+
         // 뷰포트 관리
         private int firstVisibleStage = 1;
         private int lastVisibleStage = 1;
         private float lastUpdateTime = 0f;
         private Vector2 lastScrollPosition;
-        
+
         // 상태
         private bool isInitialized = false;
-        
+
         protected override void Awake()
         {
             base.Awake();
-            
+
             // 버튼 이벤트 연결
             if (backButton != null)
             {
                 backButton.onClick.AddListener(() => UIManager.Instance?.OnBackToMenu());
             }
-            
+
             if (refreshButton != null)
             {
                 refreshButton.onClick.AddListener(RefreshStageMap);
             }
-            
+
             // 스크롤 이벤트 연결
             if (scrollRect != null)
             {
                 scrollRect.onValueChanged.AddListener(OnScrollValueChanged);
             }
-            
+
             // API 이벤트 구독
             SetupApiEventHandlers();
         }
-        
+
         protected void OnEnable()
         {
             // StageInfoModal 참조 확보 (Inspector 할당이 사라질 경우 대비)
             EnsureStageInfoModalReference();
         }
-        
+
         protected override void Start()
         {
             base.Start();
-            
+
             // ScrollRect 설정 - Horizontal 스크롤 비활성화
             if (scrollRect != null)
             {
@@ -96,19 +96,26 @@ namespace BlokusUnity.UI
                 scrollRect.vertical = true;
                 Debug.Log("ScrollRect 설정: Horizontal=false, Vertical=true");
             }
-            
+
             InitializeStageMap();
+            
+            // StageDataManager 이벤트 구독
+            if (StageDataManager.Instance != null)
+            {
+                StageDataManager.Instance.OnStageCompleted += OnStageCompleted;
+                StageDataManager.Instance.OnStageUnlocked += OnStageUnlocked;
+            }
         }
-        
+
         void Update()
         {
             // 초기화되지 않았으면 스킵
             if (!isInitialized || stageFeed == null || scrollRect == null) return;
-            
+
             // 스크롤 위치가 실제로 변경되었을 때만 업데이트
             Vector2 currentScrollPosition = scrollRect.normalizedPosition;
             float scrollDelta = Vector2.Distance(currentScrollPosition, lastScrollPosition);
-            
+
             // 스크롤 변화량이 임계값을 넘거나 일정 시간 경과시에만 업데이트
             if (scrollDelta > 0.01f || Time.time - lastUpdateTime > updateInterval)
             {
@@ -117,72 +124,69 @@ namespace BlokusUnity.UI
                 lastUpdateTime = Time.time;
             }
         }
-        
+
         void OnDestroy()
         {
             // API 이벤트 정리
             CleanupApiEventHandlers();
-            
-            // 이벤트 해제
-            if (progressManager != null)
+
+            // StageDataManager 이벤트 해제
+            if (StageDataManager.Instance != null)
             {
-                progressManager.OnStageCompleted -= OnStageCompleted;
-                progressManager.OnStageUnlocked -= OnStageUnlocked;
+                StageDataManager.Instance.OnStageCompleted -= OnStageCompleted;
+                StageDataManager.Instance.OnStageUnlocked -= OnStageUnlocked;
             }
-            
+
+            // progressManager 이벤트는 StageDataManager 이벤트와 동일하므로 중복 해제 불필요
+
             if (stageFeed != null)
             {
                 stageFeed.OnPathGenerated -= OnPathGenerated;
             }
         }
-        
+
         /// <summary>
         /// 스테이지 맵 초기화
         /// </summary>
         private void InitializeStageMap()
         {
             Debug.Log("=== StageMap 초기화 시작 ===");
-            if (isInitialized) 
+            if (isInitialized)
             {
                 Debug.Log("이미 초기화됨");
                 return;
             }
-            
+
             // 컴포넌트 검증
             Debug.Log("컴포넌트 검증 시작");
-            if (!ValidateComponents()) 
+            if (!ValidateComponents())
             {
                 Debug.LogError("컴포넌트 검증 실패!");
                 return;
             }
-            
+
             // 진행도 매니저 연결
             progressManager = StageProgressManager.Instance;
-            if (progressManager != null)
-            {
-                progressManager.OnStageCompleted += OnStageCompleted;
-                progressManager.OnStageUnlocked += OnStageUnlocked;
-            }
-            
+
             // 스테이지 피드 연결
             if (stageFeed != null)
             {
                 stageFeed.OnPathGenerated += OnPathGenerated;
-                
+
                 // 이미 경로가 생성되어 있다면 바로 설정
                 if (stageFeed.GetPathPoints().Count > 0)
                 {
                     SetupScrollContent();
                 }
             }
-            
+
             // 스테이지 정보 모달 찾기 또는 생성
             FindOrCreateStageInfoModal();
-            
+
             isInitialized = true;
             Debug.Log("CandyCrushStageMapView 초기화 완료");
         }
-        
+
         /// <summary>
         /// 필수 컴포넌트들 검증
         /// </summary>
@@ -194,17 +198,17 @@ namespace BlokusUnity.UI
                 Debug.LogError("ScrollRect가 설정되지 않았습니다!");
                 return false;
             }
-            
+
             if (contentTransform == null)
             {
                 contentTransform = scrollRect.content;
             }
-            
+
             if (viewportTransform == null)
             {
                 viewportTransform = scrollRect.viewport;
             }
-            
+
             if (stageFeed == null)
             {
                 stageFeed = GetComponentInChildren<StageFeed>();
@@ -214,7 +218,7 @@ namespace BlokusUnity.UI
                     return false;
                 }
             }
-            
+
             if (buttonPool == null)
             {
                 buttonPool = StageButtonPool.Instance;
@@ -224,24 +228,56 @@ namespace BlokusUnity.UI
                     return false;
                 }
             }
-            
+
             return true;
         }
-        
+
         /// <summary>
         /// 스테이지 정보 모달 찾기 또는 생성
         /// </summary>
         private void FindOrCreateStageInfoModal()
         {
-            stageInfoModal = FindObjectOfType<StageInfoModal>();
-            
-            // TODO: 모달이 없으면 생성 로직 추가
-            if (stageInfoModal == null)
+            if (stageInfoModal != null) return;
+
+            // 1) 현재 오브젝트 기준으로 부모를 타고 올라가며 각 부모의 자식들에서 탐색 (비활성 포함)
+            Transform cursor = transform;
+            while (cursor != null)
             {
-                Debug.LogWarning("StageInfoModal을 찾을 수 없습니다. 나중에 구현 예정");
+                var local = cursor.GetComponentInChildren<StageInfoModal>(true);
+                if (local != null)
+                {
+                    stageInfoModal = local;
+                    return;
+                }
+                cursor = cursor.parent;
+            }
+
+            // 2) 싱글톤/글로벌 백업 탐색 (비활성 포함)
+            stageInfoModal = StageInfoModal.Instance;
+#if UNITY_2020_1_OR_NEWER
+            if (stageInfoModal == null) stageInfoModal = FindObjectOfType<StageInfoModal>(true);
+#else
+    if (stageInfoModal == null)
+    {
+        var all = Resources.FindObjectsOfTypeAll<StageInfoModal>();
+        foreach (var m in all)
+        {
+            if (m != null && m.gameObject.hideFlags == HideFlags.None)
+            {
+                stageInfoModal = m;
+                break;
             }
         }
-        
+    }
+#endif
+
+            if (stageInfoModal == null)
+            {
+                Debug.LogError("StageInfoModal을 찾을 수 없습니다. 씬에 StageInfoModal이 있는지 확인하세요.");
+            }
+        }
+
+
         /// <summary>
         /// 경로 생성 완료 이벤트
         /// </summary>
@@ -249,37 +285,37 @@ namespace BlokusUnity.UI
         {
             SetupScrollContent();
         }
-        
+
         /// <summary>
         /// 스크롤 콘텐츠 설정
         /// </summary>
         private void SetupScrollContent()
         {
             if (stageFeed == null || contentTransform == null) return;
-            
+
             // 콘텐츠 크기 설정 (상단 여백 추가)
             float totalHeight = stageFeed.GetTotalHeight() + topPadding;
             float totalWidth = stageFeed.GetTotalWidth();
-            
+
             // ContentTransform 앵커와 피벗을 중앙으로 설정
             contentTransform.anchorMin = new Vector2(0.5f, 1f); // 상단 중앙 기준
             contentTransform.anchorMax = new Vector2(0.5f, 1f);
             contentTransform.pivot = new Vector2(0.5f, 1f);
             contentTransform.sizeDelta = new Vector2(totalWidth, totalHeight);
             contentTransform.anchoredPosition = new Vector2(0f, 0f);
-            
+
             Debug.Log($"스크롤 콘텐츠 설정 완료: {totalWidth}x{totalHeight}");
             Debug.Log($"ContentTransform 설정: 앵커({contentTransform.anchorMin}, {contentTransform.anchorMax}), " +
                      $"피벗({contentTransform.pivot}), 위치({contentTransform.anchoredPosition})");
-            
-            
+
+
             // 한 프레임 기다린 후 뷰포트 업데이트 (Layout 시스템이 완료될 때까지)
             StartCoroutine(DelayedViewportUpdate());
-            
+
             // UI 정보 업데이트
             UpdateUIInfo();
         }
-        
+
         /// <summary>
         /// 지연된 뷰포트 업데이트
         /// </summary>
@@ -287,10 +323,10 @@ namespace BlokusUnity.UI
         {
             yield return null; // 한 프레임 대기
             yield return null; // 안전을 위해 한 프레임 더 대기
-            
+
             Debug.Log("지연된 뷰포트 업데이트 시작");
             UpdateViewport();
-            
+
             // 첫 번째 스테이지가 보이지 않으면 강제로 처음 몇 개 스테이지 표시
             if (activeButtons.Count == 0)
             {
@@ -299,10 +335,10 @@ namespace BlokusUnity.UI
                 firstVisibleStage = 1;
                 lastVisibleStage = Mathf.Min(20, stageFeed.GetTotalStages());
             }
-            
+
             Debug.Log($"뷰포트 업데이트 완료: {activeButtons.Count}개 버튼 활성화");
         }
-        
+
         /// <summary>
         /// 스크롤 값 변경 이벤트
         /// </summary>
@@ -310,26 +346,26 @@ namespace BlokusUnity.UI
         {
             // 실시간 뷰포트 업데이트는 Update에서 처리 (성능 최적화)
         }
-        
+
         /// <summary>
         /// 뷰포트 업데이트 (가시 영역의 스테이지만 활성화)
         /// </summary>
         private void UpdateViewport()
         {
             if (stageFeed == null || viewportTransform == null) return;
-            
+
             // 현재 뷰포트 범위 계산
             Vector2 viewportMin, viewportMax;
             GetViewportBounds(out viewportMin, out viewportMax);
-            
+
             // 버퍼 영역 추가
             viewportMin.y -= viewportBuffer;
             viewportMax.y += viewportBuffer;
-            
+
             // 가시 스테이지 범위 계산
             int newFirstVisible, newLastVisible;
             CalculateVisibleStageRange(viewportMin, viewportMax, out newFirstVisible, out newLastVisible);
-            
+
             // 범위가 변경되었다면 버튼 업데이트
             if (newFirstVisible != firstVisibleStage || newLastVisible != lastVisibleStage)
             {
@@ -338,7 +374,7 @@ namespace BlokusUnity.UI
                 lastVisibleStage = newLastVisible;
             }
         }
-        
+
         /// <summary>
         /// 뷰포트 경계 계산
         /// </summary>
@@ -347,30 +383,30 @@ namespace BlokusUnity.UI
             // 뷰포트의 월드 좌표를 콘텐츠 로컬 좌표로 변환
             Vector3[] corners = new Vector3[4];
             viewportTransform.GetWorldCorners(corners);
-            
+
             Vector2 bottomLeft = contentTransform.InverseTransformPoint(corners[0]);
             Vector2 topRight = contentTransform.InverseTransformPoint(corners[2]);
-            
+
             min = bottomLeft;
             max = topRight;
         }
-        
+
         /// <summary>
         /// 가시 스테이지 범위 계산 (뷰포트 기반 동적 로딩)
         /// </summary>
-        private void CalculateVisibleStageRange(Vector2 viewportMin, Vector2 viewportMax, 
+        private void CalculateVisibleStageRange(Vector2 viewportMin, Vector2 viewportMax,
                                                 out int firstVisible, out int lastVisible)
         {
             firstVisible = int.MaxValue;
             lastVisible = 0;
-            
+
             int totalStages = stageFeed.GetTotalStages();
-            
+
             // 모든 스테이지를 검사하여 뷰포트 내에 있는지 확인
             for (int stage = 1; stage <= totalStages; stage++)
             {
                 Vector2 stagePos = stageFeed.GetStagePosition(stage);
-                
+
                 // 스테이지가 뷰포트 내에 있는지 확인
                 if (IsPositionInViewport(stagePos, viewportMin, viewportMax))
                 {
@@ -379,21 +415,21 @@ namespace BlokusUnity.UI
                     lastVisible = stage;
                 }
             }
-            
+
             // 뷰포트에 아무것도 없으면 기본값 설정
             if (firstVisible == int.MaxValue)
             {
                 firstVisible = 1;
                 lastVisible = Mathf.Min(10, totalStages);
             }
-            
+
             // 디버그 로그 (필요시)
             if (Time.frameCount % 60 == 0) // 1초에 한번만
             {
                 Debug.Log($"뷰포트 범위: {firstVisible}-{lastVisible} (뷰포트: {viewportMin.y:F0}~{viewportMax.y:F0})");
             }
         }
-        
+
         /// <summary>
         /// 위치가 뷰포트 내에 있는지 확인
         /// </summary>
@@ -402,7 +438,7 @@ namespace BlokusUnity.UI
             return position.x >= viewportMin.x && position.x <= viewportMax.x &&
                    position.y >= viewportMin.y && position.y <= viewportMax.y;
         }
-        
+
         /// <summary>
         /// 가시 버튼들 업데이트 (활성화/비활성화 기반)
         /// </summary>
@@ -413,12 +449,12 @@ namespace BlokusUnity.UI
             {
                 int stage = kvp.Key;
                 StageButton button = kvp.Value;
-                
+
                 if (button != null)
                 {
                     bool shouldBeVisible = stage >= newFirstVisible && stage <= newLastVisible;
                     bool currentlyVisible = button.gameObject.activeSelf;
-                    
+
                     // 상태가 변경된 경우에만 업데이트
                     if (shouldBeVisible != currentlyVisible)
                     {
@@ -426,7 +462,7 @@ namespace BlokusUnity.UI
                     }
                 }
             }
-            
+
             // 새로운 범위에서 아직 생성되지 않은 버튼들 생성
             for (int stage = newFirstVisible; stage <= newLastVisible; stage++)
             {
@@ -435,64 +471,63 @@ namespace BlokusUnity.UI
                     CreateStageButton(stage);
                 }
             }
-            
+
             // 성능 디버그 (1초에 한번)
             if (Time.frameCount % 60 == 0)
             {
                 int activeCount = 0;
                 int totalCount = activeButtons.Count;
-                
+
                 foreach (var kvp in activeButtons)
                 {
                     if (kvp.Value != null && kvp.Value.gameObject.activeSelf)
                         activeCount++;
                 }
-                
+
                 Debug.Log($"StageButtons: {activeCount}/{totalCount} 활성화 (범위: {newFirstVisible}-{newLastVisible})");
             }
         }
-        
+
         /// <summary>
         /// 스테이지 버튼 생성 및 설정
         /// </summary>
         private void CreateStageButton(int stageNumber)
         {
             if (!stageFeed.IsValidStage(stageNumber)) return;
-            
+
             // 풀에서 버튼 가져오기
             StageButton button = buttonPool.GetButton();
             if (button == null) return;
-            
+
             // 버튼 초기화 (상단 여백 고려)
             Vector2 stagePosition = stageFeed.GetStagePosition(stageNumber);
             Vector3 adjustedPosition = new Vector3(stagePosition.x, stagePosition.y - topPadding, 0);
-            
+
             button.transform.SetParent(contentTransform, false);
             button.transform.localPosition = adjustedPosition;
-            
+
             // StageButton 초기화 (기존 API 사용)
             button.Initialize(stageNumber, OnStageButtonClicked);
-            
+
             // 진행도 정보 적용
             UpdateButtonState(button, stageNumber);
-            
+
             // 활성 버튼 목록에 추가
             activeButtons[stageNumber] = button;
         }
-        
+
         /// <summary>
         /// 버튼 상태 업데이트 (클리어된 스테이지 포함)
         /// </summary>
         private void UpdateButtonState(StageButton button, int stageNumber)
         {
             if (progressManager == null) return;
-            
+
             bool isUnlocked = progressManager.IsStageUnlocked(stageNumber);
             var progress = progressManager.GetCachedStageProgress(stageNumber);
-            
-            // 모든 스테이지 표시 (잠겨있더라도 보여줌)
-            bool shouldShow = true; // 항상 표시
-            
+
+            // 모든 스테이지 항상 표시
+
             // StageProgress를 UserStageProgress로 변환 (StageButton 호환성)
             GameUserStageProgress userProgress = null;
             if (progress != null)
@@ -505,9 +540,9 @@ namespace BlokusUnity.UI
                     bestScore = progress.bestScore
                 };
             }
-            else if (!isUnlocked)
+            else
             {
-                // 잠겨있고 진행도가 없는 스테이지도 기본값으로 표시
+                // 진행도가 없는 경우 기본값으로 표시 (언락 여부 상관없이)
                 userProgress = new GameUserStageProgress
                 {
                     stageNumber = stageNumber,
@@ -516,39 +551,36 @@ namespace BlokusUnity.UI
                     bestScore = 0
                 };
             }
-            
+
             button.UpdateState(isUnlocked, userProgress);
-            
+
             Debug.Log($"스테이지 {stageNumber}: 언락={isUnlocked}, 클리어={userProgress?.isCompleted}, 별={userProgress?.starsEarned}");
         }
-        
+
         /// <summary>
         /// 스테이지 버튼 클릭 이벤트
         /// </summary>
         private void OnStageButtonClicked(int stageNumber)
         {
             Debug.Log($"스테이지 {stageNumber} 클릭됨");
-            
-            // 잠금 확인
+
             if (!progressManager.IsStageUnlocked(stageNumber))
             {
                 ShowUnlockedRequiredMessage(stageNumber);
                 return;
             }
-            
-            // StageInfoModal 재확인
+
+            // 클릭 시점에 참조 재확보
             if (stageInfoModal == null)
             {
-                Debug.LogWarning("StageInfoModal이 없습니다. 다시 찾아보겠습니다...");
-                EnsureStageInfoModalReference();
-                
+                FindOrCreateStageInfoModal();
                 if (stageInfoModal == null)
                 {
-                    Debug.LogError("StageInfoModal을 찾을 수 없습니다!");
+                    Debug.LogError("StageInfoModal Instance를 찾을 수 없습니다!");
                     return;
                 }
             }
-            
+
             // 스테이지 정보 모달 표시
             var stageData = GetStageData(stageNumber);
             if (stageData == null)
@@ -560,14 +592,14 @@ namespace BlokusUnity.UI
                     // TODO: 로딩 인디케이터 표시
                     return;
                 }
-                
+
                 // API 요청도 실패한 경우
                 Debug.LogError($"스테이지 {stageNumber} 데이터를 로드할 수 없습니다!");
                 return;
             }
-            
+
             var progress = progressManager?.GetCachedStageProgress(stageNumber);
-            
+
             // StageProgress를 UserStageProgress로 변환
             GameUserStageProgress userProgress = null;
             if (progress != null)
@@ -591,14 +623,14 @@ namespace BlokusUnity.UI
                     starsEarned = 0
                 };
             }
-            
+
             Debug.Log($"스테이지 {stageNumber} 모달 표시");
             stageInfoModal.ShowStageInfo(stageData, userProgress);
         }
-        
+
         // 대기 중인 스테이지 번호 (API 응답 대기)
         private int pendingStageNumber = 0;
-        
+
         /// <summary>
         /// API 이벤트 핸들러 설정
         /// </summary>
@@ -616,7 +648,7 @@ namespace BlokusUnity.UI
                 Invoke(nameof(SetupApiEventHandlers), 1f);
             }
         }
-        
+
         /// <summary>
         /// API 이벤트 핸들러 정리
         /// </summary>
@@ -628,40 +660,40 @@ namespace BlokusUnity.UI
                 HttpApiClient.Instance.OnStageProgressReceived -= OnStageProgressReceived;
             }
         }
-        
+
         /// <summary>
         /// API에서 스테이지 데이터 수신 처리
         /// </summary>
         private void OnStageDataReceived(ApiStageData stageData)
         {
             if (stageData == null) return;
-            
+
             Debug.Log($"[CandyCrushStageMapView] API에서 스테이지 {stageData.stage_number} 데이터 수신");
-            
+
             // StageDataManager 캐시에 저장
             if (StageDataManager.Instance?.GetStageManager() != null)
             {
                 // API.StageData를 Data.StageData로 변환
                 var convertedStageData = ConvertApiToDataStageData(stageData);
                 StageDataManager.Instance.GetStageManager().CacheStageData(convertedStageData);
-                
+
                 // 모달이 이 스테이지를 기다리고 있었다면 표시
                 ShowStageInfoModalIfReady(stageData.stage_number);
             }
         }
-        
+
         /// <summary>
         /// API에서 스테이지 진행도 수신 처리
         /// </summary>
         private void OnStageProgressReceived(BlokusUnity.Network.UserStageProgress progress)
         {
             if (progress == null) return;
-            
+
             Debug.Log($"[CandyCrushStageMapView] API에서 스테이지 {progress.stageNumber} 진행도 수신");
-            
+
             // UserDataCache에 저장되므로 별도 처리 불필요
         }
-        
+
         /// <summary>
         /// API.StageData를 Data.StageData로 변환
         /// </summary>
@@ -675,14 +707,14 @@ namespace BlokusUnity.UI
                 time_limit = apiStageData.time_limit ?? 0,
                 max_undo_count = apiStageData.max_undo_count,
                 available_blocks = apiStageData.available_blocks ?? new int[0],
-                hints = apiStageData.hints ?? new string[0],
+                hints = (apiStageData.hints != null && apiStageData.hints.Length > 0) ? string.Join("|", apiStageData.hints) : "",
                 // initial_board_state, special_rules는 필요시 추가 변환
                 initial_board_state = null,
                 stage_description = apiStageData.stage_description,
                 thumbnail_url = apiStageData.thumbnail_url
             };
         }
-        
+
         /// <summary>
         /// 스테이지 데이터가 준비되면 모달 표시
         /// </summary>
@@ -691,14 +723,14 @@ namespace BlokusUnity.UI
             if (pendingStageNumber == stageNumber)
             {
                 pendingStageNumber = 0; // 대기 해제
-                
+
                 Debug.Log($"[CandyCrushStageMapView] API 응답 받음. 모달 표시 재시도: 스테이지 {stageNumber}");
-                
+
                 // 직접 모달 표시 (OnStageButtonClicked 재호출 대신)
                 ShowStageModalDirectly(stageNumber);
             }
         }
-        
+
         /// <summary>
         /// 스테이지 모달 직접 표시 (API 응답 후)
         /// </summary>
@@ -710,20 +742,19 @@ namespace BlokusUnity.UI
                 ShowUnlockedRequiredMessage(stageNumber);
                 return;
             }
-            
+
             // StageInfoModal 재확인
             if (stageInfoModal == null)
             {
-                Debug.LogWarning("StageInfoModal이 없습니다. 다시 찾아보겠습니다...");
-                EnsureStageInfoModalReference();
-                
+                stageInfoModal = StageInfoModal.Instance;
+
                 if (stageInfoModal == null)
                 {
-                    Debug.LogError("StageInfoModal을 찾을 수 없습니다!");
+                    Debug.LogError("StageInfoModal Instance를 찾을 수 없습니다!");
                     return;
                 }
             }
-            
+
             // 스테이지 데이터 가져오기 (이제 캐시에 있어야 함)
             var stageData = GetStageData(stageNumber);
             if (stageData == null)
@@ -731,9 +762,9 @@ namespace BlokusUnity.UI
                 Debug.LogError($"스테이지 {stageNumber} 데이터를 캐시에서 찾을 수 없습니다!");
                 return;
             }
-            
+
             var progress = progressManager?.GetCachedStageProgress(stageNumber);
-            
+
             // StageProgress를 UserStageProgress로 변환
             GameUserStageProgress userProgress = null;
             if (progress != null)
@@ -757,27 +788,27 @@ namespace BlokusUnity.UI
                     starsEarned = 0
                 };
             }
-            
+
             Debug.Log($"[CandyCrushStageMapView] 스테이지 {stageNumber} 모달 표시 시도");
             stageInfoModal.ShowStageInfo(stageData, userProgress);
         }
-        
+
         /// <summary>
         /// 스테이지 데이터 가져오기 (캐싱된 메타데이터 우선 사용)
         /// </summary>
         private DataStageData GetStageData(int stageNumber)
         {
             Debug.Log($"[CandyCrushStageMapView] 스테이지 {stageNumber} 데이터 요청");
-            
+
             // 1. 먼저 UserDataCache의 캐싱된 메타데이터에서 확인
             if (UserDataCache.Instance != null)
             {
                 Debug.Log($"[CandyCrushStageMapView] UserDataCache 확인 중...");
-                
+
                 // 전체 메타데이터 캐시 상태 확인
                 var allMetadata = UserDataCache.Instance.GetStageMetadata();
                 Debug.Log($"[CandyCrushStageMapView] 전체 메타데이터 캐시: {allMetadata?.Length ?? 0}개");
-                
+
                 var metadata = UserDataCache.Instance.GetStageMetadata(stageNumber);
                 if (metadata != null)
                 {
@@ -787,7 +818,7 @@ namespace BlokusUnity.UI
                 else
                 {
                     Debug.Log($"[CandyCrushStageMapView] ❌ 스테이지 {stageNumber} 메타데이터가 캐시에 없음");
-                    
+
                     // 메타데이터가 아직 로드 중일 수 있으므로 짧은 지연 후 한 번 더 시도
                     if (allMetadata == null || allMetadata.Length == 0)
                     {
@@ -803,7 +834,7 @@ namespace BlokusUnity.UI
             {
                 Debug.LogWarning("[CandyCrushStageMapView] UserDataCache.Instance가 null입니다");
             }
-            
+
             // 2. StageDataManager 캐시에서 확인
             if (StageDataManager.Instance != null)
             {
@@ -818,7 +849,7 @@ namespace BlokusUnity.UI
                     }
                 }
             }
-            
+
             // 3. 캐시에 없으면 API에서 요청 (백업 방식)
             if (HttpApiClient.Instance != null)
             {
@@ -827,21 +858,21 @@ namespace BlokusUnity.UI
                     Debug.LogWarning($"API 인증이 되어있지 않습니다. 스테이지 {stageNumber} 데이터를 요청할 수 없습니다.");
                     return null;
                 }
-                
+
                 Debug.Log($"[CandyCrushStageMapView] 스테이지 {stageNumber} API 요청 (백업)");
                 HttpApiClient.Instance.GetStageData(stageNumber);
-                
+
                 // 비동기 요청이므로 현재는 null 반환하고 대기 상태로 설정
                 pendingStageNumber = stageNumber;
                 return null;
             }
-            
+
             // 4. API 클라이언트도 없으면 오류
             Debug.LogError($"HttpApiClient를 찾을 수 없습니다. 스테이지 {stageNumber} 데이터를 로드할 수 없습니다.");
             return null;
         }
-        
-        
+
+
         /// <summary>
         /// 스테이지 시작
         /// </summary>
@@ -850,7 +881,7 @@ namespace BlokusUnity.UI
             Debug.Log($"스테이지 {stageNumber} 시작!");
             UIManager.Instance?.OnStageSelected(stageNumber);
         }
-        
+
         /// <summary>
         /// 메타데이터 재시도 로직
         /// </summary>
@@ -861,26 +892,26 @@ namespace BlokusUnity.UI
                 Debug.Log($"[CandyCrushStageMapView] 스테이지 {pendingStageNumber} 메타데이터 재시도");
                 int retryStageNumber = pendingStageNumber;
                 pendingStageNumber = 0; // 리셋
-                
+
                 // OnStageButtonClicked 로직 재실행
                 OnStageButtonClicked(retryStageNumber);
             }
         }
-        
+
         /// <summary>
         /// 별점 계산 (점수 기반)
         /// </summary>
         private int CalculateStarsEarned(int score, DataStageData stageData)
         {
             if (score <= 0 || stageData == null) return 0;
-            
+
             if (score >= stageData.threeStar) return 3;
             if (score >= stageData.twoStar) return 2;
             if (score >= stageData.oneStar) return 1;
-            
+
             return 0;
         }
-        
+
         /// <summary>
         /// 언락 필요 메시지 표시
         /// </summary>
@@ -889,7 +920,7 @@ namespace BlokusUnity.UI
             // TODO: 토스트 메시지나 간단한 알림 표시
             Debug.LogWarning($"스테이지 {stageNumber - 1}을 먼저 클리어하세요!");
         }
-        
+
         /// <summary>
         /// StageInfoModal 참조를 확실하게 확보하는 함수
         /// Inspector 할당이 사라져도 동적으로 찾아서 연결
@@ -901,9 +932,9 @@ namespace BlokusUnity.UI
                 Debug.Log("StageInfoModal 참조가 이미 있습니다.");
                 return;
             }
-            
+
             Debug.Log("StageInfoModal 참조를 동적으로 찾는 중...");
-            
+
             // 1단계: 자식 오브젝트에서 찾기 (가장 일반적)
             stageInfoModal = GetComponentInChildren<StageInfoModal>(true);
             if (stageInfoModal != null)
@@ -911,7 +942,7 @@ namespace BlokusUnity.UI
                 Debug.Log($"✅ 자식에서 StageInfoModal 찾음: {stageInfoModal.name}");
                 return;
             }
-            
+
             // 2단계: 부모/형제 오브젝트에서 찾기 (StageSelectPanel 내 다른 위치)
             if (transform.parent != null)
             {
@@ -922,7 +953,7 @@ namespace BlokusUnity.UI
                     return;
                 }
             }
-            
+
             // 3단계: 씬 전체에서 찾기 (비활성 오브젝트 포함)
             stageInfoModal = FindObjectOfType<StageInfoModal>(true);
             if (stageInfoModal != null)
@@ -930,7 +961,7 @@ namespace BlokusUnity.UI
                 Debug.Log($"✅ 씬 전체에서 StageInfoModal 찾음: {stageInfoModal.name}");
                 return;
             }
-            
+
             // 4단계: 싱글톤 인스턴스에서 찾기
             stageInfoModal = StageInfoModal.Instance;
             if (stageInfoModal != null)
@@ -938,68 +969,68 @@ namespace BlokusUnity.UI
                 Debug.Log($"✅ 싱글톤에서 StageInfoModal 찾음: {stageInfoModal.name}");
                 return;
             }
-            
+
             Debug.LogError("❌ StageInfoModal을 어디에서도 찾을 수 없습니다!");
             Debug.LogError("StageSelectPanel 하위에 StageInfoModal GameObject를 추가해주세요.");
         }
-        
+
         // ========================================
         // 이벤트 핸들러들
         // ========================================
-        
+
         /// <summary>
         /// 스테이지 완료 이벤트
         /// </summary>
-        private void OnStageCompleted(int stageNumber, int stars, bool isNewRecord, bool isFirstClear)
+        private void OnStageCompleted(int stageNumber, int score, int stars)
         {
-            Debug.Log($"스테이지 {stageNumber} 완료: {stars}별");
-            
+            Debug.Log($"스테이지 {stageNumber} 완료: {score}점, {stars}별");
+
             // 해당 버튼 업데이트
             if (activeButtons.ContainsKey(stageNumber))
             {
                 UpdateButtonState(activeButtons[stageNumber], stageNumber);
-                
+
                 // StageButton은 자체적으로 클릭 애니메이션을 처리하므로 별도 애니메이션 불필요
             }
-            
+
             // UI 정보 업데이트
             UpdateUIInfo();
         }
-        
+
         /// <summary>
         /// 스테이지 언락 이벤트
         /// </summary>
         private void OnStageUnlocked(int unlockedStageNumber)
         {
             Debug.Log($"스테이지 {unlockedStageNumber} 언락!");
-            
+
             // 해당 버튼 업데이트
             if (activeButtons.ContainsKey(unlockedStageNumber))
             {
                 UpdateButtonState(activeButtons[unlockedStageNumber], unlockedStageNumber);
                 // StageButton은 자체적으로 상태 변화 애니메이션을 처리
             }
-            
+
             // 새로 언락된 스테이지로 스크롤
             ScrollToStage(unlockedStageNumber);
-            
+
             // UI 정보 업데이트
             UpdateUIInfo();
         }
-        
+
         // ========================================
         // UI 정보 업데이트
         // ========================================
-        
+
         /// <summary>
         /// UI 진행도 정보 업데이트
         /// </summary>
         private void UpdateUIInfo()
         {
             if (progressManager == null) return;
-            
+
             int totalStages = stageFeed.GetTotalStages();
-            
+
             // 진행률 텍스트
             if (progressText != null)
             {
@@ -1007,7 +1038,7 @@ namespace BlokusUnity.UI
                 int maxUnlocked = progressManager.GetMaxUnlockedStage();
                 progressText.text = $"진행률: {progress:F1}% ({maxUnlocked}/{totalStages})";
             }
-            
+
             // 총 별 개수
             if (totalStarsText != null)
             {
@@ -1016,25 +1047,25 @@ namespace BlokusUnity.UI
                 totalStarsText.text = $"별: {earnedStars}/{maxStars} ★";
             }
         }
-        
+
         /// <summary>
         /// 특정 스테이지로 스크롤
         /// </summary>
         public void ScrollToStage(int stageNumber)
         {
             if (!stageFeed.IsValidStage(stageNumber) || scrollRect == null) return;
-            
+
             Vector2 stagePosition = stageFeed.GetStagePosition(stageNumber);
             float totalHeight = stageFeed.GetTotalHeight();
-            
+
             // 정규화된 스크롤 위치 계산 (0-1)
             float normalizedY = 1f - (Mathf.Abs(stagePosition.y) / totalHeight);
             normalizedY = Mathf.Clamp01(normalizedY);
-            
+
             // 부드러운 스크롤 애니메이션
             StartCoroutine(SmoothScrollTo(new Vector2(scrollRect.normalizedPosition.x, normalizedY)));
         }
-        
+
         /// <summary>
         /// 부드러운 스크롤 애니메이션
         /// </summary>
@@ -1043,78 +1074,78 @@ namespace BlokusUnity.UI
             Vector2 startPosition = scrollRect.normalizedPosition;
             float duration = 0.5f;
             float elapsed = 0f;
-            
+
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
                 float progress = elapsed / duration;
-                
+
                 // Ease out 커브 적용
                 progress = 1f - Mathf.Pow(1f - progress, 3f);
-                
+
                 scrollRect.normalizedPosition = Vector2.Lerp(startPosition, targetPosition, progress);
                 yield return null;
             }
-            
+
             scrollRect.normalizedPosition = targetPosition;
         }
-        
+
         // ========================================
         // Public API
         // ========================================
-        
+
         /// <summary>
         /// 스테이지 맵 새로고침
         /// </summary>
         public void RefreshStageMap()
         {
             Debug.Log("스테이지 맵 새로고침");
-            
-            // 서버에서 최신 진행도 정보 요청
-            if (progressManager != null)
+
+            // 캐시된 데이터로 UI 업데이트 (서버 요청 대신)
+            if (UserDataCache.Instance != null)
             {
-                int totalStages = stageFeed.GetTotalStages();
-                int batchSize = 50;
+                Debug.Log("[RefreshStageMap] 캐시된 데이터로 UI 업데이트 (서버 요청 생략)");
                 
-                for (int start = 1; start <= totalStages; start += batchSize)
-                {
-                    int end = Mathf.Min(start + batchSize - 1, totalStages);
-                    progressManager.RequestBatchStageProgressFromServer(start, end);
-                }
+                // 캐시된 데이터로 UI 업데이트
+                StartCoroutine(UpdateButtonsFromCache());
             }
-            
+            else
+            {
+                Debug.LogWarning("[RefreshStageMap] UserDataCache가 없어서 새로고침 실패");
+            }
+
             // 현재 활성 버튼들 업데이트
             foreach (var kvp in activeButtons)
             {
                 UpdateButtonState(kvp.Value, kvp.Key);
             }
-            
+
             // UI 정보 업데이트
             UpdateUIInfo();
         }
-        
+
         /// <summary>
         /// BaseUIPanel 오버라이드
         /// </summary>
         public override void Show(bool animated = true)
         {
             Debug.Log("=== CandyCrushStageMapView Show 호출 ===");
-            
+
             // 강제로 보이게 만들기
             gameObject.SetActive(true);
-            
+
             base.Show(animated);
-            
+
             // 표시될 때마다 초기화 및 새로고침
             InitializeStageMap();
             RefreshStageMap();
-            
+
             Debug.Log($"Panel 최종 상태: Active={gameObject.activeInHierarchy}");
-            
+
             // 초기화 완료 후 스크롤 위치 조정
             StartCoroutine(DelayedScrollToStage());
         }
-        
+
         /// <summary>
         /// 지연된 스크롤 위치 조정 (도전할 스테이지 중앙 배치)
         /// </summary>
@@ -1122,72 +1153,126 @@ namespace BlokusUnity.UI
         {
             // Layout 시스템과 뷰포트 업데이트 완료 대기
             yield return new WaitForSeconds(0.1f);
-            
+
             // 도전해야 할 스테이지 계산 (현재 플레이 가능한 가장 높은 스테이지)
             int challengeStage = 1;
             if (progressManager != null)
             {
                 int maxUnlocked = progressManager.GetMaxUnlockedStage();
-                
+
                 // 현재 언락된 가장 높은 스테이지가 도전 스테이지
                 challengeStage = maxUnlocked;
-                
+
                 // 스테이지 1은 항상 도전 가능하므로 최소값 보장
                 challengeStage = Mathf.Max(1, challengeStage);
-                
+
                 Debug.Log($"최대 언락 스테이지: {maxUnlocked}, 도전 스테이지: {challengeStage}");
             }
-            
+
             Debug.Log($"도전 스테이지 {challengeStage}를 중앙으로 스크롤 시도");
-            
+
             Debug.Log($"스크롤 조정 시작: 도전 스테이지 = {challengeStage}");
-            
+
             // 항상 맨 위로 스크롤 (1번 스테이지를 확실히 보이도록)
             if (scrollRect != null)
             {
                 Vector2 targetPosition = new Vector2(0.5f, 1f); // 맨 위 
                 scrollRect.normalizedPosition = targetPosition;
                 Debug.Log($"스크롤 위치를 맨 위로 설정: {targetPosition}");
-                
+
                 // 스크롤 후 뷰포트 정보 로그
                 yield return new WaitForSeconds(0.1f);
                 LogScrollRectInfo();
             }
         }
-        
+
         /// <summary>
         /// 스크롤 상태 디버그 로그 출력
         /// </summary>
         private void LogScrollRectInfo()
         {
             if (scrollRect == null || contentTransform == null || viewportTransform == null) return;
-            
+
             Debug.Log("=== ScrollRect 상태 정보 ===");
             Debug.Log($"ScrollRect normalizedPosition: {scrollRect.normalizedPosition}");
             Debug.Log($"Content sizeDelta: {contentTransform.sizeDelta}");
             Debug.Log($"Content anchoredPosition: {contentTransform.anchoredPosition}");
             Debug.Log($"Viewport sizeDelta: {viewportTransform.sizeDelta}");
-            
+
             // 현재 뷰포트 범위 계산
             Vector2 viewportMin, viewportMax;
             GetViewportBounds(out viewportMin, out viewportMax);
-            Debug.Log($"뷰포트 범위: Min({viewportMin.x:F1}, {viewportMin.y:F1}) ~ Max({viewportMax.x:F1}, {viewportMax.y:F1})");
-            
+            // Debug.Log($"뷰포트 범위: Min({viewportMin.x:F1}, {viewportMin.y:F1}) ~ Max({viewportMax.x:F1}, {viewportMax.y:F1})");
+
             // 1번 스테이지 위치 확인
             if (stageFeed != null)
             {
                 Vector2 stage1Pos = stageFeed.GetStagePosition(1);
                 Debug.Log($"1번 스테이지 위치: ({stage1Pos.x:F1}, {stage1Pos.y:F1})");
-                
+
                 bool stage1InViewport = IsPositionInViewport(stage1Pos, viewportMin, viewportMax);
                 Debug.Log($"1번 스테이지 뷰포트 내 여부: {stage1InViewport}");
             }
         }
-        
+
+        /// <summary>
+        /// 캐시된 데이터로 버튼 상태 업데이트 (서버 요청 없음)
+        /// </summary>
+        private System.Collections.IEnumerator UpdateButtonsFromCache()
+        {
+            Debug.Log("[UpdateButtonsFromCache] 캐시된 데이터로 UI 업데이트 시작");
+            
+            if (UserDataCache.Instance == null)
+            {
+                Debug.LogWarning("[UpdateButtonsFromCache] UserDataCache가 없음");
+                yield break;
+            }
+
+            // 현재 활성 버튼들 업데이트
+            foreach (var kvp in activeButtons)
+            {
+                int stageNumber = kvp.Key;
+                StageButton button = kvp.Value;
+                
+                if (button != null)
+                {
+                    // 캐시에서 진행도 데이터 가져오기
+                    var networkProgress = UserDataCache.Instance.GetStageProgress(stageNumber);
+                    
+                    // 네트워크 진행도를 Game.UserStageProgress로 변환
+                    var gameProgress = new BlokusUnity.Game.UserStageProgress
+                    {
+                        stageNumber = networkProgress.stageNumber,
+                        isCompleted = networkProgress.isCompleted,
+                        starsEarned = networkProgress.starsEarned,
+                        bestScore = networkProgress.bestScore,
+                        totalAttempts = networkProgress.totalAttempts,
+                        successfulAttempts = networkProgress.successfulAttempts
+                    };
+                    
+                    // 언락 상태 확인
+                    bool isUnlocked = StageDataManager.Instance?.IsStageUnlocked(stageNumber) ?? false;
+                    
+                    // 버튼 상태 업데이트
+                    button.UpdateState(isUnlocked, gameProgress);
+                    
+                    Debug.Log($"[UpdateButtonsFromCache] 스테이지 {stageNumber}: 언락={isUnlocked}, 완료={gameProgress.isCompleted}, 별={gameProgress.starsEarned}");
+                }
+                
+                // 프레임 분할을 위한 yield
+                if (stageNumber % 10 == 0)
+                {
+                    yield return null;
+                }
+            }
+            
+            Debug.Log("[UpdateButtonsFromCache] 캐시된 데이터로 UI 업데이트 완료");
+        }
+
         public override void Hide(bool animated = true)
         {
             base.Hide(animated);
-            
+
             // 모든 버튼을 비활성화 (풀에 반환하지 않고 재사용 준비)
             foreach (var kvp in activeButtons)
             {

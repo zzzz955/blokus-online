@@ -116,11 +116,11 @@ namespace BlokusUnity.Common
             foreach (var block in preplaced)
             {
                 var placement = new BlockPlacement(
-                    (BlockType)block.block_type,
+                    (BlockType)(byte)block.block_type,
                     new Position(block.row, block.col),
-                    (Rotation)block.rotation,
-                    (FlipState)block.flip_state,
-                    (PlayerColor)block.color
+                    (Rotation)(byte)block.rotation,
+                    (FlipState)(byte)block.flip_state,
+                    (PlayerColor)(byte)block.color
                 );
                 result.Add(placement);
             }

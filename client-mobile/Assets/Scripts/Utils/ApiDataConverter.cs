@@ -19,6 +19,34 @@ namespace BlokusUnity.Utils
     /// </summary>
     public static class ApiDataConverter
     {
+        private static BlokusUnity.Data.InitialBoardState ConvertInitialBoardState(HttpApiClient.InitialBoardStateApi ibs)
+        {
+            if (ibs == null) return null;
+
+            var state = new BlokusUnity.Data.InitialBoardState();
+
+            // Get unified board data using new INTEGER[] format
+            var boardData = ibs.GetBoardData();
+            
+            if (boardData != null && boardData.Length > 0)
+            {
+                // Convert INTEGER[] format to placements
+                // Format: color_index * 400 + (y * 20 + x)
+                // Colors: 검정(0), 파랑(1), 노랑(2), 빨강(3), 초록(4)
+                state.boardPositions = boardData;
+                
+                Debug.Log($"[ApiDataConverter] 새로운 INTEGER[] 형식으로 초기 보드 상태 변환: {boardData.Length}개 위치");
+            }
+            else
+            {
+                // Fallback to empty state
+                state.boardPositions = new int[0];
+                Debug.Log("[ApiDataConverter] 빈 초기 보드 상태로 설정");
+            }
+
+            return state;
+        }
+        
         /// <summary>
         /// 압축된 스테이지 메타데이터를 StageData로 변환
         /// </summary>
@@ -27,27 +55,19 @@ namespace BlokusUnity.Utils
             return new BlokusUnity.Data.StageData
             {
                 stage_number = compact.n,
+                stage_title = compact.t,
                 difficulty = compact.d,
                 optimal_score = compact.o,
-                time_limit = compact.tl,
-                max_undo_count = 3, // 기본값
-                available_blocks = GetDefaultAvailableBlocks(), // 모든 블록 타입 기본 제공
-                initial_board_state = null, // 메타데이터에는 포함되지 않음
-                hints = new string[0], // 메타데이터에는 포함되지 않음
-                stage_description = compact.desc, // 스테이지 설명
-                thumbnail_url = compact.th, // 썸네일 URL
-                // stage title은 StageData에 필드가 없으므로 stage_description으로 사용
+                time_limit = compact.tl,              // null/0 허용 시 StageData 쪽 타입에 맞게 사용
+                max_undo_count = (compact.muc > 0 ? compact.muc : 3),
+                available_blocks = compact.ab,
+                initial_board_state = ConvertInitialBoardState(compact.ibs),
+                hints = (compact.h != null && compact.h.Length > 0) ? string.Join("|", compact.h) : "",
+                stage_description = compact.desc,
+                thumbnail_url = compact.tu
             };
         }
-        
-        /// <summary>
-        /// 기본 사용 가능한 블록 타입 배열 반환 (1~21)
-        /// </summary>
-        private static int[] GetDefaultAvailableBlocks()
-        {
-            return new int[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21 };
-        }
-        
+
         /// <summary>
         /// 압축된 사용자 진행도를 UserStageProgress로 변환
         /// </summary>
@@ -67,7 +87,7 @@ namespace BlokusUnity.Utils
                 last_played_at = null
             };
         }
-        
+
         /// <summary>
         /// API 응답의 AuthUserData를 UserInfo로 변환
         /// </summary>
@@ -80,28 +100,28 @@ namespace BlokusUnity.Utils
                 totalGames = authData.user.stats.total_games,
                 wins = authData.user.stats.wins,
                 losses = authData.user.stats.losses,
-                averageScore = authData.user.stats.total_score > 0 ? 
+                averageScore = authData.user.stats.total_score > 0 ?
                     authData.user.stats.total_score / Math.Max(1, authData.user.stats.total_games) : 0,
                 isOnline = true,
                 status = "로비"
             };
         }
-        
+
         /// <summary>
         /// 별점 시스템 - 클라이언트에서 optimal_score 기반으로 계산
         /// </summary>
         public static int CalculateStars(int playerScore, int optimalScore)
         {
             if (optimalScore <= 0) return 0;
-            
+
             float percentage = (float)playerScore / optimalScore;
-            
+
             if (percentage >= 0.9f) return 3;      // 90% 이상: 3별
             if (percentage >= 0.7f) return 2;      // 70% 이상: 2별  
             if (percentage >= 0.5f) return 1;      // 50% 이상: 1별
             return 0;                               // 50% 미만: 0별
         }
-        
+
         /// <summary>
         /// 언락 조건 확인 - 순차적 언락 시스템
         /// </summary>
@@ -110,7 +130,7 @@ namespace BlokusUnity.Utils
             if (stageNumber == 1) return true; // 첫 번째 스테이지는 항상 언락
             return stageNumber <= maxStageCompleted + 1; // 바로 다음 스테이지까지만 언락
         }
-        
+
         /// <summary>
         /// 진행률 계산
         /// </summary>
@@ -119,7 +139,7 @@ namespace BlokusUnity.Utils
             if (totalStages <= 0) return 0f;
             return (float)completedStages / totalStages * 100f;
         }
-        
+
         /// <summary>
         /// 압축된 응답 배열을 List로 변환
         /// </summary>
@@ -135,14 +155,14 @@ namespace BlokusUnity.Utils
             }
             return result;
         }
-        
+
         /// <summary>
         /// API 오류 메시지를 사용자 친화적 메시지로 변환
         /// </summary>
         public static string GetUserFriendlyErrorMessage(string apiError)
         {
             if (string.IsNullOrEmpty(apiError)) return "알 수 없는 오류가 발생했습니다.";
-            
+
             return apiError.ToUpper() switch
             {
                 "INVALID_CREDENTIALS" => "아이디 또는 비밀번호가 올바르지 않습니다.",
@@ -157,7 +177,7 @@ namespace BlokusUnity.Utils
                 _ => apiError
             };
         }
-        
+
         /// <summary>
         /// 네트워크 연결 상태 확인
         /// </summary>
@@ -165,19 +185,19 @@ namespace BlokusUnity.Utils
         {
             return UnityEngine.Application.internetReachability != UnityEngine.NetworkReachability.NotReachable;
         }
-        
+
         /// <summary>
         /// 디버그 정보 포함 로그 출력
         /// </summary>
         public static void LogApiResponse(string endpoint, bool success, string message, object data = null)
         {
             string logMessage = $"API [{endpoint}] {(success ? "SUCCESS" : "FAILED")}: {message}";
-            
+
             if (data != null)
             {
                 logMessage += $"\nData: {JsonUtility.ToJson(data, true)}";
             }
-            
+
             if (success)
             {
                 Debug.Log(logMessage);

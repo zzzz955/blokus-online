@@ -49,18 +49,12 @@ namespace BlokusUnity.Network
             {
                 Instance = this;
                 
-                // 루트 GameObject인지 확인하고 DontDestroyOnLoad 적용
-                if (transform.parent == null)
-                {
-                    DontDestroyOnLoad(gameObject);
-                }
-                else
-                {
-                    Debug.LogWarning("HttpApiClient가 루트 GameObject가 아닙니다. DontDestroyOnLoad를 적용할 수 없습니다.");
-                }
+                // 루트 GameObject로 이동 (DontDestroyOnLoad 적용을 위해)
+                transform.SetParent(null);
+                DontDestroyOnLoad(gameObject);
                 
                 InitializeFromEnvironment();
-                Debug.Log("HttpApiClient 초기화 완료");
+                Debug.Log("HttpApiClient 초기화 완료 - DontDestroyOnLoad 적용됨");
             }
             else
             {
@@ -678,13 +672,41 @@ namespace BlokusUnity.Network
             public string stage_description;
             public bool is_featured;
             public string thumbnail_url;  // DB stages 테이블의 thumbnail_url 필드
+            
+            /// <summary>
+            /// Get unified board data from initial_board_state
+            /// </summary>
+            public int[] GetBoardData()
+            {
+                return initial_board_state?.GetBoardData() ?? new int[0];
+            }
+            
+            /// <summary>
+            /// Check if this stage has initial board state
+            /// </summary>
+            public bool HasInitialBoardState => initial_board_state != null && GetBoardData().Length > 0;
         }
         
         [System.Serializable]
         public class InitialBoardStateApi
         {
-            public object[] pre;
-            public int[] obsIdx;
+            // INTEGER[] format from database migration
+            // Format: color_index * 400 + (row * 20 + col)
+            // Colors: 검정(0), 파랑(1), 노랑(2), 빨강(3), 초록(4)
+            public int[] boardPositions;
+            
+            /// <summary>
+            /// Get board data in INTEGER[] format
+            /// </summary>
+            public int[] GetBoardData()
+            {
+                return boardPositions ?? new int[0];
+            }
+            
+            /// <summary>
+            /// Check if this has any board data
+            /// </summary>
+            public bool HasBoardData => boardPositions != null && boardPositions.Length > 0;
         }
         
         [System.Serializable]
@@ -694,7 +716,7 @@ namespace BlokusUnity.Network
             public int total_count;
             public string last_updated;
         }
-        
+
         [System.Serializable]
         public class CompactStageMetadata
         {
@@ -703,9 +725,30 @@ namespace BlokusUnity.Network
             public int d;           // difficulty
             public int o;           // optimal_score
             public int tl;          // time_limit
-            public string th;       // thumbnail_url
+            public string tu;       // thumbnail_url
             public string desc;     // description
-            public string cat;      // category
+            public int[] ab;        // available_blocks
+            public int muc;         // max_undo_count
+            public InitialBoardStateApi ibs;        // initial_board_state
+            public string[] h;      // hints
+            
+            /// <summary>
+            /// Get unified board data in new INTEGER[] format
+            /// Priority: new format > legacy format > empty array
+            /// </summary>
+            public int[] GetBoardData()
+            {
+                if (ibs != null)
+                {
+                    return ibs.GetBoardData();
+                }
+                return new int[0];
+            }
+            
+            /// <summary>
+            /// Check if this stage has any initial board state
+            /// </summary>
+            public bool HasInitialBoardState => ibs != null && ibs.HasBoardData;
         }
         
         [System.Serializable]

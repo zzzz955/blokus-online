@@ -29,6 +29,10 @@ namespace BlokusUnity.Data
         // 현재 선택된 스테이지 (API 데이터 기반)  
         private StageData currentSelectedStage;
         private int currentSelectedStageNumber;
+        
+        // 이벤트
+        public event System.Action<int> OnStageUnlocked; // 스테이지 언락됨
+        public event System.Action<int, int, int> OnStageCompleted; // 스테이지 완룄 (stageNumber, score, stars)
 
         // API 기반 스테이지 매니저
         private StageManager apiStageManager;
@@ -40,18 +44,12 @@ namespace BlokusUnity.Data
             {
                 Instance = this;
 
-                // 루트 GameObject인지 확인하고 DontDestroyOnLoad 적용
-                if (transform.parent == null)
-                {
-                    DontDestroyOnLoad(gameObject);
-                }
-                else
-                {
-                    Debug.LogWarning("StageDataManager가 루트 GameObject가 아닙니다. DontDestroyOnLoad를 적용할 수 없습니다.");
-                }
+                // 루트 GameObject로 이동 (DontDestroyOnLoad 적용을 위해)
+                transform.SetParent(null);
+                DontDestroyOnLoad(gameObject);
 
                 SetupCacheEventHandlers();
-                Debug.Log("StageDataManager 초기화 완료");
+                Debug.Log("StageDataManager 초기화 완료 - DontDestroyOnLoad 적용됨");
             }
             else
             {
@@ -115,27 +113,34 @@ namespace BlokusUnity.Data
         public void SelectStage(int stageNumber)
         {
             currentSelectedStageNumber = stageNumber;
+            Debug.Log($"[SelectStage] 스테이지 {stageNumber} 선택 시작");
 
             // 1. 서버 데이터부터 시도
+            Debug.Log($"[SelectStage] 1단계: 서버 데이터 시도 (useServerData={useServerData})");
             if (useServerData && TryLoadServerStageData(stageNumber))
             {
+                Debug.Log($"[SelectStage] ✅ 1단계 성공 - 서버 데이터로 완료");
                 return;
             }
 
             // 2. 로컬 StageManager 데이터 시도
+            Debug.Log($"[SelectStage] 2단계: 로컬 데이터 시도 (fallbackToLocalData={fallbackToLocalData})");
             if (fallbackToLocalData && TryLoadLocalStageData(stageNumber))
             {
+                Debug.Log($"[SelectStage] ✅ 2단계 성공 - 로컬 데이터로 완료");
                 return;
             }
 
             // 3. 서버에서 데이터 요청
+            Debug.Log($"[SelectStage] 3단계: API 서버 요청 (autoRequestMissingStages={autoRequestMissingStages})");
             if (autoRequestMissingStages && RequestStageDataFromServer(stageNumber))
             {
+                Debug.Log($"[SelectStage] ✅ 3단계 성공 - 서버 요청 완료");
                 return;
             }
 
             // 4. 최후의 수단: 테스트 스테이지 생성
-            Debug.LogWarning($"스테이지 {stageNumber} 데이터를 찾을 수 없습니다.");
+            Debug.LogWarning($"[SelectStage] ❌ 모든 단계 실패 - 스테이지 {stageNumber} 데이터를 찾을 수 없습니다.");
         }
 
         /// <summary>
@@ -153,7 +158,7 @@ namespace BlokusUnity.Data
                 // 메타데이터를 기반으로 StageData 생성 (이미 변환됨)
                 currentSelectedStage = BlokusUnity.Utils.ApiDataConverter.ConvertCompactMetadata(metadata);
 
-                Debug.Log($"API 메타데이터에서 스테이지 {stageNumber} 선택");
+                Debug.Log($"[TryLoadServerStageData] ✅ API 메타데이터에서 스테이지 {stageNumber} 선택 - return true");
                 return true;
             }
 
@@ -319,7 +324,64 @@ namespace BlokusUnity.Data
                 apiStageManager.UnlockNextStage(stageNumber);
             }
 
-            // 2. UserDataCache 업데이트
+            // 2. API 서버에 완료 보고 (먼저 실행)
+            if (HttpApiClient.Instance != null && UserDataCache.Instance.IsLoggedIn() && enableApiIntegration)
+            {
+                // 서버 응답을 기다린 후 로컬 상태 업데이트
+                System.Action<bool, string> onServerResponse = null;
+                onServerResponse = (success, message) => {
+                    // 이벤트 구독 해제
+                    if (HttpApiClient.Instance != null)
+                        HttpApiClient.Instance.OnStageCompleteResponse -= onServerResponse;
+                        
+                    if (success)
+                    {
+                        // 서버 성공 시에만 로컬 상태 업데이트
+                        UpdateLocalStageProgress(stageNumber, score, stars, completionTime);
+                        
+                        // 이벤트 발생
+                        OnStageCompleted?.Invoke(stageNumber, score, stars);
+                        
+                        // 다음 스테이지 언락 확인 및 이벤트 발생
+                        int nextStage = stageNumber + 1;
+                        if (IsStageUnlocked(nextStage))
+                        {
+                            OnStageUnlocked?.Invoke(nextStage);
+                            Debug.Log($"스테이지 {nextStage} 언락됨!");
+                        }
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[StageDataManager] 스테이지 {stageNumber} 서버 저장 실패: {message}");
+                        // 실패 시에는 로컬 상태 업데이트 안함
+                    }
+                };
+                
+                // 서버 응답 이벤트 구독
+                HttpApiClient.Instance.OnStageCompleteResponse += onServerResponse;
+                HttpApiClient.Instance.CompleteStage(stageNumber, score, completionTime, true);
+            }
+            else
+            {
+                // API 통합이 비활성화된 경우 바로 로컬 업데이트
+                UpdateLocalStageProgress(stageNumber, score, stars, completionTime);
+                OnStageCompleted?.Invoke(stageNumber, score, stars);
+                
+                int nextStage = stageNumber + 1;
+                if (IsStageUnlocked(nextStage))
+                {
+                    OnStageUnlocked?.Invoke(nextStage);
+                    Debug.Log($"스테이지 {nextStage} 언락됨!");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 로컬 스테이지 진행도 업데이트 (서버 성공 후 호출)
+        /// </summary>
+        private void UpdateLocalStageProgress(int stageNumber, int score, int stars, int completionTime)
+        {
+            // UserDataCache 업데이트
             if (UserDataCache.Instance != null)
             {
                 var cacheProgress = UserDataCache.Instance.GetStageProgress(stageNumber);
@@ -342,12 +404,7 @@ namespace BlokusUnity.Data
                 };
 
                 UserDataCache.Instance.SetStageProgress(updatedProgress);
-            }
-
-            // 3. API 서버에 완료 보고
-            if (HttpApiClient.Instance != null && UserDataCache.Instance.IsLoggedIn() && enableApiIntegration)
-            {
-                HttpApiClient.Instance.CompleteStage(stageNumber, score, completionTime, true);
+                Debug.Log($"[StageDataManager] 로컬 스테이지 진행도 업데이트: {stageNumber} (별: {stars})");
             }
         }
 
@@ -390,16 +447,64 @@ namespace BlokusUnity.Data
             return new StageData
             {
                 stage_number = networkStage.stageNumber,
+                stage_title = networkStage.stageName,
                 difficulty = networkStage.difficulty,
                 optimal_score = networkStage.optimalScore,
                 time_limit = networkStage.timeLimit.GetValueOrDefault(0),
                 max_undo_count = networkStage.maxUndoCount,
                 available_blocks = networkStage.availableBlocks?.Select(bt => (int)bt).ToArray() ?? new int[0],
-                initial_board_state = null, // TODO: JSON 파싱 구현
-                hints = new string[0],
+                initial_board_state = ConvertToInitialBoardState(networkStage.initialBoardStateJson),
+                hints = "", // NetworkStageData에는 hints 필드가 없음
                 stage_description = networkStage.stageDescription,
                 thumbnail_url = networkStage.thumbnail_url
             };
+        }
+        
+        /// <summary>
+        /// NetworkStageData의 initialBoardState를 변환
+        /// </summary>
+        private BlokusUnity.Data.InitialBoardState ConvertToInitialBoardState(string initialBoardStateJson)
+        {
+            if (string.IsNullOrEmpty(initialBoardStateJson))
+                return null;
+            
+            try
+            {
+                // JSON에서 INTEGER[] 형식으로 파싱 시도
+                var jsonObject = JsonUtility.FromJson<InitialBoardStateJson>(initialBoardStateJson);
+                
+                var state = new BlokusUnity.Data.InitialBoardState();
+                
+                if (jsonObject.boardPositions != null && jsonObject.boardPositions.Length > 0)
+                {
+                    state.boardPositions = jsonObject.boardPositions;
+                    Debug.Log($"[StageDataManager] 새로운 INTEGER[] 형식으로 초기 보드 상태 파싱: {jsonObject.boardPositions.Length}개 위치");
+                }
+                else
+                {
+                    // 빈 상태
+                    state.boardPositions = new int[0];
+                }
+                
+                return state;
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"[StageDataManager] 초기 보드 상태 JSON 파싱 실패: {ex.Message}");
+                return new BlokusUnity.Data.InitialBoardState { boardPositions = new int[0] };
+            }
+        }
+        
+        /// <summary>
+        /// JSON 파싱을 위한 내부 클래스
+        /// </summary>
+        [System.Serializable]
+        private class InitialBoardStateJson
+        {
+            public int[] boardPositions;
+            // Legacy support
+            public object[] pre;
+            public int[] obsIdx;
         }
 
         /// <summary>
@@ -408,13 +513,29 @@ namespace BlokusUnity.Data
         public bool IsStageUnlocked(int stageNumber)
         {
             if (stageNumber == 1)
+            {
+                Debug.Log($"[IsStageUnlocked] 스테이지 {stageNumber}: 첫 스테이지이므로 언락=true");
                 return true; // 첫 스테이지는 항상 언락
+            }
 
             // API 서버 진행도 확인
             if (UserDataCache.Instance != null && enableApiIntegration)
             {
-                int maxCleared = UserDataCache.Instance.GetMaxClearedStage();
-                return stageNumber <= maxCleared + 1; // 다음 스테이지까지 언락
+                // 직전 스테이지가 완료되었는지 확인 (별점이 1개 이상이어야 진짜 완료)
+                var previousStageProgress = UserDataCache.Instance.GetStageProgress(stageNumber - 1);
+                Debug.Log($"[IsStageUnlocked] 스테이지 {stageNumber}: 이전 스테이지 {stageNumber - 1} 확인 - 완료={previousStageProgress?.isCompleted}, 별={previousStageProgress?.starsEarned}");
+                
+                if (previousStageProgress != null && previousStageProgress.isCompleted && previousStageProgress.starsEarned > 0)
+                {
+                    Debug.Log($"[IsStageUnlocked] 스테이지 {stageNumber}: 이전 스테이지 조건 만족 - 언락=true");
+                    return true;
+                }
+                
+                // 대안: 최대 완료 스테이지 기반 확인 (별점 기준)
+                int maxCleared = GetMaxClearedStageWithStars();
+                bool unlocked = stageNumber <= maxCleared + 1; // 다음 스테이지까지 언락
+                Debug.Log($"[IsStageUnlocked] 스테이지 {stageNumber}: 최대완료 기준 ({maxCleared}+1) - 언락={unlocked}");
+                return unlocked;
             }
 
             // API StageManager 확인
@@ -473,6 +594,40 @@ namespace BlokusUnity.Data
                 starsEarned = 0,
                 bestScore = 0
             };
+        }
+
+        /// <summary>
+        /// 별점이 1개 이상인 스테이지 중 최대 번호 반환
+        /// </summary>
+        private int GetMaxClearedStageWithStars()
+        {
+            if (UserDataCache.Instance == null) return 0;
+
+            int maxStage = 0;
+            
+            // 캐시된 진행도에서 별점이 1개 이상인 스테이지 찾기
+            for (int i = 1; i <= 300; i++) // 합리적인 상한선 설정
+            {
+                var progress = UserDataCache.Instance.GetStageProgress(i);
+                if (progress != null && progress.isCompleted && progress.starsEarned > 0)
+                {
+                    maxStage = i;
+                    Debug.Log($"[GetMaxClearedStageWithStars] 스테이지 {i}: 별 {progress.starsEarned}개 (maxStage 업데이트)");
+                }
+                else if (progress == null)
+                {
+                    // 진행도가 아직 로드되지 않은 스테이지는 계속 확인
+                    continue;
+                }
+                else if (!progress.isCompleted || progress.starsEarned == 0)
+                {
+                    // 명시적으로 미완료인 스테이지는 계속 확인 (건너뛸 수 있음)
+                    continue;
+                }
+            }
+            
+            Debug.Log($"[GetMaxClearedStageWithStars] 최종 결과: {maxStage}");
+            return maxStage;
         }
 
         // ========================================

@@ -30,9 +30,14 @@ namespace BlokusUnity.Game
             if (Instance == null)
             {
                 Instance = this;
+                
+                // 루트 GameObject로 이동 (DontDestroyOnLoad 적용을 위해)
+                transform.SetParent(null);
                 DontDestroyOnLoad(gameObject);
+                
                 stageProgressCache = new Dictionary<int, UserStageProgress>();
                 InitializeNetworkEvents();
+                Debug.Log("StageProgressManager 초기화 완료 - DontDestroyOnLoad 적용됨");
             }
             else
             {
@@ -60,25 +65,25 @@ namespace BlokusUnity.Game
                 yield return new WaitForSeconds(0.1f);
             }
             
-            var messageHandler = BlokusUnity.Network.MessageHandler.Instance;
-            
-            // 싱글플레이어 메시지 이벤트 구독
-            messageHandler.OnStageProgressReceived += OnNetworkStageProgressReceived;
-            messageHandler.OnMaxStageUpdated += OnNetworkMaxStageUpdated;
-            messageHandler.OnStageCompleteResponse += OnNetworkStageCompleteResponse;
-            
-            Debug.Log("네트워크 이벤트 구독 완료");
+            // HTTP API 클라이언트 이벤트 구독
+            if (BlokusUnity.Network.HttpApiClient.Instance != null)
+            {
+                var httpClient = BlokusUnity.Network.HttpApiClient.Instance;
+                httpClient.OnStageProgressReceived += OnHttpStageProgressReceived;
+                httpClient.OnStageCompleteResponse += OnHttpStageCompleteResponse;
+                
+                Debug.Log("HTTP API 이벤트 구독 완료");
+            }
         }
         
         void OnDestroy()
         {
-            // 이벤트 구독 해제
-            if (BlokusUnity.Network.MessageHandler.Instance != null)
+            // HTTP API 이벤트 구독 해제
+            if (BlokusUnity.Network.HttpApiClient.Instance != null)
             {
-                var messageHandler = BlokusUnity.Network.MessageHandler.Instance;
-                messageHandler.OnStageProgressReceived -= OnNetworkStageProgressReceived;
-                messageHandler.OnMaxStageUpdated -= OnNetworkMaxStageUpdated;
-                messageHandler.OnStageCompleteResponse -= OnNetworkStageCompleteResponse;
+                var httpClient = BlokusUnity.Network.HttpApiClient.Instance;
+                httpClient.OnStageProgressReceived -= OnHttpStageProgressReceived;
+                httpClient.OnStageCompleteResponse -= OnHttpStageCompleteResponse;
             }
         }
         
@@ -258,9 +263,9 @@ namespace BlokusUnity.Game
         // ========================================
         
         /// <summary>
-        /// 서버에서 스테이지 진행도 수신 처리
+        /// HTTP API에서 스테이지 진행도 수신 처리
         /// </summary>
-        private void OnNetworkStageProgressReceived(BlokusUnity.Network.UserStageProgress networkProgress)
+        private void OnHttpStageProgressReceived(BlokusUnity.Network.UserStageProgress networkProgress)
         {
             // 네트워크 데이터를 로컬 데이터로 변환
             var localProgress = new UserStageProgress
@@ -282,27 +287,12 @@ namespace BlokusUnity.Game
             Debug.Log($"서버에서 스테이지 {networkProgress.stageNumber} 진행도 수신됨");
         }
         
-        /// <summary>
-        /// 서버에서 최대 스테이지 업데이트 수신 처리
-        /// </summary>
-        private void OnNetworkMaxStageUpdated(int newMaxStage)
-        {
-            int previousMax = maxStageCompleted;
-            maxStageCompleted = newMaxStage;
-            
-            Debug.Log($"서버에서 최대 스테이지 업데이트: {previousMax} → {newMaxStage}");
-            
-            // 새로운 스테이지가 언락된 경우
-            if (newMaxStage > previousMax)
-            {
-                OnStageUnlocked?.Invoke(newMaxStage + 1); // 다음 플레이 가능한 스테이지
-            }
-        }
+        // OnNetworkMaxStageUpdated 제거됨 - HTTP API에서 별도 제공하지 않음
         
         /// <summary>
-        /// 서버에서 스테이지 완료 응답 수신 처리
+        /// HTTP API에서 스테이지 완료 응답 수신 처리
         /// </summary>
-        private void OnNetworkStageCompleteResponse(bool success, string message)
+        private void OnHttpStageCompleteResponse(bool success, string message)
         {
             if (success)
             {
@@ -363,18 +353,14 @@ namespace BlokusUnity.Game
         /// </summary>
         public void RequestStageProgressFromServer(int stageNumber)
         {
-            if (BlokusUnity.Network.NetworkClient.Instance != null && BlokusUnity.Network.NetworkClient.Instance.IsConnected())
+            if (BlokusUnity.Network.HttpApiClient.Instance != null && BlokusUnity.Network.HttpApiClient.Instance.IsAuthenticated())
             {
-                bool success = BlokusUnity.Network.NetworkClient.Instance.SendStageProgressRequest(stageNumber);
-                
-                if (!success)
-                {
-                    Debug.LogWarning($"스테이지 {stageNumber} 진행도 요청 실패");
-                }
+                BlokusUnity.Network.HttpApiClient.Instance.GetStageProgress(stageNumber);
+                Debug.Log($"HTTP API를 통해 스테이지 {stageNumber} 진행도 요청");
             }
             else
             {
-                Debug.LogWarning("서버 연결되지 않음 - 진행도 요청 불가");
+                Debug.LogWarning($"HTTP API 클라이언트가 인증되지 않아 스테이지 {stageNumber} 진행도 요청 실패");
             }
         }
         
@@ -383,18 +369,60 @@ namespace BlokusUnity.Game
         /// </summary>
         public void RequestBatchStageProgressFromServer(int startStage, int endStage)
         {
-            if (BlokusUnity.Network.NetworkClient.Instance != null && BlokusUnity.Network.NetworkClient.Instance.IsConnected())
+            // 하이브리드 네트워크: 싱글플레이어는 HTTP API, 멀티플레이어는 TCP 사용
+            
+            // 1. HTTP API 클라이언트 우선 시도 (싱글플레이어)
+            if (BlokusUnity.Network.HttpApiClient.Instance != null && 
+                BlokusUnity.Network.HttpApiClient.Instance.IsAuthenticated())
             {
+                Debug.Log($"[StageProgressManager] HTTP API로 진행도 일괄 요청: {startStage}-{endStage}");
+                BlokusUnity.Network.HttpApiClient.Instance.GetBatchProgress();
+                return;
+            }
+            
+            // 2. TCP 네트워크 클라이언트 폴백 (멀티플레이어)
+            if (BlokusUnity.Network.NetworkClient.Instance != null && 
+                BlokusUnity.Network.NetworkClient.Instance.IsConnected())
+            {
+                Debug.Log($"[StageProgressManager] TCP로 진행도 일괄 요청: {startStage}-{endStage}");
                 bool success = BlokusUnity.Network.NetworkClient.Instance.SendBatchStageProgressRequest(startStage, endStage);
                 
                 if (!success)
                 {
-                    Debug.LogWarning($"스테이지 {startStage}-{endStage} 일괄 진행도 요청 실패");
+                    Debug.LogWarning($"TCP 스테이지 {startStage}-{endStage} 일괄 진행도 요청 실패");
                 }
+                return;
             }
-            else
+            
+            // 3. 아무 연결도 없을 때 - 로컬 기본값 사용
+            Debug.Log($"[StageProgressManager] 네트워크 연결 없음 - 로컬 기본 진행도 사용 ({startStage}-{endStage})");
+            
+            // 기본 진행도 생성하여 캐시에 저장
+            if (BlokusUnity.Data.UserDataCache.Instance != null)
             {
-                Debug.LogWarning("서버 연결되지 않음 - 일괄 진행도 요청 불가");
+                for (int stageNum = startStage; stageNum <= endStage; stageNum++)
+                {
+                    var defaultProgress = new BlokusUnity.Network.UserStageProgress
+                    {
+                        stageNumber = stageNum,
+                        isCompleted = false,
+                        starsEarned = 0,
+                        bestScore = 0,
+                        bestCompletionTime = 0,
+                        totalAttempts = 0,
+                        successfulAttempts = 0,
+                        lastPlayedAt = System.DateTime.Now
+                    };
+                    
+                    // 기존 진행도가 없을 때만 기본값 설정
+                    var existingProgress = BlokusUnity.Data.UserDataCache.Instance.GetStageProgress(stageNum);
+                    if (existingProgress.totalAttempts == 0) // 새로운 스테이지
+                    {
+                        BlokusUnity.Data.UserDataCache.Instance.SetStageProgress(defaultProgress);
+                    }
+                }
+                
+                Debug.Log($"[StageProgressManager] 로컬 기본 진행도 생성 완료: {startStage}-{endStage}");
             }
         }
         

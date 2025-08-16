@@ -309,7 +309,7 @@ namespace BlokusUnity.Common
             // 모든 블록 타입을 확인하여 사용되지 않은 것만 추가
             for (int i = 1; i <= 21; i++) // BlockType.Single(1) ~ BlockType.Pento_Z(21)
             {
-                BlockType blockType = (BlockType)i;
+                BlockType blockType = (BlockType)(byte)i;
                 if (!used.Contains(blockType))
                 {
                     available.Add(blockType);
@@ -738,6 +738,69 @@ namespace BlokusUnity.Common
                 return PlayerColor.None;
 
             return board[position.row, position.col];
+        }
+
+        /// <summary>
+        /// 특정 블록이 보드의 어디든 배치 가능한지 확인 (게임 종료 조건 체크용)
+        /// 모든 위치, 모든 회전, 모든 플립 상태를 시도해서 하나라도 가능하면 true
+        /// </summary>
+        public bool CanPlaceAnywhereOnBoard(BlockType blockType, PlayerColor player)
+        {
+            // 이미 사용된 블록은 배치할 수 없음
+            if (usedBlocks.ContainsKey(player) && usedBlocks[player].Contains(blockType))
+            {
+                return false;
+            }
+
+            // 모든 회전과 플립 상태 시도
+            var rotations = new[] { Rotation.Degree_0, Rotation.Degree_90, Rotation.Degree_180, Rotation.Degree_270 };
+            var flipStates = new[] { FlipState.Normal, FlipState.Horizontal, FlipState.Vertical, FlipState.Both };
+
+            for (int row = 0; row < GameConstants.BOARD_SIZE; row++)
+            {
+                for (int col = 0; col < GameConstants.BOARD_SIZE; col++)
+                {
+                    var position = new Position(row, col);
+
+                    foreach (var rotation in rotations)
+                    {
+                        foreach (var flipState in flipStates)
+                        {
+                            var placement = new BlockPlacement(blockType, position, rotation, flipState, player);
+                            
+                            // 하나라도 배치 가능하면 true 반환
+                            if (CanPlaceBlock(placement))
+                            {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 모든 위치와 상태를 시도했지만 배치할 수 없음
+            return false;
+        }
+
+        /// <summary>
+        /// 플레이어가 사용 가능한 블록 리스트 중 하나라도 배치 가능한지 확인
+        /// </summary>
+        public bool CanPlaceAnyBlock(PlayerColor player, List<BlockType> availableBlocks)
+        {
+            if (availableBlocks == null || availableBlocks.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (var blockType in availableBlocks)
+            {
+                if (CanPlaceAnywhereOnBoard(blockType, player))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }

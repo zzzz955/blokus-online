@@ -36,17 +36,10 @@ namespace BlokusUnity.UI
                 Instance = this;
                 Debug.Log("UIManager 싱글톤 설정 완료");
                 
-                // 루트 GameObject인지 확인하고 DontDestroyOnLoad 적용
-                if (transform.parent == null)
-                {
-                    DontDestroyOnLoad(gameObject);
-                    Debug.Log("UIManager DontDestroyOnLoad 적용됨");
-                }
-                else
-                {
-                    Debug.LogWarning("UIManager가 루트 GameObject가 아닙니다. DontDestroyOnLoad를 적용할 수 없습니다.");
-                    Debug.Log($"UIManager 부모: {transform.parent.name}");
-                }
+                // 루트 GameObject로 이동 (DontDestroyOnLoad 적용을 위해)
+                transform.SetParent(null);
+                DontDestroyOnLoad(gameObject);
+                Debug.Log("UIManager DontDestroyOnLoad 적용됨");
                 
                 InitializePanels();
                 InitializeSystemMessageManager();
@@ -64,9 +57,32 @@ namespace BlokusUnity.UI
         {
             Debug.Log("=== UIManager Start 시작 ===");
             
-            // 첫 화면: 로그인
-            Debug.Log("로그인 패널 표시 시도");
-            ShowPanel(UIState.Login, false);
+            // Exit으로 돌아온 경우 확인
+            bool returnedFromGame = PlayerPrefs.GetInt("ReturnedFromGame", 0) == 1;
+            if (returnedFromGame)
+            {
+                // 플래그 초기화
+                PlayerPrefs.DeleteKey("ReturnedFromGame");
+                PlayerPrefs.Save();
+                
+                // 로그인 상태 확인 후 적절한 패널 표시
+                if (UserDataCache.Instance != null && UserDataCache.Instance.IsLoggedIn())
+                {
+                    Debug.Log("Exit으로 돌아옴 + 로그인됨 - 스테이지 선택 패널 표시");
+                    ShowPanel(UIState.StageSelect, false);
+                }
+                else
+                {
+                    Debug.Log("Exit으로 돌아옴 + 로그인 안됨 - 로그인 패널 표시");
+                    ShowPanel(UIState.Login, false);
+                }
+            }
+            else
+            {
+                // 일반적인 게임 시작 - 항상 로그인 패널
+                Debug.Log("일반 게임 시작 - 로그인 패널 표시");
+                ShowPanel(UIState.Login, false);
+            }
             
             Debug.Log("UIManager Start 완료");
         }

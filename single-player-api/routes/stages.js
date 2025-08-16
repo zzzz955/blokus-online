@@ -23,19 +23,17 @@ router.get('/metadata',
       // 데이터베이스에서 모든 활성 스테이지 조회
       const query = `
         SELECT 
-          stage_number,
-          CONCAT('스테이지 ', stage_number) as title,
-          difficulty,
-          optimal_score,
-          time_limit,
-          thumbnail_url,
-          stage_description as preview_description,
-          CASE 
-            WHEN stage_number <= 50 THEN 'tutorial'
-            WHEN stage_number <= 200 THEN 'basic'
-            WHEN stage_number <= 600 THEN 'intermediate'
-            ELSE 'advanced'
-          END as category
+          stage_number as n,
+          CONCAT('스테이지 ', stage_number) as t,
+          difficulty as d,
+          optimal_score as o,
+          time_limit as tl,
+          thumbnail_url as tu,
+          stage_description as desc,
+          array_to_json(available_blocks) AS ab,
+          max_undo_count as muc,
+          initial_board_state as ibs,
+          stage_hints as sh
         FROM stages
         WHERE is_active = true
         ORDER BY stage_number ASC
@@ -46,14 +44,17 @@ router.get('/metadata',
 
       // 압축을 위해 작은 JSON 형태로 최적화
       const compactData = stageMetadata.map(stage => ({
-        n: stage.stage_number,          // number
-        t: stage.title,                 // title  
-        d: stage.difficulty,            // difficulty
-        o: stage.optimal_score,         // optimal_score
-        tl: stage.time_limit,          // time_limit
-        th: stage.thumbnail_url || `${process.env.WEB_SERVER_URL || 'http://localhost:3000'}/api/thumbnails/stage-${stage.stage_number}`,
-        desc: stage.preview_description || `${stage.stage_number}번째 블로쿠스 퍼즐에 도전하세요!`,
-        cat: stage.category             // category
+        n: stage.n,          // number
+        t: stage.t,                 // title  
+        d: stage.d,            // difficulty
+        o: stage.o,         // optimal_score
+        tl: stage.tl,          // time_limit
+        tu: stage.tu,
+        desc: stage.desc || `${stage.n}번째 블로쿠스 퍼즐에 도전하세요!`,
+        ab: stage.ab,
+        muc: stage.muc,
+        ibs: stage.ibs,
+        sh: stage.sh
       }));
 
       res.json({
@@ -315,7 +316,8 @@ router.post('/complete',
           score,
           completionTime: completion_time,
           completed
-        }
+        },
+        optimalScore  // 실제 스테이지의 optimal_score 전달
       );
 
       // 사용자 통계 업데이트
@@ -362,15 +364,20 @@ router.post('/complete',
     } catch (error) {
       logger.error('Failed to process stage completion', {
         error: error.message,
+        errorName: error.name,
         requestBody: req.body,
         username: req.user?.username,
-        stack: error.stack
+        userId: req.user?.userId,
+        stack: error.stack,
+        sqlState: error.code,
+        sqlDetail: error.detail
       });
 
       res.status(500).json({
         success: false,
         message: 'Failed to process stage completion',
-        error: 'INTERNAL_SERVER_ERROR'
+        error: 'INTERNAL_SERVER_ERROR',
+        detail: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
   }

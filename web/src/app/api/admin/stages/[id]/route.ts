@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { expandBoardState, toBoardStateDB } from '@/lib/board-state-codec';
 
 const prisma = new PrismaClient();
 
@@ -75,7 +76,6 @@ export async function PUT(
 ) {
   try {
     const stageId = parseInt(params.id);
-
     if (isNaN(stageId)) {
       return NextResponse.json({
         success: false,
@@ -88,123 +88,149 @@ export async function PUT(
     const {
       stage_number,
       difficulty,
-      initial_board_state,
+      initial_board_state,       // 구/신 포맷 모두 허용
       available_blocks,
       optimal_score,
       time_limit,
       max_undo_count,
       stage_description,
       stage_hints,
-      thumbnail_url,
+      thumbnail_url,             // '' | null 이면 재생성 의사
       is_active,
       is_featured
     } = body;
 
-    // Validation
-    if (stage_number && stage_number <= 0) {
-      return NextResponse.json({
-        success: false,
-        message: 'Stage number must be positive',
-        error: 'VALIDATION_ERROR'
-      }, { status: 400 });
-    }
-
-    if (difficulty && (difficulty < 1 || difficulty > 10)) {
-      return NextResponse.json({
-        success: false,
-        message: 'Difficulty must be between 1 and 10',
-        error: 'VALIDATION_ERROR'
-      }, { status: 400 });
-    }
-
-    if (available_blocks && (!Array.isArray(available_blocks) || available_blocks.length === 0)) {
-      return NextResponse.json({
-        success: false,
-        message: 'Available blocks array cannot be empty',
-        error: 'VALIDATION_ERROR'
-      }, { status: 400 });
-    }
-
-    if (optimal_score !== undefined && optimal_score < 0) {
-      return NextResponse.json({
-        success: false,
-        message: 'Optimal score cannot be negative',
-        error: 'VALIDATION_ERROR'
-      }, { status: 400 });
-    }
-
-    // Check if stage exists
-    const existingStage = await prisma.$queryRaw`
-      SELECT stage_id, stage_number FROM stages WHERE stage_id = ${stageId}
+    // 현재 DB 값 조회
+    const existingRows = await prisma.$queryRaw`
+      SELECT 
+        stage_id,
+        stage_number,
+        initial_board_state,
+        available_blocks,
+        thumbnail_url,
+        time_limit
+      FROM stages
+      WHERE stage_id = ${stageId}
     `;
-
-    if ((existingStage as any[]).length === 0) {
+    if (!(existingRows as any[])?.length) {
       return NextResponse.json({
         success: false,
         message: 'Stage not found',
-        error: 'STAGE_NOT_FOUND'
+        error: 'NOT_FOUND'
       }, { status: 404 });
     }
+    const current = (existingRows as any[])[0];
 
-    // Check if stage number is being changed to an existing number
-    if (stage_number && stage_number !== (existingStage as any[])[0].stage_number) {
-      const duplicateCheck = await prisma.$queryRaw`
-        SELECT stage_id FROM stages WHERE stage_number = ${stage_number} AND stage_id != ${stageId}
-      `;
+    // time_limit: 키가 없으면 기존 유지 (null도 허용)
+    const finalTimeLimit =
+      Object.prototype.hasOwnProperty.call(body, 'time_limit')
+        ? time_limit
+        : current.time_limit;
 
-      if ((duplicateCheck as any[]).length > 0) {
-        return NextResponse.json({
-          success: false,
-          message: `Stage number ${stage_number} already exists`,
-          error: 'DUPLICATE_STAGE_NUMBER'
-        }, { status: 409 });
+    // ── 1) IBS(보드 상태): 저장은 항상 "DATABASE INTEGER[] 포맷"
+    const hasIbs = Object.prototype.hasOwnProperty.call(body, 'initial_board_state');
+    let dbFormatForSave: number[] | undefined = undefined;  // DB에 저장할 INTEGER[] 포맷
+    let expandedForThumb: any | undefined = undefined;      // 썸네일 생성용 확장 포맷
+
+    if (hasIbs) {
+      if (initial_board_state === null) {
+        dbFormatForSave = []; // DB에 빈 배열 저장
+      } else {
+        const expanded = expandBoardState(initial_board_state); // 구/신 포맷 상관없이 확장으로
+        dbFormatForSave = toBoardStateDB(initial_board_state);
+        expandedForThumb = expanded;
       }
     }
 
-    const current = (existingStage as any[])[0];
-    const finalTimeLimit =
-      Object.prototype.hasOwnProperty.call(body, 'time_limit')
-        ? time_limit  // undefined가 아니라면 값 그대로(설령 null이어도)
-        : current.time_limit;
+    // ── 2) 변경 여부 판단 (썸네일 갱신 조건)
+    const jsonEqual = (a: any, b: any) => JSON.stringify(a) === JSON.stringify(b);
+    const sortedEqual = (a?: number[], b?: number[]) => {
+      if (a == null && b == null) return true;
+      if (!Array.isArray(a) || !Array.isArray(b)) return false;
+      if (a.length !== b.length) return false;
+      const aa = [...a].sort((x, y) => x - y);
+      const bb = [...b].sort((x, y) => x - y);
+      for (let i = 0; i < aa.length; i++) if (aa[i] !== bb[i]) return false;
+      return true;
+    };
 
-    // Generate thumbnail if not provided but board state or blocks changed
-    let finalThumbnailUrl = thumbnail_url;
-    if ((!thumbnail_url || thumbnail_url.trim() === '') && (initial_board_state || available_blocks)) {
-      // Get current stage data for thumbnail generation
-      const currentStage = (existingStage as any[])[0];
-      const boardStateForThumbnail = initial_board_state || JSON.parse(JSON.stringify(currentStage.initial_board_state));
-      const blocksForThumbnail = available_blocks || currentStage.available_blocks;
-      const stageNumberForThumbnail = stage_number || currentStage.stage_number;
+    const currentIbsDB = Array.isArray(current.initial_board_state) 
+      ? current.initial_board_state 
+      : (current.initial_board_state || []);
 
-      // Import thumbnail generation utilities
+    let ibsChanged = false;
+    if (hasIbs) {
+      if (dbFormatForSave === undefined) {
+        ibsChanged = false; // 값이 제공되지 않음
+      } else if (dbFormatForSave.length === 0) {
+        ibsChanged = currentIbsDB.length > 0; // 빈 배열로 변경
+      } else {
+        ibsChanged = !jsonEqual(dbFormatForSave, currentIbsDB);
+      }
+    }
+
+    let blocksChanged = false;
+    if (available_blocks !== undefined) {
+      blocksChanged = !sortedEqual(available_blocks, current.available_blocks as number[]);
+    }
+
+    const numberChanged = (stage_number !== undefined && stage_number !== current.stage_number);
+
+    const hasThumbField = Object.prototype.hasOwnProperty.call(body, 'thumbnail_url');
+    const forceRegen = hasThumbField && (thumbnail_url === '' || thumbnail_url === null);
+
+    // ── 3) 썸네일 결정: CREATE와 동일 흐름 (커스텀 라이브러리 사용)
+    let finalThumbnailUrl: string;
+
+    // 관리자가 명시 값을 넣으면 그대로 사용
+    if (hasThumbField && typeof thumbnail_url === 'string' && thumbnail_url.trim() !== '') {
+      finalThumbnailUrl = thumbnail_url.trim();
+    } else if (forceRegen || ibsChanged || blocksChanged || numberChanged) {
+      // 내부 유틸 import (동적 import: 라우트 핫리로드/번들 충돌 방지)
       const { getThumbnailGenerator } = await import('@/lib/thumbnail-generator');
       const fileStorage = (await import('@/lib/file-storage')).default;
 
-      // ✅ 기존 썸네일 정리
-      await fileStorage.cleanupOldThumbnails(stageNumberForThumbnail);
+      // stage 번호 기준 기존 썸네일 정리
+      const targetStageNum = stage_number ?? current.stage_number;
 
+      // 번호가 바뀐다면, 이전 번호/새 번호 둘 다 청소(중복 정리 안전)
+      await fileStorage.cleanupOldThumbnails(current.stage_number);
+      if (numberChanged) await fileStorage.cleanupOldThumbnails(targetStageNum);
+
+      // 썸네일 생성: 확장 포맷 필요
       const generator = getThumbnailGenerator();
-      const dataUrl = await generator.generateThumbnail(boardStateForThumbnail, {
+
+      // 확장 포맷 준비 (요청에 안 왔으면 DB 저장값을 확장)
+      const boardForThumb = expandedForThumb
+        ?? expandBoardState(currentIbsDB);
+
+      const blocksForThumb = available_blocks ?? (current.available_blocks as number[]);
+
+      const dataUrl = await generator.generateThumbnail(boardForThumb, {
         width: 300,
         height: 300
       });
-      const filename = fileStorage.generateThumbnailFilename(stageNumberForThumbnail);
+
+      const filename = fileStorage.generateThumbnailFilename(targetStageNum);
       finalThumbnailUrl = await fileStorage.saveThumbnail(dataUrl, filename);
+    } else {
+      // 변경 없음 → 기존 유지
+      finalThumbnailUrl = current.thumbnail_url as string;
     }
 
-    // Update stage
-    const updatedStage = await prisma.$queryRaw`
+    // ── 4) UPDATE (썸네일은 "항상" 최종값 직접 세팅)
+    const updated = await prisma.$queryRaw`
       UPDATE stages SET
         stage_number = COALESCE(${stage_number}, stage_number),
         difficulty = COALESCE(${difficulty}, difficulty),
-        initial_board_state = COALESCE(${JSON.stringify(initial_board_state)}::jsonb, initial_board_state),
+        initial_board_state = COALESCE(${dbFormatForSave}, initial_board_state),
         available_blocks = COALESCE(${available_blocks}, available_blocks),
         optimal_score = COALESCE(${optimal_score}, optimal_score),
         time_limit = ${finalTimeLimit},
         max_undo_count = COALESCE(${max_undo_count}, max_undo_count),
         stage_description = COALESCE(${stage_description}, stage_description),
         stage_hints = COALESCE(${stage_hints}, stage_hints),
-        thumbnail_url = COALESCE(${finalThumbnailUrl}, thumbnail_url),
+        thumbnail_url = ${finalThumbnailUrl},    -- ★ COALESCE 아님: 항상 최종값으로 설정
         is_active = COALESCE(${is_active}, is_active),
         is_featured = COALESCE(${is_featured}, is_featured),
         updated_at = NOW()
@@ -212,20 +238,14 @@ export async function PUT(
       RETURNING stage_id, stage_number, updated_at
     `;
 
-    const updatedData = (updatedStage as any[])[0];
-
     return NextResponse.json({
       success: true,
       message: 'Stage updated successfully',
-      data: {
-        stage: updatedData
-      }
+      data: { stage: (updated as any[])[0] }
     });
 
   } catch (error) {
     console.error('Failed to update stage:', error);
-
-    // Handle unique constraint violation
     if ((error as any).code === '23505') {
       return NextResponse.json({
         success: false,
@@ -233,7 +253,6 @@ export async function PUT(
         error: 'DUPLICATE_STAGE_NUMBER'
       }, { status: 409 });
     }
-
     return NextResponse.json({
       success: false,
       message: 'Failed to update stage',

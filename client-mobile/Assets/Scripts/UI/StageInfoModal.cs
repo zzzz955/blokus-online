@@ -59,25 +59,60 @@ namespace BlokusUnity.UI
         private StageData currentStageData;
         private StageProgress currentProgress;
         private int currentStageNumber;
+        private static StageInfoModal _instance;
 
         // 비활성 시 코루틴 시작 에러 방지용 큐
         private string _pendingThumbnailUrl;
 
         // 싱글톤
-        public static StageInfoModal Instance { get; private set; }
+        public static StageInfoModal Instance
+        {
+            get
+            {
+                // Unity에서 파괴된 객체는 == null 이 true
+                if (_instance == null)
+                {
+#if UNITY_2020_1_OR_NEWER
+                    _instance = UnityEngine.Object.FindObjectOfType<StageInfoModal>(true);
+#else
+            foreach (var m in Resources.FindObjectsOfTypeAll<StageInfoModal>())
+            {
+                if (m != null && m.gameObject.hideFlags == HideFlags.None)
+                {
+                    _instance = m;
+                    break;
+                }
+            }
+#endif
+                }
+                return _instance;
+            }
+            private set { _instance = value; }
+        }
 
         void Awake()
         {
-            // 싱글톤 설정 (Scene 내에서만)
+            // 중복 인스턴스가 있어도 파괴하지 않고, '더 적합한' 인스턴스를 고릅니다.
             if (Instance == null)
             {
                 Instance = this;
-                // UI 모달은 DontDestroyOnLoad 불필요
             }
-            else
+            else if (Instance != this)
             {
-                Destroy(gameObject);
-                return;
+                var existing = Instance; // 기존 참조(파괴되었거나 비활성일 수 있음)
+
+                // 기존 인스턴스가 파괴되었거나 비활성/계층 비활성이라면 교체
+                bool existingInvalid =
+                    existing == null ||
+                    !existing.isActiveAndEnabled ||
+                    !existing.gameObject.activeInHierarchy;
+
+                if (existingInvalid)
+                {
+                    Instance = this;
+                }
+                // else: 기존 인스턴스를 유지. 현재 오브젝트는 그대로 두되 파괴하지 않음.
+                // (씬 구성에 따라 StageSelectPanel 하위/외부 여러 개가 공존해도 안전)
             }
 
             // 버튼 이벤트 연결
@@ -330,14 +365,14 @@ namespace BlokusUnity.UI
             {
                 // 썸네일은 웹 서버(3000 포트)의 stage-thumbnails 경로에서 제공
                 string thumbnailBaseUrl = "http://localhost:3000";
-                
+
                 // DB의 thumbnail_url이 /stage-1-xxx.png 형태라면 앞의 '/' 제거
                 string thumbnailPath = currentStageData.thumbnail_url;
                 if (thumbnailPath.StartsWith("/"))
                 {
                     thumbnailPath = thumbnailPath.Substring(1);
                 }
-                
+
                 string absUrl = $"{thumbnailBaseUrl}/{thumbnailPath}";
                 Debug.Log($"스테이지 {currentStageData.stage_number}: 썸네일 URL 로딩 시도 - {absUrl}");
                 LoadThumbnailFromUrl(absUrl);
@@ -533,13 +568,31 @@ namespace BlokusUnity.UI
         {
             Debug.Log($"스테이지 {currentStageNumber} 게임 시작!");
 
-            // 모달 숨기기
+            // 현재 스테이지 번호를 임시 변수에 저장 (HideModal()에서 초기화되기 전에)
+            int selectedStageNumber = currentStageNumber;
+
+            // 1. StageDataManager에 스테이지 데이터 설정 (가장 중요!)
+            if (StageDataManager.Instance != null)
+            {
+                Debug.Log($"[StageInfoModal] StageDataManager에 스테이지 {selectedStageNumber} 선택 설정");
+                StageDataManager.Instance.SelectStage(selectedStageNumber);
+            }
+            else
+            {
+                Debug.LogError("[StageInfoModal] StageDataManager.Instance가 null입니다!");
+            }
+
+            // 2. 모달 숨기기 (currentStageNumber가 0으로 초기화됨)
             HideModal();
 
-            // 게임 시작
+            // 3. 게임 시작 (UI 전환) - 저장된 스테이지 번호 사용
             if (UIManager.Instance != null)
             {
-                UIManager.Instance.OnStageSelected(currentStageNumber);
+                UIManager.Instance.OnStageSelected(selectedStageNumber);
+            }
+            else
+            {
+                Debug.LogError("[StageInfoModal] UIManager.Instance가 null입니다!");
             }
         }
 

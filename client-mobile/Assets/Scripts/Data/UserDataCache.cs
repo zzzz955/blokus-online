@@ -37,6 +37,10 @@ namespace BlokusUnity.Data
         // 압축된 스테이지 메타데이터 캐시
         private HttpApiClient.CompactStageMetadata[] stageMetadataCache;
         
+        // 중복 요청 방지
+        private bool isBatchProgressLoading = false;
+        private bool isStageMetadataLoading = false;
+        
         // 이벤트
         public event System.Action<UserInfo> OnUserDataUpdated;
         public event System.Action<NetworkUserStageProgress> OnStageProgressUpdated;
@@ -51,18 +55,13 @@ namespace BlokusUnity.Data
             {
                 Instance = this;
                 
-                // 루트 GameObject인지 확인하고 DontDestroyOnLoad 적용
-                if (transform.parent == null)
-                {
-                    DontDestroyOnLoad(gameObject);
-                }
-                else
-                {
-                    Debug.LogWarning("UserDataCache가 루트 GameObject가 아닙니다. DontDestroyOnLoad를 적용할 수 없습니다.");
-                }
+                // 루트 GameObject로 이동 (DontDestroyOnLoad 적용을 위해)
+                transform.SetParent(null);
+                DontDestroyOnLoad(gameObject);
                 
                 LoadCacheFromDisk();
-                Debug.Log("UserDataCache 초기화 완료");
+                SetupHttpApiEventHandlers();
+                Debug.Log("UserDataCache 초기화 완료 - DontDestroyOnLoad 적용됨");
             }
             else
             {
@@ -94,6 +93,49 @@ namespace BlokusUnity.Data
             {
                 SaveCacheToDisk();
             }
+            
+            CleanupHttpApiEventHandlers();
+        }
+        
+        /// <summary>
+        /// HTTP API 이벤트 핸들러 설정
+        /// </summary>
+        private void SetupHttpApiEventHandlers()
+        {
+            // HttpApiClient가 늦게 초기화될 수 있으므로 재시도
+            StartCoroutine(SetupHttpApiEventHandlersCoroutine());
+        }
+        
+        private System.Collections.IEnumerator SetupHttpApiEventHandlersCoroutine()
+        {
+            // HttpApiClient 인스턴스가 준비될 때까지 대기
+            while (HttpApiClient.Instance == null)
+            {
+                yield return new WaitForSeconds(0.1f);
+            }
+            
+            var httpClient = HttpApiClient.Instance;
+            
+            // 진행도 업데이트 이벤트 구독
+            httpClient.OnBatchProgressReceived += OnBatchProgressReceived;
+            httpClient.OnStageProgressReceived += OnStageProgressReceived;
+            httpClient.OnStageCompleteResponse += OnStageCompleteResponse;
+            
+            Debug.Log("[UserDataCache] HTTP API 이벤트 핸들러 설정 완료");
+        }
+        
+        /// <summary>
+        /// HTTP API 이벤트 핸들러 정리
+        /// </summary>
+        private void CleanupHttpApiEventHandlers()
+        {
+            if (HttpApiClient.Instance != null)
+            {
+                var httpClient = HttpApiClient.Instance;
+                httpClient.OnBatchProgressReceived -= OnBatchProgressReceived;
+                httpClient.OnStageProgressReceived -= OnStageProgressReceived;
+                httpClient.OnStageCompleteResponse -= OnStageCompleteResponse;
+            }
         }
         
         // ========================================
@@ -116,6 +158,9 @@ namespace BlokusUnity.Data
             {
                 // 사용자 ID는 userInfo에서 추출하거나 별도로 관리 필요
                 HttpApiClient.Instance.SetAuthToken(token, GetUserIdFromUserInfo(userInfo));
+                
+                // 로그인 후 자동으로 데이터 로드
+                LoadInitialDataFromServer();
             }
             
             SaveUserDataToDisk();
@@ -167,6 +212,50 @@ namespace BlokusUnity.Data
         // ========================================
         // 사용자 데이터 관리
         // ========================================
+        
+        /// <summary>
+        /// 로그인 후 서버로부터 초기 데이터 로드
+        /// </summary>
+        private void LoadInitialDataFromServer()
+        {
+            if (HttpApiClient.Instance != null)
+            {
+                Debug.Log("[UserDataCache] 로그인 후 서버 데이터 로드 시작");
+                
+                // 1. 스테이지 메타데이터 로드 (중복 방지)
+                if (!isStageMetadataLoading)
+                {
+                    isStageMetadataLoading = true;
+                    HttpApiClient.Instance.GetStageMetadata();
+                    Debug.Log("[UserDataCache] 스테이지 메타데이터 요청 (중복 방지됨)");
+                }
+                else
+                {
+                    Debug.Log("[UserDataCache] 스테이지 메타데이터 요청 중복 방지 - 이미 로딩 중");
+                }
+                
+                // 2. 사용자 진행도 일괄 로드 (중복 방지)
+                if (!isBatchProgressLoading)
+                {
+                    isBatchProgressLoading = true;
+                    HttpApiClient.Instance.GetBatchProgress();
+                    Debug.Log("[UserDataCache] 일괄 진행도 요청 (중복 방지됨)");
+                }
+                else
+                {
+                    Debug.Log("[UserDataCache] 일괄 진행도 요청 중복 방지 - 이미 로딩 중");
+                }
+                
+                // 3. 사용자 프로필 로드
+                HttpApiClient.Instance.GetUserProfile();
+                
+                Debug.Log("[UserDataCache] 서버 데이터 로드 요청 완료");
+            }
+            else
+            {
+                Debug.LogWarning("[UserDataCache] HttpApiClient가 null이어서 데이터 로드 실패");
+            }
+        }
         
         /// <summary>
         /// 사용자 정보 업데이트
@@ -442,10 +531,43 @@ namespace BlokusUnity.Data
         /// </summary>
         public void SetStageMetadata(HttpApiClient.CompactStageMetadata[] metadata)
         {
-            stageMetadataCache = metadata;
-            OnStageMetadataUpdated?.Invoke(metadata);
+            // 중복 요청 방지 플래그 초기화
+            isStageMetadataLoading = false;
             
-            Debug.Log($"스테이지 메타데이터 설정: {metadata?.Length ?? 0}개");
+            stageMetadataCache = metadata;
+            
+            // 메타데이터 검증 및 로깅
+            if (metadata != null)
+            {
+                int newFormatCount = 0;
+                int legacyFormatCount = 0;
+                
+                foreach (var stage in metadata)
+                {
+                    if (stage.HasInitialBoardState)
+                    {
+                        var boardData = stage.GetBoardData();
+                        if (stage.ibs.HasBoardData)
+                        {
+                            newFormatCount++;
+                            Debug.Log($"[UserDataCache] 스테이지 {stage.n}: 새로운 INTEGER[] 형식 ({boardData.Length}개 위치)");
+                        }
+                        else
+                        {
+                            legacyFormatCount++;
+                            Debug.Log($"[UserDataCache] 스테이지 {stage.n}: 레거시 형식 ({boardData.Length}개 위치)");
+                        }
+                    }
+                }
+                
+                Debug.Log($"[UserDataCache] 스테이지 메타데이터 설정 완료: {metadata.Length}개 총 (INTEGER[] {newFormatCount}개, Empty {legacyFormatCount}개) (중복 방지 플래그 초기화됨)");
+            }
+            else
+            {
+                Debug.Log($"[UserDataCache] 스테이지 메타데이터 설정 - 데이터 없음 (중복 방지 플래그 초기화됨)");
+            }
+            
+            OnStageMetadataUpdated?.Invoke(metadata);
         }
         
         /// <summary>
@@ -459,7 +581,7 @@ namespace BlokusUnity.Data
         /// <summary>
         /// 특정 스테이지 메타데이터 가져오기
         /// </summary>
-        public HttpApiClient.CompactStageMetadata? GetStageMetadata(int stageNumber)
+        public HttpApiClient.CompactStageMetadata GetStageMetadata(int stageNumber)
         {
             if (stageMetadataCache != null)
             {
@@ -467,11 +589,21 @@ namespace BlokusUnity.Data
                 {
                     if (metadata.n == stageNumber)
                     {
+                        // 디버그 정보 추가
+                        if (metadata.HasInitialBoardState)
+                        {
+                            var boardData = metadata.GetBoardData();
+                            string formatType = metadata.ibs.HasBoardData ? "INTEGER[]" : "Empty";
+                            Debug.Log($"[UserDataCache] 스테이지 {stageNumber} 메타데이터 반환: {formatType} 형식, {boardData.Length}개 위치");
+                        }
+                        
                         return metadata;
                     }
                 }
             }
-            return null;
+            
+            Debug.LogWarning($"[UserDataCache] 스테이지 {stageNumber} 메타데이터를 찾을 수 없음");
+            return default(HttpApiClient.CompactStageMetadata);
         }
         
         // ========================================
@@ -496,6 +628,85 @@ namespace BlokusUnity.Data
             return $"로그인: {IsLoggedIn()}, " +
                    $"진행도: {stageProgressCache.Count}개, " +
                    $"스테이지데이터: {stageDataCache.Count}개";
+        }
+        
+        // ========================================
+        // HTTP API 이벤트 핸들러
+        // ========================================
+        
+        /// <summary>
+        /// 일괄 진행도 수신 처리
+        /// </summary>
+        private void OnBatchProgressReceived(HttpApiClient.CompactUserProgress[] progressArray)
+        {
+            // 중복 요청 방지 플래그 초기화
+            isBatchProgressLoading = false;
+            
+            if (progressArray != null && progressArray.Length > 0)
+            {
+                Debug.Log($"[UserDataCache] 일괄 진행도 수신: {progressArray.Length}개 (중복 방지 플래그 초기화됨)");
+                
+                foreach (var compactProgress in progressArray)
+                {
+                    var networkProgress = new NetworkUserStageProgress
+                    {
+                        stageNumber = compactProgress.n,
+                        isCompleted = compactProgress.c,
+                        starsEarned = compactProgress.s,
+                        bestScore = compactProgress.bs,
+                        bestCompletionTime = compactProgress.bt,
+                        totalAttempts = compactProgress.a,
+                        successfulAttempts = compactProgress.c ? compactProgress.a : 0, // 추정값
+                        lastPlayedAt = System.DateTime.Now
+                    };
+                    
+                    SetStageProgress(networkProgress);
+                }
+                
+                Debug.Log($"[UserDataCache] 일괄 진행도 캐시 완료");
+            }
+            else
+            {
+                Debug.Log($"[UserDataCache] 일괄 진행도 수신 - 데이터 없음 (중복 방지 플래그 초기화됨)");
+            }
+        }
+        
+        /// <summary>
+        /// 개별 진행도 수신 처리
+        /// </summary>
+        private void OnStageProgressReceived(NetworkUserStageProgress progress)
+        {
+            if (progress != null)
+            {
+                Debug.Log($"[UserDataCache] 스테이지 {progress.stageNumber} 진행도 수신");
+                SetStageProgress(progress);
+            }
+        }
+        
+        /// <summary>
+        /// 스테이지 완료 응답 처리
+        /// </summary>
+        private void OnStageCompleteResponse(bool success, string message)
+        {
+            if (success)
+            {
+                Debug.Log($"[UserDataCache] 스테이지 완료 성공: {message}");
+                // 진행도 새로고침 요청 (중복 방지)
+                if (HttpApiClient.Instance != null && !isBatchProgressLoading)
+                {
+                    isBatchProgressLoading = true;
+                    HttpApiClient.Instance.GetBatchProgress();
+                    Debug.Log($"[UserDataCache] 스테이지 완료 후 진행도 새로고침 요청 (중복 방지됨)");
+                }
+                else if (isBatchProgressLoading)
+                {
+                    Debug.Log($"[UserDataCache] 스테이지 완료 후 진행도 새로고침 중복 방지 - 이미 로딩 중");
+                }
+            }
+            else
+            {
+                Debug.LogWarning($"[UserDataCache] 스테이지 완료 실패: {message}");
+            }
         }
         
         // ========================================

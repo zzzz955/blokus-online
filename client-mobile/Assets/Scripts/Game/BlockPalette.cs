@@ -206,6 +206,53 @@ namespace BlokusUnity.Game
             OnBlockSelected?.Invoke(_selectedBlock);
         }
 
+        /// <summary>
+        /// 사용 가능한 블록 리스트 반환 (게임 종료 조건 체크용)
+        /// </summary>
+        public List<BlockType> GetAvailableBlocks()
+        {
+            var availableBlocks = new List<BlockType>();
+            foreach (var kvp in _buttons)
+            {
+                if (kvp.Value != null && kvp.Value.gameObject.activeInHierarchy)
+                {
+                    availableBlocks.Add(kvp.Key);
+                }
+            }
+            return availableBlocks;
+        }
+
+        /// <summary>
+        /// 사용 가능한 블록이 있는지 확인 (게임 종료 조건 체크용)
+        /// </summary>
+        public bool HasAvailableBlocks()
+        {
+            foreach (var kvp in _buttons)
+            {
+                if (kvp.Value != null && kvp.Value.gameObject.activeInHierarchy)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 사용 가능한 블록 개수 반환 (디버그용)
+        /// </summary>
+        public int GetAvailableBlockCount()
+        {
+            int count = 0;
+            foreach (var kvp in _buttons)
+            {
+                if (kvp.Value != null && kvp.Value.gameObject.activeInHierarchy)
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+
         private void Clear()
         {
             // 선택 상태 초기화

@@ -115,6 +115,8 @@ void Awake()
             isCompleted = progress?.isCompleted ?? false;
             starsEarned = progress?.starsEarned ?? 0;
             
+            Debug.Log($"[StageButton {stageNumber}] UpdateState: 언락={unlocked}, 완료={isCompleted}, 별={starsEarned}");
+            
             // 버튼 활성화/비활성화
             if (button != null)
             {
@@ -195,11 +197,11 @@ void Awake()
         {
             if (starIcons == null || starIcons.Length == 0) 
             {
-                // debug.Log($"스테이지 {stageNumber}: starIcons 배열이 비어있습니다.");
+                Debug.LogWarning($"[StageButton {stageNumber}] starIcons 배열이 비어있습니다!");
                 return;
             }
             
-            // debug.Log($"스테이지 {stageNumber}: 별 아이콘 업데이트 - 획득한 별: {starsEarned}/{starIcons.Length}");
+            Debug.Log($"[StageButton {stageNumber}] 별 아이콘 업데이트 - 완료={isCompleted}, 획득한 별: {starsEarned}/{starIcons.Length}");
             
             for (int i = 0; i < starIcons.Length; i++)
             {
@@ -211,6 +213,8 @@ void Awake()
                     // 획득한 별 개수에 따른 스프라이트 및 색상 설정
                     bool shouldActivate = isCompleted && (i < starsEarned);
                     
+                    Debug.Log($"[StageButton {stageNumber}] 별 {i+1}: shouldActivate={shouldActivate} (완료={isCompleted} && {i}<{starsEarned})");
+                    
                     if (shouldActivate)
                     {
                         // 활성화된 별
@@ -218,13 +222,14 @@ void Awake()
                         {
                             starIcons[i].sprite = activeStar;
                             starIcons[i].color = Color.white; // 스프라이트 사용시 색상 취소
+                            Debug.Log($"[StageButton {stageNumber}] 별 {i+1}: activeStar 스프라이트 설정");
                         }
                         else
                         {
                             // 스프라이트가 없으면 색상만 변경
                             starIcons[i].color = activeStarColor;
+                            Debug.Log($"[StageButton {stageNumber}] 별 {i+1}: activeStarColor 색상 설정 ({activeStarColor})");
                         }
-                        // debug.Log($"별 {i+1}: 활성화됨");
                     }
                     else
                     {
@@ -233,18 +238,19 @@ void Awake()
                         {
                             starIcons[i].sprite = inactiveStar;
                             starIcons[i].color = Color.white; // 스프라이트 사용시 색상 취소
+                            Debug.Log($"[StageButton {stageNumber}] 별 {i+1}: inactiveStar 스프라이트 설정");
                         }
                         else
                         {
                             // 스프라이트가 없으면 색상만 변경
                             starIcons[i].color = inactiveStarColor;
+                            Debug.Log($"[StageButton {stageNumber}] 별 {i+1}: inactiveStarColor 색상 설정 ({inactiveStarColor})");
                         }
-                        // debug.Log($"별 {i+1}: 비활성화됨");
                     }
                 }
                 else
                 {
-                    // debug.LogWarning($"스테이지 {stageNumber}: starIcons[{i}]가 null입니다!");
+                    Debug.LogWarning($"[StageButton {stageNumber}] starIcons[{i}]가 null입니다!");
                 }
             }
         }

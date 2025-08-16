@@ -20,7 +20,7 @@ namespace BlokusUnity.UI
 
         [Header("Config")]
         [SerializeField] private string mainSceneName = "MainScene";
-        [SerializeField] private bool showExitConfirm = false; // 팝업 붙일 계획이면 true로
+        // showExitConfirm 필드 제거됨 (사용되지 않음)
 
         private void Awake()
         {
@@ -29,6 +29,13 @@ namespace BlokusUnity.UI
                 // 🔒 중복 방지: Inspector 이벤트도 비워두고, 여기서만 연결
                 undoButton.onClick.RemoveAllListeners();
                 undoButton.onClick.AddListener(OnClickUndo);
+            }
+            
+            if (exitButton != null)
+            {
+                // Exit 버튼 이벤트 연결
+                exitButton.onClick.RemoveAllListeners();
+                exitButton.onClick.AddListener(OnClickExit);
             }
 
             // 모달 자동 찾기(활성 오브젝트 우선)
@@ -124,6 +131,10 @@ private void OnClickUndo()
             // TODO: showExitConfirm == true일 때 확인 팝업 연결
             var gm = SingleGameManager.Instance;
             if (gm != null) gm.OnExitRequested();
+
+            // Exit으로 돌아온다는 플래그 설정
+            PlayerPrefs.SetInt("ReturnedFromGame", 1);
+            PlayerPrefs.Save();
 
             SceneManager.LoadScene(mainSceneName, LoadSceneMode.Single);
         }

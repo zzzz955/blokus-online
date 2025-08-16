@@ -173,8 +173,12 @@ class DatabaseService {
   }
 
   // 스테이지 진행도 업데이트/생성
-  async updateStageProgress(userId, stageNumber, scoreData) {
+  async updateStageProgress(userId, stageNumber, scoreData, optimalScore = 100) {
     const { score, completionTime, completed } = scoreData;
+    
+    winston.info('Starting updateStageProgress', {
+      userId, stageNumber, score, completionTime, completed, optimalScore
+    });
     
     return await this.transaction(async (client) => {
       // 먼저 stage_id 조회
@@ -188,12 +192,18 @@ class DatabaseService {
       }
       
       const stageId = stageResult.rows[0].stage_id;
+      winston.info('Found stage_id', { stageId });
       
       // 기존 진행도 조회
       const existingResult = await client.query(
         'SELECT * FROM user_stage_progress WHERE user_id = $1 AND stage_id = $2',
         [userId, stageId]
       );
+      
+      winston.info('Existing progress check', { 
+        hasExisting: existingResult.rows.length > 0,
+        existingData: existingResult.rows[0] || null
+      });
       
       if (existingResult.rows.length === 0) {
         // 새로운 레코드 생성
@@ -207,9 +217,9 @@ class DatabaseService {
         `;
         
         const values = [
-          userId, stageId, completed, this.calculateStars(score),
+          userId, stageId, completed, this.calculateStars(score, optimalScore),
           score, completionTime, completed ? 1 : 0,
-          completed ? 'NOW()' : null
+          completed ? new Date() : null
         ];
         
         const result = await client.query(insertQuery, values);
@@ -218,7 +228,16 @@ class DatabaseService {
         // 기존 레코드 업데이트
         const existing = existingResult.rows[0];
         const isNewBest = score > existing.best_score;
-        const newStars = this.calculateStars(score);
+        const newStars = this.calculateStars(score, optimalScore);
+        
+        winston.info('Updating existing progress', {
+          existingScore: existing.best_score,
+          newScore: score,
+          isNewBest,
+          existingStars: existing.stars_earned,
+          newStars,
+          completionTime
+        });
         
         const updateQuery = `
           UPDATE user_stage_progress SET
@@ -226,8 +245,8 @@ class DatabaseService {
             stars_earned = GREATEST(stars_earned, $4),
             best_score = GREATEST(best_score, $5),
             best_completion_time = CASE 
-              WHEN $6 IS NOT NULL AND (best_completion_time IS NULL OR $6 < best_completion_time)
-              THEN $6 ELSE best_completion_time END,
+              WHEN $6::INTEGER IS NOT NULL AND (best_completion_time IS NULL OR $6::INTEGER < best_completion_time)
+              THEN $6::INTEGER ELSE best_completion_time END,
             total_attempts = total_attempts + 1,
             successful_attempts = successful_attempts + CASE WHEN $3 THEN 1 ELSE 0 END,
             first_completed_at = CASE 
@@ -239,9 +258,18 @@ class DatabaseService {
           RETURNING *, $7 as is_new_best
         `;
         
-        const result = await client.query(updateQuery, [
-          userId, stageId, completed, newStars, score, completionTime, isNewBest
-        ]);
+        const updateParams = [userId, stageId, completed, newStars, score, completionTime, isNewBest];
+        
+        winston.info('Executing UPDATE query', {
+          params: updateParams
+        });
+        
+        const result = await client.query(updateQuery, updateParams);
+        
+        winston.info('UPDATE query completed', {
+          rowsAffected: result.rowCount,
+          updatedData: result.rows[0]
+        });
         
         return result.rows[0];
       }

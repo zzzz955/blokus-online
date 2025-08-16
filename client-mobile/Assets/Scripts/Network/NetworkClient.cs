@@ -20,7 +20,7 @@ namespace BlokusUnity.Network
         [SerializeField] private string serverHost = "localhost";
         [SerializeField] private int serverPort = 9999;
         [SerializeField] private int connectionTimeoutMs = 5000;
-        [SerializeField] private int heartbeatIntervalMs = 30000;
+        // heartbeatIntervalMs 필드 제거됨 (사용되지 않음)
         
         // 연결 상태
         private TcpClient tcpClient;
@@ -491,40 +491,6 @@ namespace BlokusUnity.Network
         public bool SendHeartbeat()
         {
             return SendProtocolMessage("HEARTBEAT");
-        }
-        
-        // ========================================
-        // 싱글플레이어 메시지 전송 함수들
-        // ========================================
-        
-        /// <summary>
-        /// 스테이지 데이터 요청
-        /// </summary>
-        public bool SendStageDataRequest(int stageNumber)
-        {
-            return SendProtocolMessage("STAGE_DATA_REQUEST", stageNumber.ToString());
-        }
-        
-        /// <summary>
-        /// 스테이지 진행도 요청
-        /// </summary>
-        public bool SendStageProgressRequest(int stageNumber)
-        {
-            return SendProtocolMessage("STAGE_PROGRESS_REQUEST", stageNumber.ToString());
-        }
-        
-        /// <summary>
-        /// 스테이지 완료 보고
-        /// </summary>
-        public bool SendStageCompleteRequest(int stageNumber, bool completed, int stars, int score, int completionTime)
-        {
-            return SendProtocolMessage("STAGE_PROGRESS_UPDATE", 
-                stageNumber.ToString(),
-                completed ? "1" : "0",
-                stars.ToString(),
-                score.ToString(),
-                completionTime.ToString()
-            );
         }
         
         /// <summary>

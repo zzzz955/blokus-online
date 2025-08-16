@@ -36,18 +36,12 @@ namespace BlokusUnity.UI.Messages
             {
                 Instance = this;
                 
-                // 루트 GameObject인지 확인하고 DontDestroyOnLoad 적용
-                if (transform.parent == null)
-                {
-                    DontDestroyOnLoad(gameObject);
-                }
-                else
-                {
-                    Debug.LogWarning("SystemMessageManager가 루트 GameObject가 아닙니다. DontDestroyOnLoad를 적용할 수 없습니다.");
-                }
+                // 루트 GameObject로 이동 (DontDestroyOnLoad 적용을 위해)
+                transform.SetParent(null);
+                DontDestroyOnLoad(gameObject);
 
                 InitializeComponents();
-                Debug.Log("SystemMessageManager 초기화 완료");
+                Debug.Log("SystemMessageManager 초기화 완료 - DontDestroyOnLoad 적용됨");
             }
             else
             {
@@ -89,7 +83,9 @@ namespace BlokusUnity.UI.Messages
         private void CreateMessageCanvas()
         {
             GameObject canvasObj = new GameObject("SystemMessageCanvas");
-            canvasObj.transform.SetParent(transform);
+            // 루트 GameObject로 생성 (DontDestroyOnLoad 적용을 위해)
+            canvasObj.transform.SetParent(null);
+            DontDestroyOnLoad(canvasObj);
 
             messageCanvas = canvasObj.AddComponent<Canvas>();
             messageCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -98,7 +94,7 @@ namespace BlokusUnity.UI.Messages
             canvasObj.AddComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             canvasObj.AddComponent<GraphicRaycaster>();
 
-            Debug.Log("SystemMessageCanvas 자동 생성됨");
+            Debug.Log("SystemMessageCanvas 자동 생성됨 - DontDestroyOnLoad 적용됨");
         }
 
         /// <summary>

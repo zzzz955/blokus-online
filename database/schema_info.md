@@ -162,7 +162,7 @@ content = """# 📦 블로쿠스 온라인 통합 데이터베이스 스키마 (
 
 ### 3.12 `stages`
 - 컬럼: `stage_id SERIAL`(PK), `stage_number INTEGER` **UNIQUE NOT NULL**,  
-  `difficulty INTEGER` (CHECK 1~10), `initial_board_state JSONB`, `available_blocks INTEGER[]` **NOT NULL**,  
+  `difficulty INTEGER` (CHECK 1~10), `initial_board_state INTEGER[]`, `available_blocks INTEGER[]` **NOT NULL**,  
   `optimal_score INTEGER` **NOT NULL**, `time_limit INTEGER` NULL, `max_undo_count INTEGER` DEFAULT 3,  
   `stage_description TEXT`, `stage_hints TEXT`,  
   `is_active BOOLEAN` DEFAULT `true`, `is_featured BOOLEAN` DEFAULT `false`,  

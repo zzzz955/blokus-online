@@ -27,7 +27,7 @@ namespace BlokusUnity.Network
         public event System.Action<bool, string> OnJoinRoomResponse; // 방 참가 응답
         
         // 게임 관련
-        public event System.Action<GameState> OnGameStateUpdated; // 게임 상태 업데이트
+        // public event System.Action<GameState> OnGameStateUpdated; // 멀티플레이어에서 사용 예정
         public event System.Action<BlockPlacement> OnBlockPlaced; // 블록 배치됨
         public event System.Action<PlayerColor> OnTurnChanged; // 턴 변경
         public event System.Action<Dictionary<PlayerColor, int>> OnScoresUpdated; // 점수 업데이트
@@ -37,11 +37,11 @@ namespace BlokusUnity.Network
         public event System.Action<string> OnErrorReceived; // 에러 메시지
         public event System.Action OnHeartbeatReceived; // 하트비트 응답
         
-        // 싱글플레이어 관련
-        public event System.Action<StageData> OnStageDataReceived; // 스테이지 데이터 수신
-        public event System.Action<UserStageProgress> OnStageProgressReceived; // 스테이지 진행도 수신
-        public event System.Action<bool, string> OnStageCompleteResponse; // 스테이지 완료 응답
-        public event System.Action<int> OnMaxStageUpdated; // 최대 스테이지 업데이트
+        // 싱글플레이어 관련 (현재 HTTP API로 대체됨)
+        // public event System.Action<StageData> OnStageDataReceived; // TCP에서 HTTP API로 이동
+        // public event System.Action<UserStageProgress> OnStageProgressReceived; // TCP에서 HTTP API로 이동
+        // public event System.Action<bool, string> OnStageCompleteResponse; // TCP에서 HTTP API로 이동
+        // public event System.Action<int> OnMaxStageUpdated; // TCP에서 HTTP API로 이동
         
         // 싱글톤 패턴
         public static MessageHandler Instance { get; private set; }
@@ -163,20 +163,6 @@ namespace BlokusUnity.Network
                         break;
                     case "HEARTBEAT_RESPONSE":
                         HandleHeartbeatResponse(parts);
-                        break;
-                    
-                    // 싱글플레이어 관련
-                    case "STAGE_DATA_RESPONSE":
-                        HandleStageDataResponse(parts);
-                        break;
-                    case "STAGE_PROGRESS_RESPONSE":
-                        HandleStageProgressResponse(parts);
-                        break;
-                    case "STAGE_COMPLETE_RESPONSE":
-                        HandleStageCompleteResponse(parts);
-                        break;
-                    case "MAX_STAGE_UPDATED":
-                        HandleMaxStageUpdated(parts);
                         break;
                     
                     default:
@@ -421,11 +407,11 @@ namespace BlokusUnity.Network
             try
             {
                 BlockPlacement placement = new BlockPlacement(
-                    (BlockType)int.Parse(parts[1]),
+                    (BlockType)(byte)int.Parse(parts[1]),
                     new Position(int.Parse(parts[2]), int.Parse(parts[3])),
-                    (Rotation)int.Parse(parts[4]),
-                    (FlipState)int.Parse(parts[5]),
-                    (PlayerColor)int.Parse(parts[6])
+                    (Rotation)(byte)int.Parse(parts[4]),
+                    (FlipState)(byte)int.Parse(parts[5]),
+                    (PlayerColor)(byte)int.Parse(parts[6])
                 );
                 
                 Debug.Log($"블록 배치됨: {placement.type} at ({placement.position.row}, {placement.position.col})");
@@ -536,153 +522,6 @@ namespace BlokusUnity.Network
         {
             Debug.Log("하트비트 응답 수신");
             OnHeartbeatReceived?.Invoke();
-        }
-        
-        // ========================================
-        // 싱글플레이어 메시지 핸들러들
-        // ========================================
-        
-        /// <summary>
-        /// 스테이지 데이터 응답 - "STAGE_DATA_RESPONSE:stageNumber:stageName:difficulty:optimalScore:timeLimit:maxUndoCount:availableBlocks:initialBoardState:stageDescription"
-        /// </summary>
-        private void HandleStageDataResponse(string[] parts)
-        {
-            if (parts.Length < 9)
-            {
-                Debug.LogError("STAGE_DATA_RESPONSE 메시지 형식 오류");
-                return;
-            }
-            
-            try
-            {
-                StageData stageData = new StageData
-                {
-                    stageNumber = int.Parse(parts[1]),
-                    stageName = parts[2],
-                    difficulty = int.Parse(parts[3]),
-                    optimalScore = int.Parse(parts[4]),
-                    timeLimit = int.Parse(parts[5]) == 0 ? (int?)null : int.Parse(parts[5]),
-                    maxUndoCount = int.Parse(parts[6])
-                };
-                
-                // 사용 가능한 블록들 파싱 (콤마로 구분된 블록 ID)
-                if (parts.Length > 7 && !string.IsNullOrEmpty(parts[7]))
-                {
-                    string[] blockIds = parts[7].Split(',');
-                    stageData.availableBlocks = new List<BlokusUnity.Common.BlockType>();
-                    
-                    foreach (string blockId in blockIds)
-                    {
-                        if (int.TryParse(blockId, out int id))
-                        {
-                            stageData.availableBlocks.Add((BlokusUnity.Common.BlockType)id);
-                        }
-                    }
-                }
-                
-                // 초기 보드 상태 (JSONB 데이터)
-                if (parts.Length > 8 && !string.IsNullOrEmpty(parts[8]))
-                {
-                    stageData.initialBoardStateJson = parts[8];
-                }
-                
-                // 스테이지 설명
-                if (parts.Length > 9)
-                {
-                    stageData.stageDescription = parts[9];
-                }
-                
-                Debug.Log($"스테이지 데이터 수신: {stageData.stageName} (난이도: {stageData.difficulty})");
-                OnStageDataReceived?.Invoke(stageData);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"STAGE_DATA_RESPONSE 파싱 오류: {ex.Message}");
-            }
-        }
-        
-        /// <summary>
-        /// 스테이지 진행도 응답 - "STAGE_PROGRESS_RESPONSE:stageNumber:isCompleted:starsEarned:bestScore:bestTime:totalAttempts:successfulAttempts"
-        /// </summary>
-        private void HandleStageProgressResponse(string[] parts)
-        {
-            if (parts.Length < 8)
-            {
-                Debug.LogError("STAGE_PROGRESS_RESPONSE 메시지 형식 오류");
-                return;
-            }
-            
-            try
-            {
-                UserStageProgress progress = new UserStageProgress
-                {
-                    stageNumber = int.Parse(parts[1]),
-                    isCompleted = bool.Parse(parts[2]),
-                    starsEarned = int.Parse(parts[3]),
-                    bestScore = int.Parse(parts[4]),
-                    bestCompletionTime = int.Parse(parts[5]),
-                    totalAttempts = int.Parse(parts[6]),
-                    successfulAttempts = int.Parse(parts[7])
-                };
-                
-                // 날짜 정보가 있다면 파싱 (추가 파라미터)
-                if (parts.Length > 8 && !string.IsNullOrEmpty(parts[8]))
-                {
-                    progress.firstPlayedAt = System.DateTime.Parse(parts[8]);
-                }
-                if (parts.Length > 9 && !string.IsNullOrEmpty(parts[9]))
-                {
-                    progress.lastPlayedAt = System.DateTime.Parse(parts[9]);
-                }
-                
-                Debug.Log($"스테이지 진행도 수신: {progress.stageNumber} (완료: {progress.isCompleted}, 별: {progress.starsEarned})");
-                OnStageProgressReceived?.Invoke(progress);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"STAGE_PROGRESS_RESPONSE 파싱 오류: {ex.Message}");
-            }
-        }
-        
-        /// <summary>
-        /// 스테이지 완료 응답 - "STAGE_COMPLETE_RESPONSE:SUCCESS/FAILURE:메시지"
-        /// </summary>
-        private void HandleStageCompleteResponse(string[] parts)
-        {
-            if (parts.Length < 3)
-            {
-                Debug.LogError("STAGE_COMPLETE_RESPONSE 메시지 형식 오류");
-                return;
-            }
-            
-            bool success = parts[1] == "SUCCESS";
-            string message = parts[2];
-            
-            Debug.Log($"스테이지 완료 응답: {(success ? "성공" : "실패")} - {message}");
-            OnStageCompleteResponse?.Invoke(success, message);
-        }
-        
-        /// <summary>
-        /// 최대 스테이지 업데이트 - "MAX_STAGE_UPDATED:maxStageCompleted"
-        /// </summary>
-        private void HandleMaxStageUpdated(string[] parts)
-        {
-            if (parts.Length < 2)
-            {
-                Debug.LogError("MAX_STAGE_UPDATED 메시지 형식 오류");
-                return;
-            }
-            
-            try
-            {
-                int maxStageCompleted = int.Parse(parts[1]);
-                Debug.Log($"최대 스테이지 업데이트: {maxStageCompleted}");
-                OnMaxStageUpdated?.Invoke(maxStageCompleted);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"MAX_STAGE_UPDATED 파싱 오류: {ex.Message}");
-            }
         }
     }
     

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import { expandBoardState, compressBoardState } from '@/lib/board-state-codec';
+import { expandBoardState, toBoardStateDB } from '@/lib/board-state-codec';
 
 const prisma = new PrismaClient();
 
@@ -69,13 +69,13 @@ export async function POST(request: NextRequest) {
       is_featured
     } = body;
 
-    // ✅ 보드 상태 정규화: 확장 → 압축
+    // ✅ 보드 상태 정규화: 확장 → DATABASE INTEGER[] 포맷
     const boardExpanded = initial_board_state
       ? expandBoardState(initial_board_state)
       : { obstacles: [], preplaced: [] };
-    const boardCompact = initial_board_state
-      ? compressBoardState(boardExpanded)
-      : null;
+    const boardForDB = initial_board_state
+      ? toBoardStateDB(initial_board_state)
+      : [];
 
     // ✅ time_limit 기본값: 무제한(null)
     const finalTimeLimit =
@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
         optimal_score, time_limit, max_undo_count, stage_description,
         stage_hints, thumbnail_url, is_active, is_featured
       ) VALUES (
-        ${stage_number}, ${difficulty}, ${JSON.stringify(boardCompact)}::jsonb,
+        ${stage_number}, ${difficulty}, ${boardForDB},
         ${available_blocks}, ${optimal_score}, ${finalTimeLimit}, ${max_undo_count},
         ${stage_description}, ${stage_hints}, ${finalThumbnailUrl},
         ${is_active}, ${is_featured}
@@ -193,7 +193,7 @@ async function generateStageThumbnail(
     // ✅ 기존 썸네일 정리
     await fileStorage.cleanupOldThumbnails(stageNumber); // 또는 deleteOldThumbnailsForStage
 
-    // ✅ 보드 미리보기 생성 (서버에선 SVG 경로)
+    // ✅ 보드 미리보기 생성
     const generator = getThumbnailGenerator();
     const dataUrl = await generator.generateThumbnail(boardState, {
       width: 300,
