@@ -329,6 +329,22 @@ namespace BlokusUnity.UI
                     UserDataCache.Instance.LoginUser(userInfo, authUserData.token);
                 }
                 
+                // 스테이지 메타데이터 로드 (로그인 성공 후 캐싱)
+                if (StageDataIntegrator.Instance != null)
+                {
+                    Debug.Log("로그인 성공 - StageDataIntegrator로 스테이지 메타데이터 로드 시작");
+                    StageDataIntegrator.Instance.LoadStageMetadata();
+                }
+                else if (HttpApiClient.Instance != null)
+                {
+                    Debug.Log("로그인 성공 - HttpApiClient로 스테이지 메타데이터 로드 시작");
+                    HttpApiClient.Instance.GetStageMetadata();
+                }
+                else
+                {
+                    Debug.LogWarning("로그인 성공했지만 스테이지 메타데이터를 로드할 수 없습니다. StageDataIntegrator와 HttpApiClient 모두 null입니다.");
+                }
+                
                 SetStatusText($"환영합니다, {authUserData.user.username}님!", MessagePriority.Success);
                 
                 // 1초 후 다음 화면으로 전환

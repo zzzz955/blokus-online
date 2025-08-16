@@ -27,15 +27,25 @@ namespace BlokusUnity.Utils
             return new BlokusUnity.Data.StageData
             {
                 stage_number = compact.n,
-                title = compact.t,
                 difficulty = compact.d,
                 optimal_score = compact.o,
                 time_limit = compact.tl,
                 max_undo_count = 3, // 기본값
-                available_blocks = new int[0], // 메타데이터에는 포함되지 않음
+                available_blocks = GetDefaultAvailableBlocks(), // 모든 블록 타입 기본 제공
                 initial_board_state = null, // 메타데이터에는 포함되지 않음
                 hints = new string[0], // 메타데이터에는 포함되지 않음
+                stage_description = compact.desc, // 스테이지 설명
+                thumbnail_url = compact.th, // 썸네일 URL
+                // stage title은 StageData에 필드가 없으므로 stage_description으로 사용
             };
+        }
+        
+        /// <summary>
+        /// 기본 사용 가능한 블록 타입 배열 반환 (1~21)
+        /// </summary>
+        private static int[] GetDefaultAvailableBlocks()
+        {
+            return new int[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21 };
         }
         
         /// <summary>

@@ -670,7 +670,6 @@ namespace BlokusUnity.UI
             return new DataStageData
             {
                 stage_number = apiStageData.stage_number,
-                title = apiStageData.title,
                 difficulty = apiStageData.difficulty,
                 optimal_score = apiStageData.optimal_score,
                 time_limit = apiStageData.time_limit ?? 0,
@@ -678,7 +677,9 @@ namespace BlokusUnity.UI
                 available_blocks = apiStageData.available_blocks ?? new int[0],
                 hints = apiStageData.hints ?? new string[0],
                 // initial_board_state, special_rules는 필요시 추가 변환
-                initial_board_state = null
+                initial_board_state = null,
+                stage_description = apiStageData.stage_description,
+                thumbnail_url = apiStageData.thumbnail_url
             };
         }
         
@@ -762,11 +763,48 @@ namespace BlokusUnity.UI
         }
         
         /// <summary>
-        /// 스테이지 데이터 가져오기 (API 통합)
+        /// 스테이지 데이터 가져오기 (캐싱된 메타데이터 우선 사용)
         /// </summary>
         private DataStageData GetStageData(int stageNumber)
         {
-            // 1. 먼저 캐시에서 확인
+            Debug.Log($"[CandyCrushStageMapView] 스테이지 {stageNumber} 데이터 요청");
+            
+            // 1. 먼저 UserDataCache의 캐싱된 메타데이터에서 확인
+            if (UserDataCache.Instance != null)
+            {
+                Debug.Log($"[CandyCrushStageMapView] UserDataCache 확인 중...");
+                
+                // 전체 메타데이터 캐시 상태 확인
+                var allMetadata = UserDataCache.Instance.GetStageMetadata();
+                Debug.Log($"[CandyCrushStageMapView] 전체 메타데이터 캐시: {allMetadata?.Length ?? 0}개");
+                
+                var metadata = UserDataCache.Instance.GetStageMetadata(stageNumber);
+                if (metadata != null)
+                {
+                    Debug.Log($"[CandyCrushStageMapView] ✅ 캐싱된 메타데이터에서 스테이지 {stageNumber} 로드");
+                    return BlokusUnity.Utils.ApiDataConverter.ConvertCompactMetadata(metadata);
+                }
+                else
+                {
+                    Debug.Log($"[CandyCrushStageMapView] ❌ 스테이지 {stageNumber} 메타데이터가 캐시에 없음");
+                    
+                    // 메타데이터가 아직 로드 중일 수 있으므로 짧은 지연 후 한 번 더 시도
+                    if (allMetadata == null || allMetadata.Length == 0)
+                    {
+                        Debug.Log($"[CandyCrushStageMapView] 메타데이터가 전혀 없음. 0.5초 후 재시도");
+                        pendingStageNumber = stageNumber; // 재시도할 스테이지 번호 저장
+                        Invoke(nameof(RetryStageDataLoad), 0.5f);
+                        // 임시로 null 반환하여 로딩 인디케이터 표시
+                        return null;
+                    }
+                }
+            }
+            else
+            {
+                Debug.LogWarning("[CandyCrushStageMapView] UserDataCache.Instance가 null입니다");
+            }
+            
+            // 2. StageDataManager 캐시에서 확인
             if (StageDataManager.Instance != null)
             {
                 var stageManager = StageDataManager.Instance.GetStageManager();
@@ -775,12 +813,13 @@ namespace BlokusUnity.UI
                     var cachedData = stageManager.GetStageData(stageNumber);
                     if (cachedData != null)
                     {
+                        Debug.Log($"[CandyCrushStageMapView] StageDataManager 캐시에서 스테이지 {stageNumber} 로드");
                         return cachedData;
                     }
                 }
             }
             
-            // 2. 캐시에 없으면 API에서 요청
+            // 3. 캐시에 없으면 API에서 요청 (백업 방식)
             if (HttpApiClient.Instance != null)
             {
                 if (!HttpApiClient.Instance.IsAuthenticated())
@@ -789,7 +828,7 @@ namespace BlokusUnity.UI
                     return null;
                 }
                 
-                Debug.Log($"[CandyCrushStageMapView] 스테이지 {stageNumber} API 요청");
+                Debug.Log($"[CandyCrushStageMapView] 스테이지 {stageNumber} API 요청 (백업)");
                 HttpApiClient.Instance.GetStageData(stageNumber);
                 
                 // 비동기 요청이므로 현재는 null 반환하고 대기 상태로 설정
@@ -797,7 +836,7 @@ namespace BlokusUnity.UI
                 return null;
             }
             
-            // 3. API 클라이언트도 없으면 오류
+            // 4. API 클라이언트도 없으면 오류
             Debug.LogError($"HttpApiClient를 찾을 수 없습니다. 스테이지 {stageNumber} 데이터를 로드할 수 없습니다.");
             return null;
         }
@@ -810,6 +849,22 @@ namespace BlokusUnity.UI
         {
             Debug.Log($"스테이지 {stageNumber} 시작!");
             UIManager.Instance?.OnStageSelected(stageNumber);
+        }
+        
+        /// <summary>
+        /// 메타데이터 재시도 로직
+        /// </summary>
+        private void RetryStageDataLoad()
+        {
+            if (pendingStageNumber > 0)
+            {
+                Debug.Log($"[CandyCrushStageMapView] 스테이지 {pendingStageNumber} 메타데이터 재시도");
+                int retryStageNumber = pendingStageNumber;
+                pendingStageNumber = 0; // 리셋
+                
+                // OnStageButtonClicked 로직 재실행
+                OnStageButtonClicked(retryStageNumber);
+            }
         }
         
         /// <summary>

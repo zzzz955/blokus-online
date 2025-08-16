@@ -1,134 +1,94 @@
+// src/lib/file-storage.ts
 import fs from 'fs/promises';
 import path from 'path';
 
-// ✅ MIME → 확장자 매핑
+// ✅ MIME → 확장자 매핑 (실제 저장은 항상 png로 통일하지만, 참고용)
 const MIME_TO_EXT: Record<string, string> = {
   'image/png': 'png',
   'image/svg+xml': 'svg',
   'image/jpeg': 'jpg',
 };
 
-// (선택) monorepo일 때 안전하게:
-// APP_ROOT_DIR=/절대/경로/…/web (Next 앱 루트) 로 지정해두면 public 경로가 정확해져요.
+type StorageConfig = {
+  baseDir: string;
+  thumbnailDir: string;
+  publicPath: string;
+};
+
 const DEFAULT_CONFIG: StorageConfig = {
   baseDir: process.env.APP_ROOT_DIR || process.cwd(),
   thumbnailDir: 'public/stage-thumbnails',
   publicPath: process.env.THUMBNAIL_PUBLIC_PATH || '/stage-thumbnails'
 };
 
-export interface StorageConfig {
-  baseDir: string;
-  thumbnailDir: string;
-  publicPath: string;
+async function ensureDir(baseDir: string, subDir: string) {
+  const full = path.join(baseDir, subDir);
+  await fs.mkdir(full, { recursive: true });
+  return full;
 }
 
-export class FileStorage {
+async function toPngBufferFromDataUrl(dataUrl: string): Promise<Buffer> {
+  const m = dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,([\s\S]+)$/);
+  if (!m) throw new Error('Unsupported data URL format');
+
+  const mime = m[1];
+  const buf = Buffer.from(m[2], 'base64');
+
+  // 항상 PNG로 변환 (SVG/JPEG 모두 포함)
+  const sharp = (await import('sharp')).default;
+
+  if (mime === 'image/png') {
+    // 이미 PNG면 그대로 리턴(필요시 재인코딩 가능)
+    return buf;
+  }
+  // SVG/JPEG 등은 PNG로 래스터화
+  return await sharp(buf).png().toBuffer();
+}
+
+class FileStorage {
   private config: StorageConfig;
 
   constructor(config: Partial<StorageConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
 
-  /**
-   * Ensure thumbnail directory exists
-   */
-  async ensureThumbnailDir(): Promise<void> {
-    const fullPath = path.join(this.config.baseDir, this.config.thumbnailDir);
-
-    try {
-      await fs.access(fullPath);
-    } catch (error) {
-      // Directory doesn't exist, create it
-      await fs.mkdir(fullPath, { recursive: true });
-    }
+  async ensureThumbnailDir() {
+    return ensureDir(this.config.baseDir, this.config.thumbnailDir);
   }
 
-  /**
-   * Save thumbnail from data URL
-   */
-  async saveThumbnail(dataUrl: string, filename: string): Promise<string> {
-    await this.ensureThumbnailDir();
-
-    // ✅ SVG/PNG/JPEG 모두 지원
-    const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,([\s\S]*)$/);
-    if (!match) throw new Error('Unsupported data URL format for thumbnail');
-
-    const mime = match[1];
-    const base64Data = match[2];
-    const ext = MIME_TO_EXT[mime] ?? 'bin';
-
-    // 확장자 동기화
-    const parsed = path.parse(filename);
-    const finalName = `${parsed.name}.${ext}`;
-
-    const buffer = Buffer.from(base64Data, 'base64');
-    const fullPath = path.join(this.config.baseDir, this.config.thumbnailDir, finalName);
-    await fs.writeFile(fullPath, buffer);
-
-    return `${this.config.publicPath}/${finalName}`;
-  }
-
-  /**
-   * Delete thumbnail file
-   */
-  async deleteThumbnail(filename: string): Promise<void> {
-    const fullPath = path.join(this.config.baseDir, this.config.thumbnailDir, filename);
-
-    try {
-      await fs.unlink(fullPath);
-    } catch (error) {
-      // File might not exist, ignore error
-      console.warn(`Failed to delete thumbnail ${filename}:`, error);
-    }
-  }
-
-  /**
-   * Check if thumbnail exists
-   */
-  async thumbnailExists(filename: string): Promise<boolean> {
-    const fullPath = path.join(this.config.baseDir, this.config.thumbnailDir, filename);
-
-    try {
-      await fs.access(fullPath);
-      return true;
-    } catch (error) {
-      return false;
-    }
-  }
-
-  /**
-   * Get thumbnail URL if exists, null otherwise
-   */
-  async getThumbnailUrl(filename: string): Promise<string | null> {
-    const exists = await this.thumbnailExists(filename);
-    return exists ? `${this.config.publicPath}/${filename}` : null;
-  }
-
-  /**
-   * Generate filename for stage thumbnail
-   */
   generateThumbnailFilename(stageNumber: number): string {
-    const timestamp = Date.now();
-    return `stage-${stageNumber}-${timestamp}.png`;
+    const ts = Date.now();
+    // 저장물은 항상 png
+    return `stage-${stageNumber}-${ts}.png`;
+  }
+  async saveThumbnail(dataUrl: string, filename: string): Promise<string> {
+    const dir = await this.ensureThumbnailDir();
+
+    // 이름에서 확장자 제거 후 .png로 강제
+    const parsed = path.parse(filename);
+    const finalName = `${parsed.name}.png`;
+    const fullPath = path.join(dir, finalName);
+
+    const pngBuffer = await toPngBufferFromDataUrl(dataUrl);
+    await fs.writeFile(fullPath, pngBuffer);
+
+    // 공개 URL 반환
+    return path.posix.join(this.config.publicPath, finalName);
   }
 
-  /**
-   * Clean up old thumbnails for a stage
-   */
   async cleanupOldThumbnails(stageNumber: number): Promise<void> {
-    await this.ensureThumbnailDir();
-
-    const dirPath = path.join(this.config.baseDir, this.config.thumbnailDir);
-    const files = await fs.readdir(dirPath);
-
-    // Find files matching the stage pattern
-    const stagePrefix = `stage-${stageNumber}-`;
-    const oldFiles = files.filter(file => file.startsWith(stagePrefix));
-
-    // Delete old files
-    for (const file of oldFiles) {
-      await this.deleteThumbnail(file);
+    const dir = await this.ensureThumbnailDir();
+    const files = await fs.readdir(dir);
+    const prefix = `stage-${stageNumber}-`;
+    const oldFiles = files.filter(f => f.startsWith(prefix));
+    for (const f of oldFiles) {
+      await fs.unlink(path.join(dir, f)).catch(() => { });
     }
+  }
+
+  async deleteThumbnail(fileName: string): Promise<void> {
+    const fullPath = path.join(this.config.baseDir, this.config.thumbnailDir, fileName);
+    await fs.unlink(fullPath).catch(() => { });
   }
 
   async deleteOldThumbnailsForStage(stageNumber: number): Promise<void> {
@@ -136,5 +96,4 @@ export class FileStorage {
   }
 }
 
-// Export default instance
 export default new FileStorage();

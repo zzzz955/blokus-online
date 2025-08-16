@@ -108,7 +108,6 @@ class DatabaseService {
     const query = `
       SELECT 
         stage_number,
-        stage_number as stage_name,
         difficulty,
         optimal_score,
         time_limit,
@@ -118,7 +117,8 @@ class DatabaseService {
         stage_description,
         stage_hints,
         is_active,
-        is_featured
+        is_featured,
+        thumbnail_url
       FROM stages 
       WHERE stage_number = $1 AND is_active = true
     `;

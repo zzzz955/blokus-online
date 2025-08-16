@@ -142,7 +142,6 @@ router.get('/:stageNumber',
       // 응답 데이터 구성 (게임 플레이에 필요한 상세 데이터)
       const responseData = {
         stage_number: stageData.stage_number,
-        title: stageData.stage_name || `스테이지 ${stageData.stage_number}`,
         difficulty: stageData.difficulty,
         optimal_score: stageData.optimal_score,
         time_limit: stageData.time_limit,
@@ -151,7 +150,8 @@ router.get('/:stageNumber',
         initial_board_state: stageData.initial_board_state,
         hints: hints,
         stage_description: stageData.stage_description,
-        is_featured: stageData.is_featured
+        is_featured: stageData.is_featured,
+        thumbnail_url: stageData.thumbnail_url
       };
 
       logger.debug('Stage data retrieved successfully', {

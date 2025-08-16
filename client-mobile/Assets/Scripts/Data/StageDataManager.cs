@@ -390,14 +390,15 @@ namespace BlokusUnity.Data
             return new StageData
             {
                 stage_number = networkStage.stageNumber,
-                title = networkStage.stageName,
                 difficulty = networkStage.difficulty,
                 optimal_score = networkStage.optimalScore,
                 time_limit = networkStage.timeLimit.GetValueOrDefault(0),
                 max_undo_count = networkStage.maxUndoCount,
                 available_blocks = networkStage.availableBlocks?.Select(bt => (int)bt).ToArray() ?? new int[0],
                 initial_board_state = null, // TODO: JSON 파싱 구현
-                hints = new string[0]
+                hints = new string[0],
+                stage_description = networkStage.stageDescription,
+                thumbnail_url = networkStage.thumbnail_url
             };
         }
 

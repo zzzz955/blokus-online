@@ -14,7 +14,6 @@ namespace BlokusUnity.Data
     {
         // API 응답 데이터 구조에 맞게 업데이트
         public int stage_number;
-        public string title;
         public int difficulty;
         public int optimal_score;
         public int time_limit;
@@ -99,12 +98,6 @@ namespace BlokusUnity.Data
             if (optimal_score <= 0)
             {
                 Debug.LogWarning($"Stage {stage_number}: 최적 점수가 설정되지 않았습니다!");
-                isValid = false;
-            }
-
-            if (string.IsNullOrEmpty(title))
-            {
-                Debug.LogWarning($"Stage {stage_number}: 스테이지 이름이 비어있습니다!");
                 isValid = false;
             }
 

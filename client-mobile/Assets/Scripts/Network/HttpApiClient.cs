@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 using UnityEngine.Networking;
+using BlokusUnity.Data;
 
 namespace BlokusUnity.Network
 {
@@ -428,12 +429,23 @@ namespace BlokusUnity.Network
         /// </summary>
         public void GetStageMetadata()
         {
+            Debug.Log("[HttpApiClient] 스테이지 메타데이터 요청 시작");
             StartCoroutine(SendGetRequest<StageMetadataResponse>(
                 "stages/metadata",
                 response => {
+                    Debug.Log($"[HttpApiClient] 스테이지 메타데이터 수신: {response.stages?.Length ?? 0}개");
+                    
+                    // UserDataCache에 직접 저장
+                    if (UserDataCache.Instance != null && response.stages != null)
+                    {
+                        UserDataCache.Instance.SetStageMetadata(response.stages);
+                        Debug.Log($"[HttpApiClient] 메타데이터 캐시에 저장 완료");
+                    }
+                    
+                    // 이벤트도 발생 (기존 구독자들을 위해)
                     OnStageMetadataReceived?.Invoke(response.stages);
                 },
-                error => Debug.LogWarning($"스테이지 메타데이터 요청 실패: {error}")
+                error => Debug.LogWarning($"[HttpApiClient] 스테이지 메타데이터 요청 실패: {error}")
             ));
         }
         

@@ -1,3 +1,6 @@
+using System;
+using System.Collections;
+using UnityEngine.Networking;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -28,7 +31,7 @@ namespace BlokusUnity.UI
         [SerializeField] private Image[] starImages;
 
         [Header("게임 보드 미리보기")]
-        [SerializeField] private RawImage boardThumbnail;
+        [SerializeField] private Image boardThumbnail;
         [SerializeField] private GameObject thumbnailPlaceholder;
 
         [Header("제약 조건 UI")]
@@ -56,6 +59,9 @@ namespace BlokusUnity.UI
         private StageData currentStageData;
         private StageProgress currentProgress;
         private int currentStageNumber;
+
+        // 비활성 시 코루틴 시작 에러 방지용 큐
+        private string _pendingThumbnailUrl;
 
         // 싱글톤
         public static StageInfoModal Instance { get; private set; }
@@ -102,6 +108,15 @@ namespace BlokusUnity.UI
             }
         }
 
+        private void OnEnable()
+        {
+            // 비활성 중 큐에 쌓인 썸네일 URL 처리
+            if (!string.IsNullOrEmpty(_pendingThumbnailUrl))
+            {
+                BeginThumbnailLoad(_pendingThumbnailUrl);
+                _pendingThumbnailUrl = null;
+            }
+        }
         /// <summary>
         /// 스테이지 정보 모달 표시 (UserStageProgress 오버로드)
         /// </summary>
@@ -182,6 +197,10 @@ namespace BlokusUnity.UI
             if (stageDescriptionText != null)
             {
                 stageDescriptionText.text = currentStageData.stage_description;
+            }
+            else
+            {
+                Debug.Log("stageDescriptionText를 찾을 수 없음");
             }
 
             // 난이도
@@ -300,93 +319,140 @@ namespace BlokusUnity.UI
         }
 
         /// <summary>
-        /// 게임 보드 썸네일 업데이트
+        /// 게임 보드 썸네일 업데이트 (PNG 전용)
         /// </summary>
         private void UpdateBoardThumbnail()
         {
             if (boardThumbnail == null || thumbnailPlaceholder == null) return;
+            Debug.Log("이미지 URL : " + currentStageData.thumbnail_url);
 
-            // 1) 서버가 준 상대경로(/stage-thumbnails/...)를 절대경로로 변환해 로딩
             if (currentStageData != null && !string.IsNullOrEmpty(currentStageData.thumbnail_url))
             {
-                // HttpApiClient의 베이스에서 호스트/포트만 뽑아 조립
-                string baseUrl = (HttpApiClient.Instance != null && !string.IsNullOrEmpty(HttpApiClient.Instance.ApiBaseUrl))
-                    ? HttpApiClient.Instance.ApiBaseUrl
-                    : "http://localhost:3000";
-
-                string absUrl = currentStageData.GetAbsoluteThumbnailUrl(baseUrl);
+                // 썸네일은 웹 서버(3000 포트)의 stage-thumbnails 경로에서 제공
+                string thumbnailBaseUrl = "http://localhost:3000";
+                
+                // DB의 thumbnail_url이 /stage-1-xxx.png 형태라면 앞의 '/' 제거
+                string thumbnailPath = currentStageData.thumbnail_url;
+                if (thumbnailPath.StartsWith("/"))
+                {
+                    thumbnailPath = thumbnailPath.Substring(1);
+                }
+                
+                string absUrl = $"{thumbnailBaseUrl}/{thumbnailPath}";
                 Debug.Log($"스테이지 {currentStageData.stage_number}: 썸네일 URL 로딩 시도 - {absUrl}");
                 LoadThumbnailFromUrl(absUrl);
                 return;
             }
 
-            Debug.Log($"스테이지 {currentStageData?.stage_number}: 초기 보드 상태 없음 - 플레이스홀더 표시");
+            Debug.Log($"스테이지 {currentStageData?.stage_number}: 썸네일 없음 - 플레이스홀더 표시");
             boardThumbnail.gameObject.SetActive(false);
             thumbnailPlaceholder.gameObject.SetActive(true);
             UpdateThumbnailPlaceholder();
         }
+
 
         /// <summary>
         /// URL에서 썸네일 이미지 로딩
         /// </summary>
         private void LoadThumbnailFromUrl(string url)
         {
-            // 개발환경에서는 localhost, 프로덕션에서는 실제 호스트
-            string fullUrl = url.StartsWith("http") ? url : $"http://localhost:3000{url}";
+            string fullUrl = MakeAbsoluteUrl(url);
 
-            Debug.Log($"[StageInfoModal] 썸네일 로딩 시작: {fullUrl}");
-            StartCoroutine(LoadThumbnailCoroutine(fullUrl));
+            if (!isActiveAndEnabled)
+            {
+                // 비활성 상태면 큐에 저장 → OnEnable에서 시작
+                _pendingThumbnailUrl = fullUrl;
+                Debug.Log($"[StageInfoModal] UI 비활성 상태 → 썸네일 대기열 저장: {fullUrl}");
+                return;
+            }
+
+            BeginThumbnailLoad(fullUrl);
+        }
+
+        private void BeginThumbnailLoad(string fullUrl)
+        {
+            StartCoroutine(LoadPngThumbnailCoroutine(fullUrl));
         }
 
         /// <summary>
-        /// 썸네일 이미지 로딩 코루틴
+        /// 서버 상대경로를 절대 URL로 보정
+        /// - /api/stage-thumbnails/..., /stage-thumbnails/... 모두 지원
+        /// - 중복 /api 방지
         /// </summary>
-        private System.Collections.IEnumerator LoadThumbnailCoroutine(string url)
+        private static string MakeAbsoluteUrl(string url)
         {
-            using (UnityEngine.Networking.UnityWebRequest www = UnityEngine.Networking.UnityWebRequestTexture.GetTexture(url))
+            if (string.IsNullOrEmpty(url)) return url;
+            if (url.StartsWith("http", StringComparison.OrdinalIgnoreCase)) return url;
+
+            const string ORIGIN = "http://localhost:8080";
+            var path = url.StartsWith("/") ? url : "/" + url;
+
+            // 이미 /api/로 시작하면 그대로 사용
+            if (path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase))
             {
-                www.timeout = 10; // 10초 타임아웃
+                return ORIGIN + path;
+            }
+
+            // /stage-thumbnails 로 시작하면 /api 안 붙임(정적 퍼블릭 경로)
+            if (path.StartsWith("/stage-thumbnails/", StringComparison.OrdinalIgnoreCase))
+            {
+                return ORIGIN + path;
+            }
+
+            // 그 외 상대경로는 /api 접두어 부여
+            return ORIGIN + "/api" + path;
+        }
+
+        /// <summary>
+        /// PNG/JPG/WebP 등 래스터 이미지 로더 (서버는 PNG)
+        /// </summary>
+        private IEnumerator LoadPngThumbnailCoroutine(string url)
+        {
+            using (var www = UnityWebRequestTexture.GetTexture(url))
+            {
+                www.timeout = 10;
                 yield return www.SendWebRequest();
 
-                if (www.result == UnityEngine.Networking.UnityWebRequest.Result.Success)
+                if (www.result == UnityWebRequest.Result.Success)
                 {
-                    Texture2D texture = ((UnityEngine.Networking.DownloadHandlerTexture)www.downloadHandler).texture;
-                    if (texture != null)
-                    {
-                        boardThumbnail.texture = texture;
-                        boardThumbnail.gameObject.SetActive(true);
-                        thumbnailPlaceholder.SetActive(false);
-                        Debug.Log($"썸네일 로딩 성공: {url}");
-                    }
+                    var tex = DownloadHandlerTexture.GetContent(www);
+                    var spr = Sprite.Create(
+                        tex,
+                        new Rect(0, 0, tex.width, tex.height),
+                        new Vector2(0.5f, 0.5f)
+                    );
+                    ApplyThumbnailSprite(spr);
+                    ShowPlaceholder(false);
                 }
                 else
                 {
-                    Debug.LogWarning($"썸네일 로딩 실패: {url} - {www.error}");
-                    // 실패시 플레이스홀더 표시
-                    boardThumbnail.gameObject.SetActive(false);
-                    thumbnailPlaceholder.SetActive(true);
-                    UpdateThumbnailPlaceholder();
+                    Debug.LogWarning($"[StageInfoModal] 썸네일 로딩 실패: {www.error} ({url})");
+                    ShowPlaceholder(true);
                 }
             }
         }
 
-        /// <summary>
-        /// 간단한 썸네일 생성 (임시 구현)
-        /// </summary>
-        private void GenerateSimpleThumbnail()
-        {
-            // TODO: 실제 보드 렌더링 로직 구현
-            // 현재는 단순히 보드가 있다는 표시만
-            boardThumbnail.gameObject.SetActive(true);
-            thumbnailPlaceholder.SetActive(false);
 
-            // RawImage에 간단한 패턴 생성 (임시)
-            if (boardThumbnail.texture == null)
+        private void ApplyThumbnailSprite(Sprite sprite)
+        {
+            if (boardThumbnail == null)
             {
-                // 기본 체크무늬 패턴 생성
-                Texture2D simpleTexture = CreateSimpleBoardTexture();
-                boardThumbnail.texture = simpleTexture;
+                Debug.LogWarning("[StageInfoModal] boardThumbnail가 없습니다.");
+                return;
             }
+
+            boardThumbnail.sprite = sprite;
+            boardThumbnail.preserveAspect = true;
+            boardThumbnail.gameObject.SetActive(true);
+        }
+
+        private void ShowPlaceholder(bool show)
+        {
+            if (thumbnailPlaceholder != null)
+                thumbnailPlaceholder.SetActive(show);
+
+            if (boardThumbnail != null)
+                boardThumbnail.gameObject.SetActive(!show);
         }
 
         /// <summary>
@@ -409,29 +475,6 @@ namespace BlokusUnity.UI
                     }
                 }
             }
-        }
-
-        /// <summary>
-        /// 간단한 보드 텍스처 생성 (임시)
-        /// </summary>
-        private Texture2D CreateSimpleBoardTexture()
-        {
-            int size = 64; // 작은 썸네일 크기
-            Texture2D texture = new Texture2D(size, size);
-
-            // 체크무늬 패턴
-            for (int x = 0; x < size; x++)
-            {
-                for (int y = 0; y < size; y++)
-                {
-                    bool isEven = (x / 8 + y / 8) % 2 == 0;
-                    Color color = isEven ? new Color(0.9f, 0.9f, 0.9f) : new Color(0.7f, 0.7f, 0.7f);
-                    texture.SetPixel(x, y, color);
-                }
-            }
-
-            texture.Apply();
-            return texture;
         }
 
         /// <summary>
@@ -484,24 +527,6 @@ namespace BlokusUnity.UI
         }
 
         /// <summary>
-        /// 개별 블록 아이콘 생성 (스프라이트 우선, 색상 폴백)
-        /// </summary>
-        private void CreateAllBlocksText()
-        {
-            GameObject textObj = new GameObject("AllBlocksText");
-            textObj.transform.SetParent(availableBlocksParent, false);
-
-            TextMeshProUGUI text = textObj.AddComponent<TextMeshProUGUI>();
-            text.text = "모든 블록 사용 가능";
-            text.fontSize = 14;
-            text.color = Color.white;
-            text.alignment = TextAlignmentOptions.Center;
-
-            RectTransform rectTransform = textObj.GetComponent<RectTransform>();
-            rectTransform.sizeDelta = new Vector2(200, 30);
-        }
-
-        /// <summary>
         /// 플레이 버튼 클릭 이벤트
         /// </summary>
         private void OnPlayButtonClicked()
@@ -550,33 +575,6 @@ namespace BlokusUnity.UI
                 case 4: return "매우 어려움";
                 default: return "알 수 없음";
             }
-        }
-
-        /// <summary>
-        /// 블록 타입별 색상 반환 (임시)
-        /// </summary>
-        private Color GetBlockTypeColor(BlokusUnity.Common.BlockType blockType)
-        {
-            // 블록 타입에 따른 임시 색상 (나중에 실제 블록 색상으로 교체)
-            int typeNumber = (int)blockType;
-            float hue = (typeNumber * 0.1f) % 1f;
-            return Color.HSVToRGB(hue, 0.8f, 0.9f);
-        }
-
-        /// <summary>
-        /// 현재 표시 중인 스테이지 번호 반환
-        /// </summary>
-        public int GetCurrentStageNumber()
-        {
-            return currentStageNumber;
-        }
-
-        /// <summary>
-        /// 모달이 표시 중인지 확인
-        /// </summary>
-        public bool IsShowing()
-        {
-            return gameObject.activeInHierarchy;
         }
     }
 }
