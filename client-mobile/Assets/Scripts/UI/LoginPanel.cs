@@ -71,6 +71,7 @@ namespace BlokusUnity.UI
             {
                 HttpApiClient.Instance.OnAuthResponse -= OnHttpAuthResponse;
                 HttpApiClient.Instance.OnUserInfoReceived -= OnHttpUserInfoReceived;
+                HttpApiClient.Instance.OnUserProfileReceived -= OnHttpUserProfileReceived; // 🔥 추가: 프로필 이벤트 구독 해제
             }
         }
         
@@ -130,6 +131,7 @@ namespace BlokusUnity.UI
             {
                 HttpApiClient.Instance.OnAuthResponse += OnHttpAuthResponse;
                 HttpApiClient.Instance.OnUserInfoReceived += OnHttpUserInfoReceived;
+                HttpApiClient.Instance.OnUserProfileReceived += OnHttpUserProfileReceived; // 🔥 추가: 프로필 이벤트 구독
                 isNetworkEventsSetup = true;
                 Debug.Log("HttpApiClient 이벤트 구독 완료");
             }
@@ -313,47 +315,65 @@ namespace BlokusUnity.UI
         }
         
         /// <summary>
-        /// HTTP 사용자 정보 수신 처리
+        /// HTTP 사용자 정보 수신 처리 (로그인 기본 정보만)
         /// </summary>
         private void OnHttpUserInfoReceived(HttpApiClient.AuthUserData authUserData)
         {
             if (authUserData != null)
             {
-                Debug.Log($"LoginPanel - 사용자 데이터 수신: {authUserData.user.username}");
+                Debug.Log($"LoginPanel - 로그인 성공: {authUserData.user.username}");
                 
-                // UserDataCache에 저장 (토큰은 HttpApiClient에서 가져옴)
+                // 🔥 수정: 로그인은 순수 인증만 처리, 프로필은 별도 API로 로드
                 if (UserDataCache.Instance != null)
                 {
-                    // AuthUserData를 UserInfo로 변환
-                    var userInfo = BlokusUnity.Utils.ApiDataConverter.ConvertAuthUserData(authUserData);
-                    UserDataCache.Instance.LoginUser(userInfo, authUserData.token);
+                    // 기본 로그인 정보만 저장 (토큰만)
+                    UserDataCache.Instance.SetAuthToken(authUserData.token, authUserData.user.username);
+                    
+                    // 🔥 추가: 로그인 후 즉시 프로필 API 호출
+                    if (HttpApiClient.Instance != null)
+                    {
+                        HttpApiClient.Instance.GetUserProfile();
+                        Debug.Log("로그인 후 프로필 API 호출 시작");
+                    }
                 }
                 
-                // 스테이지 메타데이터 로드 (로그인 성공 후 캐싱)
-                if (StageDataIntegrator.Instance != null)
+                SetStatusText($"프로필 정보를 불러오는 중...", MessagePriority.Info);
+            }
+            else
+            {
+                Debug.LogWarning("LoginPanel - 사용자 정보 수신 실패");
+                SetStatusText("사용자 정보를 가져올 수 없습니다.", MessagePriority.Error);
+            }
+        }
+        
+        /// <summary>
+        /// HTTP 프로필 정보 수신 처리 (상세 프로필)
+        /// </summary>
+        private void OnHttpUserProfileReceived(HttpApiClient.UserProfile userProfile)
+        {
+            if (userProfile != null)
+            {
+                Debug.Log($"LoginPanel - 프로필 데이터 수신: {userProfile.username} (최대 스테이지: {userProfile.max_stage_completed})");
+                
+                // UserDataCache에 프로필 정보 저장
+                if (UserDataCache.Instance != null)
                 {
-                    Debug.Log("로그인 성공 - StageDataIntegrator로 스테이지 메타데이터 로드 시작");
-                    StageDataIntegrator.Instance.LoadStageMetadata();
-                }
-                else if (HttpApiClient.Instance != null)
-                {
-                    Debug.Log("로그인 성공 - HttpApiClient로 스테이지 메타데이터 로드 시작");
-                    HttpApiClient.Instance.GetStageMetadata();
-                }
-                else
-                {
-                    Debug.LogWarning("로그인 성공했지만 스테이지 메타데이터를 로드할 수 없습니다. StageDataIntegrator와 HttpApiClient 모두 null입니다.");
+                    // 프로필 데이터를 UserInfo로 변환
+                    var userInfo = BlokusUnity.Utils.ApiDataConverter.ConvertUserProfile(userProfile);
+                    UserDataCache.Instance.SetUserProfile(userInfo);
+                    
+                    // 🔥 수정: SetUserProfile() 내에서 자동으로 LoadInitialDataFromServer() 호출됨
                 }
                 
-                SetStatusText($"환영합니다, {authUserData.user.username}님!", MessagePriority.Success);
+                SetStatusText($"환영합니다, {userProfile.username}님!", MessagePriority.Success);
                 
                 // 1초 후 다음 화면으로 전환
                 Invoke(nameof(ProceedToNextScreen), 1f);
             }
             else
             {
-                Debug.LogWarning("LoginPanel - 사용자 정보 수신 실패");
-                SetStatusText("사용자 정보를 가져올 수 없습니다.", MessagePriority.Error);
+                Debug.LogWarning("LoginPanel - 프로필 정보 수신 실패");
+                SetStatusText("프로필 정보를 가져올 수 없습니다.", MessagePriority.Error);
             }
         }
         

@@ -301,6 +301,14 @@ namespace BlokusUnity.Network
         private void HandleApiStageCompleteResponse(bool success, string message)
         {
             Debug.Log($"스테이지 완료 응답: {(success ? "성공" : "실패")} - {message}");
+            
+            // 🔥 추가: 스테이지 완료 성공 시 프로필 동기화
+            if (success && HttpApiClient.Instance != null && HttpApiClient.Instance.IsAuthenticated())
+            {
+                Debug.Log("스테이지 완료 성공 - 프로필 정보 동기화 시작");
+                HttpApiClient.Instance.GetUserProfile();
+            }
+            
             OnStageCompleted?.Invoke(success, message);
         }
         
@@ -443,7 +451,7 @@ namespace BlokusUnity.Network
         }
         
         /// <summary>
-        /// 스테이지가 언락되어 있는지 확인 (간단한 순차 언락 로직)
+        /// 스테이지가 언락되어 있는지 확인 (서버 max_stage_completed 기반)
         /// </summary>
         public bool IsStageUnlocked(int stageNumber)
         {
@@ -451,10 +459,16 @@ namespace BlokusUnity.Network
             
             if (UserDataCache.Instance != null && UserDataCache.Instance.IsLoggedIn())
             {
-                int maxClearedStage = UserDataCache.Instance.GetMaxClearedStage();
-                return stageNumber <= maxClearedStage + 1;
+                // 🔥 수정: 서버에서 받은 max_stage_completed 기반으로 언락 확인
+                int maxStageCompleted = UserDataCache.Instance.GetMaxStageCompleted();
+                bool isUnlocked = stageNumber <= maxStageCompleted + 1;
+                
+                Debug.Log($"[StageDataIntegrator] 스테이지 {stageNumber} 언락 확인: maxStageCompleted={maxStageCompleted}, 언락={isUnlocked}");
+                
+                return isUnlocked;
             }
             
+            Debug.Log($"[StageDataIntegrator] 로그인되지 않음 - 스테이지 {stageNumber} 언락 불가");
             return false; // 로그인되지 않은 경우 첫 스테이지만 언락
         }
         

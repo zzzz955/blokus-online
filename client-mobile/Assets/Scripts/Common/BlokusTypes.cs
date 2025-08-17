@@ -220,6 +220,9 @@ namespace BlokusUnity.Common
         public int averageScore = 0;           // 평균 점수
         public bool isOnline = true;           // 온라인 상태
         public string status = "로비";         // "로비", "게임중", "자리비움"
+        
+        // 싱글플레이어 진행도
+        public int maxStageCompleted = 0;      // 최대 클리어한 스테이지 번호
 
         /// <summary>
         /// 승률 계산

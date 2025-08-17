@@ -89,7 +89,7 @@ namespace BlokusUnity.Utils
         }
 
         /// <summary>
-        /// API 응답의 AuthUserData를 UserInfo로 변환
+        /// API 응답의 AuthUserData를 UserInfo로 변환 (로그인 기본 정보만)
         /// </summary>
         public static CommonUserInfo ConvertAuthUserData(HttpApiClient.AuthUserData authData)
         {
@@ -103,7 +103,27 @@ namespace BlokusUnity.Utils
                 averageScore = authData.user.stats.total_score > 0 ?
                     authData.user.stats.total_score / Math.Max(1, authData.user.stats.total_games) : 0,
                 isOnline = true,
-                status = "로비"
+                status = "로비",
+                maxStageCompleted = authData.user.max_stage_completed // 🔥 추가: 최대 클리어 스테이지
+            };
+        }
+        
+        /// <summary>
+        /// 🔥 새로운 메서드: UserProfile API 응답을 UserInfo로 변환
+        /// </summary>
+        public static CommonUserInfo ConvertUserProfile(HttpApiClient.UserProfile userProfile)
+        {
+            return new CommonUserInfo
+            {
+                username = userProfile.username,
+                level = userProfile.single_player_level,
+                totalGames = userProfile.total_single_games,
+                wins = 0, // UserProfile에는 승패 정보가 없으므로 기본값
+                losses = 0,
+                averageScore = userProfile.single_player_score,
+                isOnline = true,
+                status = "로비",
+                maxStageCompleted = userProfile.max_stage_completed // 🔥 핵심: 서버에서 받은 최대 클리어 스테이지
             };
         }
 

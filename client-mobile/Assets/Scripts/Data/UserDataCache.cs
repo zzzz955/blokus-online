@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using BlokusUnity.Common;
 using BlokusUnity.Network;
@@ -143,7 +144,42 @@ namespace BlokusUnity.Data
         // ========================================
         
         /// <summary>
-        /// 사용자 로그인 처리
+        /// 🔥 새로운 메서드: 인증 토큰만 설정 (순수 로그인)
+        /// </summary>
+        public void SetAuthToken(string token, string username)
+        {
+            authToken = token;
+            isLoggedIn = true;
+            
+            Debug.Log($"인증 토큰 설정: {username}");
+            
+            // HTTP API 토큰 설정
+            if (!string.IsNullOrEmpty(token) && HttpApiClient.Instance != null)
+            {
+                HttpApiClient.Instance.SetAuthToken(token, GetUserIdFromUsername(username));
+            }
+            
+            OnLoginStatusChanged?.Invoke();
+        }
+        
+        /// <summary>
+        /// 🔥 새로운 메서드: 프로필 정보 설정 (상세 사용자 정보)
+        /// </summary>
+        public void SetUserProfile(UserInfo userInfo)
+        {
+            currentUser = userInfo;
+            
+            Debug.Log($"사용자 프로필 설정: {userInfo.username} (최대 스테이지: {userInfo.maxStageCompleted})");
+            
+            SaveUserDataToDisk();
+            OnUserDataUpdated?.Invoke(currentUser);
+            
+            // 🔥 추가: 프로필 설정 후 자동으로 초기 데이터 로드
+            LoadInitialDataFromServer();
+        }
+        
+        /// <summary>
+        /// 사용자 로그인 처리 (기존 호환성 유지)
         /// </summary>
         public void LoginUser(UserInfo userInfo, string token = null)
         {
@@ -246,8 +282,8 @@ namespace BlokusUnity.Data
                     Debug.Log("[UserDataCache] 일괄 진행도 요청 중복 방지 - 이미 로딩 중");
                 }
                 
-                // 3. 사용자 프로필 로드
-                HttpApiClient.Instance.GetUserProfile();
+                // 3. 사용자 프로필 로드 제거 - 로그인 시 이미 AuthUserData로 받음 (중복 호출 방지)
+                Debug.Log("[UserDataCache] 사용자 프로필은 로그인 시 이미 수신됨 - 중복 요청 방지");
                 
                 Debug.Log("[UserDataCache] 서버 데이터 로드 요청 완료");
             }
@@ -293,9 +329,12 @@ namespace BlokusUnity.Data
             }
             
             SaveProgressToDisk();
-            OnStageProgressUpdated?.Invoke(progress);
             
-            Debug.Log($"스테이지 진행도 설정: {progress.stageNumber} (완료: {progress.isCompleted}, 별: {progress.starsEarned})");
+            Debug.Log($"[UserDataCache] 스테이지 진행도 설정: {progress.stageNumber} (완료: {progress.isCompleted}, 별: {progress.starsEarned})");
+            Debug.Log($"[UserDataCache] 현재 캐시 크기: {stageProgressCache.Count}개");
+            Debug.Log($"[UserDataCache] OnStageProgressUpdated 이벤트 발생 - 구독자 수: {OnStageProgressUpdated?.GetInvocationList()?.Length ?? 0}");
+            
+            OnStageProgressUpdated?.Invoke(progress);
         }
         
         /// <summary>
@@ -303,22 +342,25 @@ namespace BlokusUnity.Data
         /// </summary>
         public NetworkUserStageProgress GetStageProgress(int stageNumber)
         {
+            Debug.Log($"[UserDataCache] 스테이지 {stageNumber} 진행도 요청 - 현재 캐시 크기: {stageProgressCache.Count}개");
+            
+            // 캐시 내용 디버깅 (처음 몇 개만)
+            if (stageProgressCache.Count > 0)
+            {
+                var keys = string.Join(", ", stageProgressCache.Keys.Take(5));
+                Debug.Log($"[UserDataCache] 캐시된 스테이지들: {keys}{(stageProgressCache.Count > 5 ? "..." : "")}");
+            }
+            
             if (stageProgressCache.TryGetValue(stageNumber, out NetworkUserStageProgress progress))
             {
+                Debug.Log($"[UserDataCache] 스테이지 {stageNumber} 진행도 캐시에서 반환: 완료={progress.isCompleted}, 별={progress.starsEarned}");
                 return progress;
             }
             
-            // 진행도가 없으면 기본값 반환
-            return new NetworkUserStageProgress
-            {
-                stageNumber = stageNumber,
-                isCompleted = false,
-                starsEarned = 0,
-                bestScore = 0,
-                bestCompletionTime = 0,
-                totalAttempts = 0,
-                successfulAttempts = 0
-            };
+            // 진행도가 없으면 null 반환 (기본값 대신)
+            // UI에서 null 체크를 통해 데이터가 아직 로드되지 않았음을 알 수 있음
+            Debug.Log($"[UserDataCache] 스테이지 {stageNumber} 진행도 캐시에 없음 - null 반환");
+            return null;
         }
         
         /// <summary>
@@ -337,7 +379,7 @@ namespace BlokusUnity.Data
         }
         
         /// <summary>
-        /// 최대 클리어 스테이지 번호 반환
+        /// 최대 클리어 스테이지 번호 반환 (캐시된 개별 진행도 기반)
         /// </summary>
         public int GetMaxClearedStage()
         {
@@ -350,6 +392,21 @@ namespace BlokusUnity.Data
                 }
             }
             return maxStage;
+        }
+        
+        /// <summary>
+        /// 사용자 정보에서 최대 완료 스테이지 번호 반환 (서버 데이터 기반)
+        /// </summary>
+        public int GetMaxStageCompleted()
+        {
+            if (currentUser != null)
+            {
+                Debug.Log($"[UserDataCache] 서버 기반 최대 완료 스테이지: {currentUser.maxStageCompleted}");
+                return currentUser.maxStageCompleted;
+            }
+            
+            Debug.Log("[UserDataCache] 사용자 정보 없음 - 기본값 0 반환");
+            return 0;
         }
         
         // ========================================
@@ -621,6 +678,15 @@ namespace BlokusUnity.Data
         }
         
         /// <summary>
+        /// 🔥 추가: Username에서 사용자 ID 추출 (임시 구현)
+        /// </summary>
+        private int GetUserIdFromUsername(string username)
+        {
+            // 임시로 username 해시코드 사용
+            return Mathf.Abs(username.GetHashCode());
+        }
+        
+        /// <summary>
         /// 캐시 상태 정보 반환
         /// </summary>
         public string GetCacheStatusInfo()
@@ -639,6 +705,8 @@ namespace BlokusUnity.Data
         /// </summary>
         private void OnBatchProgressReceived(HttpApiClient.CompactUserProgress[] progressArray)
         {
+            Debug.Log($"[UserDataCache] 📥 OnBatchProgressReceived 호출됨!");
+            
             // 중복 요청 방지 플래그 초기화
             isBatchProgressLoading = false;
             
@@ -648,6 +716,8 @@ namespace BlokusUnity.Data
                 
                 foreach (var compactProgress in progressArray)
                 {
+                    Debug.Log($"[UserDataCache] 처리 중: 스테이지 {compactProgress.n} (완료={compactProgress.c}, 별={compactProgress.s})");
+                    
                     var networkProgress = new NetworkUserStageProgress
                     {
                         stageNumber = compactProgress.n,
@@ -660,14 +730,15 @@ namespace BlokusUnity.Data
                         lastPlayedAt = System.DateTime.Now
                     };
                     
+                    Debug.Log($"[UserDataCache] API 스테이지 진행도 업데이트: {compactProgress.n} (별: {compactProgress.s})");
                     SetStageProgress(networkProgress);
                 }
                 
-                Debug.Log($"[UserDataCache] 일괄 진행도 캐시 완료");
+                Debug.Log($"[UserDataCache] ✅ 일괄 진행도 캐시 완료 - 총 {progressArray.Length}개 처리됨");
             }
             else
             {
-                Debug.Log($"[UserDataCache] 일괄 진행도 수신 - 데이터 없음 (중복 방지 플래그 초기화됨)");
+                Debug.LogWarning($"[UserDataCache] ❌ 일괄 진행도 수신 - 데이터 없음 (중복 방지 플래그 초기화됨)");
             }
         }
         

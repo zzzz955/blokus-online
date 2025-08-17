@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 using BlokusUnity.Network;
@@ -33,8 +34,88 @@ namespace BlokusUnity.UI
         
         void Start()
         {
+            Debug.Log("[StageSelection] Start() 호출됨");
             InitializeUI();
+            
+            // UserDataCache 인스턴스가 준비될 때까지 대기 후 이벤트 재구독
+            StartCoroutine(RetryEventSubscription());
+            
             LoadStageData();
+        }
+        
+        /// <summary>
+        /// UserDataCache 준비 대기 및 이벤트 재구독
+        /// </summary>
+        private System.Collections.IEnumerator RetryEventSubscription()
+        {
+            int retryCount = 0;
+            const int maxRetries = 10;
+            
+            while (retryCount < maxRetries)
+            {
+                if (UserDataCache.Instance != null)
+                {
+                    Debug.Log("[StageSelection] UserDataCache 준비됨 - 이벤트 재구독");
+                    
+                    // 기존 구독 해제 후 재구독
+                    UserDataCache.Instance.OnStageProgressUpdated -= HandleStageProgressUpdated;
+                    UserDataCache.Instance.OnStageProgressUpdated += HandleStageProgressUpdated;
+                    
+                    Debug.Log("[StageSelection] ✅ 이벤트 재구독 완료");
+                    
+                    // 🔥 핵심 수정: 이벤트 구독 후 기존 캐시 데이터를 즉시 적용
+                    RefreshAllButtonsFromCache();
+                    
+                    yield break;
+                }
+                
+                retryCount++;
+                Debug.Log($"[StageSelection] UserDataCache 대기 중... ({retryCount}/{maxRetries})");
+                yield return new WaitForSeconds(0.1f);
+            }
+            
+            Debug.LogWarning("[StageSelection] UserDataCache 초기화 실패 - 이벤트 구독 불가");
+        }
+        
+        /// <summary>
+        /// 모든 스테이지 버튼을 캐시 데이터로 새로고침
+        /// </summary>
+        private void RefreshAllButtonsFromCache()
+        {
+            if (UserDataCache.Instance == null || stageButtons.Count == 0)
+            {
+                Debug.Log("[StageSelection] RefreshAllButtonsFromCache 건너뜀 - UserDataCache 또는 버튼이 없음");
+                return;
+            }
+            
+            Debug.Log($"[StageSelection] 🔄 RefreshAllButtonsFromCache 시작 - {stageButtons.Count}개 버튼 업데이트");
+            int updatedCount = 0;
+            
+            foreach (var stageButton in stageButtons)
+            {
+                if (stageButton != null)
+                {
+                    int stageNumber = stageButton.StageNumber;
+                    
+                    // 캐시에서 진행도 가져오기
+                    var networkProgress = UserDataCache.Instance.GetStageProgress(stageNumber);
+                    if (networkProgress != null)
+                    {
+                        Debug.Log($"[StageSelection] 스테이지 {stageNumber} 캐시 발견 - 업데이트 진행");
+                        
+                        // 언락 상태 확인
+                        bool isUnlocked = StageDataIntegrator.Instance?.IsStageUnlocked(stageNumber) ?? (stageNumber == 1);
+                        
+                        // 진행도 변환 및 적용
+                        var gameProgress = ConvertToGameUserProgress(networkProgress);
+                        stageButton.UpdateState(isUnlocked, gameProgress);
+                        
+                        updatedCount++;
+                    }
+                }
+            }
+            
+            Debug.Log($"[StageSelection] ✅ RefreshAllButtonsFromCache 완료 - {updatedCount}개 버튼 업데이트됨");
         }
         
         void OnDestroy()
@@ -73,6 +154,17 @@ namespace BlokusUnity.UI
                 StageDataIntegrator.Instance.OnStageMetadataLoaded += HandleStageMetadataLoaded;
                 StageDataIntegrator.Instance.OnLoadingError += HandleLoadingError;
             }
+            
+            // UserDataCache 진행도 업데이트 이벤트 구독 (캐시 데이터 실시간 반영)
+            if (UserDataCache.Instance != null)
+            {
+                UserDataCache.Instance.OnStageProgressUpdated += HandleStageProgressUpdated;
+                Debug.Log("[StageSelection] UserDataCache 진행도 업데이트 이벤트 구독 완료");
+            }
+            else
+            {
+                Debug.LogWarning("[StageSelection] UserDataCache.Instance가 null이어서 이벤트 구독 실패");
+            }
         }
         
         /// <summary>
@@ -84,6 +176,12 @@ namespace BlokusUnity.UI
             {
                 StageDataIntegrator.Instance.OnStageMetadataLoaded -= HandleStageMetadataLoaded;
                 StageDataIntegrator.Instance.OnLoadingError -= HandleLoadingError;
+            }
+            
+            // UserDataCache 이벤트 구독 해제
+            if (UserDataCache.Instance != null)
+            {
+                UserDataCache.Instance.OnStageProgressUpdated -= HandleStageProgressUpdated;
             }
         }
         
@@ -140,6 +238,13 @@ namespace BlokusUnity.UI
             
             // UI 업데이트
             CreateStageButtons(metadata);
+            
+            // 🔥 추가: 버튼 생성 후 캐시 데이터로 즉시 업데이트
+            if (UserDataCache.Instance != null)
+            {
+                Debug.Log("[StageSelection] 버튼 생성 후 캐시 데이터 즉시 적용");
+                RefreshAllButtonsFromCache();
+            }
             
             if (statusText != null)
             {
@@ -218,8 +323,12 @@ namespace BlokusUnity.UI
             bool isUnlocked = StageDataIntegrator.Instance?.IsStageUnlocked(stageInfo.n) ?? (stageInfo.n == 1);
             
             // 사용자 진행도 정보 가져오기 (캐시에서)
+            Debug.Log($"[StageSelection] 스테이지 {stageInfo.n} 진행도 요청 중...");
             var networkProgress = UserDataCache.Instance?.GetStageProgress(stageInfo.n);
+            Debug.Log($"[StageSelection] 스테이지 {stageInfo.n} 캐시 결과: {(networkProgress != null ? $"완료={networkProgress.isCompleted}, 별={networkProgress.starsEarned}" : "null")}");
+            
             var gameProgress = ConvertToGameUserProgress(networkProgress);
+            Debug.Log($"[StageSelection] 스테이지 {stageInfo.n} 변환 결과: {(gameProgress != null ? $"완료={gameProgress.isCompleted}, 별={gameProgress.starsEarned}" : "null")}");
             
             // StageButton 초기화 (별도 파일의 StageButton 인터페이스 사용)
             stageButton.Initialize(stageInfo.n, HandleStageButtonClicked);
@@ -291,13 +400,55 @@ namespace BlokusUnity.UI
         }
         
         /// <summary>
+        /// UserDataCache에서 스테이지 진행도 업데이트 이벤트 처리
+        /// </summary>
+        private void HandleStageProgressUpdated(NetworkUserStageProgress progress)
+        {
+            Debug.Log($"[StageSelection] ✅ HandleStageProgressUpdated 호출됨! 스테이지 {progress.stageNumber} 진행도: 완료={progress.isCompleted}, 별={progress.starsEarned}");
+            
+            // 해당 스테이지 버튼 찾아서 업데이트
+            Debug.Log($"[StageSelection] 스테이지 버튼 검색 중... 현재 버튼 수: {stageButtons.Count}개");
+            var stageButton = stageButtons.Find(btn => btn.StageNumber == progress.stageNumber);
+            if (stageButton != null)
+            {
+                Debug.Log($"[StageSelection] 스테이지 {progress.stageNumber} 버튼 찾음!");
+                
+                // 언락 상태 확인
+                bool isUnlocked = StageDataIntegrator.Instance?.IsStageUnlocked(progress.stageNumber) ?? (progress.stageNumber == 1);
+                
+                // 네트워크 진행도를 게임 진행도로 변환
+                var gameProgress = ConvertToGameUserProgress(progress);
+                
+                // 상태 업데이트
+                stageButton.UpdateState(isUnlocked, gameProgress);
+                
+                Debug.Log($"[StageSelection] ✅ 스테이지 {progress.stageNumber} 버튼 상태 업데이트 완료");
+            }
+            else
+            {
+                Debug.LogWarning($"[StageSelection] ❌ 스테이지 {progress.stageNumber} 버튼을 찾을 수 없음 (총 {stageButtons.Count}개 버튼)");
+                
+                // 디버깅을 위해 현재 버튼들의 스테이지 번호 출력
+                if (stageButtons.Count > 0)
+                {
+                    var buttonNumbers = string.Join(", ", stageButtons.Select(btn => btn.StageNumber.ToString()).Take(10));
+                    Debug.Log($"[StageSelection] 현재 버튼들: {buttonNumbers}{(stageButtons.Count > 10 ? "..." : "")}");
+                }
+            }
+        }
+        
+        /// <summary>
         /// 네트워크 진행도를 게임 진행도로 변환
         /// </summary>
         private GameUserStageProgress ConvertToGameUserProgress(NetworkUserStageProgress networkProgress)
         {
-            if (networkProgress == null) return null;
+            if (networkProgress == null) 
+            {
+                Debug.Log("[StageSelection] NetworkUserStageProgress가 null - 데이터 아직 로드되지 않음");
+                return null;
+            }
             
-            return new GameUserStageProgress
+            var gameProgress = new GameUserStageProgress
             {
                 stageNumber = networkProgress.stageNumber,
                 isCompleted = networkProgress.isCompleted,
@@ -309,6 +460,9 @@ namespace BlokusUnity.UI
                 firstPlayedAt = networkProgress.firstPlayedAt,
                 lastPlayedAt = networkProgress.lastPlayedAt
             };
+            
+            Debug.Log($"[StageSelection] 스테이지 {gameProgress.stageNumber} 진행도 변환: 완료={gameProgress.isCompleted}, 별={gameProgress.starsEarned}");
+            return gameProgress;
         }
     }
 }

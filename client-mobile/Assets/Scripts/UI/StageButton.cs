@@ -98,10 +98,10 @@ void Awake()
                 // // debug.LogError($"StageButton {stageNumber}: stageNumberText가 할당되지 않았습니다!");
             }
             
-            // 초기 상태: 잠김
-            UpdateState(false, null);
+            // 초기 상태는 StageSelectionController.CreateStageButton()에서 정확한 데이터로 설정됨
+            // 중복 호출 방지를 위해 여기서는 UpdateState를 호출하지 않음
             
-            // // debug.Log($"Initialize 완료: 스테이지 {stageNumber}");
+            Debug.Log($"[StageButton {stageNumber}] Initialize 완료 - 상태 업데이트는 StageSelectionController에서 처리됨");
         }
         
         /// <summary>

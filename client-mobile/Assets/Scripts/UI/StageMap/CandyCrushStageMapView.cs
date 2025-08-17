@@ -422,12 +422,6 @@ namespace BlokusUnity.UI
                 firstVisible = 1;
                 lastVisible = Mathf.Min(10, totalStages);
             }
-
-            // 디버그 로그 (필요시)
-            if (Time.frameCount % 60 == 0) // 1초에 한번만
-            {
-                Debug.Log($"뷰포트 범위: {firstVisible}-{lastVisible} (뷰포트: {viewportMin.y:F0}~{viewportMax.y:F0})");
-            }
         }
 
         /// <summary>
@@ -521,40 +515,65 @@ namespace BlokusUnity.UI
         /// </summary>
         private void UpdateButtonState(StageButton button, int stageNumber)
         {
-            if (progressManager == null) return;
-
-            bool isUnlocked = progressManager.IsStageUnlocked(stageNumber);
-            var progress = progressManager.GetCachedStageProgress(stageNumber);
-
-            // 모든 스테이지 항상 표시
-
-            // StageProgress를 UserStageProgress로 변환 (StageButton 호환성)
-            GameUserStageProgress userProgress = null;
-            if (progress != null)
+            Debug.Log($"[UpdateButtonState] 스테이지 {stageNumber} 상태 업데이트 시작");
+            
+            // 언락 상태 확인 (StageDataIntegrator 사용)
+            bool isUnlocked = StageDataIntegrator.Instance?.IsStageUnlocked(stageNumber) ?? (stageNumber == 1);
+            
+            // 🔥 수정: UserDataCache에서 직접 데이터 가져오기 (progressManager 대신)
+            NetworkUserStageProgress networkProgress = null;
+            if (UserDataCache.Instance != null)
             {
-                userProgress = new GameUserStageProgress
-                {
-                    stageNumber = stageNumber,
-                    isCompleted = progress.isCompleted,
-                    starsEarned = progress.starsEarned,
-                    bestScore = progress.bestScore
-                };
+                networkProgress = UserDataCache.Instance.GetStageProgress(stageNumber);
+                Debug.Log($"[UpdateButtonState] 스테이지 {stageNumber} UserDataCache 조회 결과: {(networkProgress != null ? $"완료={networkProgress.isCompleted}, 별={networkProgress.starsEarned}" : "null")}");
             }
             else
             {
-                // 진행도가 없는 경우 기본값으로 표시 (언락 여부 상관없이)
+                Debug.LogWarning($"[UpdateButtonState] UserDataCache.Instance가 null입니다");
+            }
+
+            // NetworkUserStageProgress를 GameUserStageProgress로 변환 (UpdateButtonsFromCache와 동일한 로직)
+            GameUserStageProgress userProgress = null;
+            if (networkProgress != null)
+            {
+                // 🔥 수정: null 체크 후 안전하게 변환
+                userProgress = new GameUserStageProgress
+                {
+                    stageNumber = networkProgress.stageNumber,
+                    isCompleted = networkProgress.isCompleted,
+                    starsEarned = networkProgress.starsEarned,
+                    bestScore = networkProgress.bestScore,
+                    bestCompletionTime = networkProgress.bestCompletionTime,
+                    totalAttempts = networkProgress.totalAttempts,
+                    successfulAttempts = networkProgress.successfulAttempts,
+                    firstPlayedAt = networkProgress.firstPlayedAt,
+                    lastPlayedAt = networkProgress.lastPlayedAt
+                };
+                
+                Debug.Log($"[UpdateButtonState] 스테이지 {stageNumber} 캐시 데이터 변환: 완료={userProgress.isCompleted}, 별={userProgress.starsEarned}");
+            }
+            else
+            {
+                // 🔥 수정: null인 경우 기본값으로 생성
                 userProgress = new GameUserStageProgress
                 {
                     stageNumber = stageNumber,
                     isCompleted = false,
                     starsEarned = 0,
-                    bestScore = 0
+                    bestScore = 0,
+                    bestCompletionTime = 0,
+                    totalAttempts = 0,
+                    successfulAttempts = 0,
+                    firstPlayedAt = System.DateTime.MinValue,
+                    lastPlayedAt = System.DateTime.MinValue
                 };
+                
+                Debug.Log($"[UpdateButtonState] 스테이지 {stageNumber} 캐시 데이터 없음 - 기본값 사용");
             }
 
             button.UpdateState(isUnlocked, userProgress);
 
-            Debug.Log($"스테이지 {stageNumber}: 언락={isUnlocked}, 클리어={userProgress?.isCompleted}, 별={userProgress?.starsEarned}");
+            Debug.Log($"[UpdateButtonState] ✅ 스테이지 {stageNumber} 최종 결과: 언락={isUnlocked}, 클리어={userProgress?.isCompleted}, 별={userProgress?.starsEarned}");
         }
 
         /// <summary>
@@ -1228,6 +1247,8 @@ namespace BlokusUnity.UI
                 yield break;
             }
 
+            int updatedCount = 0;
+
             // 현재 활성 버튼들 업데이트
             foreach (var kvp in activeButtons)
             {
@@ -1236,22 +1257,47 @@ namespace BlokusUnity.UI
                 
                 if (button != null)
                 {
+                    Debug.Log($"[UpdateButtonsFromCache] 스테이지 {stageNumber} 처리 시작");
+                    
                     // 캐시에서 진행도 데이터 가져오기
                     var networkProgress = UserDataCache.Instance.GetStageProgress(stageNumber);
                     
-                    // 네트워크 진행도를 Game.UserStageProgress로 변환
-                    var gameProgress = new BlokusUnity.Game.UserStageProgress
-                    {
-                        stageNumber = networkProgress.stageNumber,
-                        isCompleted = networkProgress.isCompleted,
-                        starsEarned = networkProgress.starsEarned,
-                        bestScore = networkProgress.bestScore,
-                        totalAttempts = networkProgress.totalAttempts,
-                        successfulAttempts = networkProgress.successfulAttempts
-                    };
+                    GameUserStageProgress gameProgress = null;
                     
-                    // 언락 상태 확인
-                    bool isUnlocked = StageDataManager.Instance?.IsStageUnlocked(stageNumber) ?? false;
+                    if (networkProgress != null)
+                    {
+                        // 🔥 수정: null 체크 후 안전하게 변환
+                        gameProgress = new GameUserStageProgress
+                        {
+                            stageNumber = networkProgress.stageNumber,
+                            isCompleted = networkProgress.isCompleted,
+                            starsEarned = networkProgress.starsEarned,
+                            bestScore = networkProgress.bestScore,
+                            totalAttempts = networkProgress.totalAttempts,
+                            successfulAttempts = networkProgress.successfulAttempts
+                        };
+                        
+                        Debug.Log($"[UpdateButtonsFromCache] 스테이지 {stageNumber} 캐시 데이터 변환: 완료={gameProgress.isCompleted}, 별={gameProgress.starsEarned}");
+                        updatedCount++;
+                    }
+                    else
+                    {
+                        Debug.Log($"[UpdateButtonsFromCache] 스테이지 {stageNumber} 캐시 데이터 없음 - 기본값 사용");
+                        
+                        // 🔥 수정: null인 경우 기본값으로 생성
+                        gameProgress = new GameUserStageProgress
+                        {
+                            stageNumber = stageNumber,
+                            isCompleted = false,
+                            starsEarned = 0,
+                            bestScore = 0,
+                            totalAttempts = 0,
+                            successfulAttempts = 0
+                        };
+                    }
+                    
+                    // 언락 상태 확인 (StageDataIntegrator 사용)
+                    bool isUnlocked = StageDataIntegrator.Instance?.IsStageUnlocked(stageNumber) ?? (stageNumber == 1);
                     
                     // 버튼 상태 업데이트
                     button.UpdateState(isUnlocked, gameProgress);
@@ -1266,7 +1312,7 @@ namespace BlokusUnity.UI
                 }
             }
             
-            Debug.Log("[UpdateButtonsFromCache] 캐시된 데이터로 UI 업데이트 완료");
+            Debug.Log($"[UpdateButtonsFromCache] ✅ 캐시된 데이터로 UI 업데이트 완료 - {updatedCount}개 스테이지 데이터 적용됨");
         }
 
         public override void Hide(bool animated = true)
