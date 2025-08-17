@@ -113,18 +113,22 @@ namespace BlokusUnity.Utils
         /// </summary>
         public static CommonUserInfo ConvertUserProfile(HttpApiClient.UserProfile userProfile)
         {
-            return new CommonUserInfo
+            var convertedUserInfo = new CommonUserInfo
             {
                 username = userProfile.username,
                 level = userProfile.single_player_level,
                 totalGames = userProfile.total_single_games,
                 wins = 0, // UserProfile에는 승패 정보가 없으므로 기본값
                 losses = 0,
-                averageScore = userProfile.single_player_score,
+                averageScore = userProfile.single_player_score, // 🔥 복원: 직접 사용
                 isOnline = true,
                 status = "로비",
                 maxStageCompleted = userProfile.max_stage_completed // 🔥 핵심: 서버에서 받은 최대 클리어 스테이지
             };
+            
+            Debug.Log($"[ApiDataConverter] 프로필 변환 완료: {userProfile.username}, maxStageCompleted={userProfile.max_stage_completed}");
+            
+            return convertedUserInfo;
         }
 
         /// <summary>

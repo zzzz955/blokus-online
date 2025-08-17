@@ -455,7 +455,10 @@ namespace BlokusUnity.Network
         /// </summary>
         public bool IsStageUnlocked(int stageNumber)
         {
-            if (stageNumber <= 1) return true; // 첫 번째 스테이지는 항상 언락
+            if (stageNumber <= 1) 
+            {
+                return true; // 첫 번째 스테이지는 항상 언락
+            }
             
             if (UserDataCache.Instance != null && UserDataCache.Instance.IsLoggedIn())
             {
@@ -463,12 +466,11 @@ namespace BlokusUnity.Network
                 int maxStageCompleted = UserDataCache.Instance.GetMaxStageCompleted();
                 bool isUnlocked = stageNumber <= maxStageCompleted + 1;
                 
-                Debug.Log($"[StageDataIntegrator] 스테이지 {stageNumber} 언락 확인: maxStageCompleted={maxStageCompleted}, 언락={isUnlocked}");
+                Debug.Log($"[StageDataIntegrator] IsStageUnlocked({stageNumber}): {isUnlocked} (max_completed: {maxStageCompleted})");
                 
                 return isUnlocked;
             }
             
-            Debug.Log($"[StageDataIntegrator] 로그인되지 않음 - 스테이지 {stageNumber} 언락 불가");
             return false; // 로그인되지 않은 경우 첫 스테이지만 언락
         }
         

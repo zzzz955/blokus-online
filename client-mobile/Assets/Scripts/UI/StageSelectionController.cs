@@ -4,8 +4,10 @@ using UnityEngine;
 using UnityEngine.UI;
 using BlokusUnity.Network;
 using BlokusUnity.Data;
+using BlokusUnity.Common;
 using NetworkUserStageProgress = BlokusUnity.Network.UserStageProgress;
 using GameUserStageProgress = BlokusUnity.Game.UserStageProgress;
+using UserInfo = BlokusUnity.Common.UserInfo;
 
 namespace BlokusUnity.UI
 {
@@ -28,6 +30,9 @@ namespace BlokusUnity.UI
         // 스테이지 버튼들
         private List<StageButton> stageButtons = new List<StageButton>();
         private bool isLoading = false;
+        
+        // 🔥 추가: 중복 새로고침 방지
+        private bool isRefreshing = false;
         
         // 이벤트
         public event System.Action<int> OnStageSelected;
@@ -61,7 +66,11 @@ namespace BlokusUnity.UI
                     UserDataCache.Instance.OnStageProgressUpdated -= HandleStageProgressUpdated;
                     UserDataCache.Instance.OnStageProgressUpdated += HandleStageProgressUpdated;
                     
-                    Debug.Log("[StageSelection] ✅ 이벤트 재구독 완료");
+                    // 🔥 추가: 사용자 프로필 업데이트 이벤트 재구독
+                    UserDataCache.Instance.OnUserDataUpdated -= HandleUserDataUpdated;
+                    UserDataCache.Instance.OnUserDataUpdated += HandleUserDataUpdated;
+                    
+                    Debug.Log("[StageSelection] ✅ 이벤트 재구독 완료 (진행도 + 프로필)");
                     
                     // 🔥 핵심 수정: 이벤트 구독 후 기존 캐시 데이터를 즉시 적용
                     RefreshAllButtonsFromCache();
@@ -82,13 +91,22 @@ namespace BlokusUnity.UI
         /// </summary>
         private void RefreshAllButtonsFromCache()
         {
+            // 🔥 추가: 중복 새로고침 방지
+            if (isRefreshing)
+            {
+                Debug.Log("[StageSelection] RefreshAllButtonsFromCache 중복 방지 - 이미 새로고침 중");
+                return;
+            }
+            
             if (UserDataCache.Instance == null || stageButtons.Count == 0)
             {
                 Debug.Log("[StageSelection] RefreshAllButtonsFromCache 건너뜀 - UserDataCache 또는 버튼이 없음");
                 return;
             }
             
+            isRefreshing = true;
             Debug.Log($"[StageSelection] 🔄 RefreshAllButtonsFromCache 시작 - {stageButtons.Count}개 버튼 업데이트");
+            
             int updatedCount = 0;
             
             foreach (var stageButton in stageButtons)
@@ -99,23 +117,20 @@ namespace BlokusUnity.UI
                     
                     // 캐시에서 진행도 가져오기
                     var networkProgress = UserDataCache.Instance.GetStageProgress(stageNumber);
-                    if (networkProgress != null)
-                    {
-                        Debug.Log($"[StageSelection] 스테이지 {stageNumber} 캐시 발견 - 업데이트 진행");
-                        
-                        // 언락 상태 확인
-                        bool isUnlocked = StageDataIntegrator.Instance?.IsStageUnlocked(stageNumber) ?? (stageNumber == 1);
-                        
-                        // 진행도 변환 및 적용
-                        var gameProgress = ConvertToGameUserProgress(networkProgress);
-                        stageButton.UpdateState(isUnlocked, gameProgress);
-                        
-                        updatedCount++;
-                    }
+                    
+                    // 언락 상태 확인
+                    bool isUnlocked = StageDataIntegrator.Instance?.IsStageUnlocked(stageNumber) ?? (stageNumber == 1);
+                    
+                    // 진행도 변환 및 적용
+                    var gameProgress = ConvertToGameUserProgress(networkProgress);
+                    stageButton.UpdateState(isUnlocked, gameProgress);
+                    
+                    updatedCount++;
                 }
             }
             
             Debug.Log($"[StageSelection] ✅ RefreshAllButtonsFromCache 완료 - {updatedCount}개 버튼 업데이트됨");
+            isRefreshing = false;
         }
         
         void OnDestroy()
@@ -159,7 +174,11 @@ namespace BlokusUnity.UI
             if (UserDataCache.Instance != null)
             {
                 UserDataCache.Instance.OnStageProgressUpdated += HandleStageProgressUpdated;
-                Debug.Log("[StageSelection] UserDataCache 진행도 업데이트 이벤트 구독 완료");
+                
+                // 🔥 추가: 사용자 프로필 업데이트 이벤트 구독 (max_stage_completed 변경시 스테이지 버튼 새로고침)
+                UserDataCache.Instance.OnUserDataUpdated += HandleUserDataUpdated;
+                
+                Debug.Log("[StageSelection] UserDataCache 이벤트 구독 완료 (진행도 + 프로필)");
             }
             else
             {
@@ -182,6 +201,9 @@ namespace BlokusUnity.UI
             if (UserDataCache.Instance != null)
             {
                 UserDataCache.Instance.OnStageProgressUpdated -= HandleStageProgressUpdated;
+                
+                // 🔥 추가: 사용자 프로필 업데이트 이벤트 구독 해제
+                UserDataCache.Instance.OnUserDataUpdated -= HandleUserDataUpdated;
             }
         }
         
@@ -434,6 +456,27 @@ namespace BlokusUnity.UI
                     var buttonNumbers = string.Join(", ", stageButtons.Select(btn => btn.StageNumber.ToString()).Take(10));
                     Debug.Log($"[StageSelection] 현재 버튼들: {buttonNumbers}{(stageButtons.Count > 10 ? "..." : "")}");
                 }
+            }
+        }
+        
+        /// <summary>
+        /// 🔥 추가: UserDataCache에서 사용자 프로필 업데이트 이벤트 처리 (max_stage_completed 변경시)
+        /// </summary>
+        private void HandleUserDataUpdated(UserInfo userInfo)
+        {
+            if (userInfo != null)
+            {
+                Debug.Log($"[StageSelection] ✅ HandleUserDataUpdated 호출됨! 사용자: {userInfo.username}, max_stage_completed: {userInfo.maxStageCompleted}");
+                
+                // 모든 스테이지 버튼의 언락 상태를 새로고침 (max_stage_completed 기준)
+                Debug.Log($"[StageSelection] 🔄 사용자 프로필 업데이트로 인한 전체 스테이지 버튼 새로고침 시작");
+                RefreshAllButtonsFromCache();
+                
+                Debug.Log($"[StageSelection] ✅ 사용자 프로필 업데이트 처리 완료");
+            }
+            else
+            {
+                Debug.LogWarning($"[StageSelection] ❌ HandleUserDataUpdated - userInfo가 null입니다");
             }
         }
         

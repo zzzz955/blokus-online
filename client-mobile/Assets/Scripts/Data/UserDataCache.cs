@@ -122,6 +122,9 @@ namespace BlokusUnity.Data
             httpClient.OnStageProgressReceived += OnStageProgressReceived;
             httpClient.OnStageCompleteResponse += OnStageCompleteResponse;
             
+            // 🔥 수정: 사용자 프로필 업데이트 이벤트 구독 추가
+            httpClient.OnUserProfileReceived += OnUserProfileReceived;
+            
             Debug.Log("[UserDataCache] HTTP API 이벤트 핸들러 설정 완료");
         }
         
@@ -136,6 +139,9 @@ namespace BlokusUnity.Data
                 httpClient.OnBatchProgressReceived -= OnBatchProgressReceived;
                 httpClient.OnStageProgressReceived -= OnStageProgressReceived;
                 httpClient.OnStageCompleteResponse -= OnStageCompleteResponse;
+                
+                // 🔥 수정: 사용자 프로필 업데이트 이벤트 구독 해제 추가
+                httpClient.OnUserProfileReceived -= OnUserProfileReceived;
             }
         }
         
@@ -167,15 +173,27 @@ namespace BlokusUnity.Data
         /// </summary>
         public void SetUserProfile(UserInfo userInfo)
         {
+            bool isMaxStageChanged = currentUser?.maxStageCompleted != userInfo.maxStageCompleted;
+            
             currentUser = userInfo;
             
-            Debug.Log($"사용자 프로필 설정: {userInfo.username} (최대 스테이지: {userInfo.maxStageCompleted})");
+            Debug.Log($"[UserDataCache] 사용자 프로필 설정: {userInfo.username} (최대 스테이지: {userInfo.maxStageCompleted})");
             
             SaveUserDataToDisk();
             OnUserDataUpdated?.Invoke(currentUser);
             
-            // 🔥 추가: 프로필 설정 후 자동으로 초기 데이터 로드
-            LoadInitialDataFromServer();
+            // 🔥 추가: max_stage_completed 변경시 스테이지 버튼 새로고침 트리거
+            if (isMaxStageChanged)
+            {
+                Debug.Log($"[UserDataCache] max_stage_completed 변경 감지 ({currentUser?.maxStageCompleted} → {userInfo.maxStageCompleted}) - 스테이지 버튼 새로고침 필요");
+                OnUserDataUpdated?.Invoke(currentUser); // 추가 이벤트 발생으로 UI 새로고침 촉진
+            }
+            
+            // 🔥 추가: 프로필 설정 후 자동으로 초기 데이터 로드 (첫 로그인시에만)
+            if (isMaxStageChanged || currentUser == null)
+            {
+                LoadInitialDataFromServer();
+            }
         }
         
         /// <summary>
@@ -262,8 +280,22 @@ namespace BlokusUnity.Data
                 if (!isStageMetadataLoading)
                 {
                     isStageMetadataLoading = true;
-                    HttpApiClient.Instance.GetStageMetadata();
-                    Debug.Log("[UserDataCache] 스테이지 메타데이터 요청 (중복 방지됨)");
+                    Debug.Log("[UserDataCache] 🔥 스테이지 메타데이터 요청 시작");
+                    
+                    // 🔥 추가: 타임아웃 체크
+                    if (HttpApiClient.Instance.IsAuthenticated())
+                    {
+                        HttpApiClient.Instance.GetStageMetadata();
+                        Debug.Log("[UserDataCache] 스테이지 메타데이터 HTTP 요청 전송");
+                        
+                        // 🔥 10초 후 타임아웃 체크
+                        StartCoroutine(CheckMetadataTimeout());
+                    }
+                    else
+                    {
+                        Debug.LogError("[UserDataCache] HTTP API 인증되지 않음 - 메타데이터 요청 실패");
+                        isStageMetadataLoading = false;
+                    }
                 }
                 else
                 {
@@ -342,24 +374,13 @@ namespace BlokusUnity.Data
         /// </summary>
         public NetworkUserStageProgress GetStageProgress(int stageNumber)
         {
-            Debug.Log($"[UserDataCache] 스테이지 {stageNumber} 진행도 요청 - 현재 캐시 크기: {stageProgressCache.Count}개");
-            
-            // 캐시 내용 디버깅 (처음 몇 개만)
-            if (stageProgressCache.Count > 0)
-            {
-                var keys = string.Join(", ", stageProgressCache.Keys.Take(5));
-                Debug.Log($"[UserDataCache] 캐시된 스테이지들: {keys}{(stageProgressCache.Count > 5 ? "..." : "")}");
-            }
-            
             if (stageProgressCache.TryGetValue(stageNumber, out NetworkUserStageProgress progress))
             {
-                Debug.Log($"[UserDataCache] 스테이지 {stageNumber} 진행도 캐시에서 반환: 완료={progress.isCompleted}, 별={progress.starsEarned}");
                 return progress;
             }
             
             // 진행도가 없으면 null 반환 (기본값 대신)
             // UI에서 null 체크를 통해 데이터가 아직 로드되지 않았음을 알 수 있음
-            Debug.Log($"[UserDataCache] 스테이지 {stageNumber} 진행도 캐시에 없음 - null 반환");
             return null;
         }
         
@@ -401,11 +422,11 @@ namespace BlokusUnity.Data
         {
             if (currentUser != null)
             {
-                Debug.Log($"[UserDataCache] 서버 기반 최대 완료 스테이지: {currentUser.maxStageCompleted}");
+                Debug.Log($"[UserDataCache] GetMaxStageCompleted: {currentUser.maxStageCompleted} (사용자: {currentUser.username})");
                 return currentUser.maxStageCompleted;
             }
             
-            Debug.Log("[UserDataCache] 사용자 정보 없음 - 기본값 0 반환");
+            Debug.Log("[UserDataCache] GetMaxStageCompleted: 0 (사용자 정보 없음)");
             return 0;
         }
         
@@ -584,46 +605,51 @@ namespace BlokusUnity.Data
         // ========================================
         
         /// <summary>
+        /// 🔥 추가: 메타데이터 로드 타임아웃 체크
+        /// </summary>
+        private System.Collections.IEnumerator CheckMetadataTimeout()
+        {
+            yield return new WaitForSeconds(10f); // 10초 대기
+            
+            if (isStageMetadataLoading)
+            {
+                Debug.LogWarning("[UserDataCache] 🔥 메타데이터 로드 타임아웃 - 응답 없음");
+                isStageMetadataLoading = false;
+            }
+        }
+        
+        /// <summary>
         /// 스테이지 메타데이터 설정 (압축된 API 응답)
         /// </summary>
         public void SetStageMetadata(HttpApiClient.CompactStageMetadata[] metadata)
         {
             // 중복 요청 방지 플래그 초기화
             isStageMetadataLoading = false;
-            
+
             stageMetadataCache = metadata;
-            
+
             // 메타데이터 검증 및 로깅
             if (metadata != null)
             {
-                int newFormatCount = 0;
-                int legacyFormatCount = 0;
-                
-                foreach (var stage in metadata)
+                Debug.Log($"[UserDataCache] 🔥 스테이지 메타데이터 설정 완료: {metadata.Length}개 (타임아웃 방지)");
+
+                // 간략한 메타데이터 로깅
+                for (int i = 0; i < Math.Min(5, metadata.Length); i++)
                 {
-                    if (stage.HasInitialBoardState)
-                    {
-                        var boardData = stage.GetBoardData();
-                        if (stage.ibs.HasBoardData)
-                        {
-                            newFormatCount++;
-                            Debug.Log($"[UserDataCache] 스테이지 {stage.n}: 새로운 INTEGER[] 형식 ({boardData.Length}개 위치)");
-                        }
-                        else
-                        {
-                            legacyFormatCount++;
-                            Debug.Log($"[UserDataCache] 스테이지 {stage.n}: 레거시 형식 ({boardData.Length}개 위치)");
-                        }
-                    }
+                    var stage = metadata[i];
+                    Debug.Log($"[UserDataCache] 메타데이터 샘플: 스테이지 {stage.n}, 난이도={stage.d}, 목표점수={stage.o}");
                 }
-                
-                Debug.Log($"[UserDataCache] 스테이지 메타데이터 설정 완료: {metadata.Length}개 총 (INTEGER[] {newFormatCount}개, Empty {legacyFormatCount}개) (중복 방지 플래그 초기화됨)");
+
+                if (metadata.Length > 5)
+                {
+                    Debug.Log($"[UserDataCache] ... 및 {metadata.Length - 5}개 더");
+                }
             }
             else
             {
-                Debug.Log($"[UserDataCache] 스테이지 메타데이터 설정 - 데이터 없음 (중복 방지 플래그 초기화됨)");
+                Debug.LogWarning($"[UserDataCache] 스테이지 메타데이터 설정 - 데이터 없음");
             }
-            
+
             OnStageMetadataUpdated?.Invoke(metadata);
         }
         
@@ -777,6 +803,39 @@ namespace BlokusUnity.Data
             else
             {
                 Debug.LogWarning($"[UserDataCache] 스테이지 완료 실패: {message}");
+            }
+        }
+        
+        /// <summary>
+        /// 🔥 추가: 사용자 프로필 수신 처리 (HTTP API → UserDataCache 연동)
+        /// </summary>
+        private void OnUserProfileReceived(HttpApiClient.UserProfile apiProfile)
+        {
+            if (apiProfile != null)
+            {
+                Debug.Log($"[UserDataCache] 📥 OnUserProfileReceived 호출됨!");
+                Debug.Log($"[UserDataCache] API 프로필 데이터: username={apiProfile.username}, max_stage_completed={apiProfile.max_stage_completed}");
+                
+                // HttpApiClient.UserProfile을 UserInfo로 변환
+                var userInfo = new UserInfo
+                {
+                    username = apiProfile.username,
+                    level = apiProfile.single_player_level,
+                    maxStageCompleted = apiProfile.max_stage_completed,
+                    totalGames = apiProfile.total_single_games,
+                    averageScore = apiProfile.single_player_score
+                };
+                
+                Debug.Log($"[UserDataCache] UserInfo 변환 완료: username={userInfo.username}, maxStageCompleted={userInfo.maxStageCompleted}");
+                
+                // 프로필 정보 설정 (기존 SetUserProfile 재사용)
+                SetUserProfile(userInfo);
+                
+                Debug.Log($"[UserDataCache] ✅ 사용자 프로필 업데이트 완료 - max_stage_completed={userInfo.maxStageCompleted}");
+            }
+            else
+            {
+                Debug.LogWarning($"[UserDataCache] ❌ OnUserProfileReceived - apiProfile이 null입니다");
             }
         }
         

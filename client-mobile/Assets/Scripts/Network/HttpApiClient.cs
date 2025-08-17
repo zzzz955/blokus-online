@@ -778,7 +778,7 @@ namespace BlokusUnity.Network
             public int single_player_level;
             public int max_stage_completed;
             public int total_single_games;
-            public int single_player_score;
+            public int single_player_score; // 🔥 복원: DB가 bigint이므로 int로 복원
         }
         
         [System.Serializable]
