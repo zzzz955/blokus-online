@@ -523,9 +523,27 @@ namespace BlokusUnity.UI
                 return;
             }
 
-            // 기존 자식 제거
-            foreach (Transform child in availableBlocksParent)
-                DestroyImmediate(child.gameObject);
+            // 🔥 수정: 기존 자식 제거 - 더 안전한 방법
+            // Destroy 사용 (프레임 끝에서 삭제)
+            int childCount = availableBlocksParent.childCount;
+            var childrenToDestroy = new Transform[childCount];
+            
+            // 먼저 모든 자식을 배열에 저장
+            for (int i = 0; i < childCount; i++)
+            {
+                childrenToDestroy[i] = availableBlocksParent.GetChild(i);
+            }
+            
+            // 배열에서 삭제 (foreach 사용 가능)
+            foreach (var child in childrenToDestroy)
+            {
+                if (child != null)
+                {
+                    Destroy(child.gameObject);
+                }
+            }
+
+            Debug.Log($"기존 블록 버튼 {childCount}개 제거 완료");
 
             // 데이터가 없으면 전체 블록을 보여주지 않고 끝
             if (currentStageData == null || currentStageData.available_blocks == null || currentStageData.available_blocks.Length == 0)
@@ -534,9 +552,15 @@ namespace BlokusUnity.UI
                 return;
             }
 
+            Debug.Log($"새로운 블록 버튼 {currentStageData.available_blocks.Length}개 생성 시작");
+
             // available_blocks 에 명시된 블록만 생성
             foreach (var blockType in currentStageData.available_blocks)
+            {
                 CreateBlockButton((BlokusUnity.Common.BlockType)blockType);
+            }
+
+            Debug.Log($"블록 버튼 생성 완료 - 현재 자식 수: {availableBlocksParent.childCount}");
         }
 
         private void CreateBlockButton(BlokusUnity.Common.BlockType blockType)

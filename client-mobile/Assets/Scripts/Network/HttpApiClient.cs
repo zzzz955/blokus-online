@@ -424,20 +424,30 @@ namespace BlokusUnity.Network
         public void GetStageMetadata()
         {
             Debug.Log("[HttpApiClient] 스테이지 메타데이터 요청 시작");
-            StartCoroutine(SendGetRequest<StageMetadataResponse>(
-                "stages/metadata",
+            StartCoroutine(SendGetRequest<MetadataSyncResponse>(
+                "user/sync/metadata",
                 response => {
                     Debug.Log($"[HttpApiClient] 스테이지 메타데이터 수신: {response.stages?.Length ?? 0}개");
                     
-                    // UserDataCache에 직접 저장
-                    if (UserDataCache.Instance != null && response.stages != null)
+                    // MetadataSyncResponse의 stages를 CompactStageMetadata로 변환
+                    if (response.stages != null && response.stages.Length > 0)
                     {
-                        UserDataCache.Instance.SetStageMetadata(response.stages);
-                        Debug.Log($"[HttpApiClient] 메타데이터 캐시에 저장 완료");
+                        var compactStages = ConvertToCompactMetadata(response.stages);
+                        
+                        // UserDataCache에 직접 저장
+                        if (UserDataCache.Instance != null)
+                        {
+                            UserDataCache.Instance.SetStageMetadata(compactStages);
+                            Debug.Log($"[HttpApiClient] 메타데이터 캐시에 저장 완료: {compactStages.Length}개");
+                        }
+                        
+                        // 이벤트도 발생 (기존 구독자들을 위해)
+                        OnStageMetadataReceived?.Invoke(compactStages);
                     }
-                    
-                    // 이벤트도 발생 (기존 구독자들을 위해)
-                    OnStageMetadataReceived?.Invoke(response.stages);
+                    else
+                    {
+                        Debug.LogWarning("[HttpApiClient] 수신된 스테이지 데이터가 없습니다");
+                    }
                 },
                 error => Debug.LogWarning($"[HttpApiClient] 스테이지 메타데이터 요청 실패: {error}")
             ));
@@ -885,7 +895,243 @@ namespace BlokusUnity.Network
         // 이벤트 추가
         public event System.Action<CompactStageMetadata[]> OnStageListReceived;
         public event System.Action<CompactUserProgress> OnUserProgressReceived;
+
+        // ========================================
+        // 새로운 캐싱 전략 API 메서드들
+        // ========================================
+
+        /// <summary>
+        /// 라이트 동기화 - 프로필 요약 + 버전 정보
+        /// </summary>
+        public void GetLightSync(System.Action<bool, BlokusUnity.Data.LightSyncResponse, string> onComplete)
+        {
+            StartCoroutine(SendGetRequest<BlokusUnity.Data.LightSyncResponse>(
+                "user/sync/light",
+                response => {
+                    Debug.Log($"라이트 동기화 성공: 버전 {response.user_profile.progress_version}");
+                    onComplete?.Invoke(true, response, null);
+                },
+                error => {
+                    Debug.LogError($"라이트 동기화 실패: {error}");
+                    onComplete?.Invoke(false, null, error);
+                }
+            ));
+        }
+
+        /// <summary>
+        /// 전체 진행도 동기화
+        /// </summary>
+        public void GetProgressSync(System.Action<bool, BlokusUnity.Data.ProgressSyncResponse, string> onComplete, 
+            int fromStage = 1, int toStage = 1000)
+        {
+            string endpoint = $"user/sync/progress?from_stage={fromStage}&to_stage={toStage}";
+            
+            StartCoroutine(SendGetRequest<BlokusUnity.Data.ProgressSyncResponse>(
+                endpoint,
+                response => {
+                    Debug.Log($"진행도 동기화 성공: {response.progress_data.Length}개 스테이지");
+                    onComplete?.Invoke(true, response, null);
+                },
+                error => {
+                    Debug.LogError($"진행도 동기화 실패: {error}");
+                    onComplete?.Invoke(false, null, error);
+                }
+            ));
+        }
+
+        /// <summary>
+        /// 메타데이터 동기화
+        /// </summary>
+        public void GetMetadataSync(System.Action<bool, BlokusUnity.Data.MetadataSyncResponse, string> onComplete, 
+            string clientVersion = "")
+        {
+            string endpoint = "user/sync/metadata";
+            if (!string.IsNullOrEmpty(clientVersion))
+            {
+                endpoint += $"?version={UnityWebRequest.EscapeURL(clientVersion)}";
+            }
+            
+            StartCoroutine(SendGetRequest<BlokusUnity.Data.MetadataSyncResponse>(
+                endpoint,
+                response => {
+                    Debug.Log($"메타데이터 동기화 성공: {(response.not_modified ? "변경없음" : response.stages.Length + "개 스테이지")}");
+                    onComplete?.Invoke(true, response, null);
+                },
+                error => {
+                    Debug.LogError($"메타데이터 동기화 실패: {error}");
+                    onComplete?.Invoke(false, null, error);
+                }
+            ));
+        }
+
+        /// <summary>
+        /// 스테이지 완료 보고 (응답에 최신 진행도 포함)
+        /// </summary>
+        public void CompleteStageWithSync(int stageNumber, int score, int completionTime, bool calculateStars,
+            System.Action<bool, BlokusUnity.Data.CompleteStageResponse, string> onComplete)
+        {
+            var requestData = new
+            {
+                score = score,
+                completion_time = completionTime,
+                stars_earned = calculateStars ? CalculateStars(score, 100) : 0 // 임시로 100을 optimal_score로 사용
+            };
+
+            StartCoroutine(SendPostRequest<BlokusUnity.Data.CompleteStageResponse>(
+                $"stages/{stageNumber}/complete",
+                requestData,
+                response => {
+                    Debug.Log($"스테이지 {stageNumber} 완료 보고 성공");
+                    onComplete?.Invoke(true, response, null);
+                },
+                error => {
+                    Debug.LogError($"스테이지 완료 보고 실패: {error}");
+                    onComplete?.Invoke(false, null, error);
+                }
+            ));
+        }
+
+        /// <summary>
+        /// 별점 계산 헬퍼 메서드
+        /// </summary>
+        private int CalculateStars(int score, int optimalScore)
+        {
+            if (optimalScore <= 0) return 0;
+            
+            float percentage = (float)score / optimalScore;
+            
+            if (percentage >= 0.9f) return 3;      // 90% 이상
+            else if (percentage >= 0.7f) return 2; // 70% 이상
+            else if (percentage >= 0.5f) return 1; // 50% 이상
+            else return 0;
+        }
+
+        /// <summary>
+        /// 건강성 체크 (연결 상태 확인용)
+        /// </summary>
+        public void CheckHealth(System.Action<bool> onComplete)
+        {
+            StartCoroutine(CheckHealthCoroutine(onComplete));
+        }
+
+        private IEnumerator CheckHealthCoroutine(System.Action<bool> onComplete)
+        {
+            using (UnityWebRequest request = UnityWebRequest.Get($"{apiBaseUrl}/health"))
+            {
+                request.timeout = 5;
+                yield return request.SendWebRequest();
+                
+                bool isHealthy = request.result == UnityWebRequest.Result.Success;
+                onComplete?.Invoke(isHealthy);
+            }
+        }
+
+        /// <summary>
+        /// 일괄 스테이지 진행도 요청 (기존 메서드 활용)
+        /// </summary>
+        public void GetBatchProgress(System.Action<bool, BatchProgressData, string> onComplete)
+        {
+            StartCoroutine(SendGetRequest<BatchProgressData>(
+                "user/progress/batch",
+                response => {
+                    Debug.Log($"일괄 진행도 수신: {response.total_count}개");
+                    onComplete?.Invoke(true, response, null);
+                },
+                error => {
+                    Debug.LogError($"일괄 진행도 로드 실패: {error}");
+                    onComplete?.Invoke(false, null, error);
+                }
+            ));
+        }
+
+        /// <summary>
+        /// 네트워크 상태 확인
+        /// </summary>
+        public bool IsOnline()
+        {
+            return isOnline;
+        }
+
+        /// <summary>
+        /// 오프라인 큐 크기 반환
+        /// </summary>
+        public int GetOfflineQueueSize()
+        {
+            return offlineQueue.Count;
+        }
+
+        /// <summary>
+        /// 강제 오프라인 큐 처리
+        /// </summary>
+        public void FlushOfflineQueue()
+        {
+            if (isOnline)
+            {
+                ProcessOfflineQueue();
+            }
+        }
+
+        // ========================================
+        // 새로운 API 응답 구조체들 (서버 실제 응답 구조에 맞춤)
+        // ========================================
         
+        [System.Serializable]
+        public class MetadataSyncResponse
+        {
+            public string metadata_version;
+            public MetadataStage[] stages;
+            public int total_count;
+            public string sync_completed_at;
+            public bool not_modified; // 304 응답시에만 존재
+        }
+        
+        [System.Serializable]
+        public class MetadataStage
+        {
+            public int stage_id;
+            public int stage_number;
+            public int difficulty;
+            public int optimal_score;
+            public int? time_limit;
+            public int max_undo_count;
+            public string description;
+            public string[] hints;
+            public int[] available_blocks;
+            public bool is_featured;
+            public string thumbnail_url;
+        }
+        
+        /// <summary>
+        /// MetadataStage 배열을 CompactStageMetadata 배열로 변환
+        /// </summary>
+        private CompactStageMetadata[] ConvertToCompactMetadata(MetadataStage[] serverStages)
+        {
+            if (serverStages == null) return new CompactStageMetadata[0];
+            
+            var compactStages = new CompactStageMetadata[serverStages.Length];
+            for (int i = 0; i < serverStages.Length; i++)
+            {
+                var server = serverStages[i];
+                compactStages[i] = new CompactStageMetadata
+                {
+                    n = server.stage_number,
+                    t = server.stage_number.ToString(), // title은 stage_number를 문자열로
+                    d = server.difficulty,
+                    o = server.optimal_score,
+                    tl = server.time_limit ?? 0,
+                    tu = server.thumbnail_url,
+                    desc = server.description,
+                    ab = server.available_blocks ?? new int[0], // 서버에서 제공하는 available_blocks 사용
+                    muc = server.max_undo_count,
+                    ibs = null, // initial_board_state는 개별 스테이지에서 로드
+                    h = server.hints ?? new string[0]
+                };
+            }
+            
+            Debug.Log($"[HttpApiClient] 메타데이터 변환 완료: {compactStages.Length}개");
+            return compactStages;
+        }
+
         private class PendingRequest
         {
             public string endpoint;

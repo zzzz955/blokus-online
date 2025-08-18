@@ -355,15 +355,8 @@ namespace BlokusUnity.UI
             {
                 Debug.Log($"LoginPanel - 프로필 데이터 수신: {userProfile.username} (최대 스테이지: {userProfile.max_stage_completed})");
                 
-                // UserDataCache에 프로필 정보 저장
-                if (UserDataCache.Instance != null)
-                {
-                    // 프로필 데이터를 UserInfo로 변환
-                    var userInfo = BlokusUnity.Utils.ApiDataConverter.ConvertUserProfile(userProfile);
-                    UserDataCache.Instance.SetUserProfile(userInfo);
-                    
-                    // 🔥 수정: SetUserProfile() 내에서 자동으로 LoadInitialDataFromServer() 호출됨
-                }
+                // 🔥 수정: UserDataCache가 자동으로 OnUserProfileReceived 이벤트를 구독하므로 중복 호출 제거
+                // UserDataCache.OnUserProfileReceived에서 자동으로 SetUserProfile() 및 LoadInitialDataFromServer() 호출됨
                 
                 SetStatusText($"환영합니다, {userProfile.username}님!", MessagePriority.Success);
                 

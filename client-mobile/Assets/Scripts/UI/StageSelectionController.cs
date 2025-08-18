@@ -118,8 +118,8 @@ namespace BlokusUnity.UI
                     // 캐시에서 진행도 가져오기
                     var networkProgress = UserDataCache.Instance.GetStageProgress(stageNumber);
                     
-                    // 언락 상태 확인
-                    bool isUnlocked = StageDataIntegrator.Instance?.IsStageUnlocked(stageNumber) ?? (stageNumber == 1);
+                    // 언락 상태 확인 (CacheManager 기반)
+                    bool isUnlocked = GetStageUnlockedStatus(stageNumber);
                     
                     // 진행도 변환 및 적용
                     var gameProgress = ConvertToGameUserProgress(networkProgress);
@@ -155,19 +155,21 @@ namespace BlokusUnity.UI
                 statusText.text = "스테이지 데이터를 로딩 중...";
             }
             
-            // StageDataIntegrator 이벤트 구독
+            // 이벤트 구독 (CacheManager + UserDataCache)
             SubscribeToEvents();
         }
         
         /// <summary>
-        /// 이벤트 구독
+        /// 이벤트 구독 (CacheManager 기반)
         /// </summary>
         private void SubscribeToEvents()
         {
-            if (StageDataIntegrator.Instance != null)
+            // CacheManager 이벤트 구독
+            if (CacheManager.Instance != null)
             {
-                StageDataIntegrator.Instance.OnStageMetadataLoaded += HandleStageMetadataLoaded;
-                StageDataIntegrator.Instance.OnLoadingError += HandleLoadingError;
+                CacheManager.Instance.OnMetadataLoaded += HandleMetadataLoaded;
+                CacheManager.Instance.OnUserProfileUpdated += HandleUserProfileUpdated;
+                CacheManager.Instance.OnProgressDataUpdated += HandleProgressDataUpdated;
             }
             
             // UserDataCache 진행도 업데이트 이벤트 구독 (캐시 데이터 실시간 반영)
@@ -187,14 +189,16 @@ namespace BlokusUnity.UI
         }
         
         /// <summary>
-        /// 이벤트 구독 해제
+        /// 이벤트 구독 해제 (CacheManager 기반)
         /// </summary>
         private void UnsubscribeFromEvents()
         {
-            if (StageDataIntegrator.Instance != null)
+            // CacheManager 이벤트 구독 해제
+            if (CacheManager.Instance != null)
             {
-                StageDataIntegrator.Instance.OnStageMetadataLoaded -= HandleStageMetadataLoaded;
-                StageDataIntegrator.Instance.OnLoadingError -= HandleLoadingError;
+                CacheManager.Instance.OnMetadataLoaded -= HandleMetadataLoaded;
+                CacheManager.Instance.OnUserProfileUpdated -= HandleUserProfileUpdated;
+                CacheManager.Instance.OnProgressDataUpdated -= HandleProgressDataUpdated;
             }
             
             // UserDataCache 이벤트 구독 해제
@@ -231,15 +235,40 @@ namespace BlokusUnity.UI
                 refreshButton.interactable = false;
             }
             
-            // StageDataIntegrator를 통한 메타데이터 로딩
-            if (StageDataIntegrator.Instance != null)
+            // CacheManager를 통한 메타데이터 로딩
+            if (CacheManager.Instance != null)
             {
-                StageDataIntegrator.Instance.LoadStageMetadata();
+                StartCoroutine(LoadStageDataWithCacheManager());
             }
             else
             {
-                Debug.LogError("[StageSelection] StageDataIntegrator가 없습니다!");
-                HandleLoadingError("StageDataIntegrator를 찾을 수 없습니다.");
+                Debug.LogError("[StageSelection] CacheManager가 없습니다!");
+                HandleLoadingError("CacheManager를 찾을 수 없습니다.");
+            }
+        }
+        
+        /// <summary>
+        /// CacheManager를 통한 메타데이터 로딩 코루틴
+        /// </summary>
+        private System.Collections.IEnumerator LoadStageDataWithCacheManager()
+        {
+            Debug.Log("[StageSelection] CacheManager 기반 메타데이터 로딩 시작");
+            
+            // CacheManager를 통해 메타데이터 로딩 보장
+            yield return StartCoroutine(CacheManager.Instance.EnsureMetadataLoaded());
+            
+            // UserDataCache에서 메타데이터 가져오기 (CacheManager 동기화 후)
+            var metadata = UserDataCache.Instance?.GetStageMetadata();
+            
+            if (metadata != null && metadata.Length > 0)
+            {
+                Debug.Log($"[StageSelection] CacheManager 메타데이터 로딩 성공: {metadata.Length}개");
+                HandleStageMetadataLoaded(metadata);
+            }
+            else
+            {
+                Debug.LogError("[StageSelection] CacheManager 메타데이터 로딩 실패");
+                HandleLoadingError("스테이지 메타데이터를 로드할 수 없습니다.");
             }
         }
         
@@ -341,8 +370,8 @@ namespace BlokusUnity.UI
                 return;
             }
             
-            // 언락 상태 확인
-            bool isUnlocked = StageDataIntegrator.Instance?.IsStageUnlocked(stageInfo.n) ?? (stageInfo.n == 1);
+            // 언락 상태 확인 (CacheManager 기반)
+            bool isUnlocked = GetStageUnlockedStatus(stageInfo.n);
             
             // 사용자 진행도 정보 가져오기 (캐시에서)
             Debug.Log($"[StageSelection] 스테이지 {stageInfo.n} 진행도 요청 중...");
@@ -409,8 +438,8 @@ namespace BlokusUnity.UI
             var stageButton = stageButtons.Find(btn => btn.StageNumber == stageNumber);
             if (stageButton != null)
             {
-                // 언락 상태 확인
-                bool isUnlocked = StageDataIntegrator.Instance?.IsStageUnlocked(stageNumber) ?? (stageNumber == 1);
+                // 언락 상태 확인 (CacheManager 기반)
+                bool isUnlocked = GetStageUnlockedStatus(stageNumber);
                 
                 // 캐시에서 최신 진행도 가져와서 업데이트
                 var networkProgress = UserDataCache.Instance?.GetStageProgress(stageNumber);
@@ -435,8 +464,8 @@ namespace BlokusUnity.UI
             {
                 Debug.Log($"[StageSelection] 스테이지 {progress.stageNumber} 버튼 찾음!");
                 
-                // 언락 상태 확인
-                bool isUnlocked = StageDataIntegrator.Instance?.IsStageUnlocked(progress.stageNumber) ?? (progress.stageNumber == 1);
+                // 언락 상태 확인 (CacheManager 기반)
+                bool isUnlocked = GetStageUnlockedStatus(progress.stageNumber);
                 
                 // 네트워크 진행도를 게임 진행도로 변환
                 var gameProgress = ConvertToGameUserProgress(progress);
@@ -457,6 +486,50 @@ namespace BlokusUnity.UI
                     Debug.Log($"[StageSelection] 현재 버튼들: {buttonNumbers}{(stageButtons.Count > 10 ? "..." : "")}");
                 }
             }
+        }
+        
+        /// <summary>
+        /// CacheManager 메타데이터 로딩 완료 이벤트 처리
+        /// </summary>
+        private void HandleMetadataLoaded()
+        {
+            Debug.Log("[StageSelection] CacheManager 메타데이터 로드 완료 이벤트 수신");
+            
+            // UserDataCache에서 메타데이터 가져와서 UI 업데이트
+            var metadata = UserDataCache.Instance?.GetStageMetadata();
+            if (metadata != null && metadata.Length > 0)
+            {
+                HandleStageMetadataLoaded(metadata);
+            }
+            else
+            {
+                Debug.LogWarning("[StageSelection] CacheManager 메타데이터 로드 완료했지만 UserDataCache에서 데이터 없음");
+            }
+        }
+        
+        /// <summary>
+        /// CacheManager 사용자 프로필 업데이트 이벤트 처리
+        /// </summary>
+        private void HandleUserProfileUpdated(UserProfileData profileData)
+        {
+            if (profileData != null)
+            {
+                Debug.Log($"[StageSelection] CacheManager 프로필 업데이트: max_stage_completed={profileData.maxStageCompleted}");
+                
+                // 모든 스테이지 버튼의 언락 상태 새로고침
+                RefreshAllButtonsFromCache();
+            }
+        }
+        
+        /// <summary>
+        /// CacheManager 진행도 데이터 업데이트 이벤트 처리
+        /// </summary>
+        private void HandleProgressDataUpdated(int stageNumber)
+        {
+            Debug.Log($"[StageSelection] CacheManager 진행도 업데이트: 스테이지 {stageNumber}");
+            
+            // 특정 스테이지 버튼 업데이트
+            RefreshStageProgress(stageNumber);
         }
         
         /// <summary>
@@ -506,6 +579,38 @@ namespace BlokusUnity.UI
             
             Debug.Log($"[StageSelection] 스테이지 {gameProgress.stageNumber} 진행도 변환: 완료={gameProgress.isCompleted}, 별={gameProgress.starsEarned}");
             return gameProgress;
+        }
+        
+        /// <summary>
+        /// 🔥 개선: CacheManager 기반 언락 상태 확인
+        /// </summary>
+        private bool GetStageUnlockedStatus(int stageNumber)
+        {
+            if (stageNumber <= 1)
+            {
+                return true; // 첫 번째 스테이지는 항상 언락
+            }
+
+            // CacheManager 우선 사용
+            if (CacheManager.Instance != null)
+            {
+                var profile = CacheManager.Instance.GetUserProfile();
+                if (profile != null)
+                {
+                    bool isUnlocked = stageNumber <= profile.maxStageCompleted + 1;
+                    return isUnlocked;
+                }
+            }
+
+            // Fallback: UserDataCache 직접 사용
+            if (UserDataCache.Instance != null && UserDataCache.Instance.IsLoggedIn())
+            {
+                int maxStageCompleted = UserDataCache.Instance.GetMaxStageCompleted();
+                bool isUnlocked = stageNumber <= maxStageCompleted + 1;
+                return isUnlocked;
+            }
+
+            return false; // 로그인되지 않은 경우 첫 스테이지만 언락
         }
     }
 }

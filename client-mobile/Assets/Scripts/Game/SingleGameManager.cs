@@ -386,13 +386,6 @@ namespace BlokusUnity.Game
                 Debug.LogWarning("[SingleGame] StageDataManager를 찾을 수 없어 완료 보고를 건너뜁니다.");
             }
             
-            // 추가적으로 StageDataIntegrator도 호출 (기존 연동 유지)
-            var integrator = BlokusUnity.Network.StageDataIntegrator.Instance;
-            if (integrator != null)
-            {
-                integrator.ReportStageCompletion(stageNumber, score, ElapsedSeconds, completed);
-                Debug.Log($"[SingleGame] StageDataIntegrator 백업 호출 완료");
-            }
         }
 
         /// <summary>
