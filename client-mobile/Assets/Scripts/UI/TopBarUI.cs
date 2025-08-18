@@ -13,6 +13,8 @@ namespace BlokusUnity.UI
     {
         [Header("Refs")]
         [SerializeField] private TMP_Text timerText;       // 또는 Text
+        [SerializeField] private TMP_Text scoreText;       // 현재 점수 표시
+        [SerializeField] private TMP_Text stageNameText;   // 스테이지 이름 표시
         [SerializeField] private Button undoButton;
         [SerializeField] private TMP_Text undoCountText;   // 또는 Text
         [SerializeField] private Button exitButton;
@@ -20,7 +22,11 @@ namespace BlokusUnity.UI
 
         [Header("Config")]
         [SerializeField] private string mainSceneName = "MainScene";
-        // showExitConfirm 필드 제거됨 (사용되지 않음)
+        [SerializeField] private string scoreFormat = "점수: {0}";
+        [SerializeField] private bool showExitConfirm = true; // Exit 확인 모달 표시 여부
+        
+        // 점수 관련 상태
+        private int currentScore = 0;
 
         private void Awake()
         {
@@ -63,16 +69,29 @@ namespace BlokusUnity.UI
             var gm = BlokusUnity.Game.SingleGameManager.Instance;
             if (gm != null)
             {
+                // Undo 이벤트 구독
                 gm.OnUndoCountChanged -= RefreshUndo;
                 gm.OnUndoCountChanged += RefreshUndo;
                 RefreshUndo(gm.RemainingUndo);
+                
+                // 점수 이벤트 구독
+                gm.OnScoreChanged -= OnScoreChanged;
+                gm.OnScoreChanged += OnScoreChanged;
+                
+                // 초기 UI 설정
+                UpdateScoreDisplay(0);
+                UpdateStageDisplay();
             }
         }
 
         private void OnDisable()
         {
             var gm = BlokusUnity.Game.SingleGameManager.Instance;
-            if (gm != null) gm.OnUndoCountChanged -= RefreshUndo;
+            if (gm != null)
+            {
+                gm.OnUndoCountChanged -= RefreshUndo;
+                gm.OnScoreChanged -= OnScoreChanged;
+            }
         }
 
         private void Update()
@@ -126,9 +145,75 @@ private void OnClickUndo()
 }
 
 
+        /// <summary>
+        /// 점수 변경 이벤트 핸들러
+        /// </summary>
+        private void OnScoreChanged(int scoreChange, string reason)
+        {
+            currentScore += scoreChange;
+            UpdateScoreDisplay(currentScore);
+            
+            Debug.Log($"[TopBarUI] 점수 변경: {scoreChange} ({reason}) - 총 점수: {currentScore}");
+        }
+        
+        /// <summary>
+        /// 점수 표시 업데이트
+        /// </summary>
+        private void UpdateScoreDisplay(int score)
+        {
+            if (scoreText != null)
+            {
+                scoreText.text = string.Format(scoreFormat, score);
+            }
+        }
+        
+        /// <summary>
+        /// 스테이지 정보 표시 업데이트
+        /// </summary>
+        private void UpdateStageDisplay()
+        {
+            if (stageNameText != null)
+            {
+                var stageData = SingleGameManager.StageManager?.GetCurrentStageData();
+                if (stageData != null)
+                {
+                    stageNameText.text = $"스테이지 {stageData.stage_number}";
+                }
+                else
+                {
+                    stageNameText.text = $"스테이지 {SingleGameManager.CurrentStage}";
+                }
+            }
+        }
+
         private void OnClickExit()
         {
-            // TODO: showExitConfirm == true일 때 확인 팝업 연결
+            if (showExitConfirm && confirmationModal != null)
+            {
+                // 확인 모달 표시
+                confirmationModal.ShowExitConfirmation(
+                    onConfirm: () =>
+                    {
+                        ExitToMainScene();
+                    },
+                    onCancel: () =>
+                    {
+                        Debug.Log("[TopBarUI] 게임 종료 취소");
+                    }
+                );
+            }
+            else
+            {
+                // 바로 종료
+                ExitToMainScene();
+            }
+        }
+        
+        /// <summary>
+        /// MainScene으로 이동
+        /// </summary>
+        private void ExitToMainScene()
+        {
             var gm = SingleGameManager.Instance;
             if (gm != null) gm.OnExitRequested();
 

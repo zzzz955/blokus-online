@@ -135,5 +135,18 @@ namespace BlokusUnity.UI
                 onCancel
             );
         }
+        
+        /// <summary>
+        /// 게임 종료 확인 모달을 위한 편의 메서드
+        /// </summary>
+        public void ShowExitConfirmation(Action onConfirm, Action onCancel = null)
+        {
+            Show(
+                "게임 종료",
+                "게임을 종료하고 스테이지 목록으로 돌아가시겠습니까?\n현재 진행상황이 저장됩니다.",
+                onConfirm,
+                onCancel
+            );
+        }
     }
 }

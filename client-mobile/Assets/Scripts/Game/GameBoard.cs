@@ -22,7 +22,7 @@ namespace BlokusUnity.Game
         [SerializeField] private RectTransform cellParent;              // GridContainer(必: RectTransform)
 
         [Header("보드 색상")]
-        [SerializeField] private Color emptyColor = Color.white;
+        [SerializeField] private Color emptyColor = new Color(0.9f, 0.9f, 0.9f, 1f); // 밝은 회색
         [SerializeField] private Color previewColor = Color.yellow;
         [SerializeField] private Color invalidColor = Color.red;
         [SerializeField] private Color blueColor = Color.blue;

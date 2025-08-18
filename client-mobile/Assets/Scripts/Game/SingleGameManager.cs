@@ -26,6 +26,7 @@ namespace BlokusUnity.Game
         [Header("References")]
         [SerializeField] private GameBoard gameBoard;
         [SerializeField] private BlockPalette blockPalette;
+        [SerializeField] private BlokusUnity.UI.Game.GameResultModal gameResultModal;
 
         [Header("Undo Settings")]
         [SerializeField] private int maxUndo = 3;
@@ -64,6 +65,7 @@ namespace BlokusUnity.Game
 
             if (gameBoard == null) gameBoard = FindObjectOfType<GameBoard>();
             if (blockPalette == null) blockPalette = FindObjectOfType<BlockPalette>();
+            if (gameResultModal == null) gameResultModal = FindObjectOfType<BlokusUnity.UI.Game.GameResultModal>();
 
             if (StageManager == null)
                 StageManager = FindObjectOfType<BlokusUnity.Data.StageDataManager>();
@@ -574,14 +576,77 @@ namespace BlokusUnity.Game
         {
             var scores = logic.CalculateScores();
             int myScore = scores.ContainsKey(playerColor) ? scores[playerColor] : 0;
+            int optimalScore = payload?.ParScore ?? 0;
+            float elapsedTime = ElapsedSeconds;
+            bool isSuccess = true; // 게임 로직에 의한 자동 종료는 성공으로 간주
             
-            Debug.Log($"[SingleGame] 게임 종료: {reason}, 최종 점수: {myScore}");
+            Debug.Log($"[SingleGame] 게임 종료: {reason}, 최종 점수: {myScore}/{optimalScore}, 시간: {elapsedTime}초");
             
             // 스테이지 완료 보고 (성공)
-            ReportStageCompletion(myScore, true);
+            ReportStageCompletion(myScore, isSuccess);
             
-            // 게임 종료 이벤트 발생
+            // 게임 결과 모달 표시
+            ShowGameResult(myScore, optimalScore, elapsedTime, isSuccess);
+            
+            // 레거시 이벤트 발생 (기존 코드 호환성)
             OnGameFinished?.Invoke(myScore);
+        }
+
+        /// <summary>
+        /// 게임 결과 모달 표시
+        /// </summary>
+        private void ShowGameResult(int score, int optimalScore, float elapsedTime, bool isSuccess)
+        {
+            if (gameResultModal != null)
+            {
+                gameResultModal.ShowResult(score, optimalScore, elapsedTime, isSuccess);
+            }
+            else
+            {
+                Debug.LogWarning("[SingleGameManager] GameResultModal이 연결되지 않았습니다. Inspector에서 설정해주세요.");
+                // 폴백: 간단한 로그만 출력
+                Debug.Log($"[SingleGameManager] 게임 결과 - 점수: {score}/{optimalScore}, 시간: {elapsedTime:F1}초, 성공: {isSuccess}");
+            }
+        }
+
+        /// <summary>
+        /// 스테이지 진행도 업데이트 (GameResultModal에서 호출)
+        /// </summary>
+        public void UpdateStageProgress(int stageNumber, bool isCompleted, int stars, int score, float elapsedTime)
+        {
+            Debug.Log($"[SingleGameManager] 스테이지 진행도 업데이트 요청 - 스테이지: {stageNumber}, 완료: {isCompleted}, 별: {stars}, 점수: {score}, 시간: {elapsedTime:F1}초");
+            
+            // StageDataManager를 통한 진행도 업데이트
+            if (StageManager != null)
+            {
+                if (isCompleted)
+                {
+                    StageManager.CompleteStage(stageNumber, score, stars, Mathf.FloorToInt(elapsedTime));
+                }
+                else
+                {
+                    StageManager.FailStage(stageNumber);
+                }
+                
+                Debug.Log($"[SingleGameManager] StageDataManager를 통한 진행도 업데이트 완료");
+            }
+            else
+            {
+                Debug.LogWarning("[SingleGameManager] StageDataManager를 찾을 수 없어 진행도 업데이트를 건너뜁니다.");
+            }
+        }
+
+        /// <summary>
+        /// 게임 완료 시 정리 작업 (GameResultModal에서 호출)
+        /// </summary>
+        public void OnGameCompleted()
+        {
+            Debug.Log("[SingleGameManager] 게임 완료 정리 시작");
+            
+            // 현재는 특별한 정리 작업 없음
+            // 필요시 리소스 정리, 네트워크 연결 해제 등 추가 가능
+            
+            Debug.Log("[SingleGameManager] 게임 완료 정리 완료");
         }
 
         // ===== Helpers =====
