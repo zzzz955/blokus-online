@@ -4,7 +4,7 @@ using TMPro;
 
 namespace BlokusUnity.UI
 {
-    public class ModeSelectionPanel : BaseUIPanel
+    public class ModeSelectionPanel : BlokusUnity.UI.PanelBase
     {
         [Header("UI 컴포넌트")]
         [SerializeField] private Button singlePlayerButton;

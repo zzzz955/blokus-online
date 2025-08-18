@@ -13,16 +13,16 @@ namespace BlokusUnity.UI
     public class UIManager : MonoBehaviour
     {
         [Header("UI Panels")]
-        [SerializeField] private BaseUIPanel loginPanel;
-        [SerializeField] private BaseUIPanel modeSelectionPanel;
-        [SerializeField] private BaseUIPanel stageSelectPanel;
-        [SerializeField] private BaseUIPanel lobbyPanel;
-        [SerializeField] private BaseUIPanel gameRoomPanel;
-        [SerializeField] private BaseUIPanel loadingPanel;
+        [SerializeField] private BlokusUnity.UI.PanelBase loginPanel;
+        [SerializeField] private BlokusUnity.UI.PanelBase modeSelectionPanel;
+        [SerializeField] private BlokusUnity.UI.PanelBase stageSelectPanel;
+        [SerializeField] private BlokusUnity.UI.PanelBase lobbyPanel;
+        [SerializeField] private BlokusUnity.UI.PanelBase gameRoomPanel;
+        [SerializeField] private BlokusUnity.UI.PanelBase loadingPanel;
 
-        private Dictionary<UIState, BaseUIPanel> panels;
+        private Dictionary<UIState, BlokusUnity.UI.PanelBase> panels;
         private UIState currentState = (UIState)(-1); // 초기값을 무효한 값으로 설정
-        private BaseUIPanel currentPanel;
+        private BlokusUnity.UI.PanelBase currentPanel;
 
         public static UIManager Instance { get; private set; }
 
@@ -66,7 +66,7 @@ namespace BlokusUnity.UI
                 PlayerPrefs.Save();
                 
                 // 로그인 상태 확인 후 적절한 패널 표시
-                if (UserDataCache.Instance != null && UserDataCache.Instance.IsLoggedIn())
+                if (BlokusUnity.Features.Single.UserDataCache.Instance != null && BlokusUnity.Features.Single.UserDataCache.Instance.IsLoggedIn())
                 {
                     Debug.Log("Exit으로 돌아옴 + 로그인됨 - 스테이지 선택 패널 표시");
                     ShowPanel(UIState.StageSelect, false);
@@ -94,7 +94,7 @@ namespace BlokusUnity.UI
         {
             Debug.Log("=== InitializePanels 시작 ===");
             
-            panels = new Dictionary<UIState, BaseUIPanel>
+            panels = new Dictionary<UIState, BlokusUnity.UI.PanelBase>
             {
                 { UIState.Login, loginPanel },
                 { UIState.ModeSelection, modeSelectionPanel },
@@ -144,7 +144,7 @@ namespace BlokusUnity.UI
             {
                 if (kvp.Value != null && kvp.Key != UIState.Login)
                 {
-                    kvp.Value.Hide(false);
+                    kvp.Value.Hide();
                     Debug.Log($"{kvp.Key} 패널 숨기기");
                 }
                 else if (kvp.Key == UIState.Login && kvp.Value != null)
@@ -195,12 +195,12 @@ namespace BlokusUnity.UI
             if (currentPanel != null)
             {
                 Debug.Log($"현재 패널 숨기기: {currentPanel.name}");
-                currentPanel.Hide(animated);
+                currentPanel.Hide();
             }
 
             // 새 패널 표시
             Debug.Log($"panels 딕셔너리에서 {state} 찾는 중...");
-            if (panels.TryGetValue(state, out BaseUIPanel newPanel))
+            if (panels.TryGetValue(state, out BlokusUnity.UI.PanelBase newPanel))
             {
                 Debug.Log($"패널 딕셔너리에서 찾음: {newPanel != null}");
                 
@@ -225,7 +225,7 @@ namespace BlokusUnity.UI
                 currentState = state;
                 
                 Debug.Log("패널 Show() 호출 직전");
-                currentPanel.Show(animated);
+                currentPanel.Show();
                 Debug.Log("패널 Show() 호출 완료");
 
                 Debug.Log($"UI State Changed: {state}");
@@ -284,10 +284,10 @@ namespace BlokusUnity.UI
         public void OnStageSelected(int stageNumber)
         {
             // 스테이지 데이터 매니저를 통해 스테이지 선택
-            if (StageDataManager.Instance != null)
+            if (BlokusUnity.Features.Single.StageDataManager.Instance != null)
             {
-                StageDataManager.Instance.SelectStage(stageNumber);
-                StageDataManager.Instance.PassDataToSingleGameManager();
+                BlokusUnity.Features.Single.StageDataManager.Instance.SelectStage(stageNumber);
+                BlokusUnity.Features.Single.StageDataManager.Instance.PassDataToSingleGameManager();
             }
 
             Debug.Log($"스테이지 {stageNumber} 선택됨");
@@ -329,7 +329,7 @@ namespace BlokusUnity.UI
 
             // 로딩 종료
             if (currentPanel != null && currentPanel == panels[UIState.Loading])
-                currentPanel.Hide(false);
+                currentPanel.Hide();
 
             // 필요시 게임 HUD 패널 표시(게임플레이용 패널이 등록돼있다면)
             // ShowPanel(UIState.Gameplay, false);
@@ -359,7 +359,7 @@ namespace BlokusUnity.UI
             // UI 패널들 숨기기 (게임 플레이 중)
             if (currentPanel != null)
             {
-                currentPanel.Hide(false);
+                currentPanel.Hide();
             }
 
             Debug.Log("Multi Gameplay Scene Loaded");

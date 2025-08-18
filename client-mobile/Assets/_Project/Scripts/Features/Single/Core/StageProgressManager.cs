@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using BlokusUnity.Data;
 
-namespace BlokusUnity.Game
+namespace BlokusUnity.Features.Single
 {
     /// <summary>
     /// 스테이지 진행도 및 언락 시스템 관리
@@ -25,24 +25,78 @@ namespace BlokusUnity.Game
         // 싱글톤 패턴
         public static StageProgressManager Instance { get; private set; }
         
+        // Migration Plan: Initialization state and dependencies
+        private bool isInitialized = false;
+        private UserDataCache userDataCache;
+        private StageDataManager stageDataManager;
+
         void Awake()
         {
+            // Migration Plan: Remove DontDestroyOnLoad - SingleCore scene management
             if (Instance == null)
             {
                 Instance = this;
-                
-                // 루트 GameObject로 이동 (DontDestroyOnLoad 적용을 위해)
-                transform.SetParent(null);
-                DontDestroyOnLoad(gameObject);
-                
                 stageProgressCache = new Dictionary<int, UserStageProgress>();
-                InitializeNetworkEvents();
-                Debug.Log("StageProgressManager 초기화 완료 - DontDestroyOnLoad 적용됨");
+                Debug.Log("[StageProgressManager] Awake - Ready for initialization");
             }
             else
             {
+                Debug.Log("[StageProgressManager] Duplicate instance destroyed");
                 Destroy(gameObject);
             }
+        }
+
+        /// <summary>
+        /// Initialize StageProgressManager (Migration Plan)
+        /// </summary>
+        public void Initialize()
+        {
+            if (isInitialized) return;
+            
+            InitializeNetworkEvents();
+            isInitialized = true;
+            
+            Debug.Log("[StageProgressManager] Initialized for SingleCore");
+        }
+
+        /// <summary>
+        /// Set UserDataCache dependency (Migration Plan)
+        /// </summary>
+        public void SetUserDataCache(UserDataCache cache)
+        {
+            userDataCache = cache;
+            Debug.Log("[StageProgressManager] UserDataCache dependency set");
+        }
+
+        /// <summary>
+        /// Set StageDataManager dependency (Migration Plan)
+        /// </summary>
+        public void SetStageDataManager(StageDataManager manager)
+        {
+            stageDataManager = manager;
+            Debug.Log("[StageProgressManager] StageDataManager dependency set");
+        }
+
+        /// <summary>
+        /// Check if initialized (Migration Plan)
+        /// </summary>
+        public bool IsInitialized => isInitialized;
+
+        /// <summary>
+        /// Cleanup for scene unload (Migration Plan)
+        /// </summary>
+        public void Cleanup()
+        {
+            CleanupNetworkEvents();
+            isInitialized = false;
+            
+            Debug.Log("[StageProgressManager] Cleaned up for scene unload");
+        }
+
+        private void CleanupNetworkEvents()
+        {
+            // Cleanup network event subscriptions
+            // Implementation depends on existing network event structure
         }
         
         /// <summary>
@@ -294,7 +348,7 @@ namespace BlokusUnity.Game
             Debug.Log($"[StageProgressManager] 네트워크 연결 없음 - 로컬 기본 진행도 사용 ({startStage}-{endStage})");
             
             // 기본 진행도 생성하여 캐시에 저장
-            if (BlokusUnity.Data.UserDataCache.Instance != null)
+            if (BlokusUnity.Features.Single.UserDataCache.Instance != null)
             {
                 for (int stageNum = startStage; stageNum <= endStage; stageNum++)
                 {
@@ -311,10 +365,10 @@ namespace BlokusUnity.Game
                     };
                     
                     // 기존 진행도가 없을 때만 기본값 설정
-                    var existingProgress = BlokusUnity.Data.UserDataCache.Instance.GetStageProgress(stageNum);
+                    var existingProgress = BlokusUnity.Features.Single.UserDataCache.Instance.GetStageProgress(stageNum);
                     if (existingProgress.totalAttempts == 0) // 새로운 스테이지
                     {
-                        BlokusUnity.Data.UserDataCache.Instance.SetStageProgress(defaultProgress);
+                        BlokusUnity.Features.Single.UserDataCache.Instance.SetStageProgress(defaultProgress);
                     }
                 }
                 

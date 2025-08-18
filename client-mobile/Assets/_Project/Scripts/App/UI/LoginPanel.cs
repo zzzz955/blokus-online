@@ -7,7 +7,7 @@ using BlokusUnity.UI.Messages;
 
 namespace BlokusUnity.UI
 {
-    public class LoginPanel : BaseUIPanel
+    public class LoginPanel : BlokusUnity.UI.PanelBase
     {
         [Header("UI 컴포넌트")]
         [SerializeField] private Button loginButton;
@@ -35,7 +35,7 @@ namespace BlokusUnity.UI
         {
             base.Awake();
             // LoginPanel은 게임의 첫 진입점이므로 시작시 활성화
-            startActive = true;
+            // startActive 제거됨 - PanelBase에서 더 이상 사용하지 않음
             Debug.Log("LoginPanel startActive = true로 설정");
         }
         
@@ -324,10 +324,10 @@ namespace BlokusUnity.UI
                 Debug.Log($"LoginPanel - 로그인 성공: {authUserData.user.username}");
                 
                 // 🔥 수정: 로그인은 순수 인증만 처리, 프로필은 별도 API로 로드
-                if (UserDataCache.Instance != null)
+                if (BlokusUnity.Features.Single.UserDataCache.Instance != null)
                 {
                     // 기본 로그인 정보만 저장 (토큰만)
-                    UserDataCache.Instance.SetAuthToken(authUserData.token, authUserData.user.username);
+                    BlokusUnity.Features.Single.UserDataCache.Instance.SetAuthToken(authUserData.token, authUserData.user.username);
                     
                     // 🔥 추가: 로그인 후 즉시 프로필 API 호출
                     if (HttpApiClient.Instance != null)
@@ -388,9 +388,9 @@ namespace BlokusUnity.UI
         /// </summary>
         private void CheckCachedUser()
         {
-            if (UserDataCache.Instance != null && UserDataCache.Instance.IsLoggedIn())
+            if (BlokusUnity.Features.Single.UserDataCache.Instance != null && BlokusUnity.Features.Single.UserDataCache.Instance.IsLoggedIn())
             {
-                var cachedUser = UserDataCache.Instance.GetCurrentUser();
+                var cachedUser = BlokusUnity.Features.Single.UserDataCache.Instance.GetCurrentUser();
                 Debug.Log($"캐시된 사용자 발견: {cachedUser.username}");
                 
                 SetStatusText($"이전 로그인: {cachedUser.username}", MessagePriority.Info);
@@ -443,7 +443,7 @@ namespace BlokusUnity.UI
             if (SystemMessageManager.Instance != null)
             {
                 float duration = GetDurationByPriority(priority);
-                SystemMessageManager.Instance.ShowToast(text, priority, duration);
+                SystemMessageManager.ShowToast(text, priority, duration);
             }
             else
             {

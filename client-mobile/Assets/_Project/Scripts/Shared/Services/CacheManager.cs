@@ -95,7 +95,7 @@ namespace BlokusUnity.Data
             // 1. 토큰 유효성 체크 (HttpApiClient 대기)
             yield return new WaitUntil(() => HttpApiClient.Instance != null);
             
-            if (!UserDataCache.Instance.IsLoggedIn())
+            if (!BlokusUnity.Features.Single.UserDataCache.Instance.IsLoggedIn())
             {
                 if (debugMode)
                     Debug.Log("[CacheManager] 로그인되지 않음 - 동기화 건너뜀");

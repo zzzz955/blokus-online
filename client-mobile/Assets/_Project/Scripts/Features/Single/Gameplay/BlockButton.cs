@@ -22,7 +22,7 @@ namespace BlokusUnity.Game
         [SerializeField] private bool useSpriteThumbnails = false; // ← 기본 off(그리드로 그림)
 
         [Header("Skin (optional)")]
-        [SerializeField] private BlockSkin skin; // 없으면 기본 색
+        [SerializeField] private BlokusUnity.Features.Single.Skins.BlockSkin skin; // 없으면 기본 색
 
         public BlockType Type { get; private set; }
         public PlayerColor Player { get; private set; }

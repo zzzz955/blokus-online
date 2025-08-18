@@ -479,10 +479,10 @@ namespace BlokusUnity.Network
                     {
                         var compactStages = ConvertToCompactMetadata(response.stages);
 
-                        // UserDataCache에 직접 저장
-                        if (UserDataCache.Instance != null)
+                        // BlokusUnity.Features.Single.UserDataCache에 직접 저장
+                        if (BlokusUnity.Features.Single.UserDataCache.Instance != null)
                         {
-                            UserDataCache.Instance.SetStageMetadata(compactStages);
+                            BlokusUnity.Features.Single.UserDataCache.Instance.SetStageMetadata(compactStages);
                             Debug.Log($"[HttpApiClient] 메타데이터 캐시에 저장 완료: {compactStages.Length}개");
                         }
 

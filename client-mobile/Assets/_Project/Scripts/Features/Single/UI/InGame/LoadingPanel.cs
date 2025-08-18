@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace BlokusUnity.UI
 {
-    public class LoadingPanel : BaseUIPanel
+    public class LoadingPanel : BlokusUnity.UI.PanelBase
     {
         protected override void Start()
         {

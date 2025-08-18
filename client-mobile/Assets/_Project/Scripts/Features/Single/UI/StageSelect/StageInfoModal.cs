@@ -5,7 +5,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using BlokusUnity.Data;
-using UserStageProgress = BlokusUnity.Game.UserStageProgress;
+using UserStageProgress = BlokusUnity.Features.Single.UserStageProgress;
 using StageData = BlokusUnity.Data.StageData;
 using BlokusUnity.Game;
 using BlokusUnity.Network;
@@ -48,7 +48,7 @@ namespace BlokusUnity.UI
         [SerializeField] private BlokusUnity.Game.BlockButton blockButtonPrefab;
         // 모달에서는 선택할 필요가 없으므로 미리보기용 플레이어 컬러(색상만 사용)
         [SerializeField] private BlokusUnity.Common.PlayerColor previewPlayerColor = BlokusUnity.Common.PlayerColor.Blue;
-        [SerializeField] private BlockSkin previewSkin;
+        [SerializeField] private BlokusUnity.Features.Single.Skins.BlockSkin previewSkin;
 
         [Header("색상 설정 (Fallback)")]
         [SerializeField] private Color activeStarColor = Color.yellow;
@@ -595,15 +595,15 @@ namespace BlokusUnity.UI
             // 현재 스테이지 번호를 임시 변수에 저장 (HideModal()에서 초기화되기 전에)
             int selectedStageNumber = currentStageNumber;
 
-            // 1. StageDataManager에 스테이지 데이터 설정 (가장 중요!)
-            if (StageDataManager.Instance != null)
+            // 1. BlokusUnity.Features.Single.StageDataManager에 스테이지 데이터 설정 (가장 중요!)
+            if (BlokusUnity.Features.Single.StageDataManager.Instance != null)
             {
-                Debug.Log($"[StageInfoModal] StageDataManager에 스테이지 {selectedStageNumber} 선택 설정");
-                StageDataManager.Instance.SelectStage(selectedStageNumber);
+                Debug.Log($"[StageInfoModal] BlokusUnity.Features.Single.StageDataManager에 스테이지 {selectedStageNumber} 선택 설정");
+                BlokusUnity.Features.Single.StageDataManager.Instance.SelectStage(selectedStageNumber);
             }
             else
             {
-                Debug.LogError("[StageInfoModal] StageDataManager.Instance가 null입니다!");
+                Debug.LogError("[StageInfoModal] BlokusUnity.Features.Single.StageDataManager.Instance가 null입니다!");
             }
 
             // 2. 모달 숨기기 (currentStageNumber가 0으로 초기화됨)

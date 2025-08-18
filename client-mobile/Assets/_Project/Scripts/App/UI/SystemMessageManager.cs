@@ -233,22 +233,33 @@ namespace BlokusUnity.UI.Messages
         // ========================================
 
         /// <summary>
-        /// Toast 메시지 표시
+        /// Toast 메시지 표시 (Migration Plan: 간단한 API)
         /// </summary>
-        public void ShowToast(string message, MessagePriority priority = MessagePriority.Info, float duration = 3f)
+        public static void ShowToast(string message, MessagePriority priority = MessagePriority.Info, float duration = 3f)
+        {
+            if (Instance == null)
+            {
+                Debug.LogError("SystemMessageManager.ShowToast() called but Instance is null!");
+                return;
+            }
+            
+            Instance.ShowToastInternal(message, priority, duration);
+        }
+
+        private void ShowToastInternal(string message, MessagePriority priority, float duration)
         {
             // 개발용 메시지 필터링
             if (priority == MessagePriority.Debug && !enableDebugMessages)
                 return;
 
             MessageData messageData = MessageData.CreateToast(message, priority, duration);
-            ShowToast(messageData);
+            ShowToastInternal(messageData);
         }
 
         /// <summary>
         /// Toast 메시지 표시 (고급)
         /// </summary>
-        public void ShowToast(MessageData messageData)
+        private void ShowToastInternal(MessageData messageData)
         {
             // 최대 Toast 개수 제한
             if (activeToasts.Count >= maxToastCount)

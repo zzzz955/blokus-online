@@ -40,7 +40,7 @@ namespace BlokusUnity.Game
         [SerializeField] private Sprite uiFallbackSprite;
 
         [Header("스킨")]
-        [SerializeField] private BlockSkin skin;
+        [SerializeField] private BlokusUnity.Features.Single.Skins.BlockSkin skin;
 
         // 내부 상태
         private GameLogic gameLogic;

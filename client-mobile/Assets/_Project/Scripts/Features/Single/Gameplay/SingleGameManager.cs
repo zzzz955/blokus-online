@@ -15,8 +15,8 @@ namespace BlokusUnity.Game
         // ===== Singleton & Legacy statics =====
         public static SingleGameManager Instance { get; private set; }
         public static int CurrentStage { get; private set; } = 0;
-        public static BlokusUnity.Data.StageDataManager StageManager { get; private set; }
-        public static void SetStageContext(int stageNumber, BlokusUnity.Data.StageDataManager stageManager)
+        public static BlokusUnity.Features.Single.StageDataManager StageManager { get; private set; }
+        public static void SetStageContext(int stageNumber, BlokusUnity.Features.Single.StageDataManager stageManager)
         {
             CurrentStage = stageNumber;
             StageManager = stageManager;
@@ -68,7 +68,7 @@ namespace BlokusUnity.Game
             if (gameResultModal == null) gameResultModal = FindObjectOfType<BlokusUnity.UI.Game.GameResultModal>();
 
             if (StageManager == null)
-                StageManager = FindObjectOfType<BlokusUnity.Data.StageDataManager>();
+                StageManager = FindObjectOfType<BlokusUnity.Features.Single.StageDataManager>();
         }
 
         private void Start()

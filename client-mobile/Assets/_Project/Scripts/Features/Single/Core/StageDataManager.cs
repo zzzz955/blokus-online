@@ -4,10 +4,10 @@ using BlokusUnity.Data;
 using BlokusUnity.Game;
 using BlokusUnity.Network;
 using NetworkUserStageProgress = BlokusUnity.Network.UserStageProgress;
-using GameUserStageProgress = BlokusUnity.Game.UserStageProgress;
 using NetworkStageData = BlokusUnity.Network.StageData;
+using LocalStageData = BlokusUnity.Data.StageData;
 
-namespace BlokusUnity.Data
+namespace BlokusUnity.Features.Single
 {
     /// <summary>
     /// 스테이지 데이터 전역 관리자
@@ -27,7 +27,7 @@ namespace BlokusUnity.Data
         public static StageDataManager Instance { get; private set; }
 
         // 현재 선택된 스테이지 (API 데이터 기반)  
-        private StageData currentSelectedStage;
+        private LocalStageData currentSelectedStage;
         private int currentSelectedStageNumber;
         
         // 이벤트
@@ -37,24 +37,70 @@ namespace BlokusUnity.Data
         // API 기반 스테이지 매니저
         private StageManager apiStageManager;
 
+        // Migration Plan: Initialization state and dependency injection
+        private bool isInitialized = false;
+        private UserDataCache userDataCache;
+
         void Awake()
         {
-            // 싱글톤 패턴 + DontDestroyOnLoad
+            // Migration Plan: Remove DontDestroyOnLoad - SingleCore scene management
             if (Instance == null)
             {
                 Instance = this;
 
-                // 루트 GameObject로 이동 (DontDestroyOnLoad 적용을 위해)
-                transform.SetParent(null);
-                DontDestroyOnLoad(gameObject);
-
-                SetupCacheEventHandlers();
-                Debug.Log("StageDataManager 초기화 완료 - DontDestroyOnLoad 적용됨");
+                Debug.Log("[StageDataManager] Awake - Ready for initialization");
             }
             else
             {
+                Debug.Log("[StageDataManager] Duplicate instance destroyed");
                 Destroy(gameObject);
-                return;
+            }
+        }
+
+        /// <summary>
+        /// Initialize StageDataManager (Migration Plan)
+        /// </summary>
+        public void Initialize()
+        {
+            if (isInitialized) return;
+            
+            SetupCacheEventHandlers();
+            InitializeStageManager();
+            isInitialized = true;
+            
+            Debug.Log("[StageDataManager] Initialized for SingleCore");
+        }
+
+        /// <summary>
+        /// Set UserDataCache dependency (Migration Plan)
+        /// </summary>
+        public void SetUserDataCache(UserDataCache cache)
+        {
+            userDataCache = cache;
+            Debug.Log("[StageDataManager] UserDataCache dependency set");
+        }
+
+        /// <summary>
+        /// Check if initialized (Migration Plan)
+        /// </summary>
+        public bool IsInitialized => isInitialized;
+
+        /// <summary>
+        /// Cleanup for scene unload (Migration Plan)
+        /// </summary>
+        public void Cleanup()
+        {
+            CleanupCacheEventHandlers();
+            isInitialized = false;
+            
+            Debug.Log("[StageDataManager] Cleaned up for scene unload");
+        }
+
+        private void InitializeStageManager()
+        {
+            if (apiStageManager == null)
+            {
+                apiStageManager = new BlokusUnity.Data.StageManager();
             }
 
             // API 기반 StageManager 초기화
@@ -221,7 +267,7 @@ namespace BlokusUnity.Data
         /// <summary>
         /// 현재 선택된 스테이지 데이터 반환
         /// </summary>
-        public StageData GetCurrentStageData()
+        public LocalStageData GetCurrentStageData()
         {
             return currentSelectedStage;
         }
@@ -440,11 +486,11 @@ namespace BlokusUnity.Data
         // ========================================
 
         /// <summary>
-        /// 네트워크 스테이지 데이터를 StageData로 변환
+        /// 네트워크 스테이지 데이터를 LocalStageData로 변환
         /// </summary>
-        private StageData ConvertNetworkToStageData(NetworkStageData networkStage)
+        private LocalStageData ConvertNetworkToStageData(NetworkStageData networkStage)
         {
-            return new StageData
+            return new LocalStageData
             {
                 stage_number = networkStage.stageNumber,
                 stage_title = networkStage.stageName,

@@ -109,7 +109,7 @@ void Awake()
         /// </summary>
         /// <param name="unlocked">언락 여부</param>
         /// <param name="progress">진행도 정보 (null이면 플레이하지 않음)</param>
-        public void UpdateState(bool unlocked, UserStageProgress progress)
+        public void UpdateState(bool unlocked, BlokusUnity.Features.Single.UserStageProgress progress)
         {
             isUnlocked = unlocked;
             isCompleted = progress?.isCompleted ?? false;
@@ -274,7 +274,7 @@ void Awake()
         /// <summary>
         /// 텍스트 정보 업데이트
         /// </summary>
-        private void UpdateTexts(UserStageProgress progress)
+        private void UpdateTexts(BlokusUnity.Features.Single.UserStageProgress progress)
         {
             // 스테이지 번호 텍스트 색상 조정
             if (stageNumberText != null)
@@ -406,7 +406,7 @@ void Awake()
         [ContextMenu("Test Completed State (3 Stars)")]
         public void TestCompletedState()
         {
-            var testProgress = new UserStageProgress
+            var testProgress = new BlokusUnity.Features.Single.UserStageProgress
             {
                 stageNumber = stageNumber,
                 isCompleted = true,

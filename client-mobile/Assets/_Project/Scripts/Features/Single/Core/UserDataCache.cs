@@ -9,7 +9,7 @@ using NetworkUserStageProgress = BlokusUnity.Network.UserStageProgress;
 using UserInfo = BlokusUnity.Common.UserInfo;
 using UserStageProgress = BlokusUnity.Common.UserStageProgress;
 
-namespace BlokusUnity.Data
+namespace BlokusUnity.Features.Single
 {
     /// <summary>
     /// 사용자 데이터 캐싱 시스템
@@ -48,24 +48,69 @@ namespace BlokusUnity.Data
         public event System.Action<HttpApiClient.CompactStageMetadata[]> OnStageMetadataUpdated;
         public event System.Action OnLoginStatusChanged;
         
+        // Migration Plan: Initialization state
+        private bool isInitialized = false;
+
         void Awake()
         {
-            // 싱글톤 패턴
+            // Migration Plan: Remove DontDestroyOnLoad - SingleCore scene management
             if (Instance == null)
             {
                 Instance = this;
-                
-                // 루트 GameObject로 이동 (DontDestroyOnLoad 적용을 위해)
-                transform.SetParent(null);
-                DontDestroyOnLoad(gameObject);
-                
                 LoadCacheFromDisk();
-                SetupHttpApiEventHandlers();
             }
             else
             {
                 Destroy(gameObject);
             }
+        }
+
+        /// <summary>
+        /// Initialize UserDataCache (Migration Plan)
+        /// </summary>
+        public void Initialize()
+        {
+            if (isInitialized) return;
+            
+            SetupHttpApiEventHandlers();
+            isInitialized = true;
+            
+            Debug.Log("[UserDataCache] Initialized for SingleCore");
+        }
+
+        /// <summary>
+        /// Check if initialized (Migration Plan)
+        /// </summary>
+        public bool IsInitialized => isInitialized;
+
+        /// <summary>
+        /// Cleanup for scene unload (Migration Plan)
+        /// </summary>
+        public void Cleanup()
+        {
+            if (enablePersistentCache)
+            {
+                SaveCacheToDisk();
+            }
+            
+            CleanupHttpApiEventHandlers();
+            isInitialized = false;
+            
+            Debug.Log("[UserDataCache] Cleaned up for scene unload");
+        }
+
+        /// <summary>
+        /// Sync with server (Migration Plan)
+        /// </summary>
+        public void SyncWithServer()
+        {
+            if (!isInitialized)
+            {
+                Debug.LogWarning("[UserDataCache] SyncWithServer called but not initialized");
+                return;
+            }
+            
+            LoadInitialDataFromServer();
         }
         
         void OnApplicationPause(bool pauseStatus)
@@ -163,11 +208,11 @@ namespace BlokusUnity.Data
             
             OnLoginStatusChanged?.Invoke();
             
-            // CacheManager 동기화 트리거
-            if (CacheManager.Instance != null)
+            // BlokusUnity.Data.CacheManager 동기화 트리거
+            if (BlokusUnity.Data.CacheManager.Instance != null)
             {
-                Debug.Log("[UserDataCache] 토큰 설정 후 CacheManager 동기화 트리거");
-                CacheManager.Instance.ForceFullSync();
+                Debug.Log("[UserDataCache] 토큰 설정 후 BlokusUnity.Data.CacheManager 동기화 트리거");
+                BlokusUnity.Data.CacheManager.Instance.ForceFullSync();
             }
         }
         
@@ -205,11 +250,11 @@ namespace BlokusUnity.Data
                 Debug.Log($"[UserDataCache] 초기 데이터 로드 시작 - isFirstLogin: {isFirstLogin}, isMaxStageChanged: {isMaxStageChanged}, hasNoMetadata: {hasNoMetadata}");
                 LoadInitialDataFromServer();
                 
-                // CacheManager 동기화 트리거
-                if (CacheManager.Instance != null)
+                // BlokusUnity.Data.CacheManager 동기화 트리거
+                if (BlokusUnity.Data.CacheManager.Instance != null)
                 {
-                    Debug.Log("[UserDataCache] 프로필 설정 후 CacheManager 동기화 트리거");
-                    CacheManager.Instance.ForceFullSync();
+                    Debug.Log("[UserDataCache] 프로필 설정 후 BlokusUnity.Data.CacheManager 동기화 트리거");
+                    BlokusUnity.Data.CacheManager.Instance.ForceFullSync();
                 }
             }
         }
@@ -238,11 +283,11 @@ namespace BlokusUnity.Data
             OnUserDataUpdated?.Invoke(currentUser);
             OnLoginStatusChanged?.Invoke();
             
-            // CacheManager 동기화 트리거
-            if (CacheManager.Instance != null)
+            // BlokusUnity.Data.CacheManager 동기화 트리거
+            if (BlokusUnity.Data.CacheManager.Instance != null)
             {
-                Debug.Log("[UserDataCache] 로그인 후 CacheManager 동기화 트리거");
-                CacheManager.Instance.ForceFullSync();
+                Debug.Log("[UserDataCache] 로그인 후 BlokusUnity.Data.CacheManager 동기화 트리거");
+                BlokusUnity.Data.CacheManager.Instance.ForceFullSync();
             }
         }
         
