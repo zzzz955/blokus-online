@@ -111,8 +111,17 @@ export function getPieceAt(boardState: BoardState, x: number, y: number): number
     return 0; // Out of bounds = empty
   }
   
+  // Ensure boardState is array and handle edge cases
+  if (!Array.isArray(boardState)) {
+    console.warn('getPieceAt: boardState is not an array', boardState);
+    return 0;
+  }
+  
   const position = y * BOARD_SIZE + x;
-  const entry = boardState.find(entry => (entry % COLOR_MULTIPLIER) === position);
+  const entry = boardState.find(entry => {
+    if (typeof entry !== 'number') return false;
+    return (entry % COLOR_MULTIPLIER) === position;
+  });
   
   if (!entry) return 0; // Empty
   
@@ -157,7 +166,18 @@ export function toLegacyBoardState(boardState: BoardState): LegacyBoardState {
   const obstacles: { x: number; y: number }[] = [];
   const preplaced: { x: number; y: number; color: number }[] = [];
   
+  // Handle edge cases where boardState might not be an array
+  if (!Array.isArray(boardState)) {
+    console.warn('toLegacyBoardState: boardState is not an array', boardState);
+    return { obstacles: [], preplaced: [] };
+  }
+  
   for (const encoded of boardState) {
+    if (typeof encoded !== 'number') {
+      console.warn('toLegacyBoardState: invalid entry in boardState', encoded);
+      continue;
+    }
+    
     const colorIndex = Math.floor(encoded / COLOR_MULTIPLIER);
     const position = encoded % COLOR_MULTIPLIER;
     const y = Math.floor(position / BOARD_SIZE);
