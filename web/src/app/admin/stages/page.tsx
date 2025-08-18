@@ -4,15 +4,13 @@ import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import StageEditor from '@/components/admin/StageEditor';
 import StageList from '@/components/admin/StageList';
+import { BoardState, createEmptyBoardState } from '@/lib/board-state-codec';
 
 interface Stage {
   stage_id: number;
   stage_number: number;
   difficulty: number;
-  initial_board_state: {
-    obstacles: Array<{x: number, y: number}>;
-    preplaced: Array<{x: number, y: number, color: number}>;
-  };
+  initial_board_state: BoardState; // Changed to int[] format
   available_blocks: number[];
   optimal_score: number;
   time_limit: number | null;
@@ -71,7 +69,7 @@ export default function StagesAdminPage() {
     const newStage: Partial<Stage> = {
       stage_number: (stages.length > 0 ? Math.max(...stages.map(s => s.stage_number)) + 1 : 1),
       difficulty: 1,
-      initial_board_state: { obstacles: [], preplaced: [] },
+      initial_board_state: createEmptyBoardState(), // Use new int[] format
       available_blocks: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21],
       optimal_score: 0,
       time_limit: null,

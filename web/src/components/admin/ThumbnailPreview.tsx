@@ -2,11 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import thumbnailGenerator from '@/lib/thumbnail-generator';
-
-interface BoardState {
-  obstacles: Array<{x: number, y: number}>;
-  preplaced: Array<{x: number, y: number, color: number}>;
-}
+import { BoardState, toLegacyBoardState } from '@/lib/board-state-codec';
 
 interface ThumbnailPreviewProps {
   boardState: BoardState;
@@ -125,8 +121,10 @@ export default function ThumbnailPreview({
                 스테이지 {stageNumber} 썸네일
               </p>
               <p className="text-gray-500 text-xs mt-1">
-                장애물: {boardState.obstacles.length}개, 
-                미리 배치: {boardState.preplaced.length}개
+                {(() => {
+                  const legacyState = toLegacyBoardState(boardState);
+                  return `장애물: ${legacyState.obstacles.length}개, 미리 배치: ${legacyState.preplaced.length}개`;
+                })()}
               </p>
             </div>
           </div>

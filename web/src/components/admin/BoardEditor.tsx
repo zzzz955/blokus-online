@@ -1,11 +1,15 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-
-interface BoardState {
-  obstacles: Array<{x: number, y: number}>;
-  preplaced: Array<{x: number, y: number, color: number}>;
-}
+import { 
+  BoardState, 
+  toLegacyBoardState, 
+  fromLegacyBoardState, 
+  addObstacle, 
+  addPreplacedPiece, 
+  removePiece, 
+  getPieceAt 
+} from '@/lib/board-state-codec';
 
 interface BoardEditorProps {
   boardState: BoardState;
@@ -38,39 +42,36 @@ export default function BoardEditor({ boardState, onChange }: BoardEditorProps) 
       Array(BOARD_SIZE).fill(null).map(() => ({ type: 'empty' as const }))
     );
 
-    // Place obstacles
-    boardState.obstacles.forEach(({x, y}) => {
-      if (x >= 0 && x < BOARD_SIZE && y >= 0 && y < BOARD_SIZE) {
-        matrix[y][x] = { type: 'obstacle' };
+    // Process int[] format directly
+    for (let y = 0; y < BOARD_SIZE; y++) {
+      for (let x = 0; x < BOARD_SIZE; x++) {
+        const piece = getPieceAt(boardState, x, y);
+        if (piece === 5) {
+          matrix[y][x] = { type: 'obstacle' };
+        } else if (piece >= 1 && piece <= 4) {
+          matrix[y][x] = { type: 'preplaced', color: piece };
+        }
       }
-    });
-
-    // Place preplaced blocks
-    boardState.preplaced.forEach(({x, y, color}) => {
-      if (x >= 0 && x < BOARD_SIZE && y >= 0 && y < BOARD_SIZE) {
-        matrix[y][x] = { type: 'preplaced', color };
-      }
-    });
+    }
 
     return matrix;
   };
 
   // Convert 2D array back to boardState format
   const matrixToBoardState = (matrix: CellState[][]): BoardState => {
-    const obstacles: Array<{x: number, y: number}> = [];
-    const preplaced: Array<{x: number, y: number, color: number}> = [];
+    let result: BoardState = [];
 
     matrix.forEach((row, y) => {
       row.forEach((cell, x) => {
         if (cell.type === 'obstacle') {
-          obstacles.push({ x, y });
+          result = addObstacle(result, x, y);
         } else if (cell.type === 'preplaced' && cell.color) {
-          preplaced.push({ x, y, color: cell.color });
+          result = addPreplacedPiece(result, x, y, cell.color);
         }
       });
     });
 
-    return { obstacles, preplaced };
+    return result;
   };
 
   const handleCellClick = (x: number, y: number) => {
@@ -164,8 +165,9 @@ export default function BoardEditor({ boardState, onChange }: BoardEditorProps) 
   };
 
   const matrix = getBoardMatrix();
-  const totalObstacles = boardState.obstacles.length;
-  const totalPreplaced = boardState.preplaced.length;
+  const legacyState = toLegacyBoardState(boardState);
+  const totalObstacles = legacyState.obstacles.length;
+  const totalPreplaced = legacyState.preplaced.length;
   const emptySpaces = BOARD_SIZE * BOARD_SIZE - totalObstacles - totalPreplaced;
 
   return (

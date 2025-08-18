@@ -1,8 +1,14 @@
 // src/lib/blokus/solver.ts (하단에 추가)
 import type { BlockShape } from './blocks';
+import { toLegacyBoardState, type BoardState as IntBoardState } from '../board-state-codec';
 
 export type Cell = -1 | 0 | 1 | 2 | 3 | 4;
-export interface BoardState {
+
+// Use the new int[] BoardState format as primary
+export type BoardState = IntBoardState;
+
+// Legacy interface for backward compatibility
+export interface LegacyBoardState {
   obstacles: Array<{ x: number; y: number }>;
   preplaced: Array<{ x: number; y: number; color: number }>;
 }
@@ -28,13 +34,34 @@ const cellsFromShape = (shape:number[][]) => {
   return out;
 };
 
+const OBSTACLE_COLOR_INDEX = 5;
+const COLOR_MULTIPLIER = 400;
+
 function makeBoardSingle(state: BoardState, targetColor: number): Grid {
   const b:Grid = Array.from({length:BOARD_SIZE},()=>Array<Cell>(BOARD_SIZE).fill(0));
-  for (const {x,y} of state.obstacles) if (inBoard(x,y)) b[y][x] = -1;
-  for (const {x,y,color} of state.preplaced) if (inBoard(x,y)) {
-    if (color === targetColor) b[y][x] = targetColor as Cell;  // 같은 색은 연결/앵커로 사용
-    else b[y][x] = -1;                                        // 다른 색은 장애물로 간주
+  
+  // Process int[] format directly
+  for (const encoded of state) {
+    const colorIndex = Math.floor(encoded / COLOR_MULTIPLIER);
+    const position = encoded % COLOR_MULTIPLIER;
+    const y = Math.floor(position / BOARD_SIZE);
+    const x = position % BOARD_SIZE;
+    
+    if (!inBoard(x, y)) continue;
+    
+    if (colorIndex === OBSTACLE_COLOR_INDEX) {
+      // Obstacle
+      b[y][x] = -1;
+    } else if (colorIndex >= 1 && colorIndex <= 4) {
+      // Preplaced piece
+      if (colorIndex === targetColor) {
+        b[y][x] = targetColor as Cell;  // 같은 색은 연결/앵커로 사용
+      } else {
+        b[y][x] = -1;                   // 다른 색은 장애물로 간주
+      }
+    }
   }
+  
   return b;
 }
 

@@ -158,11 +158,14 @@ namespace BlokusUnity.Game
                 Debug.LogWarning($"[SingleGameManager] 스테이지 {stageData.stage_number}에 available_blocks 데이터가 없음 - 최소 블록 세트 사용: {payload.AvailableBlocks.Length}개");
             }
             
-            // 초기 보드 상태 설정
+            // 초기 보드 상태 설정 (직접 int[] 데이터로 전달)
             if (stageData.initial_board_state != null)
             {
                 // StageData.InitialBoardState를 StagePayload.InitialBoardData로 변환
                 payload.InitialBoard = ConvertInitialBoardState(stageData.initial_board_state);
+                
+                // 직접 GameLogic에서 사용할 수 있도록 raw 데이터도 저장
+                payload.InitialBoardPositions = stageData.initial_board_state.boardPositions;
             }
             
             Debug.Log($"[SingleGameManager] StagePayload 생성 완료: " +
@@ -259,8 +262,25 @@ namespace BlokusUnity.Game
             gameBoard.SetGameLogic(logic);
             gameBoard.ClearBoard();
 
-            // 초기 보드 상태 적용 (장애물, 사전 배치된 블록 등)
-            ApplyInitialBoardState(payload.InitialBoard);
+            // 초기 보드 상태 적용 - 원시 데이터 우선 사용
+            if (payload.InitialBoardPositions != null && payload.InitialBoardPositions.Length > 0)
+            {
+                Debug.Log($"[SingleGameManager] 원시 initial_board_state 적용: {payload.InitialBoardPositions.Length}개 위치");
+                logic.SetInitialBoardState(payload.InitialBoardPositions);
+                
+                // GameBoard 새로고침을 다음 프레임에 실행 (초기화 완료 후)
+                StartCoroutine(RefreshBoardNextFrame());
+            }
+            else if (payload.InitialBoard != null)
+            {
+                // 파싱된 데이터가 있으면 기존 방식 사용 (장애물, 사전 배치된 블록 등)
+                Debug.Log("[SingleGameManager] 파싱된 초기 보드 상태 적용");
+                ApplyInitialBoardState(payload.InitialBoard);
+            }
+            else
+            {
+                Debug.Log("[SingleGameManager] 초기 보드 상태 없음 - 빈 보드로 시작");
+            }
 
             // 블록 세팅
             var blocks = (payload.AvailableBlocks != null && payload.AvailableBlocks.Length > 0)
@@ -648,6 +668,20 @@ namespace BlokusUnity.Game
             // ★ 블록 재적용 후 UI 업데이트 필수
             gameBoard.RefreshBoard();
             // Debug.Log("[SingleGame] Undo 보드 재구성 완료");
+        }
+        
+        /// <summary>
+        /// 다음 프레임에 보드 새로고침 (초기화 완료 후)
+        /// </summary>
+        private System.Collections.IEnumerator RefreshBoardNextFrame()
+        {
+            yield return null; // 한 프레임 대기
+            
+            Debug.Log("[SingleGameManager] 초기 보드 상태 화면 새로고침 실행");
+            if (gameBoard != null)
+            {
+                gameBoard.RefreshBoard();
+            }
         }
 
     }

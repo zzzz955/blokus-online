@@ -65,11 +65,12 @@ namespace BlokusUnity.Common
     /// </summary>
     public enum PlayerColor : byte
     {
-        None = 0,   // 빈 칸
-        Blue = 1,   // 파랑 (플레이어 1)
-        Yellow = 2, // 노랑 (플레이어 2)  
-        Red = 3,    // 빨강 (플레이어 3)
-        Green = 4   // 초록 (플레이어 4)
+        None = 0,     // 빈 칸
+        Blue = 1,     // 파랑 (플레이어 1)
+        Yellow = 2,   // 노랑 (플레이어 2)  
+        Red = 3,      // 빨강 (플레이어 3)
+        Green = 4,    // 초록 (플레이어 4)
+        Obstacle = 5  // 장애물 (어두운 회색)
     }
 
     /// <summary>
@@ -360,6 +361,7 @@ namespace BlokusUnity.Common
                 PlayerColor.Yellow => "Yellow",
                 PlayerColor.Red => "Red",
                 PlayerColor.Green => "Green",
+                PlayerColor.Obstacle => "Obstacle",
                 PlayerColor.None => "None",
                 _ => "Unknown"
             };
@@ -376,6 +378,7 @@ namespace BlokusUnity.Common
                 "Yellow" => PlayerColor.Yellow,
                 "Red" => PlayerColor.Red,
                 "Green" => PlayerColor.Green,
+                "Obstacle" => PlayerColor.Obstacle,
                 _ => PlayerColor.None
             };
         }
@@ -391,6 +394,7 @@ namespace BlokusUnity.Common
                 PlayerColor.Yellow => Color.yellow,
                 PlayerColor.Red => Color.red,
                 PlayerColor.Green => Color.green,
+                PlayerColor.Obstacle => new Color(0.3f, 0.3f, 0.3f, 1f), // 어두운 회색
                 _ => Color.gray
             };
         }

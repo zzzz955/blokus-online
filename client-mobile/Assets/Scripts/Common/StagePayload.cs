@@ -23,6 +23,7 @@ namespace BlokusUnity.Common
         public int TimeLimit = 0;             // 제한시간 (0이면 무제한)
         public int MaxUndoCount = 5;          // 최대 언두 횟수
         public InitialBoardData InitialBoard; // 초기 보드 상태 (파싱된 데이터)
+        public int[] InitialBoardPositions;   // 원시 initial_board_state 데이터 (GameLogic.SetInitialBoardState용)
         
         /// <summary>
         /// JSONB 초기 보드 상태를 파싱하여 InitialBoardData로 변환

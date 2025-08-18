@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import { expandBoardState, toBoardStateDB } from '@/lib/board-state-codec';
+import { normalizeBoardState, type BoardState } from '@/lib/board-state-codec';
 
 const prisma = new PrismaClient();
 
@@ -31,10 +31,10 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       data: {
-        // ✅ DB의 압축 포맷을 확장 포맷으로 변환해 반환
+        // ✅ DB에서 int[] 포맷으로 직접 사용
         stages: (stages as any[]).map(row => ({
           ...row,
-          initial_board_state: expandBoardState(row.initial_board_state)
+          initial_board_state: row.initial_board_state || []
         })),
         total: (stages as any[]).length
       }
@@ -69,12 +69,9 @@ export async function POST(request: NextRequest) {
       is_featured
     } = body;
 
-    // ✅ 보드 상태 정규화: 확장 → DATABASE INTEGER[] 포맷
-    const boardExpanded = initial_board_state
-      ? expandBoardState(initial_board_state)
-      : { obstacles: [], preplaced: [] };
+    // ✅ 보드 상태 정규화: 모든 포맷 → int[] 포맷
     const boardForDB = initial_board_state
-      ? toBoardStateDB(initial_board_state)
+      ? normalizeBoardState(initial_board_state)
       : [];
 
     // ✅ time_limit 기본값: 무제한(null)
@@ -134,7 +131,7 @@ export async function POST(request: NextRequest) {
     if (!finalThumbnailUrl || (typeof finalThumbnailUrl === 'string' && finalThumbnailUrl.trim() === '')) {
       finalThumbnailUrl = await generateStageThumbnail(
         stage_number,
-        boardExpanded,      // ✅ 확장 포맷을 넘겨야 보드 썸네일이 맞게 생성
+        boardForDB,      // ✅ int[] 포맷으로 썸네일 생성
         available_blocks
       );
     }
@@ -186,7 +183,7 @@ import fileStorage from '@/lib/file-storage';
 // 같은 파일 내 helper
 async function generateStageThumbnail(
   stageNumber: number,
-  boardState: any,
+  boardState: BoardState,
   availableBlocks: number[]
 ): Promise<string | null> {
   try {

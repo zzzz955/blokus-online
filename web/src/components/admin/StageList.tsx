@@ -1,15 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import { BoardState } from '@/lib/board-state-codec';
 
 interface Stage {
   stage_id: number;
   stage_number: number;
   difficulty: number;
-  initial_board_state: {
-    obstacles: Array<{x: number, y: number}>;
-    preplaced: Array<{x: number, y: number, color: number}>;
-  };
+  initial_board_state: BoardState; // Changed to int[] format
   available_blocks: number[];
   optimal_score: number;
   time_limit: number | null;

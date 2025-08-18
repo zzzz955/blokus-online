@@ -3,10 +3,7 @@
  * Creates thumbnails from board state for stage preview
  */
 
-interface BoardState {
-  obstacles: Array<{x: number, y: number}>;
-  preplaced: Array<{x: number, y: number, color: number}>;
-}
+import { toLegacyBoardState, type BoardState } from './board-state-codec';
 
 interface ThumbnailOptions {
   width?: number;
@@ -58,11 +55,13 @@ export class ThumbnailGenerator {
     boardState: BoardState,
     options: ThumbnailOptions = {}
   ): Promise<string> {
+    // Convert int[] format to legacy format for rendering
+    const legacyState = toLegacyBoardState(boardState);
     const opts = { ...DEFAULT_OPTIONS, ...options };
     
     // Use SVG generation on server-side or if canvas is not available
     if (this.isServer || !this.canvas || !this.ctx) {
-      return this.generateSVGThumbnail(boardState, opts);
+      return this.generateSVGThumbnail(legacyState, opts);
     }
     
     // Client-side canvas generation
@@ -84,10 +83,10 @@ export class ThumbnailGenerator {
     }
 
     // Draw obstacles
-    this.drawObstacles(boardState.obstacles, cellSize, offsetX, offsetY, opts.obstacleColor);
+    this.drawObstacles(legacyState.obstacles, cellSize, offsetX, offsetY, opts.obstacleColor);
 
     // Draw preplaced blocks
-    this.drawPreplacedBlocks(boardState.preplaced, cellSize, offsetX, offsetY, opts.preplacedColors);
+    this.drawPreplacedBlocks(legacyState.preplaced, cellSize, offsetX, offsetY, opts.preplacedColors);
 
     // Convert canvas to data URL
     return this.canvas.toDataURL('image/png', 0.8);
@@ -97,7 +96,7 @@ export class ThumbnailGenerator {
    * Generate SVG-based thumbnail (server-side compatible)
    */
   private generateSVGThumbnail(
-    boardState: BoardState,
+    legacyState: { obstacles: Array<{x: number, y: number}>; preplaced: Array<{x: number, y: number, color: number}> },
     options: Required<ThumbnailOptions>
   ): string {
     const { width, height, backgroundColor, obstacleColor, preplacedColors, gridColor, showGrid } = options;
@@ -118,10 +117,10 @@ export class ThumbnailGenerator {
     }
     
     // Obstacles
-    svgContent += this.generateSVGObstacles(boardState.obstacles, cellSize, offsetX, offsetY, obstacleColor);
+    svgContent += this.generateSVGObstacles(legacyState.obstacles, cellSize, offsetX, offsetY, obstacleColor);
     
     // Preplaced blocks
-    svgContent += this.generateSVGPreplacedBlocks(boardState.preplaced, cellSize, offsetX, offsetY, preplacedColors);
+    svgContent += this.generateSVGPreplacedBlocks(legacyState.preplaced, cellSize, offsetX, offsetY, preplacedColors);
     
     svgContent += '</svg>';
     
@@ -387,8 +386,9 @@ export function generateTextThumbnail(
   boardState: BoardState,
   stageNumber: number
 ): string {
-  const obstacleCount = boardState.obstacles.length;
-  const preplacedCount = boardState.preplaced.length;
+  const legacyState = toLegacyBoardState(boardState);
+  const obstacleCount = legacyState.obstacles.length;
+  const preplacedCount = legacyState.preplaced.length;
   
   // Create a simple SVG thumbnail
   const svg = `

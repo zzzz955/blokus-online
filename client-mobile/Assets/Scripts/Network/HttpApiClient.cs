@@ -1099,6 +1099,7 @@ namespace BlokusUnity.Network
             public int[] available_blocks;
             public bool is_featured;
             public string thumbnail_url;
+            public int[] initial_board_state;
         }
         
         /// <summary>
@@ -1123,7 +1124,9 @@ namespace BlokusUnity.Network
                     desc = server.description,
                     ab = server.available_blocks ?? new int[0], // 서버에서 제공하는 available_blocks 사용
                     muc = server.max_undo_count,
-                    ibs = null, // initial_board_state는 개별 스테이지에서 로드
+                    ibs = server.initial_board_state != null && server.initial_board_state.Length > 0 
+                        ? new InitialBoardStateApi { boardPositions = server.initial_board_state }
+                        : null,
                     h = server.hints ?? new string[0]
                 };
             }

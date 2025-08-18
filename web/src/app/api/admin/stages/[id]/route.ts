@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import { expandBoardState, toBoardStateDB } from '@/lib/board-state-codec';
+import { normalizeBoardState, toLegacyBoardState, type BoardState } from '@/lib/board-state-codec';
 
 const prisma = new PrismaClient();
 
@@ -127,18 +127,15 @@ export async function PUT(
         ? time_limit
         : current.time_limit;
 
-    // ── 1) IBS(보드 상태): 저장은 항상 "DATABASE INTEGER[] 포맷"
+    // ── 1) IBS(보드 상태): 저장은 항상 "int[] 포맷"
     const hasIbs = Object.prototype.hasOwnProperty.call(body, 'initial_board_state');
-    let dbFormatForSave: number[] | undefined = undefined;  // DB에 저장할 INTEGER[] 포맷
-    let expandedForThumb: any | undefined = undefined;      // 썸네일 생성용 확장 포맷
+    let dbFormatForSave: BoardState | undefined = undefined;  // DB에 저장할 int[] 포맷
 
     if (hasIbs) {
       if (initial_board_state === null) {
         dbFormatForSave = []; // DB에 빈 배열 저장
       } else {
-        const expanded = expandBoardState(initial_board_state); // 구/신 포맷 상관없이 확장으로
-        dbFormatForSave = toBoardStateDB(initial_board_state);
-        expandedForThumb = expanded;
+        dbFormatForSave = normalizeBoardState(initial_board_state); // 모든 포맷 → int[]
       }
     }
 
@@ -200,13 +197,12 @@ export async function PUT(
       // 썸네일 생성: 확장 포맷 필요
       const generator = getThumbnailGenerator();
 
-      // 확장 포맷 준비 (요청에 안 왔으면 DB 저장값을 확장)
-      const boardForThumb = expandedForThumb
-        ?? expandBoardState(currentIbsDB);
+      // 썸네일용 보드 상태 준비
+      const boardForThumb = dbFormatForSave ?? currentIbsDB;
 
       const blocksForThumb = available_blocks ?? (current.available_blocks as number[]);
 
-      const dataUrl = await generator.generateThumbnail(boardForThumb, {
+      const dataUrl = await generator.generateThumbnail(boardForThumb as BoardState, {
         width: 300,
         height: 300
       });

@@ -5,6 +5,7 @@ import BoardEditor from './BoardEditor';
 import BlockSelector from './BlockSelector';
 import { calculateOptimalScoreExact } from '@/lib/blokus/calc';
 import ThumbnailPreview from './ThumbnailPreview';
+import { BoardState, toLegacyBoardState, fromLegacyBoardState } from '@/lib/board-state-codec';
 
 function withTimeout<T>(promise: Promise<T>, ms: number, message = '계산 시간이 초과되었습니다.'): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -20,10 +21,7 @@ interface Stage {
   stage_id?: number;
   stage_number: number;
   difficulty: number;
-  initial_board_state: {
-    obstacles: Array<{ x: number, y: number }>;
-    preplaced: Array<{ x: number, y: number, color: number }>;
-  };
+  initial_board_state: BoardState; // Changed to int[] format
   available_blocks: number[];
   optimal_score: number;
   time_limit: number | null;
@@ -76,10 +74,8 @@ export default function StageEditor({ stage, onSave, onCancel }: StageEditorProp
       errors.push('최적 점수는 0 이상이어야 합니다.');
     }
 
-    // Board validation
-    const totalObstacles = formData.initial_board_state.obstacles.length;
-    const totalPreplaced = formData.initial_board_state.preplaced.length;
-    const totalOccupied = totalObstacles + totalPreplaced;
+    // Board validation - count entries in int[] format
+    const totalOccupied = formData.initial_board_state.length;
 
     if (totalOccupied >= 300) { // 20x20 = 400, leaving at least 100 empty spaces
       errors.push('보드에 빈 공간이 너무 적습니다. (최소 100개 이상의 빈 칸 필요)');
@@ -489,11 +485,11 @@ export default function StageEditor({ stage, onSave, onCancel }: StageEditorProp
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                   <div>
                     <span className="text-gray-400">장애물 수:</span>
-                    <span className="text-white ml-2">{formData.initial_board_state.obstacles.length}</span>
+                    <span className="text-white ml-2">{toLegacyBoardState(formData.initial_board_state).obstacles.length}</span>
                   </div>
                   <div>
                     <span className="text-gray-400">미리 배치된 블록:</span>
-                    <span className="text-white ml-2">{formData.initial_board_state.preplaced.length}</span>
+                    <span className="text-white ml-2">{toLegacyBoardState(formData.initial_board_state).preplaced.length}</span>
                   </div>
                   <div>
                     <span className="text-gray-400">사용 가능한 블록:</span>
@@ -502,7 +498,7 @@ export default function StageEditor({ stage, onSave, onCancel }: StageEditorProp
                   <div>
                     <span className="text-gray-400">빈 공간:</span>
                     <span className="text-white ml-2">
-                      {400 - formData.initial_board_state.obstacles.length - formData.initial_board_state.preplaced.length}칸
+                      {400 - formData.initial_board_state.length}칸
                     </span>
                   </div>
                 </div>

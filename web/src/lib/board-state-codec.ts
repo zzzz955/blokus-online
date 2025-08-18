@@ -1,72 +1,146 @@
 // src/lib/board-state-codec.ts
 
 /**
- * Board State Type Definitions
- * - BoardStateExpanded: UI-friendly format with separate arrays for obstacles and preplaced pieces
- * - BoardStateCompact: Legacy JSONB format {obsIdx, pre} (still supported for backward compatibility)
- * - BoardStateDB: New INTEGER[] format for database storage (color_index * 400 + position)
+ * Board State Type Definitions - Refactored for int[] primary format
+ * - BoardState: Primary int[] format (colorIndex * 400 + row * 20 + col)
+ * - LegacyBoardState: Legacy JSON format (deprecated, for backward compatibility only)
  */
 
-export type BoardStateExpanded = {
+export type BoardState = number[]; // Primary int[] format
+
+// Legacy JSON format - DEPRECATED, for backward compatibility only
+export type LegacyBoardState = {
   obstacles: { x: number; y: number }[];
   preplaced: { x: number; y: number; color: number }[];
 };
 
-export type BoardStateCompact = {
-  obsIdx: number[];
-  pre: [number, number, number][];
-};
-
-export type BoardStateDB = number[]; // New INTEGER[] format for database
-
 const BOARD_SIZE = 20;
 const COLOR_MULTIPLIER = 400; // color_index * 400 + position
+const OBSTACLE_COLOR_INDEX = 5; // Changed from 0 to 5
 
 /**
  * Type Guards
  */
-export function isCompactBoardState(v: any): v is BoardStateCompact {
-  return v && Array.isArray(v.obsIdx) && Array.isArray(v.pre);
-}
-
-export function isExpandedBoardState(v: any): v is BoardStateExpanded {
-  return v && Array.isArray(v.obstacles) && Array.isArray(v.preplaced);
-}
-
-export function isDBBoardState(v: any): v is BoardStateDB {
+export function isBoardState(v: any): v is BoardState {
   return Array.isArray(v) && v.every(item => typeof item === 'number');
 }
 
-/**
- * Legacy functions (maintained for backward compatibility)
- */
-export function compressBoardState(exp: BoardStateExpanded): BoardStateCompact {
-  const obsIdx = exp.obstacles.map(o => o.y * BOARD_SIZE + o.x);
-  const pre: [number, number, number][] = exp.preplaced.map(p => [p.x, p.y, p.color]);
-  return { obsIdx, pre };
+export function isLegacyBoardState(v: any): v is LegacyBoardState {
+  return v && Array.isArray(v.obstacles) && Array.isArray(v.preplaced);
 }
 
 /**
- * New conversion functions for DATABASE INTEGER[] format
+ * Core BoardState manipulation functions
  */
 
 /**
- * Convert expanded format to database INTEGER[] format
- * Encoding: color_index * 400 + (y * 20 + x)
+ * Create empty board state
  */
-export function expandedToDBFormat(exp: BoardStateExpanded): BoardStateDB {
-  const result: number[] = [];
+export function createEmptyBoardState(): BoardState {
+  return [];
+}
+
+/**
+ * Add obstacle to board state
+ * @param boardState - Current board state
+ * @param x - X coordinate (0-19)
+ * @param y - Y coordinate (0-19)
+ */
+export function addObstacle(boardState: BoardState, x: number, y: number): BoardState {
+  if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) {
+    throw new Error(`Invalid coordinates: (${x}, ${y})`);
+  }
   
-  // Add obstacles (color = 0)
-  for (const obs of exp.obstacles) {
-    const position = obs.y * BOARD_SIZE + obs.x;  // y * 20 + x
-    const encoded = 0 * COLOR_MULTIPLIER + position; // Black color (0)
+  const position = y * BOARD_SIZE + x;
+  const encoded = OBSTACLE_COLOR_INDEX * COLOR_MULTIPLIER + position;
+  
+  // Remove existing entry at this position if any
+  const filtered = boardState.filter(entry => (entry % COLOR_MULTIPLIER) !== position);
+  
+  return [...filtered, encoded];
+}
+
+/**
+ * Add preplaced piece to board state
+ * @param boardState - Current board state
+ * @param x - X coordinate (0-19)
+ * @param y - Y coordinate (0-19)
+ * @param color - Player color (1-4)
+ */
+export function addPreplacedPiece(boardState: BoardState, x: number, y: number, color: number): BoardState {
+  if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) {
+    throw new Error(`Invalid coordinates: (${x}, ${y})`);
+  }
+  if (color < 1 || color > 4) {
+    throw new Error(`Invalid color: ${color}. Must be 1-4`);
+  }
+  
+  const position = y * BOARD_SIZE + x;
+  const encoded = color * COLOR_MULTIPLIER + position;
+  
+  // Remove existing entry at this position if any
+  const filtered = boardState.filter(entry => (entry % COLOR_MULTIPLIER) !== position);
+  
+  return [...filtered, encoded];
+}
+
+/**
+ * Remove piece from board state at position
+ * @param boardState - Current board state
+ * @param x - X coordinate (0-19)
+ * @param y - Y coordinate (0-19)
+ */
+export function removePiece(boardState: BoardState, x: number, y: number): BoardState {
+  if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) {
+    throw new Error(`Invalid coordinates: (${x}, ${y})`);
+  }
+  
+  const position = y * BOARD_SIZE + x;
+  return boardState.filter(entry => (entry % COLOR_MULTIPLIER) !== position);
+}
+
+/**
+ * Get piece at position
+ * @param boardState - Current board state
+ * @param x - X coordinate (0-19)
+ * @param y - Y coordinate (0-19)
+ * @returns Color index (5 = obstacle, 1-4 = player colors, 0 = empty)
+ */
+export function getPieceAt(boardState: BoardState, x: number, y: number): number {
+  if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) {
+    return 0; // Out of bounds = empty
+  }
+  
+  const position = y * BOARD_SIZE + x;
+  const entry = boardState.find(entry => (entry % COLOR_MULTIPLIER) === position);
+  
+  if (!entry) return 0; // Empty
+  
+  return Math.floor(entry / COLOR_MULTIPLIER);
+}
+
+/**
+ * Legacy conversion functions for backward compatibility
+ */
+
+/**
+ * Convert legacy JSON format to new BoardState format
+ * @param legacyState - Legacy JSON format
+ * @returns BoardState in int[] format
+ */
+export function fromLegacyBoardState(legacyState: LegacyBoardState): BoardState {
+  const result: BoardState = [];
+  
+  // Add obstacles with new color index (5)
+  for (const obs of legacyState.obstacles) {
+    const position = obs.y * BOARD_SIZE + obs.x;
+    const encoded = OBSTACLE_COLOR_INDEX * COLOR_MULTIPLIER + position;
     result.push(encoded);
   }
   
   // Add preplaced pieces
-  for (const piece of exp.preplaced) {
-    const position = piece.y * BOARD_SIZE + piece.x;  // y * 20 + x
+  for (const piece of legacyState.preplaced) {
+    const position = piece.y * BOARD_SIZE + piece.x;
     const encoded = piece.color * COLOR_MULTIPLIER + position;
     result.push(encoded);
   }
@@ -75,24 +149,23 @@ export function expandedToDBFormat(exp: BoardStateExpanded): BoardStateDB {
 }
 
 /**
- * Convert database INTEGER[] format to expanded format
- * Decoding: color_index = value / 400, position = value % 400, y = position / 20, x = position % 20
+ * Convert BoardState to legacy JSON format
+ * @param boardState - BoardState in int[] format
+ * @returns Legacy JSON format
  */
-export function dbFormatToExpanded(dbState: BoardStateDB): BoardStateExpanded {
+export function toLegacyBoardState(boardState: BoardState): LegacyBoardState {
   const obstacles: { x: number; y: number }[] = [];
   const preplaced: { x: number; y: number; color: number }[] = [];
   
-  for (const encoded of dbState) {
+  for (const encoded of boardState) {
     const colorIndex = Math.floor(encoded / COLOR_MULTIPLIER);
     const position = encoded % COLOR_MULTIPLIER;
-    const y = Math.floor(position / BOARD_SIZE);  // y = position / 20
-    const x = position % BOARD_SIZE;              // x = position % 20
+    const y = Math.floor(position / BOARD_SIZE);
+    const x = position % BOARD_SIZE;
     
-    if (colorIndex === 0) {
-      // Black color = obstacle
+    if (colorIndex === OBSTACLE_COLOR_INDEX) {
       obstacles.push({ x, y });
-    } else {
-      // Other colors = preplaced piece
+    } else if (colorIndex >= 1 && colorIndex <= 4) {
       preplaced.push({ x, y, color: colorIndex });
     }
   }
@@ -101,101 +174,25 @@ export function dbFormatToExpanded(dbState: BoardStateDB): BoardStateExpanded {
 }
 
 /**
- * Convert compact JSONB format to database INTEGER[] format
+ * Universal function to convert any format to BoardState
+ * @param anyState - Any board state format
+ * @returns BoardState in int[] format
  */
-export function compactToDBFormat(compact: BoardStateCompact): BoardStateDB {
-  const result: number[] = [];
-  
-  // Convert obstacles (obsIdx array)
-  for (const obsPosition of compact.obsIdx) {
-    const encoded = 0 * COLOR_MULTIPLIER + obsPosition; // Black color (0)
-    result.push(encoded);
-  }
-  
-  // Convert preplaced pieces (pre array: [x, y, color])
-  for (const [x, y, color] of compact.pre) {
-    const position = y * BOARD_SIZE + x;  // y * 20 + x
-    const encoded = color * COLOR_MULTIPLIER + position;
-    result.push(encoded);
-  }
-  
-  return result;
-}
-
-/**
- * Convert database INTEGER[] format to compact JSONB format
- */
-export function dbFormatToCompact(dbState: BoardStateDB): BoardStateCompact {
-  const obsIdx: number[] = [];
-  const pre: [number, number, number][] = [];
-  
-  for (const encoded of dbState) {
-    const colorIndex = Math.floor(encoded / COLOR_MULTIPLIER);
-    const position = encoded % COLOR_MULTIPLIER;
-    
-    if (colorIndex === 0) {
-      // Black color = obstacle
-      obsIdx.push(position);
-    } else {
-      // Other colors = preplaced piece
-      const y = Math.floor(position / BOARD_SIZE);  // y = position / 20
-      const x = position % BOARD_SIZE;              // x = position % 20
-      pre.push([x, y, colorIndex]);
-    }
-  }
-  
-  return { obsIdx, pre };
-}
-
-/**
- * Universal function to expand any board state format to expanded format
- * Supports: expanded, compact (legacy JSONB), and database INTEGER[] formats
- */
-export function expandBoardState(anyState: any): BoardStateExpanded {
-  if (anyState === null || anyState === undefined) {
-    return { obstacles: [], preplaced: [] };
-  }
-  
-  // Already expanded format
-  if (isExpandedBoardState(anyState)) {
-    return anyState;
-  }
-  
-  // Database INTEGER[] format
-  if (isDBBoardState(anyState)) {
-    return dbFormatToExpanded(anyState);
-  }
-  
-  // Legacy compact JSONB format
-  if (isCompactBoardState(anyState)) {
-    return {
-      obstacles: anyState.obsIdx.map((i: number) => ({ 
-        x: i % BOARD_SIZE,           // x = position % 20
-        y: Math.floor(i / BOARD_SIZE) // y = position / 20
-      })),
-      preplaced: anyState.pre.map(([x, y, color]: [number, number, number]) => ({ x, y, color })),
-    };
-  }
-  
-  // Fallback for unknown format
-  return { obstacles: [], preplaced: [] };
-}
-
-/**
- * Convert any board state format to database INTEGER[] format
- * This is the function to use when saving to database
- */
-export function toBoardStateDB(anyState: any): BoardStateDB {
+export function normalizeBoardState(anyState: any): BoardState {
   if (anyState === null || anyState === undefined) {
     return [];
   }
   
-  // Already database format
-  if (isDBBoardState(anyState)) {
+  // Already int[] format
+  if (isBoardState(anyState)) {
     return anyState;
   }
   
-  // Convert via expanded format
-  const expanded = expandBoardState(anyState);
-  return expandedToDBFormat(expanded);
+  // Legacy JSON format
+  if (isLegacyBoardState(anyState)) {
+    return fromLegacyBoardState(anyState);
+  }
+  
+  // Fallback for unknown format
+  return [];
 }

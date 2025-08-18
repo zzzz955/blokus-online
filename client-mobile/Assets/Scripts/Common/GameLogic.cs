@@ -118,26 +118,6 @@ namespace BlokusUnity.Common
             return board[pos.row, pos.col];
         }
 
-        /// <summary>
-        /// 셀이 점유되어 있는지 확인
-        /// </summary>
-        public bool IsCellOccupied(Position pos)
-        {
-            return GetCellOwner(pos) != PlayerColor.None;
-        }
-
-        /// <summary>
-        /// 보드 셀 직접 접근 (디버깅용)
-        /// </summary>
-        public PlayerColor GetBoardCell(int row, int col)
-        {
-            if (row < 0 || row >= GameConstants.BOARD_SIZE ||
-                col < 0 || col >= GameConstants.BOARD_SIZE)
-                return PlayerColor.None;
-
-            return board[row, col];
-        }
-
         // ========================================
         // 블록 배치 관련
         // ========================================
@@ -738,6 +718,78 @@ namespace BlokusUnity.Common
                 return PlayerColor.None;
 
             return board[position.row, position.col];
+        }
+        
+        /// <summary>
+        /// 보드 셀 색상 가져오기 (행, 열 인덱스 사용)
+        /// </summary>
+        public PlayerColor GetBoardCell(int row, int col)
+        {
+            if (row < 0 || row >= GameConstants.BOARD_SIZE || col < 0 || col >= GameConstants.BOARD_SIZE)
+                return PlayerColor.None;
+            
+            return board[row, col];
+        }
+        
+        /// <summary>
+        /// 초기 보드 상태 설정 (initial_board_state 적용용)
+        /// Format: color_index * 400 + (row * 20 + col)
+        /// Colors: 검정(0: 0-399), 파랑(1: 400-799), 노랑(2: 800-1199), 빨강(3: 1200-1599), 초록(4: 1600-1999)
+        /// </summary>
+        public void SetInitialBoardState(int[] boardPositions)
+        {
+            if (boardPositions == null || boardPositions.Length == 0)
+                return;
+                
+            Debug.Log($"[GameLogic] 초기 보드 상태 설정: {boardPositions.Length}개 위치");
+            
+            foreach (int encoded in boardPositions)
+            {
+                // Format: color_index * 400 + (row * 20 + col)
+                int colorIndex = encoded / 400;
+                int position = encoded % 400;
+                int col = position % 20;
+                int row = position / 20;
+                
+                Debug.Log($"[GameLogic] encoded={encoded}, colorIndex={colorIndex}, position={position}, row={row}, col={col}");
+                
+                // 유효한 범위 체크
+                if (row >= 0 && row < GameConstants.BOARD_SIZE && col >= 0 && col < GameConstants.BOARD_SIZE)
+                {
+                    // 색상 인덱스를 PlayerColor로 변환
+                    PlayerColor color = colorIndex switch
+                    {
+                        0 => PlayerColor.None,     // 검정 → 빈 칸 (서버에서 변경될 예정)
+                        1 => PlayerColor.Blue,     // 파랑
+                        2 => PlayerColor.Yellow,   // 노랑  
+                        3 => PlayerColor.Red,      // 빨강
+                        4 => PlayerColor.Green,    // 초록
+                        5 => PlayerColor.Obstacle, // 장애물 (어두운 회색)
+                        _ => PlayerColor.Obstacle  // 기타 값은 장애물로 처리
+                    };
+                    
+                    board[row, col] = color;
+                    Debug.Log($"[GameLogic] 초기 보드 설정: ({row},{col}) = {color} (encoded: {encoded}, colorIndex: {colorIndex})");
+                }
+                else
+                {
+                    Debug.LogWarning($"[GameLogic] 잘못된 보드 위치: row={row}, col={col} (encoded: {encoded})");
+                }
+            }
+            
+            // 캐시 무효화
+            InvalidateCache();
+        }
+        
+        /// <summary>
+        /// 특정 위치의 셀이 점유되어 있는지 확인
+        /// </summary>
+        private bool IsCellOccupied(Position position)
+        {
+            if (!ValidationUtility.IsValidPosition(position))
+                return true; // 보드 밖은 점유된 것으로 간주
+                
+            return board[position.row, position.col] != PlayerColor.None;
         }
 
         /// <summary>

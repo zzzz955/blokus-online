@@ -29,6 +29,7 @@ namespace BlokusUnity.Game
         [SerializeField] private Color yellowColor = Color.yellow;
         [SerializeField] private Color redColor = Color.red;
         [SerializeField] private Color greenColor = Color.green;
+        [SerializeField] private Color obstacleColor = new Color(0.3f, 0.3f, 0.3f, 1f); // 어두운 회색
 
         [Header("터치 UI")]
         // === Action Buttons (우측 상단 패널) ===
@@ -364,6 +365,7 @@ namespace BlokusUnity.Game
                 PlayerColor.Yellow => yellowColor,
                 PlayerColor.Red => redColor,
                 PlayerColor.Green => greenColor,
+                PlayerColor.Obstacle => obstacleColor,
                 _ => emptyColor
             };
         }

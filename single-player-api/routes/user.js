@@ -618,7 +618,8 @@ router.get('/sync/metadata',
           is_active,
           is_featured,
           thumbnail_url,
-          updated_at
+          updated_at,
+          initial_board_state
         FROM stages
         WHERE is_active = true
         ORDER BY stage_number ASC
@@ -645,7 +646,8 @@ router.get('/sync/metadata',
           hints: row.stage_hints,
           available_blocks: row.available_blocks,
           is_featured: row.is_featured,
-          thumbnail_url: row.thumbnail_url
+          thumbnail_url: row.thumbnail_url,
+          initial_board_state: row.initial_board_state
         })),
         total_count: metadataResult.rows.length,
         sync_completed_at: new Date().toISOString()
