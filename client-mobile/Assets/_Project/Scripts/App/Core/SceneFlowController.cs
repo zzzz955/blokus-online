@@ -1,10 +1,13 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using BlokusUnity.UI;
-using BlokusUnity.UI.Messages;
+using App.UI;
+using Shared.UI;
+using Features.Single.Gameplay;   // SingleGameManager
+using Features.Single.Core;       // SingleCoreBootstrap, StageDataManager
+using Features.Single.UI.InGame;
 
-namespace BlokusUnity
+namespace App.Core
 {
     /// <summary>
     /// Scene flow controller for additive scene loading and transition management
@@ -32,7 +35,7 @@ namespace BlokusUnity
                 Instance = this;
                 transform.SetParent(null);
                 DontDestroyOnLoad(gameObject);
-                
+
                 if (debugMode)
                     Debug.Log("SceneFlowController initialized with DontDestroyOnLoad");
             }
@@ -44,15 +47,81 @@ namespace BlokusUnity
             }
         }
 
+        void Start()
+        {
+            // Auto-boot to MainScene if we're starting from AppPersistent
+            if (SceneManager.GetActiveScene().name == AppPersistentScene)
+            {
+                if (debugMode)
+                    Debug.Log("[SceneFlowController] Starting from AppPersistent - auto-booting to MainScene");
+
+                StartCoroutine(BootToMainScene());
+            }
+        }
+
+        /// <summary>
+        /// Boot sequence from AppPersistent to MainScene
+        /// </summary>
+        private IEnumerator BootToMainScene()
+        {
+            if (debugMode)
+                Debug.Log("[SceneFlowController] Boot sequence started - waiting for systems");
+
+            // Wait for all systems to initialize completely
+            yield return new WaitForSeconds(1f);
+
+            // Wait for LoadingOverlay to be ready
+            while (LoadingOverlay.Instance == null)
+            {
+                yield return new WaitForEndOfFrame();
+            }
+
+            LoadingOverlay.Show("게임 초기화 중...");
+            InputLocker.Enable();
+
+            if (debugMode)
+                Debug.Log("[SceneFlowController] Systems ready, continuing boot sequence");
+
+            // Wait a moment more for loading overlay to show
+            yield return new WaitForSeconds(0.5f);
+
+            // Check if MainScene is already loaded
+            Scene mainScene = SceneManager.GetSceneByName(MainScene);
+            if (!mainScene.IsValid() || !mainScene.isLoaded)
+            {
+                if (debugMode)
+                    Debug.Log("[SceneFlowController] Loading MainScene additively");
+
+                LoadingOverlay.Show("메인 화면 로드 중...");
+                yield return LoadAdditive(MainScene, setActive: true);
+            }
+            else
+            {
+                if (debugMode)
+                    Debug.Log("[SceneFlowController] MainScene already loaded, setting active");
+
+                SetActive(MainScene);
+            }
+
+            // Wait before hiding loading overlay
+            yield return new WaitForSeconds(0.3f);
+
+            LoadingOverlay.Hide();
+            InputLocker.Disable();
+
+            if (debugMode)
+                Debug.Log("[SceneFlowController] Boot sequence completed");
+        }
+
         // ========================================
         // Scene Transition Coroutines
         // ========================================
 
         /// <summary>
         /// GoSingle: SingleCore(없으면 로드) → SingleGameplayScene 로드 → SingleGameplayScene 활성
-        /// Migration Plan: 전환 규칙을 위반하지 않음(코어 생존/언로드 타이밍 정확)
+        /// 이후 SingleGameManager에 선택된 스테이지를 '명시적'으로 전달 (강제 토글 금지)
         /// </summary>
-        public IEnumerator GoSingle()
+        public IEnumerator GoSingle(int? stageNumber = null)
         {
             if (debugMode)
                 Debug.Log("[SceneFlowController] GoSingle() started");
@@ -63,13 +132,12 @@ namespace BlokusUnity
             bool success = false;
             string errorMsg = "";
 
-            // Execute operations without try-catch to avoid yield issues
-            yield return StartCoroutine(GoSingleInternal((result, error) => {
+            yield return StartCoroutine(CoGoSingle(stageNumber, (result, error) =>
+            {
                 success = result;
                 errorMsg = error;
             }));
 
-            // Handle results
             if (!success && !string.IsNullOrEmpty(errorMsg))
             {
                 SystemMessageManager.ShowToast(errorMsg, MessagePriority.Error);
@@ -84,23 +152,148 @@ namespace BlokusUnity
             InputLocker.Disable();
         }
 
-        private IEnumerator GoSingleInternal(System.Action<bool, string> callback)
+        private IEnumerator CoGoSingle(int? stageNumber, System.Action<bool, string> callback)
         {
-            // Ensure SingleCore is loaded
+            // 1) SingleCore 확보
             yield return EnsureLoaded(SingleCoreScene);
-            
-            // Load SingleGameplayScene
-            yield return LoadAdditive(SingleGameplayScene, setActive: false);
-            
-            // Activate SingleGameplayScene
+
+            // 2) SingleCore 데이터 로딩 완료 대기
+            yield return WaitForSingleCoreDataLoading();
+
+            // 3) SingleGameplayScene 확보 + Active 전환
+            yield return EnsureLoaded(SingleGameplayScene);
             SetActive(SingleGameplayScene);
-            
+
+            // 4) SingleGameManager 인스턴스 대기 (토글/재생성 금지)
+            SingleGameManager gm = null;
+            float timeout = 3f;
+            while (timeout > 0f)
+            {
+                gm = SingleGameManager.Instance ?? FindObjectOfType<SingleGameManager>(true);
+                if (gm != null) break;
+                timeout -= Time.unscaledDeltaTime;
+                yield return null;
+            }
+            if (gm == null)
+            {
+                callback(false, "SingleGameManager를 찾지 못했습니다.");
+                yield break;
+            }
+
+            // 5) StageData 전달 (선택적으로 번호 명시)
+            var sdm = StageDataManager.Instance ?? FindObjectOfType<StageDataManager>(true);
+
+            if (stageNumber.HasValue && stageNumber.Value > 0)
+            {
+                if (debugMode) Debug.Log($"[SceneFlowController] 명시적 스테이지 번호 전달: {stageNumber.Value}");
+                gm.RequestStartByNumber(stageNumber.Value);
+            }
+            else if (sdm != null && sdm.GetCurrentStageNumber() > 0)
+            {
+                int cur = sdm.GetCurrentStageNumber();
+                if (debugMode) Debug.Log($"[SceneFlowController] StageDataManager의 현재 스테이지 전달: {cur}");
+                gm.RequestStartByNumber(cur);
+            }
+            else
+            {
+                // 아직 선택되지 않았다면 StageSelectPanel을 유지하고, 시작 버튼으로 GamePanel → SingleGameManager 호출
+                if (debugMode) Debug.Log("[SceneFlowController] 아직 선택된 스테이지 없음. StageSelectPanel 유지.");
+            }
+
             callback(true, "");
         }
 
         /// <summary>
+        /// 🔥 SingleCore 데이터 로딩 완료까지 대기
+        /// </summary>
+        private IEnumerator WaitForSingleCoreDataLoading()
+        {
+            if (debugMode)
+                Debug.Log("[SceneFlowController] SingleCore 데이터 로딩 대기 중...");
+
+            SingleCoreBootstrap bootstrap = null;
+
+            // 인스턴스가 생길 때까지 대기
+            float t = 0f;
+            while (bootstrap == null && t < 5f)
+            {
+                bootstrap = SingleCoreBootstrap.Instance;
+                if (bootstrap == null)
+                {
+                    t += 0.1f;
+                    yield return new WaitForSeconds(0.1f);
+                }
+            }
+
+            if (bootstrap == null)
+            {
+                Debug.LogWarning("[SceneFlowController] SingleCoreBootstrap 인스턴스를 찾지 못했습니다. 계속 진행합니다.");
+                yield break;
+            }
+
+            if (debugMode)
+                Debug.Log("[SceneFlowController] SingleCoreBootstrap 발견. 데이터 로딩 상태 확인 중...");
+
+            // 데이터 로딩 완료까지 대기
+            float timeout = 15f; // 15초 타임아웃
+            float elapsed = 0f;
+
+            bool loadingCompleted = false;
+            System.Action onCompleted = () => { loadingCompleted = true; };
+            System.Action<string> onFailed = (error) =>
+            {
+                loadingCompleted = true;
+                Debug.LogError($"[SceneFlowController] 데이터 로딩 실패: {error}");
+            };
+
+            // 이벤트 구독
+            bootstrap.OnDataLoadingComplete += onCompleted;
+            bootstrap.OnDataLoadingFailed += onFailed;
+
+            try
+            {
+                if (bootstrap.IsDataLoaded())
+                {
+                    if (debugMode) Debug.Log("[SceneFlowController] 데이터 이미 로딩 완료됨");
+                    yield break;
+                }
+
+                if (!bootstrap.IsDataLoading())
+                {
+                    Debug.LogWarning("[SceneFlowController] 데이터 로딩이 시작되지 않음. 수동 동기화 시도...");
+                    bootstrap.SyncWithServer();
+                    yield return new WaitForSeconds(1f);
+                }
+
+                while (!loadingCompleted && elapsed < timeout)
+                {
+                    if (bootstrap.IsDataLoading())
+                    {
+                        LoadingOverlay.Show("게임 데이터 로딩 중...");
+                    }
+
+                    yield return new WaitForSeconds(0.1f);
+                    elapsed += 0.1f;
+                }
+
+                if (elapsed >= timeout && !bootstrap.IsDataLoaded())
+                {
+                    Debug.LogWarning("[SceneFlowController] 데이터 로딩 타임아웃. 게임플레이는 계속 진행됩니다.");
+                }
+                else if (debugMode)
+                {
+                    Debug.Log("[SceneFlowController] ✅ 데이터 로딩 완료!");
+                }
+            }
+            finally
+            {
+                bootstrap.OnDataLoadingComplete -= onCompleted;
+                bootstrap.OnDataLoadingFailed -= onFailed;
+            }
+        }
+
+        /// <summary>
         /// ExitSingleToMain: SingleGameplayScene 언로드(코어 유지) → MainScene 활성
-        /// Migration Plan: 로딩 중 UI 입력 완전 차단
         /// </summary>
         public IEnumerator ExitSingleToMain()
         {
@@ -113,13 +306,12 @@ namespace BlokusUnity
             bool success = false;
             string errorMsg = "";
 
-            // Execute operations without try-catch to avoid yield issues
-            yield return StartCoroutine(ExitSingleToMainInternal((result, error) => {
+            yield return StartCoroutine(CoExitSingleToMain((result, error) =>
+            {
                 success = result;
                 errorMsg = error;
             }));
 
-            // Handle results
             if (!success && !string.IsNullOrEmpty(errorMsg))
             {
                 SystemMessageManager.ShowToast(errorMsg, MessagePriority.Error);
@@ -134,20 +326,26 @@ namespace BlokusUnity
             InputLocker.Disable();
         }
 
-        private IEnumerator ExitSingleToMainInternal(System.Action<bool, string> callback)
+        private IEnumerator CoExitSingleToMain(System.Action<bool, string> callback)
         {
-            // Unload SingleGameplayScene (keep SingleCore alive)
+            // (선택) SingleGameManager 싱글톤 정리
+            if (SingleGameManager.Instance != null)
+            {
+                if (debugMode) Debug.Log("[SceneFlowController] SingleGameManager 싱글톤 참조 정리");
+                SingleGameManager.ClearInstance();
+            }
+
+            // SingleGameplayScene만 언로드 (SingleCore 유지)
             yield return UnloadIfLoaded(SingleGameplayScene);
-            
-            // Activate MainScene
+
+            // MainScene 활성
             SetActive(MainScene);
-            
+
             callback(true, "");
         }
 
         /// <summary>
         /// GoMulti: SingleGameplayScene 언로드(있다면) → SingleCore 언로드(있다면) → MultiGameplayScene 로드/활성
-        /// Migration Plan: 예외 발생 시 SystemMessageManager.ShowToast("로딩 실패: ...", Priority.Error) 호출
         /// </summary>
         public IEnumerator GoMulti()
         {
@@ -160,13 +358,12 @@ namespace BlokusUnity
             bool success = false;
             string errorMsg = "";
 
-            // Execute operations without try-catch to avoid yield issues
-            yield return StartCoroutine(GoMultiInternal((result, error) => {
+            yield return StartCoroutine(CoGoMulti((result, error) =>
+            {
                 success = result;
                 errorMsg = error;
             }));
 
-            // Handle results
             if (!success && !string.IsNullOrEmpty(errorMsg))
             {
                 SystemMessageManager.ShowToast(errorMsg, MessagePriority.Error);
@@ -181,23 +378,22 @@ namespace BlokusUnity
             InputLocker.Disable();
         }
 
-        private IEnumerator GoMultiInternal(System.Action<bool, string> callback)
+        private IEnumerator CoGoMulti(System.Action<bool, string> callback)
         {
-            // Unload SingleGameplayScene if loaded
+            // SingleGameplayScene 언로드
             yield return UnloadIfLoaded(SingleGameplayScene);
-            
-            // Unload SingleCore if loaded (multi doesn't need single core)
+
+            // SingleCore 언로드 (멀티에서는 필요 없음)
             yield return UnloadIfLoaded(SingleCoreScene);
-            
-            // Load and activate MultiGameplayScene
+
+            // MultiGameplayScene 로드 및 활성
             yield return LoadAdditive(MultiGameplayScene, setActive: true);
-            
+
             callback(true, "");
         }
 
         /// <summary>
         /// ExitMultiToMain: MultiGameplayScene 언로드 → MainScene 활성
-        /// Migration Plan: 전환 전후 깜빡임/입력 누수 없음
         /// </summary>
         public IEnumerator ExitMultiToMain()
         {
@@ -210,13 +406,12 @@ namespace BlokusUnity
             bool success = false;
             string errorMsg = "";
 
-            // Execute operations without try-catch to avoid yield issues
-            yield return StartCoroutine(ExitMultiToMainInternal((result, error) => {
+            yield return StartCoroutine(CoExitMultiToMain((result, error) =>
+            {
                 success = result;
                 errorMsg = error;
             }));
 
-            // Handle results
             if (!success && !string.IsNullOrEmpty(errorMsg))
             {
                 SystemMessageManager.ShowToast(errorMsg, MessagePriority.Error);
@@ -231,14 +426,14 @@ namespace BlokusUnity
             InputLocker.Disable();
         }
 
-        private IEnumerator ExitMultiToMainInternal(System.Action<bool, string> callback)
+        private IEnumerator CoExitMultiToMain(System.Action<bool, string> callback)
         {
-            // Unload MultiGameplayScene
+            // MultiGameplayScene 언로드
             yield return UnloadIfLoaded(MultiGameplayScene);
-            
-            // Activate MainScene
+
+            // MainScene 활성
             SetActive(MainScene);
-            
+
             callback(true, "");
         }
 
@@ -248,7 +443,6 @@ namespace BlokusUnity
 
         /// <summary>
         /// Ensure scene is loaded, load if not present
-        /// Migration Plan: 헬퍼 완비
         /// </summary>
         private IEnumerator EnsureLoaded(string sceneName)
         {
@@ -257,7 +451,7 @@ namespace BlokusUnity
             {
                 if (debugMode)
                     Debug.Log($"[SceneFlowController] EnsureLoaded: Loading {sceneName}");
-                
+
                 yield return LoadAdditive(sceneName, setActive: false);
             }
             else
@@ -269,7 +463,6 @@ namespace BlokusUnity
 
         /// <summary>
         /// Load scene additively
-        /// Migration Plan: LoadAdditive(name, setActive=false)
         /// </summary>
         private IEnumerator LoadAdditive(string sceneName, bool setActive = false)
         {
@@ -282,13 +475,11 @@ namespace BlokusUnity
                 throw new System.Exception($"Failed to start loading scene: {sceneName}");
             }
 
-            // Wait for scene to load
             while (!asyncLoad.isDone)
             {
                 yield return null;
             }
 
-            // Set active if requested
             if (setActive)
             {
                 SetActive(sceneName);
@@ -300,7 +491,6 @@ namespace BlokusUnity
 
         /// <summary>
         /// Unload scene if it's loaded
-        /// Migration Plan: UnloadIfLoaded(name)
         /// </summary>
         private IEnumerator UnloadIfLoaded(string sceneName)
         {
@@ -317,7 +507,6 @@ namespace BlokusUnity
                     yield break;
                 }
 
-                // Wait for scene to unload
                 while (!asyncUnload.isDone)
                 {
                     yield return null;
@@ -335,7 +524,6 @@ namespace BlokusUnity
 
         /// <summary>
         /// Set scene as active scene
-        /// Migration Plan: SetActive(name)
         /// </summary>
         private void SetActive(string sceneName)
         {
@@ -343,7 +531,7 @@ namespace BlokusUnity
             if (scene.IsValid() && scene.isLoaded)
             {
                 SceneManager.SetActiveScene(scene);
-                
+
                 if (debugMode)
                     Debug.Log($"[SceneFlowController] SetActive: {sceneName} is now active scene");
             }
@@ -358,11 +546,20 @@ namespace BlokusUnity
         // ========================================
 
         /// <summary>
-        /// Start single player mode transition
+        /// Start single player mode transition (스테이지 번호 미지정)
         /// </summary>
         public void StartGoSingle()
         {
-            StartCoroutine(GoSingle());
+            StartCoroutine(GoSingle(null));
+        }
+
+        /// <summary>
+        /// Start single player mode transition (스테이지 번호 지정)
+        /// - StageInfoModal에서 바로 호출 가능
+        /// </summary>
+        public void StartGoSingle(int stageNumber)
+        {
+            StartCoroutine(GoSingle(stageNumber));
         }
 
         /// <summary>

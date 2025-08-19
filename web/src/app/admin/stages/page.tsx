@@ -35,7 +35,7 @@ export default function StagesAdminPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const action = searchParams.get('action');
+    const action = searchParams?.get('action');
     if (action === 'create') {
       handleCreateStage();
     } else {

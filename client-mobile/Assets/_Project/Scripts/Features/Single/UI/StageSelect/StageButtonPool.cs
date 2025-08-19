@@ -1,9 +1,7 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
-using BlokusUnity.UI;
-
-namespace BlokusUnity.Application.Stages
-{
+using Shared.UI;
+namespace Features.Single.UI.StageSelect{
     /// <summary>
     /// 스테이지 버튼 오브젝트 풀링 시스템
     /// 기존 StageButton 컴포넌트를 재사용하여 성능 최적화

@@ -1,12 +1,11 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using BlokusUnity.Network;
-using BlokusUnity.Common;
+using App.Network;
+using Features.Single.Core;
 
-namespace BlokusUnity.Data
-{
+namespace App.Services{
     /// <summary>
     /// 새로운 캐싱 전략 관리자
     /// 라이트 동기화, 메타데이터 TTL, 버전 관리 등을 담당
@@ -95,7 +94,7 @@ namespace BlokusUnity.Data
             // 1. 토큰 유효성 체크 (HttpApiClient 대기)
             yield return new WaitUntil(() => HttpApiClient.Instance != null);
             
-            if (!BlokusUnity.Features.Single.UserDataCache.Instance.IsLoggedIn())
+            if (!Features.Single.Core.UserDataCache.Instance.IsLoggedIn())
             {
                 if (debugMode)
                     Debug.Log("[CacheManager] 로그인되지 않음 - 동기화 건너뜀");

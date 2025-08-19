@@ -1,13 +1,12 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using BlokusUnity.Common;
-
-namespace BlokusUnity.Game
-{
+using Features.Single.Gameplay.Skins;
+using Shared.Models;
+namespace Features.Single.Gameplay{
     [RequireComponent(typeof(RectTransform))]
     [RequireComponent(typeof(Button))]
     [RequireComponent(typeof(Image))]
@@ -22,7 +21,7 @@ namespace BlokusUnity.Game
         [SerializeField] private bool useSpriteThumbnails = false; // ← 기본 off(그리드로 그림)
 
         [Header("Skin (optional)")]
-        [SerializeField] private BlokusUnity.Features.Single.Skins.BlockSkin skin; // 없으면 기본 색
+        [SerializeField] private Features.Single.Gameplay.Skins.BlockSkin skin; // 없으면 기본 색
 
         public BlockType Type { get; private set; }
         public PlayerColor Player { get; private set; }
@@ -146,7 +145,7 @@ namespace BlokusUnity.Game
             if (useSpriteThumbnails && TryGetSpriteFor(blockType, out var spr) && spr != null)
             {
                 // 자식으로 1장만 붙임 (여전히 cellSize에 맞춰서 컨테이너 크기 설정)
-                var baseShape = BlokusUnity.Common.Block.GetBaseShape(blockType);
+                var baseShape = Shared.Models.Block.GetBaseShape(blockType);
                 int minR = int.MaxValue, maxR = int.MinValue, minC = int.MaxValue, maxC = int.MinValue;
                 foreach (var p in baseShape)
                 {
@@ -180,7 +179,7 @@ namespace BlokusUnity.Game
             }
 
             // 기본: 셀-그리기 (셀 크기 동일)
-            var positions = BlokusUnity.Common.Block.GetBaseShape(blockType);
+            var positions = Shared.Models.Block.GetBaseShape(blockType);
             if (positions == null || positions.Count == 0) return;
 
             var visualContainer = new GameObject("BlockVisual", typeof(RectTransform));

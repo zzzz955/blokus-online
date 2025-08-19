@@ -1,10 +1,9 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using BlokusUnity.UI;
-
-namespace BlokusUnity.UI
-{
+using App.Core;
+using Shared.UI;
+namespace App.UI{
     /// <summary>
     /// Login panel controller for MainScene
     /// Migration Plan: 로그인 로직은 MainScene의 패널에서 동작
@@ -47,6 +46,37 @@ namespace BlokusUnity.UI
             if (usernameInput == null || passwordInput == null || loginButton == null)
             {
                 Debug.LogError("[LoginPanelController] Required UI components not assigned!", this);
+            }
+            
+            // TMP_Text 컴포넌트 검증 및 복구
+            if (statusText == null)
+            {
+                Debug.LogWarning("[LoginPanelController] statusText가 할당되지 않음, 자동으로 찾는 중...");
+                var textComponents = GetComponentsInChildren<TMP_Text>();
+                foreach (var text in textComponents)
+                {
+                    if (text.name.ToLower().Contains("status") || text.name.ToLower().Contains("message"))
+                    {
+                        statusText = text;
+                        Debug.Log($"[LoginPanelController] statusText 자동 할당: {text.name}");
+                        break;
+                    }
+                }
+                
+                if (statusText == null)
+                {
+                    Debug.LogWarning("[LoginPanelController] statusText를 찾을 수 없음, TextMeshProUGUI로 생성 시도");
+                    var statusObj = GameObject.Find("StatusText");
+                    if (statusObj != null)
+                    {
+                        statusText = statusObj.GetComponent<TMP_Text>();
+                        if (statusText == null)
+                        {
+                            statusText = statusObj.AddComponent<TMPro.TextMeshProUGUI>();
+                            Debug.Log("[LoginPanelController] statusText를 TextMeshProUGUI로 생성했습니다");
+                        }
+                    }
+                }
             }
         }
 
@@ -155,14 +185,52 @@ namespace BlokusUnity.UI
                 if (loginSuccess)
                 {
                     UpdateStatusText("로그인 성공!", false);
+                    Debug.Log("[LoginPanelController] 로그인 성공 처리 시작");
                     
-                    // Hide login panel after successful login
-                    await System.Threading.Tasks.Task.Delay(1000); // Brief delay to show success message
-                    Hide();
+                    // 즉시 BlokusUIManager 호출 - 강화된 방어 코드
+                    Debug.Log("[LoginPanelController] BlokusUIManager 찾기 시작");
+                    Debug.Log($"[LoginPanelController] BlokusUIManager.Instance 값: {BlokusUIManager.Instance}");
                     
-                    // TODO: Transition to next UI state (mode selection)
-                    if (debugMode)
-                        Debug.Log("[LoginPanelController] Login successful, should transition to mode selection");
+                    BlokusUIManager uiManager = BlokusUIManager.GetInstance();
+                    Debug.Log($"[LoginPanelController] BlokusUIManager.GetInstance() 결과: {uiManager}");
+                    
+                    if (uiManager != null)
+                    {
+                        Debug.Log("[LoginPanelController] BlokusUIManager 발견! OnLoginSuccess() 즉시 호출");
+                        try
+                        {
+                            uiManager.OnLoginSuccess();
+                            Debug.Log("[LoginPanelController] BlokusUIManager.OnLoginSuccess() 호출 완료");
+                        }
+                        catch (System.Exception ex)
+                        {
+                            Debug.LogError($"[LoginPanelController] OnLoginSuccess() 호출 중 오류: {ex.Message}");
+                            
+                            // 폴백: SystemMessageManager로 사용자에게 알림
+                            if (SystemMessageManager.Instance != null)
+                            {
+                                MessagePriority priority = MessagePriority.Warning;
+                                SystemMessageManager.ShowToast("로그인 성공했지만 화면 전환에 문제가 있습니다.", priority);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        Debug.LogError("[LoginPanelController] BlokusUIManager를 찾을 수 없습니다!");
+                        Debug.LogError($"[LoginPanelController] BlokusUIManager.Instance: {BlokusUIManager.Instance}");
+                        Debug.LogError($"[LoginPanelController] FindObjectOfType 결과: {Object.FindObjectOfType<BlokusUIManager>()}");
+                        
+                        // 폴백: SystemMessageManager로 사용자에게 알림
+                        if (SystemMessageManager.Instance != null)
+                        {
+                            MessagePriority priority = MessagePriority.Error;
+                            SystemMessageManager.ShowToast("로그인 성공했지만 UI 매니저를 찾을 수 없습니다.", priority);
+                        }
+                        
+                        // 수동으로 씬 새로고침 시도
+                        Debug.Log("[LoginPanelController] 수동으로 MainScene 새로고침 시도");
+                        StartCoroutine(RefreshMainSceneAfterDelay());
+                    }
                 }
                 else
                 {
@@ -235,6 +303,17 @@ namespace BlokusUnity.UI
                 statusText.text = message;
                 statusText.color = isError ? Color.red : Color.white;
             }
+            else
+            {
+                Debug.LogWarning($"[LoginPanelController] statusText가 null입니다. 메시지: {message}");
+                
+                // 폴백: SystemMessageManager 사용
+                if (SystemMessageManager.Instance != null)
+                {
+                    MessagePriority priority = isError ? MessagePriority.Error : MessagePriority.Info;
+                    SystemMessageManager.ShowToast(message, priority);
+                }
+            }
         }
 
         private void ClearInputFields()
@@ -263,6 +342,33 @@ namespace BlokusUnity.UI
         /// Check if login is currently in progress
         /// </summary>
         public bool IsProcessingLogin => isProcessingLogin;
+
+        /// <summary>
+        /// Fallback method to refresh MainScene when UI Manager is not found
+        /// </summary>
+        private System.Collections.IEnumerator RefreshMainSceneAfterDelay()
+        {
+            yield return new WaitForSeconds(1.0f);
+            
+            Debug.Log("[LoginPanelController] MainScene 새로고침 시도");
+            
+            // Try to find BlokusUIManager again
+            BlokusUIManager uiManager = Object.FindObjectOfType<BlokusUIManager>();
+            if (uiManager != null)
+            {
+                Debug.Log("[LoginPanelController] 새로고침 후 BlokusUIManager 발견! OnLoginSuccess() 호출");
+                uiManager.OnLoginSuccess();
+            }
+            else
+            {
+                Debug.LogError("[LoginPanelController] 새로고침 후에도 BlokusUIManager를 찾을 수 없습니다.");
+                
+                // Final fallback: reload current scene
+                var currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+                Debug.Log($"[LoginPanelController] 최종 폴백: {currentScene.name} 씬 재로드");
+                UnityEngine.SceneManagement.SceneManager.LoadScene(currentScene.name);
+            }
+        }
 
         // ========================================
         // Unity Lifecycle

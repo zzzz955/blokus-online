@@ -1,8 +1,8 @@
-using UnityEngine;
-using BlokusUnity.UI.Messages;
-
-namespace BlokusUnity.Features.Multi
-{
+﻿using UnityEngine;
+using Shared.Models;
+using App.Core;
+using App.UI;
+namespace Features.Multi{
     /// <summary>
     /// MultiGameplayScene stub implementation
     /// Migration Plan: 멀티플레이어 기능은 나중에 구현하되, 스켈레톤만 제공하여 씬 로딩 오류 방지
@@ -56,20 +56,21 @@ namespace BlokusUnity.Features.Multi
         }
 
         /// <summary>
-        /// 메인 씬으로 돌아가기
+        /// 메인 씬으로 돌아가기 (5-Scene 아키텍처 지원)
         /// </summary>
         private void ReturnToMainScene()
         {
             Debug.Log("[MultiGameplaySceneStub] Returning to MainScene");
 
-            // SceneFlowController를 통해 메인 씬으로 돌아가기
-            if (BlokusUnity.SceneFlowController.Instance != null)
+            // 🔥 수정: SceneFlowController를 통한 proper Scene 전환
+            if (SceneFlowController.Instance != null)
             {
-                StartCoroutine(BlokusUnity.SceneFlowController.Instance.ExitMultiToMain());
+                Debug.Log("[MultiGameplaySceneStub] SceneFlowController를 통해 MainScene으로 전환");
+                SceneFlowController.Instance.StartExitMultiToMain();
             }
             else
             {
-                Debug.LogWarning("[MultiGameplaySceneStub] SceneFlowController not found, manual scene load");
+                Debug.LogError("[MultiGameplaySceneStub] SceneFlowController가 없습니다! 레거시 방식으로 전환");
                 UnityEngine.SceneManagement.SceneManager.LoadScene("MainScene");
             }
         }

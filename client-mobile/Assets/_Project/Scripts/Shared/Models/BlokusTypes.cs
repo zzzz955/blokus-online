@@ -1,9 +1,9 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
-
-namespace BlokusUnity.Common
-{
+using Features.Multi.Net;
+using Features.Single.Core;
+namespace Shared.Models{
     // ========================================
     // 기본 상수 정의 (Types.h 포팅)
     // ========================================

@@ -1,7 +1,5 @@
-using UnityEngine;
-
-namespace BlokusUnity.UI
-{
+﻿using UnityEngine;
+namespace Shared.UI{
     /// <summary>
     /// Base implementation for UI panels with Animator-based transitions
     /// Migration Plan: PanelBase는 Animator와 트리거(Show, Hide)를 강제
@@ -25,14 +23,16 @@ namespace BlokusUnity.UI
             if (animator == null)
                 animator = GetComponent<Animator>();
 
-            // Validate animator exists
+            // Check animator status
             if (animator == null)
             {
-                Debug.LogError($"[PanelBase] {gameObject.name}: Animator component is required but not found!", this);
+                if (debugMode)
+                    Debug.Log($"[PanelBase] {gameObject.name}: No Animator found - will use immediate show/hide fallback");
             }
-            else if (debugMode)
+            else
             {
-                Debug.Log($"[PanelBase] {gameObject.name}: Animator found and initialized");
+                if (debugMode)
+                    Debug.Log($"[PanelBase] {gameObject.name}: Animator found and initialized");
             }
         }
 
@@ -47,8 +47,8 @@ namespace BlokusUnity.UI
         }
 
         /// <summary>
-        /// Show panel with Show trigger animation
-        /// Migration Plan: 0.2s EaseOut transition
+        /// Show panel with Show trigger animation or immediate fallback
+        /// Migration Plan: 0.2s EaseOut transition or SetActive fallback
         /// </summary>
         public virtual void Show()
         {
@@ -57,34 +57,41 @@ namespace BlokusUnity.UI
 
             gameObject.SetActive(true);
             
-            if (animator != null)
+            if (animator != null && HasAnimatorParameter(ShowTrigger))
             {
                 animator.SetTrigger(ShowTrigger);
+                if (debugMode)
+                    Debug.Log($"[PanelBase] {gameObject.name}: Show animation triggered");
             }
             else
             {
-                Debug.LogWarning($"[PanelBase] {gameObject.name}: No animator found for Show animation");
+                if (debugMode)
+                    Debug.Log($"[PanelBase] {gameObject.name}: Using immediate show (no animator or trigger)");
+                // Immediate show fallback - no animation needed
             }
         }
 
         /// <summary>
-        /// Hide panel with Hide trigger animation
-        /// Migration Plan: 0.2s EaseOut transition
+        /// Hide panel with Hide trigger animation or immediate fallback
+        /// Migration Plan: 0.2s EaseOut transition or SetActive fallback
         /// </summary>
         public virtual void Hide()
         {
             if (debugMode)
                 Debug.Log($"[PanelBase] {gameObject.name}: Hide() called");
 
-            if (animator != null)
+            if (animator != null && HasAnimatorParameter(HideTrigger))
             {
                 animator.SetTrigger(HideTrigger);
                 // Note: GameObject deactivation should be handled by animation event
                 // or override in child class if immediate deactivation is needed
+                if (debugMode)
+                    Debug.Log($"[PanelBase] {gameObject.name}: Hide animation triggered");
             }
             else
             {
-                Debug.LogWarning($"[PanelBase] {gameObject.name}: No animator found for Hide animation");
+                if (debugMode)
+                    Debug.Log($"[PanelBase] {gameObject.name}: Using immediate hide (no animator or trigger)");
                 gameObject.SetActive(false);
             }
         }
@@ -146,6 +153,21 @@ namespace BlokusUnity.UI
                 Debug.Log($"[PanelBase] {gameObject.name}: HideImmediate() called");
 
             gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// Check if animator has a specific parameter/trigger
+        /// </summary>
+        private bool HasAnimatorParameter(string parameterName)
+        {
+            if (animator == null) return false;
+            
+            foreach (AnimatorControllerParameter param in animator.parameters)
+            {
+                if (param.name == parameterName)
+                    return true;
+            }
+            return false;
         }
     }
 }

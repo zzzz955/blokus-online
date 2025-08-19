@@ -1,9 +1,8 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
-using BlokusUnity.UI.Messages;
+using Shared.UI;
 
-namespace BlokusUnity.UI.Messages
-{
+namespace App.UI{
     /// <summary>
     /// 전역 시스템 메시지 매니저
     /// Toast, Alert, Loading 등 모든 시스템 메시지를 중앙에서 관리
@@ -16,8 +15,13 @@ namespace BlokusUnity.UI.Messages
         [SerializeField] private Transform toastContainer;
 
         [Header("Toast 설정")]
-        [SerializeField] private int maxToastCount = 3; // 동시에 표시할 수 있는 Toast 최대 개수
+        [SerializeField] private int fixedToastCount = 3; // 미리 생성할 Toast 개수
         [SerializeField] private float toastSpacing = 10f; // Toast 간 간격
+        [SerializeField] private int maxQueueSize = 10; // 최대 대기열 크기
+
+        [Header("보안 설정")]
+        [SerializeField] private float rateLimitWindow = 1f; // Rate limit 시간 (초)
+        [SerializeField] private int maxToastsPerSecond = 5; // 초당 최대 Toast 개수
 
         [Header("개발용 설정")]
         [SerializeField] private bool enableDebugMessages = true;
@@ -25,9 +29,10 @@ namespace BlokusUnity.UI.Messages
         // 싱글톤
         public static SystemMessageManager Instance { get; private set; }
 
-        // Toast 관리
-        private System.Collections.Generic.Queue<ToastMessage> toastPool = new System.Collections.Generic.Queue<ToastMessage>();
-        private System.Collections.Generic.List<ToastMessage> activeToasts = new System.Collections.Generic.List<ToastMessage>();
+        // Toast 관리 (고정 개수 + 큐잉 시스템)
+        private ToastMessage[] toastSlots; // 고정된 3개 Toast 슬롯
+        private System.Collections.Generic.Queue<MessageData> messageQueue = new System.Collections.Generic.Queue<MessageData>(); // 대기열
+        private System.Collections.Generic.Queue<float> toastRequestTimes = new System.Collections.Generic.Queue<float>(); // Rate limiting용
 
         void Awake()
         {
@@ -41,11 +46,11 @@ namespace BlokusUnity.UI.Messages
                 DontDestroyOnLoad(gameObject);
 
                 InitializeComponents();
-                Debug.Log("SystemMessageManager 초기화 완료 - DontDestroyOnLoad 적용됨");
+                // Debug.Log("SystemMessageManager 초기화 완료 - DontDestroyOnLoad 적용됨");
             }
             else
             {
-                Debug.Log("SystemMessageManager 중복 인스턴스 제거");
+                // Debug.Log("SystemMessageManager 중복 인스턴스 제거");
                 Destroy(gameObject);
             }
         }
@@ -55,26 +60,45 @@ namespace BlokusUnity.UI.Messages
         /// </summary>
         private void InitializeComponents()
         {
+            // Debug.Log("[SystemMessageManager] InitializeComponents 시작");
+            
             // Canvas가 없으면 자동 생성
             if (messageCanvas == null)
             {
+                // Debug.Log("[SystemMessageManager] Canvas가 없어서 생성 중...");
                 CreateMessageCanvas();
+            }
+            else
+            {
+                // Debug.Log("[SystemMessageManager] Canvas 이미 존재함");
             }
 
             // Toast Container가 없으면 자동 생성
             if (toastContainer == null)
             {
+                // Debug.Log("[SystemMessageManager] ToastContainer가 없어서 생성 중...");
                 CreateToastContainer();
+            }
+            else
+            {
+                // Debug.Log("[SystemMessageManager] ToastContainer 이미 존재함");
             }
 
             // Toast Prefab이 없으면 기본 Toast 생성
             if (toastPrefab == null)
             {
+                // Debug.Log("[SystemMessageManager] ToastPrefab이 없어서 생성 중...");
                 CreateDefaultToastPrefab();
             }
+            else
+            {
+                // Debug.Log("[SystemMessageManager] ToastPrefab 이미 존재함");
+            }
 
-            // 초기 Toast 풀 생성
-            PrewarmToastPool();
+            // 고정된 Toast 슬롯 생성
+            CreateFixedToastSlots();
+            
+            // Debug.Log("[SystemMessageManager] InitializeComponents 완료");
         }
 
         /// <summary>
@@ -91,10 +115,13 @@ namespace BlokusUnity.UI.Messages
             messageCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
             messageCanvas.sortingOrder = 100; // 다른 UI보다 위에 표시
 
-            canvasObj.AddComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            CanvasScaler scaler = canvasObj.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920, 1080);
+            
             canvasObj.AddComponent<GraphicRaycaster>();
 
-            Debug.Log("SystemMessageCanvas 자동 생성됨 - DontDestroyOnLoad 적용됨");
+            // // Debug.Log($"SystemMessageCanvas 자동 생성됨 - Active: {canvasObj.activeInHierarchy}, DontDestroyOnLoad 적용됨");
         }
 
         /// <summary>
@@ -102,28 +129,31 @@ namespace BlokusUnity.UI.Messages
         /// </summary>
         private void CreateToastContainer()
         {
+            // Canvas가 제대로 생성되었는지 확인
+            if (messageCanvas == null)
+            {
+                // Debug.LogError("[SystemMessageManager] Canvas가 null입니다! CreateMessageCanvas()를 먼저 호출하세요.");
+                return;
+            }
+
             GameObject containerObj = new GameObject("ToastContainer");
-            containerObj.transform.SetParent(messageCanvas.transform);
+            containerObj.transform.SetParent(messageCanvas.transform, false); // worldPositionStays = false
 
             toastContainer = containerObj.transform;
             RectTransform rectTransform = containerObj.AddComponent<RectTransform>();
 
-            // 화면 상단 중앙에 배치
-            rectTransform.anchorMin = new Vector2(0.5f, 1f);
-            rectTransform.anchorMax = new Vector2(0.5f, 1f);
-            rectTransform.pivot = new Vector2(0.5f, 1f);
-            rectTransform.anchoredPosition = new Vector2(0, -50); // 상단에서 50px 아래
+            // 전체 화면 크기로 설정
+            rectTransform.anchorMin = Vector2.zero;
+            rectTransform.anchorMax = Vector2.one;
+            rectTransform.offsetMin = Vector2.zero;
+            rectTransform.offsetMax = Vector2.zero;
 
-            // 세로 레이아웃 그룹 추가
-            VerticalLayoutGroup layoutGroup = containerObj.AddComponent<VerticalLayoutGroup>();
-            layoutGroup.spacing = toastSpacing;
-            layoutGroup.childAlignment = TextAnchor.UpperCenter;
-            layoutGroup.childControlWidth = false;
-            layoutGroup.childControlHeight = false;
-            layoutGroup.childForceExpandWidth = false;
-            layoutGroup.childForceExpandHeight = false;
+            // 고정 위치 시스템 사용 (VerticalLayoutGroup 제거)
+            // Toast들은 개별적으로 고정된 위치에 배치됨
 
-            Debug.Log("ToastContainer 자동 생성됨");
+            // Debug.Log($"ToastContainer 생성됨 - Active: {containerObj.activeInHierarchy}, Parent Active: {messageCanvas.gameObject.activeInHierarchy}");
+
+            // Debug.Log("ToastContainer 자동 생성됨");
         }
 
         /// <summary>
@@ -168,55 +198,184 @@ namespace BlokusUnity.UI.Messages
             // Prefab 준비를 위해 비활성화
             toastObj.SetActive(false);
 
-            Debug.Log("기본 ToastPrefab 자동 생성됨");
+            // Debug.Log("기본 ToastPrefab 자동 생성됨");
         }
 
         /// <summary>
-        /// Toast 풀 사전 생성
+        /// 고정된 Toast 슬롯 생성
         /// </summary>
-        private void PrewarmToastPool()
+        private void CreateFixedToastSlots()
         {
-            for (int i = 0; i < maxToastCount; i++)
-            {
-                CreateToastInstance();
-            }
-        }
-
-        /// <summary>
-        /// Toast 인스턴스 생성
-        /// </summary>
-        private ToastMessage CreateToastInstance()
-        {
-            GameObject instance = Instantiate(toastPrefab.gameObject, toastContainer);
-            ToastMessage toast = instance.GetComponent<ToastMessage>();
+            toastSlots = new ToastMessage[fixedToastCount];
             
-            toast.OnToastClosed += OnToastClosed;
-            toast.gameObject.SetActive(false);
-            toastPool.Enqueue(toast);
-
-            return toast;
-        }
-
-        /// <summary>
-        /// Toast 풀에서 가져오기
-        /// </summary>
-        private ToastMessage GetToastFromPool()
-        {
-            if (toastPool.Count == 0)
+            for (int i = 0; i < fixedToastCount; i++)
             {
-                return CreateToastInstance();
+                ToastMessage toast = CreateSafeToastInstance(i);
+                if (toast != null)
+                {
+                    toastSlots[i] = toast;
+                    toast.OnToastClosed += OnToastClosed;
+                    
+                    // 각 슬롯에 고정된 Y 위치 설정 (위에서부터 차례로)
+                    SetToastSlotPosition(toast, i);
+                    
+                    // Debug.Log($"[SystemMessageManager] Toast 슬롯 {i} 생성 완료 - Y위치: {-i * (60 + toastSpacing)}");
+                }
+                else
+                {
+                    // Debug.LogError($"[SystemMessageManager] Toast 슬롯 {i} 생성 실패!");
+                }
             }
-
-            return toastPool.Dequeue();
         }
 
         /// <summary>
-        /// Toast 풀에 반환
+        /// Toast 슬롯의 고정 위치 설정
         /// </summary>
-        private void ReturnToastToPool(ToastMessage toast)
+        private void SetToastSlotPosition(ToastMessage toast, int slotIndex)
         {
-            toast.gameObject.SetActive(false);
-            toastPool.Enqueue(toast);
+            RectTransform rectTransform = toast.GetComponent<RectTransform>();
+            if (rectTransform != null)
+            {
+                // 상단에서부터 차례로 배치 (0번이 가장 위, 1번이 그 아래...)
+                float yPosition = -slotIndex * (60 + toastSpacing); // 토스트 높이 60 + 간격
+                
+                rectTransform.anchoredPosition = new Vector2(0, yPosition);
+                rectTransform.anchorMin = new Vector2(0.5f, 1f); // 상단 중앙 기준
+                rectTransform.anchorMax = new Vector2(0.5f, 1f);
+                
+                // Debug.Log($"[SystemMessageManager] Toast 슬롯 {slotIndex} 위치 설정: Y={yPosition}");
+            }
+        }
+
+        /// <summary>
+        /// 안전한 Toast 인스턴스 생성
+        /// </summary>
+        private ToastMessage CreateSafeToastInstance(int slotIndex)
+        {
+            try
+            {
+                if (toastPrefab == null)
+                {
+                    // Debug.LogWarning("[SystemMessageManager] ToastPrefab이 null, 간단한 Toast 생성");
+                    return CreateSimpleToast(slotIndex);
+                }
+                
+                GameObject instance = Instantiate(toastPrefab.gameObject, toastContainer, false);
+                instance.name = $"ToastSlot_{slotIndex}";
+                
+                ToastMessage toast = instance.GetComponent<ToastMessage>();
+                if (toast == null)
+                {
+                    // Debug.LogError("[SystemMessageManager] ToastMessage 컴포넌트가 없습니다!");
+                    Destroy(instance);
+                    return CreateSimpleToast(slotIndex);
+                }
+                
+                instance.SetActive(false);
+                return toast;
+            }
+            catch (System.Exception e)
+            {
+                // Debug.LogError($"[SystemMessageManager] Toast 생성 중 오류: {e.Message}");
+                return CreateSimpleToast(slotIndex);
+            }
+        }
+
+        /// <summary>
+        /// 간단한 Toast 런타임 생성 (대안)
+        /// </summary>
+        private ToastMessage CreateSimpleToast(int slotIndex)
+        {
+            GameObject toastObj = new GameObject($"ToastSlot_{slotIndex}");
+            toastObj.transform.SetParent(toastContainer, false);
+            
+            RectTransform rectTransform = toastObj.AddComponent<RectTransform>();
+            rectTransform.sizeDelta = new Vector2(300, 60);
+            
+            toastObj.AddComponent<CanvasGroup>();
+            
+            Image bgImage = toastObj.AddComponent<Image>();
+            bgImage.color = new Color(0, 0, 0, 0.8f);
+            
+            // 간단한 텍스트 추가
+            GameObject textObj = new GameObject("Text");
+            textObj.transform.SetParent(toastObj.transform, false);
+            
+            RectTransform textRect = textObj.AddComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = Vector2.zero;
+            textRect.offsetMax = Vector2.zero;
+            
+            Text text = textObj.AddComponent<Text>();
+            text.text = "Toast Message";
+            text.color = Color.white;
+            text.alignment = TextAnchor.MiddleCenter;
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            
+            ToastMessage toastComponent = toastObj.AddComponent<ToastMessage>();
+            toastObj.SetActive(false);
+            
+            // Debug.Log($"[SystemMessageManager] 간단한 Toast 생성 완료: {slotIndex}");
+            return toastComponent;
+        }
+
+        /// <summary>
+        /// 사용 가능한 Toast 슬롯 찾기
+        /// </summary>
+        private ToastMessage GetAvailableToastSlot()
+        {
+            for (int i = 0; i < toastSlots.Length; i++)
+            {
+                if (toastSlots[i] != null && !toastSlots[i].gameObject.activeSelf)
+                {
+                    // Debug.Log($"[SystemMessageManager] Toast 슬롯 {i} 사용 가능");
+                    return toastSlots[i];
+                }
+            }
+            
+            // Debug.LogWarning("[SystemMessageManager] 사용 가능한 Toast 슬롯이 없습니다. 큐에 추가합니다.");
+            return null;
+        }
+
+        /// <summary>
+        /// Toast 큐 처리
+        /// </summary>
+        private void ProcessToastQueue()
+        {
+            if (messageQueue.Count == 0) return;
+
+            ToastMessage availableSlot = GetAvailableToastSlot();
+            if (availableSlot != null)
+            {
+                MessageData messageData = messageQueue.Dequeue();
+                DisplayToastInSlot(availableSlot, messageData);
+                // Debug.Log($"[SystemMessageManager] 큐에서 메시지 처리: {messageData.message}");
+            }
+        }
+
+        /// <summary>
+        /// 특정 슬롯에 Toast 표시
+        /// </summary>
+        private void DisplayToastInSlot(ToastMessage toast, MessageData messageData)
+        {
+            if (toast == null) return;
+            
+            // 안전한 활성화 및 표시
+            toast.gameObject.SetActive(true);
+            
+            // GameObject가 제대로 활성화되었는지 확인
+            if (toast.gameObject.activeSelf)
+            {
+                toast.Show(messageData);
+                // Debug.Log($"[SystemMessageManager] Toast 슬롯에서 메시지 표시 성공: {messageData.message}");
+            }
+            else
+            {
+                // Debug.LogError($"[SystemMessageManager] Toast 활성화 실패, 직접 표시: {messageData.message}");
+                // 대안: 직접 메시지 출력 (Console이나 다른 방법)
+                // Debug.Log($"[TOAST] {messageData.priority}: {messageData.message}");
+            }
         }
 
         /// <summary>
@@ -224,8 +383,8 @@ namespace BlokusUnity.UI.Messages
         /// </summary>
         private void OnToastClosed(ToastMessage toast)
         {
-            activeToasts.Remove(toast);
-            ReturnToastToPool(toast);
+            // Toast 슬롯이 비워졌으므로 큐에서 대기 중인 메시지 처리
+            ProcessToastQueue();
         }
 
         // ========================================
@@ -239,11 +398,36 @@ namespace BlokusUnity.UI.Messages
         {
             if (Instance == null)
             {
-                Debug.LogError("SystemMessageManager.ShowToast() called but Instance is null!");
+                // Debug.LogError("SystemMessageManager.ShowToast() called but Instance is null!");
                 return;
             }
             
             Instance.ShowToastInternal(message, priority, duration);
+        }
+
+        /// <summary>
+        /// Rate limiting 체크
+        /// </summary>
+        private bool IsRateLimited()
+        {
+            float currentTime = Time.time;
+            
+            // 오래된 요청들 제거 (rateLimitWindow보다 오래된 것들)
+            while (toastRequestTimes.Count > 0 && currentTime - toastRequestTimes.Peek() > rateLimitWindow)
+            {
+                toastRequestTimes.Dequeue();
+            }
+            
+            // Rate limit 체크
+            if (toastRequestTimes.Count >= maxToastsPerSecond)
+            {
+                // Debug.LogWarning($"[SystemMessageManager] Rate limit 초과! 초당 최대 {maxToastsPerSecond}개");
+                return true; // Rate limited
+            }
+            
+            // 현재 요청 시간 기록
+            toastRequestTimes.Enqueue(currentTime);
+            return false; // Not rate limited
         }
 
         private void ShowToastInternal(string message, MessagePriority priority, float duration)
@@ -252,29 +436,43 @@ namespace BlokusUnity.UI.Messages
             if (priority == MessagePriority.Debug && !enableDebugMessages)
                 return;
 
+            // 보안 체크: Rate limiting
+            if (IsRateLimited())
+            {
+                return; // 요청 거부
+            }
+
             MessageData messageData = MessageData.CreateToast(message, priority, duration);
             ShowToastInternal(messageData);
         }
 
         /// <summary>
-        /// Toast 메시지 표시 (고급)
+        /// Toast 메시지 표시 (고급) - 고정 슬롯 시스템
         /// </summary>
         private void ShowToastInternal(MessageData messageData)
         {
-            // 최대 Toast 개수 제한
-            if (activeToasts.Count >= maxToastCount)
+            // 사용 가능한 슬롯 확인
+            ToastMessage availableSlot = GetAvailableToastSlot();
+            
+            if (availableSlot != null)
             {
-                // 가장 오래된 Toast 제거
-                ToastMessage oldestToast = activeToasts[0];
-                oldestToast.Hide();
+                // 즉시 표시
+                DisplayToastInSlot(availableSlot, messageData);
+                // Debug.Log($"Toast 즉시 표시: [{messageData.priority}] {messageData.message}");
             }
-
-            // 새 Toast 생성 및 표시
-            ToastMessage toast = GetToastFromPool();
-            activeToasts.Add(toast);
-            toast.Show(messageData);
-
-            Debug.Log($"Toast 표시: [{messageData.priority}] {messageData.message}");
+            else
+            {
+                // 큐에 추가 (큐 크기 제한)
+                if (messageQueue.Count < maxQueueSize)
+                {
+                    messageQueue.Enqueue(messageData);
+                    // Debug.Log($"Toast 큐에 추가: [{messageData.priority}] {messageData.message} (큐 크기: {messageQueue.Count})");
+                }
+                else
+                {
+                    // Debug.LogWarning($"Toast 큐 포화! 메시지 무시: [{messageData.priority}] {messageData.message}");
+                }
+            }
         }
 
         /// <summary>
@@ -306,10 +504,18 @@ namespace BlokusUnity.UI.Messages
         /// </summary>
         public void HideAllToasts()
         {
-            for (int i = activeToasts.Count - 1; i >= 0; i--)
+            // 모든 활성 Toast 슬롯 숨김
+            for (int i = 0; i < toastSlots.Length; i++)
             {
-                activeToasts[i].Hide();
+                if (toastSlots[i] != null && toastSlots[i].gameObject.activeSelf)
+                {
+                    toastSlots[i].Hide();
+                }
             }
+            
+            // 대기 큐 비우기
+            messageQueue.Clear();
+            // Debug.Log("[SystemMessageManager] 모든 Toast 숨김 및 큐 비우기 완료");
         }
 
         /// <summary>
@@ -318,7 +524,7 @@ namespace BlokusUnity.UI.Messages
         public void SetDebugMessagesEnabled(bool enabled)
         {
             enableDebugMessages = enabled;
-            Debug.Log($"디버그 메시지 {(enabled ? "활성화" : "비활성화")}");
+            // Debug.Log($"디버그 메시지 {(enabled ? "활성화" : "비활성화")}");
         }
 
         // ========================================
@@ -331,7 +537,7 @@ namespace BlokusUnity.UI.Messages
         public void ShowAlert(string message, string title = "", System.Action onConfirm = null, System.Action onCancel = null)
         {
             // TODO: AlertModal 구현 후 추가
-            Debug.LogWarning("Alert 기능은 아직 구현되지 않았습니다. Toast로 대체 표시합니다.");
+            // Debug.LogWarning("Alert 기능은 아직 구현되지 않았습니다. Toast로 대체 표시합니다.");
             ShowWarning($"{title}: {message}");
         }
 
@@ -341,7 +547,7 @@ namespace BlokusUnity.UI.Messages
         public void ShowLoading(string message = "로딩 중...")
         {
             // TODO: LoadingOverlay 구현 후 추가
-            Debug.LogWarning("Loading 기능은 아직 구현되지 않았습니다. Toast로 대체 표시합니다.");
+            // Debug.LogWarning("Loading 기능은 아직 구현되지 않았습니다. Toast로 대체 표시합니다.");
             ShowToast(message, MessagePriority.Info, 0f); // 지속시간 0 = 수동 종료
         }
 
@@ -351,7 +557,7 @@ namespace BlokusUnity.UI.Messages
         public void HideLoading()
         {
             // TODO: LoadingOverlay 구현 후 추가
-            Debug.LogWarning("Loading 숨김 기능은 아직 구현되지 않았습니다.");
+            // Debug.LogWarning("Loading 숨김 기능은 아직 구현되지 않았습니다.");
         }
     }
 }

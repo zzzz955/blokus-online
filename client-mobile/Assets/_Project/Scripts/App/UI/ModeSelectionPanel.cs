@@ -1,10 +1,9 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-
-namespace BlokusUnity.UI
-{
-    public class ModeSelectionPanel : BlokusUnity.UI.PanelBase
+using Shared.UI;
+namespace App.UI{
+    public class ModeSelectionPanel : Shared.UI.PanelBase
     {
         [Header("UI 컴포넌트")]
         [SerializeField] private Button singlePlayerButton;
@@ -61,19 +60,55 @@ namespace BlokusUnity.UI
         public void OnSinglePlayerClicked()
         {
             Debug.Log("싱글플레이 버튼 클릭");
-            UIManager.Instance?.OnSingleModeSelected();
+            
+            // UIManager 우선, BlokusUIManager 폴백
+            var uiManager = UIManager.GetInstanceSafe();
+            if (uiManager != null)
+            {
+                Debug.Log("[ModeSelectionPanel] UIManager로 싱글플레이 모드 선택");
+                uiManager.OnSingleModeSelected();
+            }
+            else
+            {
+                Debug.Log("[ModeSelectionPanel] UIManager 없음, BlokusUIManager 폴백");
+                BlokusUIManager.Instance?.OnSingleModeSelected();
+            }
         }
         
         public void OnMultiPlayerClicked()
         {
             Debug.Log("멀티플레이 버튼 클릭");
-            UIManager.Instance?.OnMultiModeSelected();
+            
+            // UIManager 우선, BlokusUIManager 폴백
+            var uiManager = UIManager.GetInstanceSafe();
+            if (uiManager != null)
+            {
+                Debug.Log("[ModeSelectionPanel] UIManager로 멀티플레이 모드 선택");
+                uiManager.OnMultiModeSelected();
+            }
+            else
+            {
+                Debug.Log("[ModeSelectionPanel] UIManager 없음, BlokusUIManager 폴백");
+                BlokusUIManager.Instance?.OnMultiModeSelected();
+            }
         }
         
         public void OnBackButtonClicked()
         {
             Debug.Log("뒤로가기 버튼 클릭");
-            UIManager.Instance?.OnBackToMenu();
+            
+            // UIManager 우선, BlokusUIManager 폴백
+            var uiManager = UIManager.GetInstanceSafe();
+            if (uiManager != null)
+            {
+                Debug.Log("[ModeSelectionPanel] UIManager로 메뉴 돌아가기");
+                uiManager.OnBackToMenu();
+            }
+            else
+            {
+                Debug.Log("[ModeSelectionPanel] UIManager 없음, BlokusUIManager 폴백");
+                BlokusUIManager.Instance?.OnBackToMenu();
+            }
         }
     }
 }

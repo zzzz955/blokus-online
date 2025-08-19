@@ -1,9 +1,11 @@
+﻿namespace Features.Multi.Net
+{
 // using System;
 // using System.Collections.Generic;
 // using UnityEngine;
-// using BlokusUnity.Common;
+// using Shared.Models;
 
-// namespace BlokusUnity.Network
+// namespace App.Network
 // {
 //     /// <summary>
 //     /// 네트워크 메시지 핸들러
@@ -587,3 +589,4 @@
     
     
 // }
+}

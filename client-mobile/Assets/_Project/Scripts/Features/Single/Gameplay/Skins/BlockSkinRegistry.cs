@@ -1,9 +1,8 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
-using BlokusUnity.UI.Messages;
-
-namespace BlokusUnity.Features.Single.Skins
-{
+using App.UI;
+using Shared.Models;
+namespace Features.Single.Gameplay.Skins{
     /// <summary>
     /// Block skin registry manager
     /// Migration Plan: DB에서 상수값(enum) 수신 → BlockSkinId 매핑 → 내부 리소스 할당(텍스처/머티리얼/프리팹 경로)

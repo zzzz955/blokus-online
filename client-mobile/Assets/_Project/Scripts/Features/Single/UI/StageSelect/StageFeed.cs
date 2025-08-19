@@ -1,9 +1,7 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
-using BlokusUnity.Common;
-
-namespace BlokusUnity.Application.Stages
-{
+using Shared.Models;
+namespace Features.Single.UI.StageSelect{
     /// <summary>
     /// 캔디크러시 사가 스타일의 곡선 스테이지 경로 생성기
     /// 한 줄에 하나씩 스테이지를 배치하고 베지어 곡선으로 연결

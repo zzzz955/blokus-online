@@ -1,7 +1,5 @@
-using UnityEngine;
-
-namespace BlokusUnity.UI.Messages
-{
+﻿using UnityEngine;
+namespace Shared.UI{
     /// <summary>
     /// 시스템 메시지 타입
     /// </summary>

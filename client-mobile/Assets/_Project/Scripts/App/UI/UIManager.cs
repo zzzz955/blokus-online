@@ -1,34 +1,92 @@
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using BlokusUnity.Common;
-using BlokusUnity.Data;
-using BlokusUnity.UI.Messages;
+using UnityEngine.Serialization;
+using Features.Single.Core;
+using Shared.UI;
 
-namespace BlokusUnity.UI
+namespace App.UI
 {
     /// <summary>
     /// Unity 블로쿠스 UI 매니저
     /// 모든 UI 패널 전환을 중앙에서 관리
+    /// 
+    /// Inspector SerializeField 참조 복구용 강화 버전
+    /// FormerlySerializedAs를 통한 필드 복구
     /// </summary>
+    [System.Serializable]
     public class UIManager : MonoBehaviour
     {
         [Header("UI Panels")]
-        [SerializeField] private BlokusUnity.UI.PanelBase loginPanel;
-        [SerializeField] private BlokusUnity.UI.PanelBase modeSelectionPanel;
-        [SerializeField] private BlokusUnity.UI.PanelBase stageSelectPanel;
-        [SerializeField] private BlokusUnity.UI.PanelBase lobbyPanel;
-        [SerializeField] private BlokusUnity.UI.PanelBase gameRoomPanel;
-        [SerializeField] private BlokusUnity.UI.PanelBase loadingPanel;
+        [SerializeField] 
+        [FormerlySerializedAs("loginPanel")]
+        public PanelBase loginPanel;
+        
+        [SerializeField]
+        [FormerlySerializedAs("modeSelectionPanel")] 
+        public PanelBase modeSelectionPanel;
+        
+        [SerializeField]
+        [FormerlySerializedAs("stageSelectPanel")]
+        public PanelBase stageSelectPanel;
 
-        private Dictionary<UIState, BlokusUnity.UI.PanelBase> panels;
+        // 🔥 추가: 게임 패널 (SingleGameplayScene 전환 시 사용)
+        [Header("Game Integration")]
+        [SerializeField] private bool enableGameIntegration = true;
+
+        private Dictionary<UIState, PanelBase> panels;
         private UIState currentState = (UIState)(-1); // 초기값을 무효한 값으로 설정
-        private BlokusUnity.UI.PanelBase currentPanel;
+        private PanelBase currentPanel;
 
         public static UIManager Instance { get; private set; }
+        
+        /// <summary>
+        /// 🔥 개선: 안전한 UIManager 접근 (MainScene 및 Scene 전환 지원)
+        /// </summary>
+        public static UIManager GetInstance()
+        {
+            if (Instance == null)
+            {
+                // UIManager 찾기 시도
+                Instance = Object.FindObjectOfType<UIManager>();
+                if (Instance != null)
+                {
+                    Debug.Log("[UIManager] Instance를 씬에서 재발견했습니다");
+                }
+                else
+                {
+                    // BlokusUIManager도 확인 (중복 제거 과정에서)
+                    var blokusUIManager = Object.FindObjectOfType<BlokusUIManager>();
+                    if (blokusUIManager != null)
+                    {
+                        Debug.LogWarning("[UIManager] BlokusUIManager 발견 - UIManager로 통합 필요");
+                    }
+                }
+            }
+            return Instance;
+        }
+
+        /// <summary>
+        /// 🔥 추가: Scene 전환 지원을 위한 강화된 Instance 접근
+        /// </summary>
+        public static UIManager GetInstanceSafe()
+        {
+            var manager = GetInstance();
+            if (manager == null)
+            {
+                Debug.LogError("[UIManager] Instance를 찾을 수 없습니다. MainScene이 활성화되어 있는지 확인하세요.");
+            }
+            return manager;
+        }
 
         void Awake()
         {
             Debug.Log("=== UIManager Awake 시작 ===");
+            Debug.Log($"[UIManager] 스크립트 컴파일 상태 확인 - GetType(): {GetType()}");
+            Debug.Log($"[UIManager] Inspector 필드 상태:");
+            Debug.Log($"  loginPanel SerializeField: {loginPanel != null} (값: {loginPanel})");
+            Debug.Log($"  modeSelectionPanel SerializeField: {modeSelectionPanel != null} (값: {modeSelectionPanel})");
+            Debug.Log($"  stageSelectPanel SerializeField: {stageSelectPanel != null} (값: {stageSelectPanel})");
             
             // 싱글톤 패턴
             if (Instance == null)
@@ -36,10 +94,8 @@ namespace BlokusUnity.UI
                 Instance = this;
                 Debug.Log("UIManager 싱글톤 설정 완료");
                 
-                // 루트 GameObject로 이동 (DontDestroyOnLoad 적용을 위해)
-                transform.SetParent(null);
-                DontDestroyOnLoad(gameObject);
-                Debug.Log("UIManager DontDestroyOnLoad 적용됨");
+                // MainScene에 유지 (패널 참조 유지를 위해 DontDestroyOnLoad 사용 안함)
+                Debug.Log("UIManager MainScene에 유지됨 - 패널 참조 보존");
                 
                 InitializePanels();
                 InitializeSystemMessageManager();
@@ -66,7 +122,7 @@ namespace BlokusUnity.UI
                 PlayerPrefs.Save();
                 
                 // 로그인 상태 확인 후 적절한 패널 표시
-                if (BlokusUnity.Features.Single.UserDataCache.Instance != null && BlokusUnity.Features.Single.UserDataCache.Instance.IsLoggedIn())
+                if (Features.Single.Core.UserDataCache.Instance != null && Features.Single.Core.UserDataCache.Instance.IsLoggedIn())
                 {
                     Debug.Log("Exit으로 돌아옴 + 로그인됨 - 스테이지 선택 패널 표시");
                     ShowPanel(UIState.StageSelect, false);
@@ -94,15 +150,30 @@ namespace BlokusUnity.UI
         {
             Debug.Log("=== InitializePanels 시작 ===");
             
-            panels = new Dictionary<UIState, BlokusUnity.UI.PanelBase>
+            // 런타임에 패널들을 동적으로 찾기 (Inspector 참조가 사라진 경우 대비)
+            if (loginPanel == null)
+            {
+                Debug.Log("[UIManager] LoginPanel이 null, 동적으로 찾는 중...");
+                loginPanel = Object.FindObjectOfType<LoginPanelController>()?.GetComponent<PanelBase>();
+                if (loginPanel != null) Debug.Log("[UIManager] LoginPanel 동적으로 찾음");
+            }
+            
+            if (modeSelectionPanel == null)
+            {
+                Debug.Log("[UIManager] ModeSelectionPanel이 null, 동적으로 찾는 중...");
+                var modePanel = GameObject.Find("ModeSelectionPanel");
+                if (modePanel != null) 
+                {
+                    modeSelectionPanel = modePanel.GetComponent<PanelBase>();
+                    if (modeSelectionPanel != null) Debug.Log("[UIManager] ModeSelectionPanel 동적으로 찾음");
+                }
+            }
+            
+            panels = new Dictionary<UIState, PanelBase>
             {
                 { UIState.Login, loginPanel },
                 { UIState.ModeSelection, modeSelectionPanel },
-                { UIState.StageSelect, stageSelectPanel },
-                // 임시로 누락된 패널들은 null 허용
-                { UIState.Lobby, lobbyPanel },
-                { UIState.GameRoom, gameRoomPanel },
-                { UIState.Loading, loadingPanel }
+                { UIState.StageSelect, stageSelectPanel }
             };
             
             // 패널 연결 상태 확인 (강화된 로깅)
@@ -126,15 +197,6 @@ namespace BlokusUnity.UI
             {
                 Debug.Log($"StageSelect Panel Name: {stageSelectPanel.name}");
                 Debug.Log($"StageSelect Panel GameObject null?: {stageSelectPanel.gameObject == null}");
-            }
-            
-            Debug.Log($"Lobby Panel: {lobbyPanel != null}");
-            Debug.Log($"GameRoom Panel: {gameRoomPanel != null}");
-            Debug.Log($"Loading Panel: {loadingPanel != null}");
-            if (loadingPanel != null) 
-            {
-                Debug.Log($"Loading Panel Name: {loadingPanel.name}");
-                Debug.Log($"Loading Panel GameObject null?: {loadingPanel.gameObject == null}");
             }
             
             Debug.Log("InitializePanels 완료");
@@ -200,7 +262,7 @@ namespace BlokusUnity.UI
 
             // 새 패널 표시
             Debug.Log($"panels 딕셔너리에서 {state} 찾는 중...");
-            if (panels.TryGetValue(state, out BlokusUnity.UI.PanelBase newPanel))
+            if (panels.TryGetValue(state, out PanelBase newPanel))
             {
                 Debug.Log($"패널 딕셔너리에서 찾음: {newPanel != null}");
                 
@@ -268,12 +330,57 @@ namespace BlokusUnity.UI
 
         public void OnLoginSuccess()
         {
+            Debug.Log("[UIManager] OnLoginSuccess() 호출됨");
             ShowPanel(UIState.ModeSelection);
         }
 
         public void OnSingleModeSelected()
         {
-            ShowPanel(UIState.StageSelect);
+            Debug.Log("[UIManager] OnSingleModeSelected() 호출됨");
+            
+            // 🔥 핵심 해결: 스테이지 선택을 먼저 표시하고, 실제 게임플레이는 스테이지 선택 후에
+            if (App.Core.SceneFlowController.Instance != null)
+            {
+                Debug.Log("[UIManager] SceneFlowController로 스테이지 선택 모드 진입");
+                StartCoroutine(LoadScenesForStageSelection());
+            }
+            else
+            {
+                Debug.LogError("[UIManager] SceneFlowController.Instance가 null입니다!");
+                SystemMessageManager.ShowToast("싱글플레이 화면을 로드할 수 없습니다.", MessagePriority.Error);
+            }
+        }
+        
+        /// <summary>
+        /// 🔥 핵심 수정: 스테이지 선택 화면으로만 진입 (게임플레이 초기화 안함)
+        /// </summary>
+        private IEnumerator LoadScenesForStageSelection()
+        {
+            Debug.Log("[UIManager] 스테이지 선택 화면 로드 시작");
+            
+            // 1. SingleCore와 SingleGameplayScene을 로드하되, 게임 데이터 없이 스테이지 선택용으로만 사용
+            // 2. SingleGameManager.IsInGameplayMode = false 상태로 유지 (스테이지 선택 모드)
+            
+            // 🔥 중요: CurrentStage = 0으로 설정하여 테스트 데이터 초기화 방지
+            Features.Single.Gameplay.SingleGameManager.SetStageContext(0, null);
+            
+            // SceneFlowController의 GoSingle을 호출 (하지만 스테이지 데이터는 없음)
+            yield return StartCoroutine(App.Core.SceneFlowController.Instance.GoSingle());
+            
+            // MainScene 패널들을 조건부로 숨김 (스테이지 선택 모드에서는 MainScene 패널 유지)
+            HideMainScenePanelsForStageSelection();
+            
+            Debug.Log("[UIManager] ✅ 스테이지 선택 화면 준비 완료 - IsInGameplayMode = false");
+        }
+        
+        /// <summary>
+        /// 🔥 추가: 스테이지 선택 모드에 따른 패널 표시/숨김 제어
+        /// </summary>
+        private void HideMainScenePanelsForStageSelection()
+        {
+            // 스테이지 선택 모드에서는 MainScene 패널들을 유지
+            // (실제 게임플레이가 시작되면 그때 숨김)
+            Debug.Log("[UIManager] 스테이지 선택 모드 - MainScene 패널들 유지");
         }
 
         public void OnMultiModeSelected()
@@ -281,19 +388,82 @@ namespace BlokusUnity.UI
             ShowPanel(UIState.Lobby);
         }
 
+        /// <summary>
+        /// 🔥 핵심 수정: 스테이지 선택 후 실제 게임플레이 모드로 전환
+        /// </summary>
         public void OnStageSelected(int stageNumber)
         {
-            // 스테이지 데이터 매니저를 통해 스테이지 선택
-            if (BlokusUnity.Features.Single.StageDataManager.Instance != null)
+            Debug.Log($"[UIManager] 스테이지 {stageNumber} 선택됨 - 게임플레이 모드 전환 시작");
+
+            // 1. 스테이지 데이터 매니저를 통해 스테이지 선택
+            if (Features.Single.Core.StageDataManager.Instance != null)
             {
-                BlokusUnity.Features.Single.StageDataManager.Instance.SelectStage(stageNumber);
-                BlokusUnity.Features.Single.StageDataManager.Instance.PassDataToSingleGameManager();
+                Features.Single.Core.StageDataManager.Instance.SelectStage(stageNumber);
+                
+                // 🔥 중요: 게임플레이 모드로 전환하기 위한 스테이지 컨텍스트 설정
+                Features.Single.Gameplay.SingleGameManager.SetStageContext(stageNumber, Features.Single.Core.StageDataManager.Instance);
+                Debug.Log($"[UIManager] SingleGameManager 스테이지 컨텍스트 설정: {stageNumber} (IsInGameplayMode=true)");
+                
+                // StageDataManager에 데이터 전달
+                Features.Single.Core.StageDataManager.Instance.PassDataToSingleGameManager();
+                Debug.Log($"[UIManager] StageDataManager에 스테이지 {stageNumber} 설정 완료");
+            }
+            else
+            {
+                Debug.LogError("[UIManager] StageDataManager.Instance가 null입니다!");
+                return;
             }
 
-            Debug.Log($"스테이지 {stageNumber} 선택됨");
-
-            // 싱글게임 씬으로 전환
-            LoadSingleGameplayScene();
+            // 2. 🔥 핵심: 게임플레이 모드로 전환 (Scene은 이미 로드됨)
+            StartCoroutine(TransitionToGameplayMode());
+        }
+        
+        /// <summary>
+        /// 🔥 추가: 스테이지 선택 모드에서 게임플레이 모드로 전환
+        /// </summary>
+        private IEnumerator TransitionToGameplayMode()
+        {
+            Debug.Log("[UIManager] 게임플레이 모드 전환 시작");
+            
+            // 1. MainScene 패널들 숨기기 (이제 실제 게임플레이 시작)
+            HideAllMainScenePanels();
+            
+            // 2. SingleGameManager 강제 재초기화 (이미 Scene은 로드되어 있음)
+            if (App.Core.SceneFlowController.Instance != null)
+            {
+                // SceneFlowController의 EnsureSingleGameManagerActive를 통해 강제 초기화
+                Debug.Log("[UIManager] SingleGameManager 재초기화 요청");
+                yield return StartCoroutine(App.Core.SceneFlowController.Instance.GoSingle());
+            }
+            
+            Debug.Log("[UIManager] ✅ 게임플레이 모드 전환 완료 - 게임 시작!");
+        }
+        
+        /// <summary>
+        /// 🔥 추가: MainScene의 모든 패널 숨기기 (게임플레이 시작 시)
+        /// </summary>
+        private void HideAllMainScenePanels()
+        {
+            Debug.Log("[UIManager] 게임플레이 시작 - 모든 MainScene 패널 숨기기");
+            
+            // 현재 활성 패널이 있다면 숨기기
+            if (currentPanel != null)
+            {
+                Debug.Log($"[UIManager] 현재 패널 숨기기: {currentPanel.name}");
+                currentPanel.Hide();
+                currentPanel = null;
+                currentState = (UIState)(-1); // 무효 상태로 설정
+            }
+            
+            // 모든 MainScene 패널들을 강제로 숨기기
+            foreach (var kvp in panels)
+            {
+                if (kvp.Value != null)
+                {
+                    Debug.Log($"[UIManager] 패널 강제 숨기기: {kvp.Key}");
+                    kvp.Value.Hide();
+                }
+            }
         }
 
         public void OnRoomJoined()

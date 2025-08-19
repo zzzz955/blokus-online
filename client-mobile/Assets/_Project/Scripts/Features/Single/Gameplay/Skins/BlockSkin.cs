@@ -1,9 +1,6 @@
-using UnityEngine;
-using BlokusUnity.Common;
-using BlokusUnity.Features.Single.Skins;
-
-namespace BlokusUnity.Features.Single.Skins
-{
+﻿using UnityEngine;
+using Shared.Models;
+namespace Features.Single.Gameplay.Skins{
     /// <summary>
     /// Block skin data container
     /// Migration Plan: Phase 1로 enum 매핑 + 내부 리소스 할당(Registry/Resources)

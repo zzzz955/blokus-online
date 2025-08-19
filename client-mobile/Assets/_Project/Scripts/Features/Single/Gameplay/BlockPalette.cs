@@ -1,11 +1,9 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using BlokusUnity.Common;
-
-namespace BlokusUnity.Game
-{
+using Shared.Models;
+namespace Features.Single.Gameplay{
     /// <summary>
     /// ScrollView Content에 블록 버튼들을 생성/관리.
     /// Content에는 HorizontalLayoutGroup + ContentSizeFitter(가로 Preferred)가 필요합니다.

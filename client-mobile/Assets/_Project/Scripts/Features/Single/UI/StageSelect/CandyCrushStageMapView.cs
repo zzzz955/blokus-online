@@ -1,26 +1,27 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using BlokusUnity.Application.Stages;
-using BlokusUnity.Game;
-using BlokusUnity.Data;
-using BlokusUnity.Network;
-using BlokusUnity.Common;
-using DataStageData = BlokusUnity.Data.StageData;
-using ApiStageData = BlokusUnity.Network.HttpApiClient.ApiStageData;
-using GameUserStageProgress = BlokusUnity.Features.Single.UserStageProgress;
-using NetworkUserStageProgress = BlokusUnity.Network.UserStageProgress;
-using UserInfo = BlokusUnity.Common.UserInfo;
-
-namespace BlokusUnity.UI
+using App.Core;
+using App.Network;
+using App.Services;
+using App.UI;
+using Features.Single.Core;
+using Shared.Models;
+using Shared.UI;
+using DataStageData = Shared.Models.StageData;
+using ApiStageData = App.Network.HttpApiClient.ApiStageData;
+using GameUserStageProgress = Features.Single.Core.UserStageProgress;
+using NetworkUserStageProgress = App.Network.UserStageProgress;
+using UserInfo = Shared.Models.UserInfo;
+namespace Features.Single.UI.StageSelect
 {
     /// <summary>
     /// 캔디크러시 사가 스타일의 메인 스테이지 선택 뷰
     /// 뱀 모양 레이아웃과 스크롤 기반 동적 로딩을 제공
     /// </summary>
-    public class CandyCrushStageMapView : BlokusUnity.UI.PanelBase
+    public class CandyCrushStageMapView : Shared.UI.PanelBase
     {
         [Header("스크롤 컴포넌트")]
         [SerializeField] private ScrollRect scrollRect;
@@ -45,7 +46,7 @@ namespace BlokusUnity.UI
 
         // 스테이지 관리
         private Dictionary<int, StageButton> activeButtons = new Dictionary<int, StageButton>();
-        private BlokusUnity.Features.Single.StageProgressManager progressManager;
+        private Features.Single.Core.StageProgressManager progressManager;
 
         // 뷰포트 관리
         private int firstVisibleStage = 1;
@@ -87,18 +88,24 @@ namespace BlokusUnity.UI
 
         protected void OnEnable()
         {
+            // 🔥 추가: Scene 상태 확인 - MainScene 비활성화 상태에서는 프로필 업데이트 스킵
+            if (!IsMainSceneActiveOrCurrent())
+            {
+                Debug.LogWarning("[CandyCrushStageMapView] OnEnable - MainScene 비활성화 상태로 인해 프로필 업데이트 스킵");
+                return;
+            }
+
             // StageInfoModal 참조 확보 (Inspector 할당이 사라질 경우 대비)
             EnsureStageInfoModalReference();
 
             // 🔥 수정: 중복 방지 - 이미 진행 중이면 건너뜀
-
-            if (!isProfileUpdateInProgress && BlokusUnity.Features.Single.UserDataCache.Instance != null && BlokusUnity.Features.Single.UserDataCache.Instance.IsLoggedIn())
+            if (!isProfileUpdateInProgress && Features.Single.Core.UserDataCache.Instance != null && Features.Single.Core.UserDataCache.Instance.IsLoggedIn())
             {
-                var currentUser = BlokusUnity.Features.Single.UserDataCache.Instance.GetCurrentUser();
+                var currentUser = Features.Single.Core.UserDataCache.Instance.GetCurrentUser();
                 if (currentUser != null)
                 {
                     isProfileUpdateInProgress = true;
-                    StartCoroutine(DelayedProfileUpdate(currentUser));
+                    StartSafe(DelayedProfileUpdate(currentUser));
                 }
             }
             else
@@ -119,11 +126,11 @@ namespace BlokusUnity.UI
 
             InitializeStageMap();
 
-            // BlokusUnity.Features.Single.StageDataManager 이벤트 구독
-            if (BlokusUnity.Features.Single.StageDataManager.Instance != null)
+            // Features.Single.Core.StageDataManager 이벤트 구독
+            if (Features.Single.Core.StageDataManager.Instance != null)
             {
-                BlokusUnity.Features.Single.StageDataManager.Instance.OnStageCompleted += OnStageCompleted;
-                BlokusUnity.Features.Single.StageDataManager.Instance.OnStageUnlocked += OnStageUnlocked;
+                Features.Single.Core.StageDataManager.Instance.OnStageCompleted += OnStageCompleted;
+                Features.Single.Core.StageDataManager.Instance.OnStageUnlocked += OnStageUnlocked;
             }
         }
 
@@ -150,14 +157,14 @@ namespace BlokusUnity.UI
             // API 이벤트 정리
             CleanupApiEventHandlers();
 
-            // BlokusUnity.Features.Single.StageDataManager 이벤트 해제
-            if (BlokusUnity.Features.Single.StageDataManager.Instance != null)
+            // Features.Single.Core.StageDataManager 이벤트 해제
+            if (Features.Single.Core.StageDataManager.Instance != null)
             {
-                BlokusUnity.Features.Single.StageDataManager.Instance.OnStageCompleted -= OnStageCompleted;
-                BlokusUnity.Features.Single.StageDataManager.Instance.OnStageUnlocked -= OnStageUnlocked;
+                Features.Single.Core.StageDataManager.Instance.OnStageCompleted -= OnStageCompleted;
+                Features.Single.Core.StageDataManager.Instance.OnStageUnlocked -= OnStageUnlocked;
             }
 
-            // progressManager 이벤트는 BlokusUnity.Features.Single.StageDataManager 이벤트와 동일하므로 중복 해제 불필요
+            // progressManager 이벤트는 Features.Single.Core.StageDataManager 이벤트와 동일하므로 중복 해제 불필요
 
             if (stageFeed != null)
             {
@@ -183,7 +190,7 @@ namespace BlokusUnity.UI
             }
 
             // 진행도 매니저 연결
-            progressManager = BlokusUnity.Features.Single.StageProgressManager.Instance;
+            progressManager = Features.Single.Core.StageProgressManager.Instance;
 
             // 스테이지 피드 연결
             if (stageFeed != null)
@@ -208,6 +215,13 @@ namespace BlokusUnity.UI
         /// </summary>
         private bool ValidateComponents()
         {
+            // 🔥 추가: Scene 상태 검증 - MainScene이 활성 상태인지 확인
+            if (!IsMainSceneActiveOrCurrent())
+            {
+                Debug.LogWarning("[CandyCrushStageMapView] MainScene이 비활성화 상태 - 초기화 지연");
+                return false;
+            }
+
             if (scrollRect == null)
             {
                 Debug.LogError("ScrollRect가 설정되지 않았습니다!");
@@ -242,6 +256,45 @@ namespace BlokusUnity.UI
                     Debug.LogError("StageButtonPool 인스턴스를 찾을 수 없습니다!");
                     return false;
                 }
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// 🔥 수정: Scene 상태 및 컴포넌트 접근 가능성 확인
+        /// </summary>
+        private bool IsMainSceneActiveOrCurrent()
+        {
+            // 현재 Scene이 MainScene인지 확인
+            var currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+            if (currentScene.name == "MainScene")
+            {
+                return true;
+            }
+
+            // MainScene이 로드되어 있고 사용 가능한지 확인
+            var mainScene = UnityEngine.SceneManagement.SceneManager.GetSceneByName("MainScene");
+            if (!mainScene.IsValid() || !mainScene.isLoaded)
+            {
+                Debug.LogWarning("[CandyCrushStageMapView] MainScene이 로드되지 않음");
+                return false;
+            }
+
+            // 🔥 수정: StageButtonPool 접근성 확인 - SingleGameplayScene에서도 찾아보기
+            if (StageButtonPool.Instance == null)
+            {
+                // SingleGameplayScene에서 StageButtonPool 찾기 시도
+                var singleGameplayScene = UnityEngine.SceneManagement.SceneManager.GetSceneByName("SingleGameplayScene");
+                if (singleGameplayScene.IsValid() && singleGameplayScene.isLoaded)
+                {
+                    Debug.Log("[CandyCrushStageMapView] SingleGameplayScene에서 StageButtonPool 접근 시도");
+                    // 잠시 대기 후 재확인 (Scene 로딩 완료 대기)
+                    return false; // 일단 false 반환하고 재시도하도록 함
+                }
+
+                Debug.LogWarning("[CandyCrushStageMapView] StageButtonPool.Instance 접근 불가");
+                return false;
             }
 
             return true;
@@ -320,7 +373,7 @@ namespace BlokusUnity.UI
             contentTransform.anchoredPosition = new Vector2(0f, 0f);
 
             // 한 프레임 기다린 후 뷰포트 업데이트 (Layout 시스템이 완료될 때까지)
-            StartCoroutine(DelayedViewportUpdate());
+            StartSafe(DelayedViewportUpdate());
 
             // UI 정보 업데이트
             UpdateUIInfo();
@@ -538,10 +591,10 @@ namespace BlokusUnity.UI
                 }
             }
 
-            // Fallback: BlokusUnity.Features.Single.UserDataCache 직접 사용
-            if (BlokusUnity.Features.Single.UserDataCache.Instance != null && BlokusUnity.Features.Single.UserDataCache.Instance.IsLoggedIn())
+            // Fallback: Features.Single.Core.UserDataCache 직접 사용
+            if (Features.Single.Core.UserDataCache.Instance != null && Features.Single.Core.UserDataCache.Instance.IsLoggedIn())
             {
-                int maxStageCompleted = BlokusUnity.Features.Single.UserDataCache.Instance.GetMaxStageCompleted();
+                int maxStageCompleted = UserDataCache.Instance.MaxStageCompleted;
                 bool isUnlocked = stageNumber <= maxStageCompleted + 1;
                 return isUnlocked;
             }
@@ -558,15 +611,15 @@ namespace BlokusUnity.UI
             // 🔥 수정: 견고한 언락 상태 확인 사용
             bool isUnlocked = GetStageUnlockedStatus(stageNumber);
 
-            // 🔥 수정: BlokusUnity.Features.Single.UserDataCache에서 직접 데이터 가져오기 (progressManager 대신)
+            // 🔥 수정: Features.Single.Core.UserDataCache에서 직접 데이터 가져오기 (progressManager 대신)
             NetworkUserStageProgress networkProgress = null;
-            if (BlokusUnity.Features.Single.UserDataCache.Instance != null)
+            if (Features.Single.Core.UserDataCache.Instance != null)
             {
-                networkProgress = BlokusUnity.Features.Single.UserDataCache.Instance.GetStageProgress(stageNumber);
+                networkProgress = Features.Single.Core.UserDataCache.Instance.GetStageProgress(stageNumber);
             }
             else
             {
-                Debug.LogWarning($"[UpdateButtonState] BlokusUnity.Features.Single.UserDataCache.Instance가 null입니다");
+                Debug.LogWarning($"[UpdateButtonState] Features.Single.Core.UserDataCache.Instance가 null입니다");
             }
 
             // NetworkUserStageProgress를 GameUserStageProgress로 변환 (UpdateButtonsFromCache와 동일한 로직)
@@ -700,15 +753,15 @@ namespace BlokusUnity.UI
             else
             {
                 Debug.LogWarning("[CandyCrushStageMapView] HttpApiClient 인스턴스 없음 - 1초 후 재시도");
-                Invoke(nameof(SetupApiEventHandlers), 1f);
+                InvokeLater(1f, SetupApiEventHandlers);
             }
 
-            // BlokusUnity.Features.Single.UserDataCache 이벤트 구독(기존 유지)
-            Debug.Log($"[CandyCrushStageMapView] BlokusUnity.Features.Single.UserDataCache.Instance null 여부: {BlokusUnity.Features.Single.UserDataCache.Instance == null}");
-            if (BlokusUnity.Features.Single.UserDataCache.Instance != null)
+            // Features.Single.Core.UserDataCache 이벤트 구독(기존 유지)
+            Debug.Log($"[CandyCrushStageMapView] Features.Single.Core.UserDataCache.Instance null 여부: {Features.Single.Core.UserDataCache.Instance == null}");
+            if (Features.Single.Core.UserDataCache.Instance != null)
             {
-                BlokusUnity.Features.Single.UserDataCache.Instance.OnUserDataUpdated += OnUserDataUpdated;
-                Debug.Log("[CandyCrushStageMapView] BlokusUnity.Features.Single.UserDataCache 이벤트 핸들러 설정 완료");
+                Features.Single.Core.UserDataCache.Instance.OnUserDataUpdated += OnUserDataUpdated;
+                Debug.Log("[CandyCrushStageMapView] Features.Single.Core.UserDataCache 이벤트 핸들러 설정 완료");
                 Debug.Log("[CandyCrushStageMapView] 프로필 데이터 즉시 업데이트는 OnEnable에서 처리");
             }
         }
@@ -728,9 +781,9 @@ namespace BlokusUnity.UI
                 HttpApiClient.Instance.OnStageMetadataReceived -= OnStageMetadataReceived;
             }
 
-            if (BlokusUnity.Features.Single.UserDataCache.Instance != null)
+            if (Features.Single.Core.UserDataCache.Instance != null)
             {
-                BlokusUnity.Features.Single.UserDataCache.Instance.OnUserDataUpdated -= OnUserDataUpdated;
+                Features.Single.Core.UserDataCache.Instance.OnUserDataUpdated -= OnUserDataUpdated;
             }
         }
 
@@ -739,7 +792,7 @@ namespace BlokusUnity.UI
             if (pendingStageNumber <= 0) return; // 대기 중인 스테이지 없음
 
             // 캐시에 방금 들어온 메타데이터가 있는지 확인
-            var cached = BlokusUnity.Features.Single.UserDataCache.Instance?.GetStageMetadata(pendingStageNumber);
+            var cached = Features.Single.Core.UserDataCache.Instance?.GetStageMetadata(pendingStageNumber);
             if (cached.n == pendingStageNumber)
             {
                 Debug.Log($"[CandyCrushStageMapView] 메타데이터 수신 확인 - 대기 중이던 스테이지 {pendingStageNumber} 모달 표시");
@@ -762,12 +815,12 @@ namespace BlokusUnity.UI
 
             Debug.Log($"[CandyCrushStageMapView] API에서 스테이지 {stageData.stage_number} 데이터 수신");
 
-            // BlokusUnity.Features.Single.StageDataManager 캐시에 저장
-            if (BlokusUnity.Features.Single.StageDataManager.Instance?.GetStageManager() != null)
+            // Features.Single.Core.StageDataManager 캐시에 저장
+            if (Features.Single.Core.StageDataManager.Instance?.GetStageManager() != null)
             {
                 // API.StageData를 Data.StageData로 변환
                 var convertedStageData = ConvertApiToDataStageData(stageData);
-                BlokusUnity.Features.Single.StageDataManager.Instance.GetStageManager().CacheStageData(convertedStageData);
+                Features.Single.Core.StageDataManager.Instance.GetStageManager().CacheStageData(convertedStageData);
 
                 // 모달이 이 스테이지를 기다리고 있었다면 표시
                 ShowStageInfoModalIfReady(stageData.stage_number);
@@ -777,13 +830,13 @@ namespace BlokusUnity.UI
         /// <summary>
         /// API에서 스테이지 진행도 수신 처리
         /// </summary>
-        private void OnStageProgressReceived(BlokusUnity.Network.UserStageProgress progress)
+        private void OnStageProgressReceived(App.Network.UserStageProgress progress)
         {
             if (progress == null) return;
 
             Debug.Log($"[CandyCrushStageMapView] API에서 스테이지 {progress.stageNumber} 진행도 수신");
 
-            // BlokusUnity.Features.Single.UserDataCache에 저장되므로 별도 처리 불필요
+            // Features.Single.Core.UserDataCache에 저장되므로 별도 처리 불필요
         }
 
         /// <summary>
@@ -803,11 +856,11 @@ namespace BlokusUnity.UI
             Debug.Log($"[CandyCrushStageMapView] 사용자 데이터 업데이트됨: {userInfo.username}, maxStageCompleted={userInfo.maxStageCompleted}");
             Debug.Log($"[CandyCrushStageMapView] 프로필 로드 완료 - 모든 스테이지 버튼 상태 새로고침 시작");
 
-            // 🔥 추가: progressManager와 BlokusUnity.Features.Single.UserDataCache 동기화
+            // 🔥 추가: progressManager와 Features.Single.Core.UserDataCache 동기화
             if (progressManager != null && userInfo.maxStageCompleted > 0)
             {
                 Debug.Log($"[CandyCrushStageMapView] progressManager 동기화: max_stage_completed={userInfo.maxStageCompleted}");
-                // progressManager의 최대 언락 스테이지를 BlokusUnity.Features.Single.UserDataCache 데이터와 동기화
+                // progressManager의 최대 언락 스테이지를 Features.Single.Core.UserDataCache 데이터와 동기화
                 for (int stage = 1; stage <= userInfo.maxStageCompleted + 1; stage++)
                 {
                     if (!progressManager.IsStageUnlocked(stage))
@@ -986,20 +1039,20 @@ namespace BlokusUnity.UI
         {
             Debug.Log($"[CandyCrushStageMapView] 스테이지 {stageNumber} 데이터 요청");
 
-            // 1. 먼저 BlokusUnity.Features.Single.UserDataCache의 캐싱된 메타데이터에서 확인
-            if (BlokusUnity.Features.Single.UserDataCache.Instance != null)
+            // 1. 먼저 Features.Single.Core.UserDataCache의 캐싱된 메타데이터에서 확인
+            if (Features.Single.Core.UserDataCache.Instance != null)
             {
-                Debug.Log($"[CandyCrushStageMapView] BlokusUnity.Features.Single.UserDataCache 확인 중...");
+                Debug.Log($"[CandyCrushStageMapView] Features.Single.Core.UserDataCache 확인 중...");
 
                 // 전체 메타데이터 캐시 상태 확인
-                var allMetadata = BlokusUnity.Features.Single.UserDataCache.Instance.GetStageMetadata();
+                var allMetadata = Features.Single.Core.UserDataCache.Instance.GetStageMetadata();
                 Debug.Log($"[CandyCrushStageMapView] 전체 메타데이터 캐시: {allMetadata?.Length ?? 0}개");
 
-                var metadata = BlokusUnity.Features.Single.UserDataCache.Instance.GetStageMetadata(stageNumber);
+                var metadata = Features.Single.Core.UserDataCache.Instance.GetStageMetadata(stageNumber);
                 if (metadata != null)
                 {
                     Debug.Log($"[CandyCrushStageMapView] ✅ 캐싱된 메타데이터에서 스테이지 {stageNumber} 로드");
-                    return BlokusUnity.Utils.ApiDataConverter.ConvertCompactMetadata(metadata);
+                    return ApiDataConverter.ConvertCompactMetadata(metadata);
                 }
                 else
                 {
@@ -1011,7 +1064,7 @@ namespace BlokusUnity.UI
                         Debug.Log($"[CandyCrushStageMapView] 메타데이터가 전혀 없음. 0.5초 후 재시도");
                         pendingStageNumber = stageNumber; // 재시도할 스테이지 번호 저장
                         retryCount = 0; // 🔥 초기화
-                        Invoke(nameof(RetryStageDataLoad), 0.5f);
+                        InvokeLater(0.5f, RetryStageDataLoad);
                         // 임시로 null 반환하여 로딩 인디케이터 표시
                         return null;
                     }
@@ -1019,19 +1072,19 @@ namespace BlokusUnity.UI
             }
             else
             {
-                Debug.LogWarning("[CandyCrushStageMapView] BlokusUnity.Features.Single.UserDataCache.Instance가 null입니다");
+                Debug.LogWarning("[CandyCrushStageMapView] Features.Single.Core.UserDataCache.Instance가 null입니다");
             }
 
-            // 2. BlokusUnity.Features.Single.StageDataManager 캐시에서 확인
-            if (BlokusUnity.Features.Single.StageDataManager.Instance != null)
+            // 2. Features.Single.Core.StageDataManager 캐시에서 확인
+            if (Features.Single.Core.StageDataManager.Instance != null)
             {
-                var stageManager = BlokusUnity.Features.Single.StageDataManager.Instance.GetStageManager();
+                var stageManager = Features.Single.Core.StageDataManager.Instance.GetStageManager();
                 if (stageManager != null)
                 {
                     var cachedData = stageManager.GetStageData(stageNumber);
                     if (cachedData != null)
                     {
-                        Debug.Log($"[CandyCrushStageMapView] BlokusUnity.Features.Single.StageDataManager 캐시에서 스테이지 {stageNumber} 로드");
+                        Debug.Log($"[CandyCrushStageMapView] Features.Single.Core.StageDataManager 캐시에서 스테이지 {stageNumber} 로드");
                         return cachedData;
                     }
                 }
@@ -1258,7 +1311,7 @@ namespace BlokusUnity.UI
             normalizedY = Mathf.Clamp01(normalizedY);
 
             // 부드러운 스크롤 애니메이션
-            StartCoroutine(SmoothScrollTo(new Vector2(scrollRect.normalizedPosition.x, normalizedY)));
+            StartSafe(SmoothScrollTo(new Vector2(scrollRect.normalizedPosition.x, normalizedY)));
         }
 
         /// <summary>
@@ -1297,10 +1350,10 @@ namespace BlokusUnity.UI
             Debug.Log("스테이지 맵 새로고침");
 
             // 초기 표시용으로만 한 번 캐시 업데이트 실행
-            if (!hasSyncedOnce && BlokusUnity.Features.Single.UserDataCache.Instance != null)
+            if (!hasSyncedOnce && Features.Single.Core.UserDataCache.Instance != null)
             {
                 Debug.Log("[RefreshStageMap] 캐시된 데이터로 UI 업데이트 (서버 요청 생략)");
-                StartCoroutine(UpdateButtonsFromCache());
+                StartSafe(UpdateButtonsFromCache());
                 hasSyncedOnce = true;
             }
             else
@@ -1335,14 +1388,44 @@ namespace BlokusUnity.UI
             // 부모 Show 호출 (PanelBase가 gameObject.SetActive(true) 처리)
             base.Show();
 
-            // 표시될 때마다 초기화 및 새로고침
-            InitializeStageMap();
-            RefreshStageMap();
+            // 🔥 추가: Scene 상태 확인 후 초기화
+            if (IsMainSceneActiveOrCurrent())
+            {
+                // 표시될 때마다 초기화 및 새로고침
+                InitializeStageMap();
+                RefreshStageMap();
 
-            Debug.Log($"Panel 최종 상태: Active={gameObject.activeInHierarchy}");
+                Debug.Log($"Panel 최종 상태: Active={gameObject.activeInHierarchy}");
 
-            // 초기화 완료 후 스크롤 위치 조정
-            StartCoroutine(DelayedScrollToStage());
+                // 초기화 완료 후 스크롤 위치 조정
+                StartSafe(DelayedScrollToStage());
+            }
+            else
+            {
+                Debug.LogWarning("[CandyCrushStageMapView] Show - MainScene 비활성화 상태로 인해 초기화 지연. 재시도 예약");
+                // 0.5초 후 재시도
+                StartSafe(RetryShowAfterDelay());
+            }
+        }
+
+        /// <summary>
+        /// 🔥 추가: Scene 상태 확인 후 Show 재시도
+        /// </summary>
+        private System.Collections.IEnumerator RetryShowAfterDelay()
+        {
+            yield return new WaitForSeconds(0.5f);
+
+            if (IsMainSceneActiveOrCurrent() && gameObject.activeInHierarchy)
+            {
+                Debug.Log("[CandyCrushStageMapView] 재시도 성공 - 초기화 진행");
+                InitializeStageMap();
+                RefreshStageMap();
+                StartSafe(DelayedScrollToStage());
+            }
+            else
+            {
+                Debug.LogWarning("[CandyCrushStageMapView] 재시도 실패 - Scene 여전히 비활성화 상태");
+            }
         }
 
         /// <summary>
@@ -1353,12 +1436,12 @@ namespace BlokusUnity.UI
             // Layout 시스템과 뷰포트 업데이트 완료 대기
             yield return new WaitForSeconds(0.1f);
 
-            // 🔥 수정: BlokusUnity.Features.Single.UserDataCache 기반으로 도전해야 할 스테이지 계산
+            // 🔥 수정: Features.Single.Core.UserDataCache 기반으로 도전해야 할 스테이지 계산
             int challengeStage = 1;
-            if (BlokusUnity.Features.Single.UserDataCache.Instance != null && BlokusUnity.Features.Single.UserDataCache.Instance.IsLoggedIn())
+            if (Features.Single.Core.UserDataCache.Instance != null && Features.Single.Core.UserDataCache.Instance.IsLoggedIn())
             {
-                // BlokusUnity.Features.Single.UserDataCache에서 직접 max_stage_completed 사용
-                int maxStageCompleted = BlokusUnity.Features.Single.UserDataCache.Instance.GetMaxStageCompleted();
+                // Features.Single.Core.UserDataCache에서 직접 max_stage_completed 사용
+                int maxStageCompleted = UserDataCache.Instance.MaxStageCompleted;
                 int maxUnlocked = maxStageCompleted + 1; // 다음 스테이지까지 언락됨
 
                 // 현재 언락된 가장 높은 스테이지가 도전 스테이지
@@ -1367,7 +1450,7 @@ namespace BlokusUnity.UI
                 // 스테이지 1은 항상 도전 가능하므로 최소값 보장
                 challengeStage = Mathf.Max(1, challengeStage);
 
-                Debug.Log($"[CandyCrushStageMapView] BlokusUnity.Features.Single.UserDataCache 기반: max_stage_completed={maxStageCompleted}, 최대 언락 스테이지={maxUnlocked}, 도전 스테이지={challengeStage}");
+                Debug.Log($"[CandyCrushStageMapView] Features.Single.Core.UserDataCache 기반: max_stage_completed={maxStageCompleted}, 최대 언락 스테이지={maxUnlocked}, 도전 스테이지={challengeStage}");
             }
             else if (progressManager != null)
             {
@@ -1431,9 +1514,9 @@ namespace BlokusUnity.UI
         {
             Debug.Log("[UpdateButtonsFromCache] 캐시된 데이터로 UI 업데이트 시작");
 
-            if (BlokusUnity.Features.Single.UserDataCache.Instance == null)
+            if (Features.Single.Core.UserDataCache.Instance == null)
             {
-                Debug.LogWarning("[UpdateButtonsFromCache] BlokusUnity.Features.Single.UserDataCache가 없음");
+                Debug.LogWarning("[UpdateButtonsFromCache] Features.Single.Core.UserDataCache가 없음");
                 yield break;
             }
 
@@ -1450,7 +1533,7 @@ namespace BlokusUnity.UI
                     Debug.Log($"[UpdateButtonsFromCache] 스테이지 {stageNumber} 처리 시작");
 
                     // 캐시에서 진행도 데이터 가져오기
-                    var networkProgress = BlokusUnity.Features.Single.UserDataCache.Instance.GetStageProgress(stageNumber);
+                    var networkProgress = Features.Single.Core.UserDataCache.Instance.GetStageProgress(stageNumber);
 
                     GameUserStageProgress gameProgress = null;
 
@@ -1518,6 +1601,21 @@ namespace BlokusUnity.UI
                 }
             }
             // activeButtons는 유지 (다시 Show할 때 재사용)
+        }
+
+        private Coroutine StartSafe(System.Collections.IEnumerator routine)
+        {
+            return isActiveAndEnabled ? StartCoroutine(routine) : CoroutineRunner.Run(routine);
+        }
+
+        private void InvokeLater(float seconds, System.Action action)
+        {
+            System.Collections.IEnumerator Wrapper()
+            {
+                yield return new WaitForSeconds(seconds);
+                if (this != null) action?.Invoke();
+            }
+            StartSafe(Wrapper());
         }
     }
 }

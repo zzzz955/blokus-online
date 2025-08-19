@@ -89,8 +89,14 @@ export default function StageList({ stages, onEditStage, onDeleteStage }: StageL
       const bValue = b[sortField];
       
       let comparison = 0;
-      if (aValue < bValue) comparison = -1;
-      if (aValue > bValue) comparison = 1;
+      if (aValue !== null && bValue !== null) {
+        if (aValue < bValue) comparison = -1;
+        if (aValue > bValue) comparison = 1;
+      } else if (aValue === null && bValue !== null) {
+        comparison = 1;
+      } else if (aValue !== null && bValue === null) {
+        comparison = -1;
+      }
       
       return sortDirection === 'asc' ? comparison : -comparison;
     });

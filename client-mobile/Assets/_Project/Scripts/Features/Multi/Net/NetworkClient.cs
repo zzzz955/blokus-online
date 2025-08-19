@@ -1,3 +1,5 @@
+﻿namespace Features.Multi.Net
+{
 // using System;
 // using System.Collections.Generic;
 // using System.IO;
@@ -6,9 +8,9 @@
 // using System.Threading;
 // using System.Threading.Tasks;
 // using UnityEngine;
-// using BlokusUnity.Common;
+// using Shared.Models;
 
-// namespace BlokusUnity.Network
+// namespace App.Network
 // {
 //     /// <summary>
 //     /// Unity 블로쿠스 네트워크 클라이언트
@@ -561,3 +563,4 @@
 //         }
 //     }
 // }
+}

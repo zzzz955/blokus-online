@@ -1,10 +1,8 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
-using BlokusUnity.Common;
+using App.Core;
 using System;
-
-namespace BlokusUnity.Data
-{
+namespace Shared.Models{
     /// <summary>
     /// 싱글플레이 스테이지 데이터 - API 서버에서 생성된 데이터 구조
     /// 이전 ScriptableObject 방식에서 API 기반으로 변경
@@ -31,18 +29,18 @@ namespace BlokusUnity.Data
         public int oneStar => Mathf.RoundToInt(optimal_score * 0.5f); // 50%
 
         // 사용 가능한 블록들 (BlockType 리스트로 변환)
-        public System.Collections.Generic.List<BlokusUnity.Common.BlockType> availableBlocks
+        public System.Collections.Generic.List<Shared.Models.BlockType> availableBlocks
         {
             get
             {
-                var blockList = new System.Collections.Generic.List<BlokusUnity.Common.BlockType>();
+                var blockList = new System.Collections.Generic.List<Shared.Models.BlockType>();
                 if (available_blocks != null)
                 {
                     foreach (var blockId in available_blocks)
                     {
                         if (blockId >= 1 && blockId <= 21)
                         {
-                            blockList.Add((BlokusUnity.Common.BlockType)(byte)blockId);
+                            blockList.Add((Shared.Models.BlockType)(byte)blockId);
                         }
                     }
                 }

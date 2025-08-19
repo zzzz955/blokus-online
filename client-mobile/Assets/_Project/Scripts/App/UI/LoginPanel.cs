@@ -1,13 +1,11 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using BlokusUnity.Network;
-using BlokusUnity.Data;
-using BlokusUnity.UI.Messages;
-
-namespace BlokusUnity.UI
-{
-    public class LoginPanel : BlokusUnity.UI.PanelBase
+using App.Network;
+using Features.Single.Core;
+using Shared.UI;
+namespace App.UI{
+    public class LoginPanel : Shared.UI.PanelBase
     {
         [Header("UI 컴포넌트")]
         [SerializeField] private Button loginButton;
@@ -319,31 +317,44 @@ namespace BlokusUnity.UI
         /// </summary>
         private void OnHttpUserInfoReceived(HttpApiClient.AuthUserData authUserData)
         {
+            Debug.Log("============= OnHttpUserInfoReceived 호출됨 =============");
+            
             if (authUserData != null)
             {
-                Debug.Log($"LoginPanel - 로그인 성공: {authUserData.user.username}");
+                Debug.Log($"[LoginPanel] 로그인 성공: {authUserData.user.username}");
                 
-                // 🔥 수정: 로그인은 순수 인증만 처리, 프로필은 별도 API로 로드
-                if (BlokusUnity.Features.Single.UserDataCache.Instance != null)
+                // UserDataCache 상태 확인
+                Debug.Log($"[LoginPanel] UserDataCache.Instance: {Features.Single.Core.UserDataCache.Instance}");
+                
+                // 🔥 임시 수정: UserDataCache 의존성 제거하고 즉시 화면 전환
+                Debug.Log("[LoginPanel] UserDataCache 의존성 건너뛰고 즉시 화면 전환 시도");
+                
+                // UserDataCache가 있으면 사용하고, 없어도 진행
+                if (Features.Single.Core.UserDataCache.Instance != null)
                 {
-                    // 기본 로그인 정보만 저장 (토큰만)
-                    BlokusUnity.Features.Single.UserDataCache.Instance.SetAuthToken(authUserData.token, authUserData.user.username);
-                    
-                    // 🔥 추가: 로그인 후 즉시 프로필 API 호출
-                    if (HttpApiClient.Instance != null)
-                    {
-                        HttpApiClient.Instance.GetUserProfile();
-                        Debug.Log("로그인 후 프로필 API 호출 시작");
-                    }
+                    Debug.Log("[LoginPanel] UserDataCache 발견! SetAuthToken 호출");
+                    Features.Single.Core.UserDataCache.Instance.SetAuthToken(authUserData.token, authUserData.user.username);
+                }
+                else
+                {
+                    Debug.LogWarning("[LoginPanel] UserDataCache 없음 - SingleCore 씬 미로드 상태, 일단 화면 전환 진행");
                 }
                 
-                SetStatusText($"프로필 정보를 불러오는 중...", MessagePriority.Info);
+                SetStatusText($"로그인 완료!", MessagePriority.Success);
+                
+                // 즉시 화면 전환 (UserDataCache 상태와 무관하게)
+                Debug.Log("[LoginPanel] ProceedToNextScreen() 호출 직전");
+                ProceedToNextScreen();
+                Debug.Log("[LoginPanel] ProceedToNextScreen() 호출 완료");
+                return; // 조기 반환
             }
             else
             {
-                Debug.LogWarning("LoginPanel - 사용자 정보 수신 실패");
+                Debug.LogWarning("[LoginPanel] 사용자 정보 수신 실패");
                 SetStatusText("사용자 정보를 가져올 수 없습니다.", MessagePriority.Error);
             }
+            
+            Debug.Log("============= OnHttpUserInfoReceived 완료 =============");
         }
         
         /// <summary>
@@ -360,8 +371,8 @@ namespace BlokusUnity.UI
                 
                 SetStatusText($"환영합니다, {userProfile.username}님!", MessagePriority.Success);
                 
-                // 1초 후 다음 화면으로 전환
-                Invoke(nameof(ProceedToNextScreen), 1f);
+                // 즉시 다음 화면으로 전환 (딜레이 제거)
+                ProceedToNextScreen();
             }
             else
             {
@@ -375,8 +386,84 @@ namespace BlokusUnity.UI
         /// </summary>
         private void ProceedToNextScreen()
         {
-            Debug.Log("로그인 완료 - 모드 선택 화면으로 이동");
-            UIManager.Instance?.OnLoginSuccess();
+            Debug.Log("======== 로그인 완료 - 모드 선택 화면으로 이동 ========");
+            
+            // UIManager 상태 확인
+            Debug.Log($"[LoginPanel] UIManager.Instance 값: {UIManager.Instance}");
+            Debug.Log($"[LoginPanel] FindObjectOfType<UIManager> 결과: {Object.FindObjectOfType<UIManager>()}");
+            
+            // UIManager 사용으로 변경
+            UIManager uiManager = UIManager.GetInstanceSafe();
+            Debug.Log($"[LoginPanel] UIManager.GetInstanceSafe() 결과: {uiManager}");
+            
+            if (uiManager != null)
+            {
+                Debug.Log("[LoginPanel] UIManager 발견! OnLoginSuccess() 호출");
+                try
+                {
+                    uiManager.OnLoginSuccess();
+                    Debug.Log("[LoginPanel] UIManager.OnLoginSuccess() 호출 완료");
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogError($"[LoginPanel] OnLoginSuccess() 호출 중 오류: {ex.Message}");
+                    SetStatusText("화면 전환 중 오류가 발생했습니다.", MessagePriority.Error);
+                }
+            }
+            else
+            {
+                Debug.LogError("[LoginPanel] UIManager를 찾을 수 없습니다!");
+                
+                // 폴백: BlokusUIManager 시도 (레거시 지원)
+                var blokusUIManager = App.UI.BlokusUIManager.Instance;
+                if (blokusUIManager != null)
+                {
+                    Debug.Log("[LoginPanel] 폴백: BlokusUIManager 사용");
+                    blokusUIManager.OnLoginSuccess();
+                }
+                else
+                {
+                    Debug.LogError("[LoginPanel] 모든 UI Manager를 찾을 수 없습니다!");
+                    SetStatusText("UI 매니저를 찾을 수 없어 화면 전환에 실패했습니다.", MessagePriority.Error);
+                    
+                    // 최종 폴백: 수동으로 씬 새로고침
+                    Debug.Log("[LoginPanel] 최종 폴백: MainScene 새로고침 시도");
+                    StartCoroutine(RefreshMainSceneAfterDelay());
+                }
+            }
+        }
+        
+        /// <summary>
+        /// 폴백: MainScene 새로고침 시도
+        /// </summary>
+        private System.Collections.IEnumerator RefreshMainSceneAfterDelay()
+        {
+            yield return new WaitForSeconds(1.0f);
+            
+            Debug.Log("[LoginPanel] MainScene 새로고침 시도");
+            
+            // Try to find UIManager again
+            UIManager uiManager = Object.FindObjectOfType<UIManager>();
+            if (uiManager != null)
+            {
+                Debug.Log("[LoginPanel] 새로고침 후 UIManager 발견! OnLoginSuccess() 호출");
+                uiManager.OnLoginSuccess();
+            }
+            else
+            {
+                // 마지막으로 BlokusUIManager 시도
+                BlokusUIManager blokusUIManager = Object.FindObjectOfType<BlokusUIManager>();
+                if (blokusUIManager != null)
+                {
+                    Debug.Log("[LoginPanel] 새로고침 후 BlokusUIManager 발견! OnLoginSuccess() 호출");
+                    blokusUIManager.OnLoginSuccess();
+                }
+                else
+                {
+                    Debug.LogError("[LoginPanel] 새로고침 후에도 UI Manager를 찾을 수 없습니다.");
+                    SetStatusText("화면 전환에 실패했습니다. 게임을 재시작해주세요.", MessagePriority.Error);
+                }
+            }
         }
         
         // ========================================
@@ -388,9 +475,9 @@ namespace BlokusUnity.UI
         /// </summary>
         private void CheckCachedUser()
         {
-            if (BlokusUnity.Features.Single.UserDataCache.Instance != null && BlokusUnity.Features.Single.UserDataCache.Instance.IsLoggedIn())
+            if (Features.Single.Core.UserDataCache.Instance != null && Features.Single.Core.UserDataCache.Instance.IsLoggedIn())
             {
-                var cachedUser = BlokusUnity.Features.Single.UserDataCache.Instance.GetCurrentUser();
+                var cachedUser = Features.Single.Core.UserDataCache.Instance.GetCurrentUser();
                 Debug.Log($"캐시된 사용자 발견: {cachedUser.username}");
                 
                 SetStatusText($"이전 로그인: {cachedUser.username}", MessagePriority.Info);

@@ -1,11 +1,9 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using UnityEngine.SceneManagement;
-using BlokusUnity.Game;
-
-namespace BlokusUnity.UI.Game
-{
+using Features.Single.Gameplay;
+namespace Features.Single.UI.InGame{
     /// <summary>
     /// 게임 종료 확인 모달
     /// Exit 버튼 클릭 시 표시되는 확인 다이얼로그
@@ -87,7 +85,7 @@ namespace BlokusUnity.UI.Game
         }
         
         /// <summary>
-        /// 확인 버튼 클릭 - MainScene으로 이동
+        /// 확인 버튼 클릭 - MainScene으로 이동 (5-Scene 아키텍처 지원)
         /// </summary>
         private void OnAcceptClicked()
         {
@@ -99,8 +97,21 @@ namespace BlokusUnity.UI.Game
                 SingleGameManager.Instance.OnExitRequested();
             }
             
-            // MainScene으로 이동
-            SceneManager.LoadScene(mainSceneName);
+            // Exit으로 돌아온다는 플래그 설정
+            PlayerPrefs.SetInt("ReturnedFromGame", 1);
+            PlayerPrefs.Save();
+            
+            // 🔥 수정: SceneFlowController를 통한 proper Scene 전환
+            if (App.Core.SceneFlowController.Instance != null)
+            {
+                Debug.Log("[ExitConfirmModal] SceneFlowController를 통해 MainScene으로 전환");
+                App.Core.SceneFlowController.Instance.StartExitSingleToMain();
+            }
+            else
+            {
+                Debug.LogError("[ExitConfirmModal] SceneFlowController가 없습니다! 레거시 방식으로 전환");
+                SceneManager.LoadScene(mainSceneName);
+            }
         }
         
         /// <summary>

@@ -1,9 +1,11 @@
+﻿namespace Features.Multi.Net
+{
 // using System.Collections;
 // using UnityEngine;
-// using BlokusUnity.Network;
-// using BlokusUnity.Common;
+// using App.Network;
+// using Shared.Models;
 
-// namespace BlokusUnity.Network
+// namespace App.Network
 // {
 //     /// <summary>
 //     /// 네트워크 매니저 - NetworkClient와 MessageHandler 통합 관리
@@ -467,3 +469,4 @@
 //         }
 //     }
 // }
+}

@@ -1,22 +1,32 @@
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const compression = require('compression');
-const rateLimit = require('express-rate-limit');
-const path = require('path');
-const logger = require('./config/logger');
+const express = require('express')
+const cors = require('cors')
+const helmet = require('helmet')
+const compression = require('compression')
+const rateLimit = require('express-rate-limit')
+const logger = require('./config/logger')
+
+// Validate required environment variables
+const requiredEnvVars = ['JWT_SECRET', 'DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME']
+const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName])
+
+if (missingEnvVars.length > 0) {
+  logger.error('Missing required environment variables for API server', {
+    missing: missingEnvVars
+  })
+  throw new Error(`Missing required environment variables: ${missingEnvVars.join(', ')}`)
+}
 
 // Route imports
-const stagesRouter = require('./routes/stages');
-const userRouter = require('./routes/user');
-const authRouter = require('./routes/auth');
-const healthRouter = require('./routes/health');
+const stagesRouter = require('./routes/stages')
+const userRouter = require('./routes/user')
+const authRouter = require('./routes/auth')
+const healthRouter = require('./routes/health')
 
-const app = express();
+const app = express()
 
 // Trust proxy (for rate limiting and IP detection)
 if (process.env.TRUST_PROXY === 'true') {
-  app.set('trust proxy', 1);
+  app.set('trust proxy', 1)
 }
 
 // Security middleware
@@ -26,47 +36,47 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
-    },
+      imgSrc: ["'self'", 'data:', 'https:']
+    }
   },
   crossOriginEmbedderPolicy: false // Unity WebGL 호환성을 위해
-}));
+}))
 
 // CORS configuration
 const corsOptions = {
   origin: function (origin, callback) {
-    const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000').split(',');
-    
+    const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000').split(',')
+
     // 개발 환경에서는 origin이 없는 요청도 허용 (Postman, 모바일 앱 등)
     if (!origin && process.env.NODE_ENV === 'development') {
-      return callback(null, true);
+      return callback(null, true)
     }
-    
+
     if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
-      callback(null, true);
+      callback(null, true)
     } else {
-      logger.warn('CORS blocked request', { origin, allowedOrigins });
-      callback(new Error('Not allowed by CORS'));
+      logger.warn('CORS blocked request', { origin, allowedOrigins })
+      callback(new Error('Not allowed by CORS'))
     }
   },
   credentials: true,
   optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-};
+}
 
-app.use(cors(corsOptions));
+app.use(cors(corsOptions))
 
 // Compression middleware
 app.use(compression({
-  level: parseInt(process.env.COMPRESSION_LEVEL) || 6,
+  level: parseInt(process.env.COMPRESSION_LEVEL, 10) || 6,
   threshold: 1024 // 1KB 이상만 압축
-}));
+}))
 
 // Rate limiting
 const rateLimitOptions = {
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15분
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // 최대 100 요청
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000, // 15분
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || 100, // 최대 100 요청
   message: {
     success: false,
     message: 'Too many requests from this IP, please try again later',
@@ -80,39 +90,39 @@ const rateLimitOptions = {
       userAgent: req.get('User-Agent'),
       method: req.method,
       url: req.originalUrl
-    });
-    
+    })
+
     res.status(429).json({
       success: false,
       message: 'Too many requests from this IP, please try again later',
       error: 'RATE_LIMIT_EXCEEDED',
       retry_after: Math.ceil(rateLimitOptions.windowMs / 1000)
-    });
+    })
   }
-};
+}
 
 // Apply rate limiting to all API routes
-app.use('/api/', rateLimit(rateLimitOptions));
+app.use('/api/', rateLimit(rateLimitOptions))
 
 // Body parsing middleware
-app.use(express.json({ 
+app.use(express.json({
   limit: '1mb',
   strict: true
-}));
-app.use(express.urlencoded({ 
-  extended: true, 
-  limit: '1mb' 
-}));
+}))
+app.use(express.urlencoded({
+  extended: true,
+  limit: '1mb'
+}))
 
 // Request logging middleware
 app.use((req, res, next) => {
-  const startTime = Date.now();
-  
+  const startTime = Date.now()
+
   // Response logging
   res.on('finish', () => {
-    const duration = Date.now() - startTime;
-    const logLevel = res.statusCode >= 400 ? 'warn' : 'info';
-    
+    const duration = Date.now() - startTime
+    const logLevel = res.statusCode >= 400 ? 'warn' : 'info'
+
     logger[logLevel]('HTTP Request', {
       method: req.method,
       url: req.originalUrl,
@@ -121,19 +131,19 @@ app.use((req, res, next) => {
       ip: req.ip,
       userAgent: req.get('User-Agent'),
       contentLength: res.get('Content-Length') || 0
-    });
-  });
-  
-  next();
-});
+    })
+  })
+
+  next()
+})
 
 // API Routes
-const apiPrefix = process.env.API_PREFIX || '/api';
+const apiPrefix = process.env.API_PREFIX || '/api'
 
-app.use(`${apiPrefix}/stages`, stagesRouter);
-app.use(`${apiPrefix}/user`, userRouter);
-app.use(`${apiPrefix}/auth`, authRouter);
-app.use(`${apiPrefix}/health`, healthRouter);
+app.use(`${apiPrefix}/stages`, stagesRouter)
+app.use(`${apiPrefix}/user`, userRouter)
+app.use(`${apiPrefix}/auth`, authRouter)
+app.use(`${apiPrefix}/health`, healthRouter)
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -152,8 +162,8 @@ app.get('/', (req, res) => {
       stats: `${apiPrefix}/user/stats`,
       auth: `${apiPrefix}/auth/validate`
     }
-  });
-});
+  })
+})
 
 // API documentation endpoint
 app.get(`${apiPrefix}`, (req, res) => {
@@ -217,8 +227,8 @@ app.get(`${apiPrefix}`, (req, res) => {
         auth: true
       }
     ]
-  });
-});
+  })
+})
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -226,7 +236,7 @@ app.use('*', (req, res) => {
     method: req.method,
     url: req.originalUrl,
     ip: req.ip
-  });
+  })
 
   res.status(404).json({
     success: false,
@@ -240,8 +250,8 @@ app.use('*', (req, res) => {
       `POST ${apiPrefix}/stages/complete`,
       `GET ${apiPrefix}/user/profile`
     ]
-  });
-});
+  })
+})
 
 // Global error handler
 app.use((error, req, res, next) => {
@@ -252,7 +262,7 @@ app.use((error, req, res, next) => {
     url: req.originalUrl,
     ip: req.ip,
     userAgent: req.get('User-Agent')
-  });
+  })
 
   // CORS 에러 처리
   if (error.message === 'Not allowed by CORS') {
@@ -260,7 +270,7 @@ app.use((error, req, res, next) => {
       success: false,
       message: 'CORS policy violation',
       error: 'CORS_ERROR'
-    });
+    })
   }
 
   // JSON parsing 에러 처리
@@ -269,7 +279,7 @@ app.use((error, req, res, next) => {
       success: false,
       message: 'Invalid JSON format',
       error: 'INVALID_JSON'
-    });
+    })
   }
 
   // 기본 에러 응답
@@ -277,10 +287,10 @@ app.use((error, req, res, next) => {
     success: false,
     message: 'Internal server error',
     error: 'INTERNAL_SERVER_ERROR',
-    ...(process.env.NODE_ENV === 'development' && { 
-      details: error.message 
+    ...(process.env.NODE_ENV === 'development' && {
+      details: error.message
     })
-  });
-});
+  })
+})
 
-module.exports = app;
+module.exports = app

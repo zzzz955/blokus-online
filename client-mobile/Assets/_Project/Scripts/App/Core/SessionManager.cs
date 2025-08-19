@@ -1,10 +1,9 @@
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using UnityEngine;
-using BlokusUnity.Network;
-using BlokusUnity.UI.Messages;
-
-namespace BlokusUnity
-{
+using App.Network;
+using App.UI;
+using Shared.UI;
+namespace App.Core{
     /// <summary>
     /// Session manager for user authentication and session persistence
     /// Migration Plan: 로그인은 MainScene 로그인 패널에서 처리. 게스트 없음. 멀티 입장 시 캐싱된 ID/PW를 TCP 서버로 전송

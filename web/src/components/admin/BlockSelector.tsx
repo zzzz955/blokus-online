@@ -99,7 +99,7 @@ export default function BlockSelector({ selectedBlocks, onChange }: BlockSelecto
       ? BLOCK_TYPES 
       : BLOCK_TYPES.filter(block => block.category === category);
     const categoryIds = categoryBlocks.map(block => block.id);
-    const newSelection = [...new Set([...selectedBlocks, ...categoryIds])];
+    const newSelection = Array.from(new Set([...selectedBlocks, ...categoryIds]));
     onChange(newSelection.sort((a, b) => a - b));
   };
 

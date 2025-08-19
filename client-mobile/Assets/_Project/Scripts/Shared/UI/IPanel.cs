@@ -1,4 +1,5 @@
-namespace BlokusUnity.UI
+﻿using App.UI;
+namespace Shared.UI
 {
     /// <summary>
     /// UI Panel interface for standardized panel behavior

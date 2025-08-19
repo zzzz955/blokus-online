@@ -1,10 +1,8 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using BlokusUnity.Game;
-
-namespace BlokusUnity.UI
-{
+using Features.Single.Core;
+namespace Features.Single.UI.StageSelect{
     /// <summary>
     /// 개별 스테이지 버튼 컴포넌트
     /// 스테이지 상태 (언락/잠금/완료)에 따라 시각적 표현 변경
@@ -79,9 +77,7 @@ void Awake()
         /// <param name="stageNum">스테이지 번호</param>
         /// <param name="clickCallback">클릭시 호출될 콜백</param>
         public void Initialize(int stageNum, System.Action<int> clickCallback)
-        {
-            // // debug.Log($"=== StageButton Initialize: 스테이지 {stageNum} ===");
-            
+        {            
             stageNumber = stageNum;
             onClickCallback = clickCallback;
             
@@ -90,18 +86,7 @@ void Awake()
             {
                 string newText = stageNumber.ToString();
                 stageNumberText.text = newText;
-                // // debug.Log($"스테이지 번호 설정: {newText}");
-                // // debug.Log($"설정 후 텍스트 확인: '{stageNumberText.text}'");
             }
-            else
-            {
-                // // debug.LogError($"StageButton {stageNumber}: stageNumberText가 할당되지 않았습니다!");
-            }
-            
-            // 초기 상태는 StageSelectionController.CreateStageButton()에서 정확한 데이터로 설정됨
-            // 중복 호출 방지를 위해 여기서는 UpdateState를 호출하지 않음
-            
-            Debug.Log($"[StageButton {stageNumber}] Initialize 완료 - 상태 업데이트는 StageSelectionController에서 처리됨");
         }
         
         /// <summary>
@@ -109,13 +94,11 @@ void Awake()
         /// </summary>
         /// <param name="unlocked">언락 여부</param>
         /// <param name="progress">진행도 정보 (null이면 플레이하지 않음)</param>
-        public void UpdateState(bool unlocked, BlokusUnity.Features.Single.UserStageProgress progress)
+        public void UpdateState(bool unlocked, Features.Single.Core.UserStageProgress progress)
         {
             isUnlocked = unlocked;
             isCompleted = progress?.isCompleted ?? false;
             starsEarned = progress?.starsEarned ?? 0;
-            
-            Debug.Log($"[StageButton {stageNumber}] UpdateState: 언락={unlocked}, 완료={isCompleted}, 별={starsEarned}");
             
             // 버튼 활성화/비활성화
             if (button != null)
@@ -201,8 +184,6 @@ void Awake()
                 return;
             }
             
-            Debug.Log($"[StageButton {stageNumber}] 별 아이콘 업데이트 - 완료={isCompleted}, 획득한 별: {starsEarned}/{starIcons.Length}");
-            
             for (int i = 0; i < starIcons.Length; i++)
             {
                 if (starIcons[i] != null)
@@ -213,8 +194,6 @@ void Awake()
                     // 획득한 별 개수에 따른 스프라이트 및 색상 설정
                     bool shouldActivate = isCompleted && (i < starsEarned);
                     
-                    Debug.Log($"[StageButton {stageNumber}] 별 {i+1}: shouldActivate={shouldActivate} (완료={isCompleted} && {i}<{starsEarned})");
-                    
                     if (shouldActivate)
                     {
                         // 활성화된 별
@@ -222,13 +201,11 @@ void Awake()
                         {
                             starIcons[i].sprite = activeStar;
                             starIcons[i].color = Color.white; // 스프라이트 사용시 색상 취소
-                            Debug.Log($"[StageButton {stageNumber}] 별 {i+1}: activeStar 스프라이트 설정");
                         }
                         else
                         {
                             // 스프라이트가 없으면 색상만 변경
                             starIcons[i].color = activeStarColor;
-                            Debug.Log($"[StageButton {stageNumber}] 별 {i+1}: activeStarColor 색상 설정 ({activeStarColor})");
                         }
                     }
                     else
@@ -238,13 +215,11 @@ void Awake()
                         {
                             starIcons[i].sprite = inactiveStar;
                             starIcons[i].color = Color.white; // 스프라이트 사용시 색상 취소
-                            Debug.Log($"[StageButton {stageNumber}] 별 {i+1}: inactiveStar 스프라이트 설정");
                         }
                         else
                         {
                             // 스프라이트가 없으면 색상만 변경
                             starIcons[i].color = inactiveStarColor;
-                            Debug.Log($"[StageButton {stageNumber}] 별 {i+1}: inactiveStarColor 색상 설정 ({inactiveStarColor})");
                         }
                     }
                 }
@@ -263,18 +238,13 @@ void Awake()
             if (lockIcon != null)
             {
                 lockIcon.gameObject.SetActive(!isUnlocked);
-                // debug.Log($"스테이지 {stageNumber}: 잠금 아이콘 {(!isUnlocked ? "표시" : "숨김")}");
-            }
-            else
-            {
-                // debug.Log($"스테이지 {stageNumber}: lockIcon이 할당되지 않음 (상태별 스프라이트를 사용하세요)");
             }
         }
         
         /// <summary>
         /// 텍스트 정보 업데이트
         /// </summary>
-        private void UpdateTexts(BlokusUnity.Features.Single.UserStageProgress progress)
+        private void UpdateTexts(Features.Single.Core.UserStageProgress progress)
         {
             // 스테이지 번호 텍스트 색상 조정
             if (stageNumberText != null)
@@ -391,35 +361,6 @@ void Awake()
             }
             
             transform.localPosition = originalPosition;
-        }
-        
-        // ========================================
-        // 개발자 도구 (Inspector에서 테스트용)
-        // ========================================
-        
-        [ContextMenu("Test Unlocked State")]
-        public void TestUnlockedState()
-        {
-            UpdateState(true, null);
-        }
-        
-        [ContextMenu("Test Completed State (3 Stars)")]
-        public void TestCompletedState()
-        {
-            var testProgress = new BlokusUnity.Features.Single.UserStageProgress
-            {
-                stageNumber = stageNumber,
-                isCompleted = true,
-                starsEarned = 3,
-                bestScore = 100
-            };
-            UpdateState(true, testProgress);
-        }
-        
-        [ContextMenu("Test Locked State")]
-        public void TestLockedState()
-        {
-            UpdateState(false, null);
         }
     }
 }

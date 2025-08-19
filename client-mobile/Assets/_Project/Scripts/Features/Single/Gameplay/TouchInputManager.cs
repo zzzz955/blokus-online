@@ -1,8 +1,6 @@
-// Assets/Scripts/Game/TouchInputManager.cs
+﻿// Assets/Scripts/Game/TouchInputManager.cs
 using UnityEngine;
-
-namespace BlokusUnity.Game
-{
+namespace Features.Single.Gameplay{
     /// <summary>
     /// (비활성 버전) 스와이프/제스처 입력 제거.
     /// 조작은 ActionButtonPanel(회전/플립/배치)과 팔레트/보드 UI가 담당한다.

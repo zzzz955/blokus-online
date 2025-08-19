@@ -1,11 +1,13 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using BlokusUnity.Common;
-
-namespace BlokusUnity.Game
-{
+using App.Services;
+using Features.Single.Core;
+using Features.Single.UI.InGame;
+using Shared.Models;
+using App.Core; // GameLogic
+namespace Features.Single.Gameplay{
     /// <summary>
     /// 2D 게임보드(UI) 시각화 및 터치 상호작용
     /// </summary>
@@ -40,7 +42,7 @@ namespace BlokusUnity.Game
         [SerializeField] private Sprite uiFallbackSprite;
 
         [Header("스킨")]
-        [SerializeField] private BlokusUnity.Features.Single.Skins.BlockSkin skin;
+        [SerializeField] private Features.Single.Gameplay.Skins.BlockSkin skin;
 
         // 내부 상태
         private GameLogic gameLogic;

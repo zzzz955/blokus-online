@@ -1,244 +1,229 @@
+﻿// Assets/_Project/Scripts/Features/Single/UI/InGame/GameResultModal.cs
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using UnityEngine.SceneManagement;
-using BlokusUnity.Game;
-using BlokusUnity.Data;
+using UnityEngine.EventSystems;
+using Features.Single.Gameplay;
 
-namespace BlokusUnity.UI.Game
+namespace Features.Single.UI.InGame
 {
     /// <summary>
-    /// 게임 종료 시 결과를 표시하는 모달
-    /// 점수, 별점, 시간, 클리어 여부 등을 표시
+    /// 게임 종료 결과 모달.
+    /// - 형제 패널 직접 제어 금지
+    /// - 화면 전환은 SingleGameplayUIScreenController에 위임(의존 역전)
     /// </summary>
     public class GameResultModal : MonoBehaviour
     {
-        [Header("UI 참조")]
-        [SerializeField] private GameObject modalPanel;
-        [SerializeField] private TMP_Text resultTitleText;        // 클리어 성공/실패
-        [SerializeField] private TMP_Text scoreText;             // 획득 점수
-        [SerializeField] private TMP_Text timeText;              // 소요 시간
-        [SerializeField] private TMP_Text optimalScoreText;      // 최대 점수 (별점 계산용)
-        [SerializeField] private Button confirmButton;          // MainScene 이동
-        
-        [Header("별점 시스템")]
-        [SerializeField] private Image[] starImages = new Image[3];  // Star[3]
-        [SerializeField] private Sprite activeStarSprite;            // 활성화된 별
-        [SerializeField] private Sprite inactiveStarSprite;          // 비활성화된 별
-        
-        [Header("설정")]
-        [SerializeField] private string mainSceneName = "MainScene";
+        [Header("UI")]
+        [SerializeField] private GameObject modalPanel;          // 모달 루트
+        [SerializeField] private Button backgroundButton;        // 배경 (클릭 시 닫기)
+        [SerializeField] private Button confirmButton;           // 확인 (닫기)
+        [Space(4)]
+        [SerializeField] private TMP_Text resultTitleText;
+        [SerializeField] private TMP_Text scoreText;
+        [SerializeField] private TMP_Text timeText;
+        [SerializeField] private TMP_Text optimalScoreText;
+
+        [Header("Stars")]
+        [SerializeField] private Image[] starImages = new Image[3];
+        [SerializeField] private Sprite activeStarSprite;
+        [SerializeField] private Sprite inactiveStarSprite;
+
+        [Header("Labels")]
         [SerializeField] private string successTitle = "클리어 성공!";
         [SerializeField] private string failureTitle = "클리어 실패";
         [SerializeField] private Color successColor = Color.green;
         [SerializeField] private Color failureColor = Color.red;
-        
-        // 별점 계산 기준 (점수 비율)
-        [SerializeField] private float threeStarThreshold = 0.9f;    // 90% 이상: 3개
-        [SerializeField] private float twoStarThreshold = 0.7f;      // 70% 이상: 2개
-        [SerializeField] private float oneStarThreshold = 0.5f;      // 50% 이상: 1개
-        
+
+        [Header("Star thresholds (ratio)")]
+        [SerializeField] private float threeStarThreshold = 0.90f;
+        [SerializeField] private float twoStarThreshold   = 0.70f;
+        [SerializeField] private float oneStarThreshold   = 0.50f;
+
+        [Header("Router (선택: 미지정 시 자동 탐색)")]
+        [SerializeField] private Features.Single.UI.Scene.SingleGameplayUIScreenController uiController;
+
+        private Action _onClosed;
+
         private void Awake()
         {
-            // 초기에는 모달 숨김
-            if (modalPanel != null)
+            if (modalPanel) modalPanel.SetActive(false);
+
+            if (backgroundButton)
             {
-                modalPanel.SetActive(false);
+                backgroundButton.onClick.RemoveAllListeners();
+                backgroundButton.onClick.AddListener(CloseToSelection);
             }
-            
-            // 확인 버튼 이벤트 연결
-            if (confirmButton != null)
+            if (confirmButton)
             {
-                confirmButton.onClick.AddListener(OnConfirmClicked);
-            }
-            
-            // 별 스프라이트 기본값 설정
-            if (activeStarSprite == null || inactiveStarSprite == null)
-            {
-                Debug.LogWarning("[GameResultModal] 별 스프라이트가 설정되지 않았습니다. Inspector에서 설정해주세요.");
+                confirmButton.onClick.RemoveAllListeners();
+                confirmButton.onClick.AddListener(CloseToSelection);
             }
         }
-        
+
         private void OnDestroy()
         {
-            // 버튼 이벤트 해제
-            if (confirmButton != null)
-            {
-                confirmButton.onClick.RemoveListener(OnConfirmClicked);
-            }
+            if (backgroundButton) backgroundButton.onClick.RemoveListener(CloseToSelection);
+            if (confirmButton)    confirmButton.onClick.RemoveListener(CloseToSelection);
         }
-        
-        /// <summary>
-        /// 게임 결과 모달을 표시합니다
-        /// </summary>
-        /// <param name="score">획득 점수</param>
-        /// <param name="optimalScore">최대 가능 점수</param>
-        /// <param name="elapsedTime">소요 시간 (초)</param>
-        /// <param name="isSuccess">클리어 성공 여부</param>
+
+        // ---------------- Public API ----------------
+
         public void ShowResult(int score, int optimalScore, float elapsedTime, bool isSuccess)
         {
+            ShowResult(score, optimalScore, elapsedTime, isSuccess, onClosed: null);
+        }
+
+        public void ShowResult(int score, int optimalScore, float elapsedTime, bool isSuccess, Action onClosed)
+        {
+            _onClosed = onClosed;
+
+            // 🔥 디버깅 코드 추가
+            Debug.Log($"[GameResultModal] modalPanel null check: {modalPanel == null}");
             if (modalPanel != null)
             {
-                modalPanel.SetActive(true);
+                Debug.Log($"[GameResultModal] modalPanel.activeSelf: {modalPanel.activeSelf}");
+                Debug.Log($"[GameResultModal] modalPanel.activeInHierarchy: {modalPanel.activeInHierarchy}");
+                Debug.Log($"[GameResultModal] modalPanel.transform.parent: {modalPanel.transform.parent?.name}");
+                
+                var rect = modalPanel.GetComponent<RectTransform>();
+                if (rect != null)
+                    Debug.Log($"[GameResultModal] modalPanel size: {rect.sizeDelta}, position: {rect.position}");
+                    
+                var canvas = modalPanel.GetComponent<Canvas>();
+                if (canvas != null)
+                    Debug.Log($"[GameResultModal] Canvas enabled: {canvas.enabled}, sortingOrder: {canvas.sortingOrder}");
+                    
+                var cg = modalPanel.GetComponent<CanvasGroup>();
+                if (cg != null)
+                    Debug.Log($"[GameResultModal] CanvasGroup alpha: {cg.alpha}, interactable: {cg.interactable}");
             }
-            
-            // 결과 제목 설정
-            if (resultTitleText != null)
+
+            // 🔥 부모 GameObject 먼저 활성화 (핵심 수정!)
+            if (!this.gameObject.activeSelf)
             {
-                resultTitleText.text = isSuccess ? successTitle : failureTitle;
+                this.gameObject.SetActive(true);
+                Debug.Log("[GameResultModal] GameResultModal GameObject 활성화됨");
+            }
+
+            EnsureModalOnTopAndBlockRaycasts();
+
+            if (modalPanel && !modalPanel.activeSelf)
+                modalPanel.SetActive(true);
+                
+            // 🔥 활성화 후 재확인
+            if (modalPanel != null)
+                Debug.Log($"[GameResultModal] After SetActive - activeSelf: {modalPanel.activeSelf}, activeInHierarchy: {modalPanel.activeInHierarchy}");
+
+            if (resultTitleText)
+            {
+                resultTitleText.text  = isSuccess ? successTitle : failureTitle;
                 resultTitleText.color = isSuccess ? successColor : failureColor;
             }
-            
-            // 점수 표시
-            if (scoreText != null)
+            if (scoreText)        scoreText.text        = $"획득 점수: {score:N0}";
+            if (optimalScoreText) optimalScoreText.text = $"최대 점수: {optimalScore:N0}";
+
+            if (timeText)
             {
-                scoreText.text = $"획득 점수: {score:N0}";
+                int m = Mathf.FloorToInt(elapsedTime / 60f);
+                int s = Mathf.FloorToInt(elapsedTime % 60f);
+                timeText.text = $"소요 시간: {m:00}:{s:00}";
             }
-            
-            // 최대 점수 표시
-            if (optimalScoreText != null)
-            {
-                optimalScoreText.text = $"최대 점수: {optimalScore:N0}";
-            }
-            
-            // 시간 표시
-            if (timeText != null)
-            {
-                int minutes = Mathf.FloorToInt(elapsedTime / 60f);
-                int seconds = Mathf.FloorToInt(elapsedTime % 60f);
-                timeText.text = $"소요 시간: {minutes:00}:{seconds:00}";
-            }
-            
-            // 별점 계산 및 표시
-            int starCount = CalculateStars(score, optimalScore, isSuccess);
-            DisplayStars(starCount);
-            
-            // 진행도 업데이트 (서버 전송)
-            UpdateStageProgress(score, starCount, elapsedTime, isSuccess);
-            
-            Debug.Log($"[GameResultModal] 게임 결과 표시 - 점수: {score}/{optimalScore}, 시간: {elapsedTime:F1}초, 성공: {isSuccess}, 별: {starCount}개");
+
+            int stars = CalculateStars(score, optimalScore, isSuccess);
+            DisplayStars(stars);
+            UpdateStageProgress(score, stars, elapsedTime, isSuccess);
+
+            Debug.Log($"[GameResultModal] 표시: score={score}/{optimalScore}, time={elapsedTime:F1}s, success={isSuccess}, stars={stars}");
         }
-        
-        /// <summary>
-        /// 점수 비율에 따른 별점 계산
-        /// </summary>
+
+        // ---------------- Internals ----------------
+
         private int CalculateStars(int score, int optimalScore, bool isSuccess)
         {
-            // 클리어 실패 시 0개
-            if (!isSuccess)
+            if (!isSuccess) return 0;
+            if (optimalScore <= 0) return 1;
+
+            float r = (float)score / optimalScore;
+            if (r >= threeStarThreshold) return 3;
+            if (r >= twoStarThreshold)   return 2;
+            if (r >= oneStarThreshold)   return 1;
+            return 0;
+        }
+
+        private void DisplayStars(int starCount)
+        {
+            if (starImages == null) return;
+
+            for (int i = 0; i < starImages.Length; i++)
             {
-                return 0;
+                var img = starImages[i];
+                if (!img) continue;
+
+                bool on = (i < starCount);
+                img.sprite = on ? activeStarSprite : inactiveStarSprite;
+                img.color  = on ? Color.white : new Color(0.5f, 0.5f, 0.5f, 1f);
             }
-            
-            // 최대 점수가 0이면 1개 (안전장치)
-            if (optimalScore <= 0)
+
+            Debug.Log($"[GameResultModal] 별점 표시 완료 - {starCount}개");
+        }
+
+        private void UpdateStageProgress(int score, int starCount, float elapsedTime, bool isSuccess)
+        {
+            var gm = SingleGameManager.Instance;
+            if (gm == null)
             {
-                return 1;
+                Debug.LogWarning("[GameResultModal] SingleGameManager 없음 → 진행도 전송 생략");
+                return;
             }
-            
-            // 점수 비율 계산
-            float ratio = (float)score / optimalScore;
-            
-            if (ratio >= threeStarThreshold)
+
+            int stageNumber = SingleGameManager.CurrentStage;
+            bool completed  = isSuccess && starCount > 0;
+
+            Debug.Log($"[GameResultModal] 서버 진행도 업데이트 요청: stage={stageNumber}, done={completed}, stars={starCount}, score={score}, t={elapsedTime:F1}s");
+            gm.UpdateStageProgress(stageNumber, completed, starCount, score, elapsedTime);
+        }
+
+        private void CloseToSelection()
+        {
+            if (modalPanel && modalPanel.activeSelf)
+                modalPanel.SetActive(false);
+
+            // 컨트롤러에만 위임 (형제 패널 직접 제어 금지)
+            if (!uiController)
+                uiController = FindObjectOfType<Features.Single.UI.Scene.SingleGameplayUIScreenController>(true);
+
+            if (uiController)
             {
-                return 3;  // 90% 이상: 3개
-            }
-            else if (ratio >= twoStarThreshold)
-            {
-                return 2;  // 70% 이상: 2개
-            }
-            else if (ratio >= oneStarThreshold)
-            {
-                return 1;  // 50% 이상: 1개
+                uiController.ShowSelection(); // GamePanel OFF, StageSelect ON(또는 활성 유지 전략)
             }
             else
             {
-                return 0;  // 50% 미만: 0개 (클리어 실패 처리)
+                Debug.LogWarning("[GameResultModal] UIController가 없어 화면 복귀를 수행하지 못했습니다.");
             }
+
+            var cb = _onClosed; _onClosed = null;
+            cb?.Invoke();
+
+            Debug.Log("[GameResultModal] 닫기 → 스테이지 선택으로 복귀");
         }
-        
-        /// <summary>
-        /// 별점 UI 표시
-        /// </summary>
-        private void DisplayStars(int starCount)
+
+        private void EnsureModalOnTopAndBlockRaycasts()
         {
-            for (int i = 0; i < starImages.Length; i++)
-            {
-                if (starImages[i] != null)
-                {
-                    bool isActive = i < starCount;
-                    starImages[i].sprite = isActive ? activeStarSprite : inactiveStarSprite;
-                    
-                    // 별 색상도 조정 (선택사항)
-                    starImages[i].color = isActive ? Color.white : new Color(0.5f, 0.5f, 0.5f, 1f);
-                }
-            }
-            
-            Debug.Log($"[GameResultModal] 별점 표시 완료 - {starCount}개");
-        }
-        
-        /// <summary>
-        /// 스테이지 진행도 업데이트 (서버 전송)
-        /// </summary>
-        private void UpdateStageProgress(int score, int starCount, float elapsedTime, bool isSuccess)
-        {
-            var gameManager = SingleGameManager.Instance;
-            if (gameManager == null)
-            {
-                Debug.LogWarning("[GameResultModal] SingleGameManager를 찾을 수 없어 진행도 업데이트를 건너뜁니다.");
-                return;
-            }
-            
-            int currentStage = SingleGameManager.CurrentStage;
-            bool isCompleted = isSuccess && starCount > 0;  // 별 1개 이상이어야 클리어
-            
-            Debug.Log($"[GameResultModal] 서버에 진행도 업데이트 요청 - 스테이지: {currentStage}, 완료: {isCompleted}, 별: {starCount}, 점수: {score}, 시간: {elapsedTime:F1}초");
-            
-            // 게임 매니저를 통해 진행도 업데이트
-            gameManager.UpdateStageProgress(currentStage, isCompleted, starCount, score, elapsedTime);
-        }
-        
-        /// <summary>
-        /// 확인 버튼 클릭 - MainScene으로 이동
-        /// </summary>
-        private void OnConfirmClicked()
-        {
-            Debug.Log("[GameResultModal] 확인 버튼 클릭 - MainScene으로 이동");
-            
-            // 게임 정리
-            var gameManager = SingleGameManager.Instance;
-            if (gameManager != null)
-            {
-                gameManager.OnGameCompleted();
-            }
-            
-            // MainScene으로 복귀했다는 플래그 설정
-            PlayerPrefs.SetInt("ReturnedFromGame", 1);
-            PlayerPrefs.Save();
-            
-            // MainScene으로 이동
-            SceneManager.LoadScene(mainSceneName, LoadSceneMode.Single);
-        }
-        
-        /// <summary>
-        /// 모달 숨김 (필요시 사용)
-        /// </summary>
-        public void HideModal()
-        {
-            if (modalPanel != null)
-            {
-                modalPanel.SetActive(false);
-            }
-        }
-        
-        /// <summary>
-        /// 별점 기준 설정 (Inspector에서 조정 가능)
-        /// </summary>
-        public void SetStarThresholds(float three, float two, float one)
-        {
-            threeStarThreshold = three;
-            twoStarThreshold = two;
-            oneStarThreshold = one;
+            if (!modalPanel) return;
+
+            // 같은 Canvas 내에서 최상단 배치
+            modalPanel.transform.SetAsLastSibling();
+
+            // 입력 차단 보장
+            var cg = modalPanel.GetComponent<CanvasGroup>();
+            if (!cg) cg = modalPanel.AddComponent<CanvasGroup>();
+            cg.interactable = true;
+            cg.blocksRaycasts = true;
+
+            if (!FindObjectOfType<EventSystem>())
+                Debug.LogWarning("[GameResultModal] EventSystem이 없어 버튼 입력이 안 될 수 있습니다.");
         }
     }
 }

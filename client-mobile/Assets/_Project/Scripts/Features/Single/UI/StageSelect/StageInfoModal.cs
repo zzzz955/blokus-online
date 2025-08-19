@@ -1,16 +1,16 @@
-using System;
+﻿using System;
 using System.Collections;
 using UnityEngine.Networking;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using BlokusUnity.Data;
-using UserStageProgress = BlokusUnity.Features.Single.UserStageProgress;
-using StageData = BlokusUnity.Data.StageData;
-using BlokusUnity.Game;
-using BlokusUnity.Network;
-
-namespace BlokusUnity.UI
+using App.Network;
+using Features.Single.Gameplay;
+using Features.Single.Gameplay.Skins;
+using Shared.Models;
+using UserStageProgress = Features.Single.Core.UserStageProgress;
+using StageData = Shared.Models.StageData;
+namespace Features.Single.UI.StageSelect
 {
     /// <summary>
     /// 스테이지 정보 표시 모달
@@ -45,10 +45,10 @@ namespace BlokusUnity.UI
 
         [Header("블록 아이콘 스프라이트")]
         // 미리보기용 BlockButton 프리팹 (Assets/Prefabs/BlockButton.prefab)
-        [SerializeField] private BlokusUnity.Game.BlockButton blockButtonPrefab;
+        [SerializeField] private Features.Single.Gameplay.BlockButton blockButtonPrefab;
         // 모달에서는 선택할 필요가 없으므로 미리보기용 플레이어 컬러(색상만 사용)
-        [SerializeField] private BlokusUnity.Common.PlayerColor previewPlayerColor = BlokusUnity.Common.PlayerColor.Blue;
-        [SerializeField] private BlokusUnity.Features.Single.Skins.BlockSkin previewSkin;
+        [SerializeField] private Shared.Models.PlayerColor previewPlayerColor = Shared.Models.PlayerColor.Blue;
+        [SerializeField] private Features.Single.Gameplay.Skins.BlockSkin previewSkin;
 
         [Header("색상 설정 (Fallback)")]
         [SerializeField] private Color activeStarColor = Color.yellow;
@@ -170,9 +170,20 @@ namespace BlokusUnity.UI
 
             Debug.Log($"[DEBUG] currentStageNumber 설정됨: {currentStageNumber}");
 
-            // UserStageProgress를 StageProgress로 변환
-            if (userProgress != null)
+            // ✅ 캐시 우선: 서버 캐시에 저장된 진행도를 먼저 사용
+            var cached = Features.Single.Core.UserDataCache.Instance?.GetStageProgress(currentStageNumber); // NetworkUserStageProgress
+            if (cached != null)
             {
+                currentProgress = new StageProgress
+                {
+                    stageNumber = cached.stageNumber,
+                    isCompleted = cached.isCompleted,
+                    bestScore = cached.bestScore
+                };
+            }
+            else if (userProgress != null)
+            {
+                // 폴백: 전달된 userProgress 사용
                 currentProgress = new StageProgress
                 {
                     stageNumber = userProgress.stageNumber,
@@ -188,13 +199,11 @@ namespace BlokusUnity.UI
             // UI 업데이트
             UpdateModalUI();
 
-            // 로그 먼저 출력 (gameObject.SetActive 전에)
             Debug.Log($"스테이지 {currentStageNumber} 정보 모달 표시");
 
-            // 모달 표시 - 전체 GameObject 활성화 (마지막에)
+            // 모달 표시
             gameObject.SetActive(true);
         }
-
 
         /// <summary>
         /// 모달 UI 업데이트
@@ -264,56 +273,66 @@ namespace BlokusUnity.UI
             }
 
             int earnedStars = 0;
-            if (currentProgress != null)
+
+            // ✅ 1순위: 캐시에 있는 별 수 사용
+            var cache = Features.Single.Core.UserDataCache.Instance;
+            var cached = cache?.GetStageProgress(currentStageNumber); // NetworkUserStageProgress
+            if (cached != null)
             {
-                // StageProgress에서 별점 계산
+                earnedStars = Mathf.Clamp(cached.starsEarned, 0, 3);
+                // 필요하면 isCompleted와의 정합성도 체크 가능:
+                // if (!cached.isCompleted) earnedStars = 0;
+            }
+            else if (currentProgress != null)
+            {
+                // ✅ 2순위: bestScore/optimal_score 비율로 환산
                 if (currentProgress.isCompleted)
                 {
-                    if (currentProgress.bestScore >= currentStageData.threeStar)
-                        earnedStars = 3;
-                    else if (currentProgress.bestScore >= currentStageData.twoStar)
-                        earnedStars = 2;
-                    else if (currentProgress.bestScore >= currentStageData.oneStar)
-                        earnedStars = 1;
+                    int optimal = currentStageData != null ? currentStageData.optimal_score : 0;
+                    earnedStars = ScoreToStars(currentProgress.bestScore, optimal);
                 }
+                else
+                {
+                    earnedStars = 0;
+                }
+            }
+            else
+            {
+                earnedStars = 0;
             }
 
             Debug.Log($"StageInfoModal: 별점 업데이트 - 획득한 별: {earnedStars}/{starImages.Length}");
 
-            // StageButton과 동일한 방식으로 별 스프라이트/색상 적용
+            // 스프라이트/색상 반영
             for (int i = 0; i < starImages.Length; i++)
             {
-                if (starImages[i] != null)
-                {
-                    bool shouldActivate = i < earnedStars;
+                var img = starImages[i];
+                if (img == null) continue;
 
-                    if (shouldActivate)
+                bool active = i < earnedStars;
+
+                if (active)
+                {
+                    if (activeStar != null)
                     {
-                        // 활성화된 별 - 스프라이트 우선, 색상 폴백
-                        if (activeStar != null)
-                        {
-                            starImages[i].sprite = activeStar;
-                            starImages[i].color = Color.white; // 스프라이트 사용시 색상 취소
-                        }
-                        else
-                        {
-                            // 스프라이트가 없으면 색상만 변경
-                            starImages[i].color = activeStarColor;
-                        }
+                        img.sprite = activeStar;
+                        img.color = Color.white;
                     }
                     else
                     {
-                        // 비활성화된 별 - 스프라이트 우선, 색상 폴백
-                        if (inactiveStar != null)
-                        {
-                            starImages[i].sprite = inactiveStar;
-                            starImages[i].color = Color.white; // 스프라이트 사용시 색상 취소
-                        }
-                        else
-                        {
-                            // 스프라이트가 없으면 색상만 변경
-                            starImages[i].color = inactiveStarColor;
-                        }
+                        img.color = activeStarColor;
+                    }
+                }
+                else
+                {
+                    if (inactiveStar != null)
+                    {
+                        img.sprite = inactiveStar;
+                        img.color = Color.white;
+                    }
+                    else
+                    {
+                        img.color = inactiveStarColor;
                     }
                 }
             }
@@ -527,13 +546,13 @@ namespace BlokusUnity.UI
             // Destroy 사용 (프레임 끝에서 삭제)
             int childCount = availableBlocksParent.childCount;
             var childrenToDestroy = new Transform[childCount];
-            
+
             // 먼저 모든 자식을 배열에 저장
             for (int i = 0; i < childCount; i++)
             {
                 childrenToDestroy[i] = availableBlocksParent.GetChild(i);
             }
-            
+
             // 배열에서 삭제 (foreach 사용 가능)
             foreach (var child in childrenToDestroy)
             {
@@ -557,13 +576,13 @@ namespace BlokusUnity.UI
             // available_blocks 에 명시된 블록만 생성
             foreach (var blockType in currentStageData.available_blocks)
             {
-                CreateBlockButton((BlokusUnity.Common.BlockType)blockType);
+                CreateBlockButton((Shared.Models.BlockType)blockType);
             }
 
             Debug.Log($"블록 버튼 생성 완료 - 현재 자식 수: {availableBlocksParent.childCount}");
         }
 
-        private void CreateBlockButton(BlokusUnity.Common.BlockType blockType)
+        private void CreateBlockButton(Shared.Models.BlockType blockType)
         {
             var btn = Instantiate(blockButtonPrefab, availableBlocksParent);
 
@@ -580,7 +599,7 @@ namespace BlokusUnity.UI
             // (선택) 스킨 주입
             if (previewSkin != null)
             {
-                var field = typeof(BlokusUnity.Game.BlockButton).GetField("skin", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                var field = typeof(BlockButton).GetField("skin", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
                 if (field != null) field.SetValue(btn, previewSkin);
             }
         }
@@ -595,31 +614,74 @@ namespace BlokusUnity.UI
             // 현재 스테이지 번호를 임시 변수에 저장 (HideModal()에서 초기화되기 전에)
             int selectedStageNumber = currentStageNumber;
 
-            // 1. BlokusUnity.Features.Single.StageDataManager에 스테이지 데이터 설정 (가장 중요!)
-            if (BlokusUnity.Features.Single.StageDataManager.Instance != null)
+            Debug.Log($"[StageInfoModal] 스테이지 {selectedStageNumber} 게임 시작 준비");
+            // 🔥 수정: SelectStage 중복 호출 제거 - UIManager.OnStageSelected에서 처리
+
+            // 🔥 수정: Scene 전환 먼저 실행 (GameObject 활성 상태에서)
+            var uiManager = App.UI.UIManager.GetInstanceSafe();
+            var blokusUIManager = App.UI.BlokusUIManager.Instance;
+
+            if (uiManager != null)
             {
-                Debug.Log($"[StageInfoModal] BlokusUnity.Features.Single.StageDataManager에 스테이지 {selectedStageNumber} 선택 설정");
-                BlokusUnity.Features.Single.StageDataManager.Instance.SelectStage(selectedStageNumber);
+                Debug.Log($"[StageInfoModal] UIManager 발견. 스테이지 {selectedStageNumber} 게임 시작");
+                uiManager.OnStageSelected(selectedStageNumber);
+
+                // Scene 전환 후 모달 숨기기
+                StartCoroutine(HideModalAfterDelay());
+            }
+            else if (blokusUIManager != null)
+            {
+                Debug.Log($"[StageInfoModal] BlokusUIManager 발견. 스테이지 {selectedStageNumber} 게임 시작");
+                blokusUIManager.OnStageSelected(selectedStageNumber);
+
+                // Scene 전환 후 모달 숨기기
+                StartCoroutine(HideModalAfterDelay());
             }
             else
             {
-                Debug.LogError("[StageInfoModal] BlokusUnity.Features.Single.StageDataManager.Instance가 null입니다!");
-            }
+                Debug.LogError("[StageInfoModal] UI Manager를 찾을 수 없습니다! SceneFlowController로 직접 전환");
+                // 🔥 백업: SceneFlowController로 직접 전환 (GameObject 활성 상태에서 실행)
+                StartSingleGameplaySceneDirectly(selectedStageNumber);
 
-            // 2. 모달 숨기기 (currentStageNumber가 0으로 초기화됨)
-            HideModal();
-
-            // 3. 게임 시작 (UI 전환) - 저장된 스테이지 번호 사용
-            if (UIManager.Instance != null)
-            {
-                UIManager.Instance.OnStageSelected(selectedStageNumber);
-            }
-            else
-            {
-                Debug.LogError("[StageInfoModal] UIManager.Instance가 null입니다!");
+                // Scene 전환 후 모달 숨기기
+                StartCoroutine(HideModalAfterDelay());
             }
         }
 
+
+        /// <summary>
+        /// 🔥 추가: Scene 전환 후 모달 숨기기 (Coroutine 에러 방지)
+        /// </summary>
+        private System.Collections.IEnumerator HideModalAfterDelay()
+        {
+            // Scene 전환이 시작될 때까지 잠시 대기
+            yield return new WaitForSeconds(0.1f);
+
+            // 모달 숨기기 (이제 Scene 전환이 진행 중이므로 안전)
+            HideModal();
+        }
+
+        /// <summary>
+        /// 🔥 추가: UIManager 실패 시 SceneFlowController로 직접 전환
+        /// </summary>
+        private void StartSingleGameplaySceneDirectly(int stageNumber)
+        {
+            Debug.Log($"[StageInfoModal] 직접 Scene 전환 시작: 스테이지 {stageNumber}");
+
+            // 🔥 수정: SelectStage 중복 호출 제거 - UIManager에서 이미 처리됨
+            Debug.Log($"[StageInfoModal] SelectStage는 UIManager에서 처리되므로 생략");
+
+            // SceneFlowController로 SingleGameplayScene 전환
+            if (App.Core.SceneFlowController.Instance != null)
+            {
+                Debug.Log("[StageInfoModal] SceneFlowController로 SingleGameplayScene 전환 시작");
+                StartCoroutine(App.Core.SceneFlowController.Instance.GoSingle());
+            }
+            else
+            {
+                Debug.LogError("[StageInfoModal] SceneFlowController.Instance도 null입니다!");
+            }
+        }
 
         /// <summary>
         /// 모달 숨기기
@@ -652,6 +714,16 @@ namespace BlokusUnity.UI
                 case 4: return "매우 어려움";
                 default: return "알 수 없음";
             }
+        }
+
+        private static int ScoreToStars(int score, int optimal)
+        {
+            if (optimal <= 0) return 0;
+            float r = (float)score / optimal;
+            if (r >= 0.90f) return 3;
+            if (r >= 0.70f) return 2;
+            if (r >= 0.50f) return 1;
+            return 0;
         }
     }
 }

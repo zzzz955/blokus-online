@@ -1,23 +1,24 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
-using BlokusUnity.Network;
-using CommonUserStageProgress = BlokusUnity.Common.UserStageProgress;
-using CommonUserInfo = BlokusUnity.Common.UserInfo;
-
-namespace BlokusUnity.Utils
-{
+using App.Network;
+using Features.Multi.Net;
+using Features.Single.Core;
+using Shared.Models;
+using CommonUserStageProgress = Shared.Models.UserStageProgress;
+using CommonUserInfo = Shared.Models.UserInfo;
+namespace App.Services{
     /// <summary>
     /// API 데이터 변환 유틸리티
     /// 압축된 JSON 응답을 Unity에서 사용 가능한 데이터 구조로 변환
     /// </summary>
     public static class ApiDataConverter
     {
-        private static BlokusUnity.Data.InitialBoardState ConvertInitialBoardState(HttpApiClient.InitialBoardStateApi ibs)
+        private static Shared.Models.InitialBoardState ConvertInitialBoardState(HttpApiClient.InitialBoardStateApi ibs)
         {
             if (ibs == null) return null;
 
-            var state = new BlokusUnity.Data.InitialBoardState();
+            var state = new Shared.Models.InitialBoardState();
 
             // Get unified board data using new INTEGER[] format
             var boardData = ibs.GetBoardData();
@@ -44,9 +45,9 @@ namespace BlokusUnity.Utils
         /// <summary>
         /// 압축된 스테이지 메타데이터를 StageData로 변환
         /// </summary>
-        public static BlokusUnity.Data.StageData ConvertCompactMetadata(HttpApiClient.CompactStageMetadata compact)
+        public static Shared.Models.StageData ConvertCompactMetadata(HttpApiClient.CompactStageMetadata compact)
         {
-            return new BlokusUnity.Data.StageData
+            return new Shared.Models.StageData
             {
                 stage_number = compact.n,
                 stage_title = compact.t,

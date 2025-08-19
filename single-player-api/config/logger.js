@@ -1,8 +1,18 @@
-const winston = require('winston');
+const winston = require('winston')
+const fs = require('fs')
+const path = require('path')
+
+// 프로덕션 환경에서 logs 디렉토리 생성
+if (process.env.NODE_ENV === 'production') {
+  const logsDir = path.join(process.cwd(), 'logs')
+  if (!fs.existsSync(logsDir)) {
+    fs.mkdirSync(logsDir, { recursive: true })
+  }
+}
 
 // 로그 레벨 설정
-const logLevel = process.env.LOG_LEVEL || 'info';
-const isProduction = process.env.NODE_ENV === 'production';
+const logLevel = process.env.LOG_LEVEL || 'info'
+const isProduction = process.env.NODE_ENV === 'production'
 
 // 로그 포맷 정의
 const logFormat = winston.format.combine(
@@ -12,7 +22,7 @@ const logFormat = winston.format.combine(
   winston.format.errors({ stack: true }),
   winston.format.json(),
   winston.format.prettyPrint()
-);
+)
 
 // Console 포맷 (개발용)
 const consoleFormat = winston.format.combine(
@@ -21,16 +31,16 @@ const consoleFormat = winston.format.combine(
     format: 'HH:mm:ss'
   }),
   winston.format.printf(({ timestamp, level, message, ...meta }) => {
-    let log = `${timestamp} [${level}] ${message}`;
-    
+    let log = `${timestamp} [${level}] ${message}`
+
     // 메타데이터가 있으면 추가
     if (Object.keys(meta).length > 0) {
-      log += ` ${JSON.stringify(meta, null, 2)}`;
+      log += ` ${JSON.stringify(meta, null, 2)}`
     }
-    
-    return log;
+
+    return log
   })
-);
+)
 
 // Transport 설정
 const transports = [
@@ -41,7 +51,7 @@ const transports = [
     handleExceptions: true,
     handleRejections: true
   })
-];
+]
 
 // 프로덕션 환경에서는 파일 로그도 추가
 if (isProduction) {
@@ -56,7 +66,7 @@ if (isProduction) {
       handleExceptions: true,
       handleRejections: true
     }),
-    
+
     // 일반 로그 파일
     new winston.transports.File({
       filename: 'logs/combined.log',
@@ -64,7 +74,7 @@ if (isProduction) {
       maxsize: 5242880, // 5MB
       maxFiles: 5
     })
-  );
+  )
 }
 
 // Winston 로거 생성
@@ -73,15 +83,15 @@ const logger = winston.createLogger({
   format: logFormat,
   transports,
   exitOnError: false
-});
+})
 
 // HTTP 요청 로깅을 위한 Morgan과 연동
 logger.stream = {
   write: (message) => {
     // Morgan의 메시지에서 개행 문자 제거
-    logger.info(message.trim());
+    logger.info(message.trim())
   }
-};
+}
 
 // 개발 환경에서만 디버그 정보 출력
 if (!isProduction) {
@@ -89,7 +99,7 @@ if (!isProduction) {
     level: logLevel,
     environment: process.env.NODE_ENV,
     transports: transports.length
-  });
+  })
 }
 
-module.exports = logger;
+module.exports = logger

@@ -1,10 +1,8 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using System.Collections.Generic;
-
-namespace BlokusUnity.UI
-{
+namespace App.UI{
     /// <summary>
     /// Input locker to disable UI interactions during loading
     /// Migration Plan: InputLocker.Enable() / Disable() → EventSystem 및 GraphicRaycaster 비활성

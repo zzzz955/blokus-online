@@ -292,12 +292,12 @@ export class ThumbnailGenerator {
         const posY = offsetY + y * cellSize;
         
         // Draw filled rectangle with slight border
-        this.ctx.fillRect(posX + 1, posY + 1, cellSize - 2, cellSize - 2);
+        this.ctx!.fillRect(posX + 1, posY + 1, cellSize - 2, cellSize - 2);
         
         // Add border for better visibility
-        this.ctx.strokeStyle = '#999999';
-        this.ctx.lineWidth = 1;
-        this.ctx.strokeRect(posX + 1, posY + 1, cellSize - 2, cellSize - 2);
+        this.ctx!.strokeStyle = '#999999';
+        this.ctx!.lineWidth = 1;
+        this.ctx!.strokeRect(posX + 1, posY + 1, cellSize - 2, cellSize - 2);
       }
     });
   }
@@ -323,18 +323,18 @@ export class ThumbnailGenerator {
         const posY = offsetY + y * cellSize;
         
         // Draw filled rectangle
-        this.ctx.fillStyle = blockColor;
-        this.ctx.fillRect(posX + 2, posY + 2, cellSize - 4, cellSize - 4);
+        this.ctx!.fillStyle = blockColor;
+        this.ctx!.fillRect(posX + 2, posY + 2, cellSize - 4, cellSize - 4);
         
         // Add border
-        this.ctx.strokeStyle = this.lightenColor(blockColor, 0.3);
-        this.ctx.lineWidth = 2;
-        this.ctx.strokeRect(posX + 2, posY + 2, cellSize - 4, cellSize - 4);
+        this.ctx!.strokeStyle = this.lightenColor(blockColor, 0.3);
+        this.ctx!.lineWidth = 2;
+        this.ctx!.strokeRect(posX + 2, posY + 2, cellSize - 4, cellSize - 4);
         
         // Add highlight for 3D effect
-        this.ctx.fillStyle = this.lightenColor(blockColor, 0.5);
-        this.ctx.fillRect(posX + 2, posY + 2, cellSize - 4, 3);
-        this.ctx.fillRect(posX + 2, posY + 2, 3, cellSize - 4);
+        this.ctx!.fillStyle = this.lightenColor(blockColor, 0.5);
+        this.ctx!.fillRect(posX + 2, posY + 2, cellSize - 4, 3);
+        this.ctx!.fillRect(posX + 2, posY + 2, 3, cellSize - 4);
       }
     });
   }

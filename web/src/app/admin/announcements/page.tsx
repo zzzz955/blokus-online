@@ -45,7 +45,7 @@ export default function AdminAnnouncementsPage() {
 
   useEffect(() => {
     // URL 파라미터로 생성 모드 체크
-    if (searchParams.get('action') === 'create') {
+    if (searchParams?.get('action') === 'create') {
       setShowForm(true);
     }
   }, [searchParams]);

@@ -1,9 +1,8 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.EventSystems;
-using BlokusUnity.Common;
-
-namespace BlokusUnity.Game
-{
+using Features.Single.Gameplay.Skins;
+using Shared.Models;
+namespace Features.Single.Gameplay{
     /// <summary>
     /// 게임보드 셀 터치/드래그 처리 컴포넌트
     /// 모바일 터치 입력과 드래그 제스처 지원

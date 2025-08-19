@@ -3,6 +3,24 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { PrismaClient } from '@prisma/client';
 
+// Helper function to get JWT secret with validation
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable is required');
+  }
+  return secret;
+}
+
+// Helper function to get refresh secret with validation
+function getRefreshSecret(): string {
+  const secret = process.env.JWT_REFRESH_SECRET;
+  if (!secret) {
+    throw new Error('JWT_REFRESH_SECRET environment variable is required');
+  }
+  return secret;
+}
+
 const prisma = new PrismaClient();
 
 export interface AdminSession {
@@ -48,7 +66,6 @@ export async function authenticateAdmin(credentials: AdminLoginRequest): Promise
     // 비밀번호 검증
     const isPasswordValid = await bcrypt.compare(password, adminUser.password_hash);
     if (!isPasswordValid) {
-      console.log(adminUser.password_hash);
       return {
         success: false,
         error: '비밀번호가 일치하지 않습니다.'
@@ -64,13 +81,13 @@ export async function authenticateAdmin(credentials: AdminLoginRequest): Promise
 
     const accessToken = jwt.sign(
       adminSession,
-      process.env.JWT_SECRET || 'fallback-secret',
+      getJwtSecret(),
       { expiresIn: '15m' } // Access token은 15분으로 단축
     );
 
     const refreshToken = jwt.sign(
       { id: adminSession.id, username: adminSession.username },
-      process.env.JWT_REFRESH_SECRET || 'fallback-refresh-secret',
+      getRefreshSecret(),
       { expiresIn: '7d' } // Refresh token은 7일
     );
 
@@ -95,7 +112,7 @@ export async function authenticateAdmin(credentials: AdminLoginRequest): Promise
  */
 export function verifyAdminToken(token: string): AdminSession | null {
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as AdminSession;
+    const decoded = jwt.verify(token, getJwtSecret()) as AdminSession;
     return decoded;
   } catch (error) {
     console.error('토큰 검증 실패:', error);
@@ -108,7 +125,7 @@ export function verifyAdminToken(token: string): AdminSession | null {
  */
 export function verifyRefreshToken(refreshToken: string): { id: number; username: string } | null {
   try {
-    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET || 'fallback-refresh-secret') as { id: number; username: string };
+    const decoded = jwt.verify(refreshToken, getRefreshSecret()) as { id: number; username: string };
     return decoded;
   } catch (error) {
     console.error('Refresh 토큰 검증 실패:', error);
@@ -141,7 +158,7 @@ export async function generateNewAccessToken(refreshTokenPayload: { id: number; 
 
     const newAccessToken = jwt.sign(
       adminSession,
-      process.env.JWT_SECRET || 'fallback-secret',
+      getJwtSecret(),
       { expiresIn: '15m' }
     );
 

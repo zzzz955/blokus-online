@@ -1,11 +1,9 @@
-// Assets/Scripts/UI/ConfirmationModal.cs
+﻿// Assets/Scripts/UI/ConfirmationModal.cs
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System;
-
-namespace BlokusUnity.UI
-{
+namespace Features.Single.UI.InGame{
     /// <summary>
     /// 확인/취소 모달 다이얼로그
     /// </summary>

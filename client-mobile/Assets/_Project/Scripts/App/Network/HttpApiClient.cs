@@ -1,13 +1,14 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 using UnityEngine.Networking;
-using BlokusUnity.Data;
-
-namespace BlokusUnity.Network
-{
+using App.Services;
+using Features.Single.Core;
+using Shared.Models;
+using MessagePriority = Shared.UI.MessagePriority;
+namespace App.Network{
     /// <summary>
     /// HTTP API 클라이언트 - 싱글플레이어 전용
     /// TCP 대신 HTTP REST API 사용으로 리소스 효율성 극대화
@@ -25,7 +26,7 @@ namespace BlokusUnity.Network
         public int optimalScore;
         public int? timeLimit; // null이면 무제한
         public int maxUndoCount;
-        public List<BlokusUnity.Common.BlockType> availableBlocks;
+        public List<Shared.Models.BlockType> availableBlocks;
         public string initialBoardStateJson; // JSONB 데이터 문자열
         public string stageDescription;
         public string thumbnail_url; // 썸네일 이미지 URL
@@ -479,10 +480,10 @@ namespace BlokusUnity.Network
                     {
                         var compactStages = ConvertToCompactMetadata(response.stages);
 
-                        // BlokusUnity.Features.Single.UserDataCache에 직접 저장
-                        if (BlokusUnity.Features.Single.UserDataCache.Instance != null)
+                        // Features.Single.Core.UserDataCache에 직접 저장
+                        if (Features.Single.Core.UserDataCache.Instance != null)
                         {
-                            BlokusUnity.Features.Single.UserDataCache.Instance.SetStageMetadata(compactStages);
+                            Features.Single.Core.UserDataCache.Instance.SetStageMetadata(compactStages);
                             Debug.Log($"[HttpApiClient] 메타데이터 캐시에 저장 완료: {compactStages.Length}개");
                         }
 
@@ -952,9 +953,9 @@ namespace BlokusUnity.Network
         /// <summary>
         /// 라이트 동기화 - 프로필 요약 + 버전 정보
         /// </summary>
-        public void GetLightSync(System.Action<bool, BlokusUnity.Data.LightSyncResponse, string> onComplete)
+        public void GetLightSync(System.Action<bool, App.Services.LightSyncResponse, string> onComplete)
         {
-            StartCoroutine(SendGetRequest<BlokusUnity.Data.LightSyncResponse>(
+            StartCoroutine(SendGetRequest<App.Services.LightSyncResponse>(
                 "user/sync/light",
                 response =>
                 {
@@ -972,12 +973,12 @@ namespace BlokusUnity.Network
         /// <summary>
         /// 전체 진행도 동기화
         /// </summary>
-        public void GetProgressSync(System.Action<bool, BlokusUnity.Data.ProgressSyncResponse, string> onComplete,
+        public void GetProgressSync(System.Action<bool, App.Services.ProgressSyncResponse, string> onComplete,
             int fromStage = 1, int toStage = 1000)
         {
             string endpoint = $"user/sync/progress?from_stage={fromStage}&to_stage={toStage}";
 
-            StartCoroutine(SendGetRequest<BlokusUnity.Data.ProgressSyncResponse>(
+            StartCoroutine(SendGetRequest<App.Services.ProgressSyncResponse>(
                 endpoint,
                 response =>
                 {
@@ -995,7 +996,7 @@ namespace BlokusUnity.Network
         /// <summary>
         /// 메타데이터 동기화
         /// </summary>
-        public void GetMetadataSync(System.Action<bool, BlokusUnity.Data.MetadataSyncResponse, string> onComplete,
+        public void GetMetadataSync(System.Action<bool, App.Services.MetadataSyncResponse, string> onComplete,
             string clientVersion = "")
         {
             string endpoint = "user/sync/metadata";
@@ -1004,7 +1005,7 @@ namespace BlokusUnity.Network
                 endpoint += $"?version={UnityWebRequest.EscapeURL(clientVersion)}";
             }
 
-            StartCoroutine(SendGetRequest<BlokusUnity.Data.MetadataSyncResponse>(
+            StartCoroutine(SendGetRequest<App.Services.MetadataSyncResponse>(
                 endpoint,
                 response =>
                 {
@@ -1023,7 +1024,7 @@ namespace BlokusUnity.Network
         /// 스테이지 완료 보고 (응답에 최신 진행도 포함)
         /// </summary>
         public void CompleteStageWithSync(int stageNumber, int score, int completionTime, bool calculateStars,
-            System.Action<bool, BlokusUnity.Data.CompleteStageResponse, string> onComplete)
+            System.Action<bool, App.Services.CompleteStageResponse, string> onComplete)
         {
             var requestData = new
             {
@@ -1032,7 +1033,7 @@ namespace BlokusUnity.Network
                 stars_earned = calculateStars ? CalculateStars(score, 100) : 0 // 임시로 100을 optimal_score로 사용
             };
 
-            StartCoroutine(SendPostRequest<BlokusUnity.Data.CompleteStageResponse>(
+            StartCoroutine(SendPostRequest<App.Services.CompleteStageResponse>(
                 $"stages/{stageNumber}/complete",
                 requestData,
                 response =>

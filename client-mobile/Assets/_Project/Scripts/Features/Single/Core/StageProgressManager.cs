@@ -1,10 +1,9 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
-using BlokusUnity.Data;
-
-namespace BlokusUnity.Features.Single
-{
+using App.Network;
+using Features.Multi.Net;
+namespace Features.Single.Core{
     /// <summary>
     /// 스테이지 진행도 및 언락 시스템 관리
     /// 별점 계산 및 언락 조건 검증을 클라이언트에서 처리
@@ -115,9 +114,9 @@ namespace BlokusUnity.Features.Single
         {
             
             // HTTP API 클라이언트 이벤트 구독
-            if (BlokusUnity.Network.HttpApiClient.Instance != null)
+            if (App.Network.HttpApiClient.Instance != null)
             {
-                var httpClient = BlokusUnity.Network.HttpApiClient.Instance;
+                var httpClient = App.Network.HttpApiClient.Instance;
                 httpClient.OnStageProgressReceived += OnHttpStageProgressReceived;
                 httpClient.OnStageCompleteResponse += OnHttpStageCompleteResponse;
                 
@@ -128,9 +127,9 @@ namespace BlokusUnity.Features.Single
         void OnDestroy()
         {
             // HTTP API 이벤트 구독 해제
-            if (BlokusUnity.Network.HttpApiClient.Instance != null)
+            if (App.Network.HttpApiClient.Instance != null)
             {
-                var httpClient = BlokusUnity.Network.HttpApiClient.Instance;
+                var httpClient = App.Network.HttpApiClient.Instance;
                 httpClient.OnStageProgressReceived -= OnHttpStageProgressReceived;
                 httpClient.OnStageCompleteResponse -= OnHttpStageCompleteResponse;
             }
@@ -249,7 +248,7 @@ namespace BlokusUnity.Features.Single
         /// <summary>
         /// HTTP API에서 스테이지 진행도 수신 처리
         /// </summary>
-        private void OnHttpStageProgressReceived(BlokusUnity.Network.UserStageProgress networkProgress)
+        private void OnHttpStageProgressReceived(App.Network.UserStageProgress networkProgress)
         {
             // 네트워크 데이터를 로컬 데이터로 변환
             var localProgress = new UserStageProgress
@@ -297,10 +296,10 @@ namespace BlokusUnity.Features.Single
         /// </summary>
         private void UpdateStageProgressOnServer(int stageNumber, bool completed, int stars, int score, float time)
         {
-            if (completed && BlokusUnity.Network.HttpApiClient.Instance != null)
+            if (completed && App.Network.HttpApiClient.Instance != null)
             {
                 // HTTP API를 통한 스테이지 완료 보고
-                BlokusUnity.Network.HttpApiClient.Instance.CompleteStage(stageNumber, score, (int)time, completed);
+                App.Network.HttpApiClient.Instance.CompleteStage(stageNumber, score, (int)time, completed);
             }
             else if (!completed)
             {
@@ -317,9 +316,9 @@ namespace BlokusUnity.Features.Single
         /// </summary>
         public void RequestStageProgressFromServer(int stageNumber)
         {
-            if (BlokusUnity.Network.HttpApiClient.Instance != null && BlokusUnity.Network.HttpApiClient.Instance.IsAuthenticated())
+            if (App.Network.HttpApiClient.Instance != null && App.Network.HttpApiClient.Instance.IsAuthenticated())
             {
-                BlokusUnity.Network.HttpApiClient.Instance.GetStageProgress(stageNumber);
+                App.Network.HttpApiClient.Instance.GetStageProgress(stageNumber);
                 Debug.Log($"HTTP API를 통해 스테이지 {stageNumber} 진행도 요청");
             }
             else
@@ -336,11 +335,11 @@ namespace BlokusUnity.Features.Single
             // 하이브리드 네트워크: 싱글플레이어는 HTTP API, 멀티플레이어는 TCP 사용
             
             // 1. HTTP API 클라이언트 우선 시도 (싱글플레이어)
-            if (BlokusUnity.Network.HttpApiClient.Instance != null && 
-                BlokusUnity.Network.HttpApiClient.Instance.IsAuthenticated())
+            if (App.Network.HttpApiClient.Instance != null && 
+                App.Network.HttpApiClient.Instance.IsAuthenticated())
             {
                 Debug.Log($"[StageProgressManager] HTTP API로 진행도 일괄 요청: {startStage}-{endStage}");
-                BlokusUnity.Network.HttpApiClient.Instance.GetBatchProgress();
+                App.Network.HttpApiClient.Instance.GetBatchProgress();
                 return;
             }
             
@@ -348,11 +347,11 @@ namespace BlokusUnity.Features.Single
             Debug.Log($"[StageProgressManager] 네트워크 연결 없음 - 로컬 기본 진행도 사용 ({startStage}-{endStage})");
             
             // 기본 진행도 생성하여 캐시에 저장
-            if (BlokusUnity.Features.Single.UserDataCache.Instance != null)
+            if (Features.Single.Core.UserDataCache.Instance != null)
             {
                 for (int stageNum = startStage; stageNum <= endStage; stageNum++)
                 {
-                    var defaultProgress = new BlokusUnity.Network.UserStageProgress
+                    var defaultProgress = new App.Network.UserStageProgress
                     {
                         stageNumber = stageNum,
                         isCompleted = false,
@@ -365,10 +364,10 @@ namespace BlokusUnity.Features.Single
                     };
                     
                     // 기존 진행도가 없을 때만 기본값 설정
-                    var existingProgress = BlokusUnity.Features.Single.UserDataCache.Instance.GetStageProgress(stageNum);
+                    var existingProgress = Features.Single.Core.UserDataCache.Instance.GetStageProgress(stageNum);
                     if (existingProgress.totalAttempts == 0) // 새로운 스테이지
                     {
-                        BlokusUnity.Features.Single.UserDataCache.Instance.SetStageProgress(defaultProgress);
+                        Features.Single.Core.UserDataCache.Instance.SetStageProgress(defaultProgress);
                     }
                 }
                 

@@ -1,4 +1,5 @@
-namespace BlokusUnity.Features.Single.Skins
+﻿using Shared.Models;
+namespace Features.Single.Gameplay.Skins
 {
     /// <summary>
     /// Block skin identifier enum
