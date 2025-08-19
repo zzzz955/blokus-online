@@ -25,9 +25,10 @@ interface StageListProps {
   stages: Stage[];
   onEditStage: (stage: Stage) => void;
   onDeleteStage: (stageId: number) => void;
+  onCloneStage: (stage: Stage) => void;
 }
 
-export default function StageList({ stages, onEditStage, onDeleteStage }: StageListProps) {
+export default function StageList({ stages, onEditStage, onDeleteStage, onCloneStage }: StageListProps) {
   const [sortField, setSortField] = useState<keyof Stage>('stage_number');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [filterDifficulty, setFilterDifficulty] = useState<number | null>(null);
@@ -241,6 +242,15 @@ export default function StageList({ stages, onEditStage, onDeleteStage }: StageL
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex gap-2 justify-end">
+                      <button
+                        onClick={() => onCloneStage(stage)}
+                        className="text-green-400 hover:text-green-300 transition-colors"
+                        title="복제"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      </button>
                       <button
                         onClick={() => onEditStage(stage)}
                         className="text-blue-400 hover:text-blue-300 transition-colors"

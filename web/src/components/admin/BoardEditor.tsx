@@ -117,7 +117,7 @@ export default function BoardEditor({ boardState, onChange }: BoardEditorProps) 
 
   const clearBoard = () => {
     if (confirm('정말로 보드를 초기화하시겠습니까?')) {
-      onChange({ obstacles: [], preplaced: [] });
+      onChange([]);
     }
   };
 

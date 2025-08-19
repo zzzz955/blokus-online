@@ -89,6 +89,24 @@ export default function StagesAdminPage() {
     setShowEditor(true);
   };
 
+  const handleCloneStage = (sourceStage: Stage) => {
+    // 현재 최대 스테이지 번호 + 1 계산
+    const maxStageNumber = stages.length > 0 ? Math.max(...stages.map(s => s.stage_number)) : 0;
+    
+    // 소스 스테이지 데이터를 복사하되 특정 필드는 수정
+    const clonedStage: Partial<Stage> = {
+      ...sourceStage,
+      stage_id: undefined, // 새 스테이지이므로 ID 제거
+      stage_number: maxStageNumber + 1, // 최대 번호 + 1
+      thumbnail_url: null, // 썸네일 초기화
+      created_at: undefined, // 새로 생성될 때의 시간으로 설정
+      updated_at: undefined // 새로 생성될 때의 시간으로 설정
+    };
+    
+    setEditingStage(clonedStage as Stage);
+    setShowEditor(true);
+  };
+
   const handleSaveStage = async (stageData: Partial<Stage>) => {
     try {
       const isNew = !stageData.stage_id;
@@ -111,7 +129,10 @@ export default function StagesAdminPage() {
           fetchStages(); // Refresh the list
           
           // Show success message
-          alert(isNew ? '스테이지가 성공적으로 생성되었습니다!' : '스테이지가 성공적으로 수정되었습니다!');
+          const successMessage = isNew 
+            ? '스테이지가 성공적으로 생성되었습니다!' 
+            : '스테이지가 성공적으로 수정되었습니다!';
+          alert(successMessage);
         } else {
           setError(result.message || '스테이지 저장 실패');
         }
@@ -238,6 +259,7 @@ export default function StagesAdminPage() {
           stages={stages}
           onEditStage={handleEditStage}
           onDeleteStage={handleDeleteStage}
+          onCloneStage={handleCloneStage}
         />
       </div>
     </div>
