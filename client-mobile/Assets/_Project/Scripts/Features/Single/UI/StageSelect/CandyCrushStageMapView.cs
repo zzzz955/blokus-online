@@ -68,7 +68,7 @@ namespace Features.Single.UI.StageSelect
             // 버튼 이벤트 연결
             if (backButton != null)
             {
-                backButton.onClick.AddListener(() => UIManager.Instance?.OnBackToMenu());
+                backButton.onClick.AddListener(OnBackButtonClicked);
             }
 
             if (refreshButton != null)
@@ -1121,6 +1121,26 @@ namespace Features.Single.UI.StageSelect
         {
             Debug.Log($"스테이지 {stageNumber} 시작!");
             UIManager.Instance?.OnStageSelected(stageNumber);
+        }
+
+        /// <summary>
+        /// 뒤로가기 버튼 클릭 처리
+        /// </summary>
+        private void OnBackButtonClicked()
+        {
+            Debug.Log("[CandyCrushStageMapView] 뒤로가기 버튼 클릭");
+            
+            // UIManager를 통해 SingleGameplayScene 언로드 후 ModeSelection으로 이동
+            var uiManager = UIManager.GetInstanceSafe();
+            if (uiManager != null)
+            {
+                Debug.Log("[CandyCrushStageMapView] UIManager로 SingleGameplayScene 종료 요청");
+                uiManager.OnExitSingleToModeSelection();
+            }
+            else
+            {
+                Debug.LogError("[CandyCrushStageMapView] UIManager를 찾을 수 없습니다!");
+            }
         }
 
         // 🔥 추가: 재시도 횟수 제한 및 무한 루프 방지

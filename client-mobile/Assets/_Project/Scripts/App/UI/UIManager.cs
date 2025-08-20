@@ -168,6 +168,29 @@ namespace App.UI
                 }
             }
             
+            if (stageSelectPanel == null)
+            {
+                Debug.Log("[UIManager] StageSelectPanel이 null, CandyCrushStageMapView 찾는 중...");
+                // CandyCrushStageMapView를 찾기 (SingleGameplayScene에 있을 수 있음)
+                var candyCrushView = Object.FindObjectOfType<Features.Single.UI.StageSelect.CandyCrushStageMapView>();
+                if (candyCrushView != null)
+                {
+                    stageSelectPanel = candyCrushView.GetComponent<PanelBase>();
+                    if (stageSelectPanel != null) Debug.Log("[UIManager] CandyCrushStageMapView를 StageSelectPanel로 동적 할당");
+                }
+                
+                // 백업: GameObject 이름으로 찾기
+                if (stageSelectPanel == null)
+                {
+                    var stagePanel = GameObject.Find("StageSelectPanel");
+                    if (stagePanel != null)
+                    {
+                        stageSelectPanel = stagePanel.GetComponent<PanelBase>();
+                        if (stageSelectPanel != null) Debug.Log("[UIManager] StageSelectPanel GameObject로 동적으로 찾음");
+                    }
+                }
+            }
+            
             panels = new Dictionary<UIState, PanelBase>
             {
                 { UIState.Login, loginPanel },
@@ -249,7 +272,8 @@ namespace App.UI
                 Debug.Log($"현재 State: {currentState}");
             }
             
-            if (currentState == state && currentPanel != null) 
+            // 🔥 수정: StageSelect 패널의 경우 씬 간 전환이 있을 수 있으므로 재초기화 허용
+            if (currentState == state && currentPanel != null && state != UIState.StageSelect) 
             {
                 Debug.Log("동일한 State이고 패널이 활성화되어 있어서 return");
                 return;
@@ -481,6 +505,83 @@ namespace App.UI
 
         public void OnBackToMenu()
         {
+            Debug.Log("[UIManager] OnBackToMenu() 호출됨");
+            
+            // 현재 상태에 따라 다른 동작 수행
+            if (currentState == UIState.ModeSelection)
+            {
+                // ModeSelection에서 뒤로가기 = 로그아웃
+                Debug.Log("[UIManager] ModeSelection에서 뒤로가기 - 로그아웃 처리");
+                OnLogoutRequested();
+            }
+            else if (currentState == UIState.StageSelect)
+            {
+                // StageSelect에서 뒤로가기 = SingleGameplayScene 언로드 후 ModeSelection으로
+                Debug.Log("[UIManager] StageSelect에서 뒤로가기 - SingleGameplayScene 언로드 후 ModeSelection으로");
+                OnExitSingleToModeSelection();
+            }
+            else
+            {
+                // 기본 동작 - ModeSelection으로
+                ShowPanel(UIState.ModeSelection);
+            }
+        }
+
+        /// <summary>
+        /// 로그아웃 요청 처리
+        /// </summary>
+        public void OnLogoutRequested()
+        {
+            Debug.Log("[UIManager] 로그아웃 처리 시작");
+            
+            // SessionManager를 통해 로그아웃
+            if (App.Core.SessionManager.Instance != null)
+            {
+                App.Core.SessionManager.Instance.Logout();
+                Debug.Log("[UIManager] SessionManager.Logout() 호출 완료");
+            }
+            else
+            {
+                Debug.LogWarning("[UIManager] SessionManager.Instance가 null입니다!");
+            }
+            
+            // 로그인 화면으로 전환
+            ShowPanel(UIState.Login);
+        }
+
+        /// <summary>
+        /// SingleGameplayScene에서 ModeSelection으로 돌아가기
+        /// </summary>
+        public void OnExitSingleToModeSelection()
+        {
+            Debug.Log("[UIManager] SingleGameplayScene에서 ModeSelection으로 돌아가기 시작");
+            
+            if (App.Core.SceneFlowController.Instance != null)
+            {
+                // ExitSingleToMain 코루틴 실행 후 ModeSelection 패널 표시
+                StartCoroutine(ExitSingleAndShowModeSelection());
+            }
+            else
+            {
+                Debug.LogError("[UIManager] SceneFlowController.Instance가 null입니다!");
+                // Fallback: 단순히 ModeSelection 패널만 표시
+                ShowPanel(UIState.ModeSelection);
+            }
+        }
+
+        /// <summary>
+        /// SingleGameplayScene 언로드 후 ModeSelection 패널 표시
+        /// </summary>
+        private System.Collections.IEnumerator ExitSingleAndShowModeSelection()
+        {
+            Debug.Log("[UIManager] ExitSingleAndShowModeSelection 코루틴 시작");
+            
+            // SceneFlowController의 ExitSingleToMain 실행 (SingleGameplayScene 언로드)
+            yield return StartCoroutine(App.Core.SceneFlowController.Instance.ExitSingleToMain());
+            
+            Debug.Log("[UIManager] ExitSingleToMain 완료 - ModeSelection 패널 표시");
+            
+            // MainScene으로 돌아온 후 ModeSelection 패널 표시
             ShowPanel(UIState.ModeSelection);
         }
 

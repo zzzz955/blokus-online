@@ -340,24 +340,6 @@ namespace App.Network{
         }
 
         /// <summary>
-        /// 게스트 로그인 요청 - 실제 API에 맞게 업데이트
-        /// </summary>
-        public void GuestLogin()
-        {
-            StartCoroutine(SendPostRequest<AuthUserData>(
-                "auth/guest",
-                new { }, // 빈 객체
-                response =>
-                {
-                    SetAuthToken(response.token, response.user.user_id);
-                    OnAuthResponse?.Invoke(true, "게스트 로그인 성공", response.token);
-                    OnUserInfoReceived?.Invoke(response);
-                },
-                error => OnAuthResponse?.Invoke(false, error, null)
-            ));
-        }
-
-        /// <summary>
         /// 토큰 유효성 검증 - POST 요청으로 변경
         /// </summary>
         public void ValidateToken()
@@ -392,32 +374,19 @@ namespace App.Network{
         }
 
         /// <summary>
-        /// 로그아웃
+        /// 로그아웃 (클라이언트 측 토큰 클리어만 수행)
         /// </summary>
         public void Logout()
         {
-            if (!string.IsNullOrEmpty(authToken))
-            {
-                StartCoroutine(SendPostRequest<LogoutResponse>(
-                    "auth/logout",
-                    new { }, // 빈 객체
-                    response =>
-                    {
-                        ClearAuthToken();
-                        Debug.Log("로그아웃 완료");
-                    },
-                    error =>
-                    {
-                        // 로그아웃은 실패해도 로컬에서 토큰 클리어
-                        ClearAuthToken();
-                        Debug.LogWarning($"로그아웃 요청 실패: {error}");
-                    }
-                ));
-            }
-            else
-            {
-                ClearAuthToken();
-            }
+            // 🔥 수정: 서버에 logout 엔드포인트가 없으므로 클라이언트에서만 토큰 클리어
+            Debug.Log("[HttpApiClient] 로그아웃 - 로컬 토큰 클리어 시작");
+            
+            ClearAuthToken();
+            
+            // 로그아웃 완료 이벤트 발생 (필요시)
+            OnAuthResponse?.Invoke(true, "로그아웃 완료", "");
+            
+            Debug.Log("[HttpApiClient] 로그아웃 완료 - 토큰 클리어됨");
         }
 
         // ========================================
