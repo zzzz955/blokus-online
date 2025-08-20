@@ -20,6 +20,10 @@ namespace App.UI
         [SerializeField] private float spinSpeed = 180f; // degrees per second
         [SerializeField] private float fadeSpeed = 3f;
 
+        [SerializeField] private float minSweep = 0.08f;   // 최소 호 길이(비율)
+        [SerializeField] private float maxSweep = 0.6f;    // 최대 호 길이(비율)
+        [SerializeField] private float sweepCycle = 1.2f;  // 호가 커졌다 작아지는 한 사이클(초)
+
         // Singleton pattern
         public static LoadingOverlay Instance { get; private set; }
 
@@ -159,32 +163,80 @@ namespace App.UI
         private void CreateSpinner()
         {
             GameObject spinner = new GameObject("Spinner");
-            spinner.transform.SetParent(stackRoot);     // ⭐ 스택의 자식으로
+            spinner.transform.SetParent(stackRoot);
             RectTransform spinnerRect = spinner.AddComponent<RectTransform>();
-            spinnerRect.sizeDelta = new Vector2(180, 180); // 크기만 조정하면 자동 배치!
+            spinnerRect.sizeDelta = new Vector2(180, 180);
 
             spinnerImage = spinner.AddComponent<Image>();
+            spinnerImage.raycastTarget = false;
             spinnerImage.color = Color.white;
+
+            // 각도 그라디언트가 들어간 링 스프라이트 생성
             CreateDefaultSpinnerSprite(180);
+
+            // 안드로이드 스피너처럼 '부분 호'만 보이도록 Filled 설정
+            spinnerImage.type = Image.Type.Filled;
+            spinnerImage.fillMethod = Image.FillMethod.Radial360;
+            spinnerImage.fillOrigin = 0;        // Top(0) 기준 시작
+            spinnerImage.fillClockwise = true;  // 시계방향으로 채움
+            spinnerImage.fillAmount = 0.15f;    // 시작 호 길이(15%)
+            spinnerImage.preserveAspect = true;
         }
 
         private void CreateDefaultSpinnerSprite(int diameter = 64)
         {
-            int N = Mathf.Max(32, diameter);   // 너무 작지 않게
+            int N = Mathf.Max(32, diameter);
+            float thickness = Mathf.Max(3f, N * 0.10f);   // 링 두께(지름의 10%)
             Texture2D texture = new Texture2D(N, N, TextureFormat.ARGB32, false);
-            Color[] colors = new Color[N * N];
+            texture.wrapMode = TextureWrapMode.Clamp;
 
+            Color[] colors = new Color[N * N];
             Vector2 center = new Vector2(N * 0.5f, N * 0.5f);
             float radius = (N * 0.5f) - 2f;
+
+            // 각도 그라디언트 파라미터
+            // angleNorm: 0(머리) -> 1(꼬리)로 갈수록 알파가 줄어드는 램프
+            // gamma로 꼬리 페이드 곡률 조정
+            float gamma = 1.8f;
 
             for (int y = 0; y < N; y++)
             {
                 for (int x = 0; x < N; x++)
                 {
-                    float d = Vector2.Distance(new Vector2(x, y), center);
-                    colors[y * N + x] = (d <= radius && d >= radius - Mathf.Max(3f, N * 0.05f)) ? Color.white : Color.clear;
+                    int idx = y * N + x;
+                    Vector2 p = new Vector2(x + 0.5f, y + 0.5f);
+                    float d = Vector2.Distance(p, center);
+
+                    bool inRing = (d <= radius && d >= radius - thickness);
+                    if (!inRing)
+                    {
+                        colors[idx] = Color.clear;
+                        continue;
+                    }
+
+                    // 각도 계산: Top 기준(위쪽이 0도), 시계방향 증가로 정규화
+                    float angleRad = Mathf.Atan2(p.y - center.y, p.x - center.x); // -pi..pi, 기준: +X축
+                    float angleDeg = angleRad * Mathf.Rad2Deg;                    // -180..180
+                                                                                  // +X축 기준을 'Top(북쪽)' 기준으로 회전 보정: +90도
+                    angleDeg = (angleDeg + 450f) % 360f; // (angle+90) % 360, +360 보정
+
+                    // 0..1 정규화 (0: 머리, 1: 꼬리)
+                    float angleNorm = angleDeg / 360f;
+
+                    // 꼬리로 갈수록 옅어지도록: alpha = 1 - ramp^gamma
+                    float alpha = 1f - Mathf.Pow(angleNorm, gamma);
+
+                    // 링 픽셀 내에서도 가장자리 안티앨리어싱(선택)
+                    float inner = radius - thickness;
+                    float t = Mathf.InverseLerp(inner, radius, d);
+                    float edgeAA = Mathf.SmoothStep(0f, 1f, Mathf.Min(t, 1f - t) * 2f);
+
+                    Color c = Color.white;
+                    c.a = Mathf.Clamp01(alpha * edgeAA);
+                    colors[idx] = c;
                 }
             }
+
             texture.SetPixels(colors);
             texture.Apply();
 
@@ -192,6 +244,36 @@ namespace App.UI
             spinnerImage.sprite = sprite;
         }
 
+        private System.Collections.IEnumerator SpinnerAnimCoroutine()
+        {
+            float t = 0f;
+            bool expanding = true;
+
+            while (isShowing && spinnerImage != null)
+            {
+                // 회전
+                spinnerImage.transform.Rotate(0f, 0f, -spinSpeed * Time.deltaTime);
+
+                // 호 길이 애니메이션 (Ping-Pong)
+                t += Time.deltaTime / (sweepCycle * 0.5f); // 반 주기
+                if (t >= 1f)
+                {
+                    t = 0f;
+                    expanding = !expanding;
+
+                    // 매 전환 시 약간의 각도 점프를 줘서 시작점이 바뀌는 느낌 (선택)
+                    spinnerImage.transform.Rotate(0f, 0f, -30f);
+                }
+
+                float sweep = expanding
+                    ? Mathf.Lerp(minSweep, maxSweep, Mathf.SmoothStep(0f, 1f, t))
+                    : Mathf.Lerp(maxSweep, minSweep, Mathf.SmoothStep(0f, 1f, t));
+
+                spinnerImage.fillAmount = sweep;
+
+                yield return null;
+            }
+        }
 
         private void CreateLoadingText()
         {
@@ -269,7 +351,7 @@ namespace App.UI
             // Start spinner animation
             if (spinCoroutine != null)
                 StopCoroutine(spinCoroutine);
-            spinCoroutine = StartCoroutine(SpinCoroutine());
+            spinCoroutine = StartCoroutine(SpinnerAnimCoroutine());
 
             // Fade in
             if (fadeCoroutine != null)
