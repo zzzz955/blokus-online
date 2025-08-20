@@ -6111,6 +6111,10 @@ MonoBehaviour:
   blockButtonPrefab: {fileID: 4315752024597889403, guid: 1e0399f4002a31140b995b88db7b9c99, type: 3}
   previewPlayerColor: 1
   previewSkin: {fileID: 0}
+  developmentWebServerUrl: http://localhost:3000
+  productionWebServerUrl: https://blokus-online.mooo.com:3000
+  developmentApiServerUrl: http://localhost:8080
+  productionApiServerUrl: https://blokus-online.mooo.com:8080
   activeStarColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   inactiveStarColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   difficultyColors:

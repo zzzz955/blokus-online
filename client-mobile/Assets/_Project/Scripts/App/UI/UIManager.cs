@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.Serialization;
 using Features.Single.Core;
 using Shared.UI;
+using App.Core;
 
 namespace App.UI
 {
@@ -134,12 +135,30 @@ namespace App.UI
             }
             else
             {
-                // 일반적인 게임 시작 - 항상 로그인 패널
-                Debug.Log("일반 게임 시작 - 로그인 패널 표시");
-                ShowPanel(UIState.Login, false);
+                // 일반적인 게임 시작 - 자동 로그인 상태 확인
+                CheckAutoLoginStatus();
             }
             
             Debug.Log("UIManager Start 완료");
+        }
+
+        /// <summary>
+        /// 자동 로그인 상태 확인 (UIManager 초기화 후)
+        /// </summary>
+        private void CheckAutoLoginStatus()
+        {
+            Debug.Log("[UIManager] 자동 로그인 상태 확인 시작");
+
+            if (SessionManager.Instance != null && SessionManager.Instance.IsLoggedIn)
+            {
+                Debug.Log("[UIManager] 이미 자동 로그인됨 - ModeSelection 패널 표시");
+                ShowPanel(UIState.ModeSelection, false);
+            }
+            else
+            {
+                Debug.Log("[UIManager] 자동 로그인 없음 - Login 패널 표시");
+                ShowPanel(UIState.Login, false);
+            }
         }
 
         /// <summary>

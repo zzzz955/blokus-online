@@ -26,6 +26,11 @@ namespace App.UI
         [SerializeField] private bool enableTestMode = false;
         [SerializeField] private string testUsername = "testuser";
         [SerializeField] private string testPassword = "testpass";
+        
+        /// <summary>
+        /// 릴리즈 빌드에서는 테스트 모드 강제 비활성화
+        /// </summary>
+        private bool IsTestModeEnabled => enableTestMode && (Application.isEditor || Debug.isDebugBuild);
 
         // 상태 관리  
         private bool isAuthenticating = false;
@@ -104,8 +109,8 @@ namespace App.UI
             if (testLoginButton != null)
             {
                 testLoginButton.onClick.AddListener(OnTestLoginButtonClicked);
-                testLoginButton.gameObject.SetActive(enableTestMode);
-                Debug.Log($"테스트 로그인 버튼 설정: {enableTestMode}");
+                testLoginButton.gameObject.SetActive(IsTestModeEnabled);
+                Debug.Log($"테스트 로그인 버튼 설정: {IsTestModeEnabled}");
             }
 
             Debug.Log("LoginPanel 버튼 설정 완료");

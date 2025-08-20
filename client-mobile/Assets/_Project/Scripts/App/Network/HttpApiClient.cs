@@ -52,9 +52,23 @@ namespace App.Network{
     public class HttpApiClient : MonoBehaviour
     {
         [Header("API 서버 설정")]
-        [SerializeField] private string apiBaseUrl = "http://localhost:8080/api";
-        public string ApiBaseUrl => apiBaseUrl;
+        [SerializeField] private string developmentApiUrl = "http://localhost:8080/api";
+        [SerializeField] private string productionApiUrl = "https://your-production-server.com/api";
+        
+        public string ApiBaseUrl => GetApiBaseUrl();
         [SerializeField] private int requestTimeoutSeconds = 10;
+
+        /// <summary>
+        /// 환경별 API URL 반환
+        /// </summary>
+        private string GetApiBaseUrl()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            return developmentApiUrl;
+#else
+            return productionApiUrl;
+#endif
+        }
 
         // 인증 토큰
         private string authToken;
@@ -109,9 +123,13 @@ namespace App.Network{
             string envApiUrl = Environment.GetEnvironmentVariable("BLOKUS_API_URL");
             if (!string.IsNullOrEmpty(envApiUrl))
             {
-                apiBaseUrl = envApiUrl;
-                Debug.Log($"API URL 환경변수 설정: {apiBaseUrl}");
+                // 환경변수가 있으면 개발 URL 오버라이드
+                developmentApiUrl = envApiUrl;
+                Debug.Log($"API URL 환경변수 설정: {envApiUrl}");
             }
+            
+            Debug.Log($"[HttpApiClient] 현재 환경: {(Application.isEditor ? "에디터" : Application.isMobilePlatform ? "모바일" : "데스크톱")}");
+            Debug.Log($"[HttpApiClient] 사용할 API URL: {ApiBaseUrl}");
         }
 
         /// <summary>
@@ -160,7 +178,7 @@ namespace App.Network{
         /// </summary>
         private IEnumerator SendGetRequest<T>(string endpoint, System.Action<T> onSuccess, System.Action<string> onError = null)
         {
-            string url = $"{apiBaseUrl}/{endpoint}";
+            string url = $"{ApiBaseUrl}/{endpoint}";
 
             using (UnityWebRequest request = UnityWebRequest.Get(url))
             {
@@ -221,7 +239,7 @@ namespace App.Network{
         /// </summary>
         private IEnumerator SendPostRequest<T>(string endpoint, object requestData, System.Action<T> onSuccess, System.Action<string> onError = null)
         {
-            string url = $"{apiBaseUrl}/{endpoint}";
+            string url = $"{ApiBaseUrl}/{endpoint}";
             string jsonData = JsonUtility.ToJson(requestData);
 
             using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
@@ -522,7 +540,7 @@ namespace App.Network{
                 yield return new WaitForSeconds(30f); // 30초마다 확인
 
                 // 간단한 핑 테스트
-                using (UnityWebRequest ping = UnityWebRequest.Get($"{apiBaseUrl}/health"))
+                using (UnityWebRequest ping = UnityWebRequest.Get($"{ApiBaseUrl}/health"))
                 {
                     ping.timeout = 5;
                     yield return ping.SendWebRequest();
@@ -1021,7 +1039,7 @@ namespace App.Network{
 
         private IEnumerator CheckHealthCoroutine(System.Action<bool> onComplete)
         {
-            using (UnityWebRequest request = UnityWebRequest.Get($"{apiBaseUrl}/health"))
+            using (UnityWebRequest request = UnityWebRequest.Get($"{ApiBaseUrl}/health"))
             {
                 request.timeout = 5;
                 yield return request.SendWebRequest();

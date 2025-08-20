@@ -50,6 +50,12 @@ namespace Features.Single.UI.StageSelect
         [SerializeField] private Shared.Models.PlayerColor previewPlayerColor = Shared.Models.PlayerColor.Blue;
         [SerializeField] private Features.Single.Gameplay.Skins.BlockSkin previewSkin;
 
+        [Header("서버 URL 설정")]
+        [SerializeField] private string developmentWebServerUrl = "http://localhost:3000";
+        [SerializeField] private string productionWebServerUrl = "https://web.blokus-online.com";
+        [SerializeField] private string developmentApiServerUrl = "http://localhost:8080";
+        [SerializeField] private string productionApiServerUrl = "https://api.blokus-online.com";
+
         [Header("색상 설정 (Fallback)")]
         [SerializeField] private Color activeStarColor = Color.yellow;
         [SerializeField] private Color inactiveStarColor = Color.gray;
@@ -63,6 +69,31 @@ namespace Features.Single.UI.StageSelect
 
         // 비활성 시 코루틴 시작 에러 방지용 큐
         private string _pendingThumbnailUrl;
+
+        // 환경별 서버 URL 프로퍼티
+        private string WebServerUrl
+        {
+            get
+            {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                return developmentWebServerUrl;
+#else
+                return productionWebServerUrl;
+#endif
+            }
+        }
+
+        private string ApiServerUrl
+        {
+            get
+            {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                return developmentApiServerUrl;
+#else
+                return productionApiServerUrl;
+#endif
+            }
+        }
 
         // 싱글톤
         public static StageInfoModal Instance
@@ -382,8 +413,8 @@ namespace Features.Single.UI.StageSelect
 
             if (currentStageData != null && !string.IsNullOrEmpty(currentStageData.thumbnail_url))
             {
-                // 썸네일은 웹 서버(3000 포트)의 stage-thumbnails 경로에서 제공
-                string thumbnailBaseUrl = "http://localhost:3000";
+                // 썸네일은 웹 서버의 stage-thumbnails 경로에서 제공
+                string thumbnailBaseUrl = WebServerUrl;
 
                 // DB의 thumbnail_url이 /stage-1-xxx.png 형태라면 앞의 '/' 제거
                 string thumbnailPath = currentStageData.thumbnail_url;
@@ -433,28 +464,28 @@ namespace Features.Single.UI.StageSelect
         /// - /api/stage-thumbnails/..., /stage-thumbnails/... 모두 지원
         /// - 중복 /api 방지
         /// </summary>
-        private static string MakeAbsoluteUrl(string url)
+        private string MakeAbsoluteUrl(string url)
         {
             if (string.IsNullOrEmpty(url)) return url;
             if (url.StartsWith("http", StringComparison.OrdinalIgnoreCase)) return url;
 
-            const string ORIGIN = "http://localhost:8080";
+            string origin = ApiServerUrl;
             var path = url.StartsWith("/") ? url : "/" + url;
 
             // 이미 /api/로 시작하면 그대로 사용
             if (path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase))
             {
-                return ORIGIN + path;
+                return origin + path;
             }
 
             // /stage-thumbnails 로 시작하면 /api 안 붙임(정적 퍼블릭 경로)
             if (path.StartsWith("/stage-thumbnails/", StringComparison.OrdinalIgnoreCase))
             {
-                return ORIGIN + path;
+                return origin + path;
             }
 
             // 그 외 상대경로는 /api 접두어 부여
-            return ORIGIN + "/api" + path;
+            return origin + "/api" + path;
         }
 
         /// <summary>

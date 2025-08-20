@@ -13,7 +13,7 @@ namespace App.UI
         [Header("UI 컴포넌트")]
         [SerializeField] private Button singlePlayerButton;
         [SerializeField] private Button multiPlayerButton;
-        [SerializeField] private Button backButton;
+        [SerializeField] private Button backButton; // 로그아웃 버튼으로 사용
         [SerializeField] private TMP_Text GreatingMessage;
 
         private void OnEnable()
@@ -98,12 +98,12 @@ namespace App.UI
 
             if (backButton != null)
             {
-                backButton.onClick.AddListener(OnBackButtonClicked);
-                Debug.Log("뒤로가기 버튼 이벤트 연결 완료");
+                backButton.onClick.AddListener(OnLogoutButtonClicked);
+                Debug.Log("로그아웃 버튼 이벤트 연결 완료");
             }
             else
             {
-                Debug.LogWarning("backButton이 인스펙터에서 할당되지 않았습니다!");
+                Debug.LogWarning("backButton(로그아웃)이 인스펙터에서 할당되지 않았습니다!");
             }
 
             Debug.Log("ModeSelectionPanel 버튼 설정 완료");
@@ -171,19 +171,30 @@ namespace App.UI
             }
         }
 
-        public void OnBackButtonClicked()
+        public void OnLogoutButtonClicked()
         {
-            Debug.Log("뒤로가기 버튼 클릭");
+            Debug.Log("로그아웃 버튼 클릭");
 
-            var uiManager = UIManager.GetInstanceSafe();
-            if (uiManager != null)
+            if (SessionManager.Instance != null)
             {
-                Debug.Log("[ModeSelectionPanel] UIManager로 메뉴 돌아가기");
-                uiManager.OnBackToMenu();
+                Debug.Log("[ModeSelectionPanel] SessionManager로 로그아웃 처리");
+                SessionManager.Instance.LogoutAndClearSession();
+
+                // 로그아웃 후 LoginPanel로 이동
+                var uiManager = UIManager.GetInstanceSafe();
+                if (uiManager != null)
+                {
+                    Debug.Log("[ModeSelectionPanel] UIManager로 로그인 화면 복귀");
+                    uiManager.ShowPanel(App.UI.UIState.Login);
+                }
+                else
+                {
+                    Debug.LogError("[ModeSelectionPanel] UIManager를 찾을 수 없습니다!");
+                }
             }
             else
             {
-                Debug.LogError("[ModeSelectionPanel] UIManager를 찾을 수 없습니다!");
+                Debug.LogError("[ModeSelectionPanel] SessionManager를 찾을 수 없습니다!");
             }
         }
     }
