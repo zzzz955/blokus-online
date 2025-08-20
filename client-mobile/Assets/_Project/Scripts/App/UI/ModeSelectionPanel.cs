@@ -2,23 +2,74 @@
 using UnityEngine.UI;
 using TMPro;
 using Shared.UI;
-namespace App.UI{
+using App.Services;
+using Features.Single.Core;
+using Shared.Models;
+using App.Core;
+namespace App.UI
+{
     public class ModeSelectionPanel : Shared.UI.PanelBase
     {
         [Header("UI 컴포넌트")]
         [SerializeField] private Button singlePlayerButton;
         [SerializeField] private Button multiPlayerButton;
         [SerializeField] private Button backButton;
-        
+        [SerializeField] private TMP_Text GreatingMessage;
+
+        private void OnEnable()
+        {
+            // 나중에 값이 들어오는 상황까지 커버하고 싶다면(선택):
+            if (SessionManager.Instance != null)
+                SessionManager.Instance.OnUserDataReceived += OnUserDataReceived;
+        }
+        private void OnDisable()
+        {
+            if (SessionManager.Instance != null)
+                SessionManager.Instance.OnUserDataReceived -= OnUserDataReceived;
+        }
+
+        private void OnUserDataReceived(string username, int _)
+        {
+            var displayName = SessionManager.Instance?.DisplayName;
+            UpdateGreetingMessage(displayName ?? username);
+        }
         protected override void Start()
         {
             base.Start();
             Debug.Log("ModeSelectionPanel 초기화 완료");
-            
+
             // 인스펙터 할당 버튼 이벤트 연결
             SetupButtons();
+            SetupTexts();
+        }
+
+        private void SetupTexts()
+        {
+            if (GreatingMessage == null)
+            {
+                Debug.LogWarning("GreatingMessage가 인스펙터에서 할당되지 않았습니다!");
+                return;
+            }
+
+            // SessionManager에서 displayName 가져오기 (fallback: username)
+            var displayName = SessionManager.Instance?.DisplayName;
+            if (string.IsNullOrEmpty(displayName))
+                displayName = SessionManager.Instance?.CachedId;
+
+            UpdateGreetingMessage(displayName);
         }
         
+        private void UpdateGreetingMessage(string displayName)
+        {
+            if (GreatingMessage == null) return;
+            
+            GreatingMessage.text = string.IsNullOrEmpty(displayName) 
+                ? "환영합니다!" 
+                : $"환영합니다! {displayName}님";
+                
+            Debug.Log($"[ModeSelectionPanel] 인사말 업데이트: {GreatingMessage.text}");
+        }
+
         /// <summary>
         /// 인스펙터에서 할당된 버튼들의 이벤트 연결
         /// </summary>
@@ -33,17 +84,18 @@ namespace App.UI{
             {
                 Debug.LogWarning("singlePlayerButton이 인스펙터에서 할당되지 않았습니다!");
             }
-            
+
             if (multiPlayerButton != null)
             {
                 multiPlayerButton.onClick.AddListener(OnMultiPlayerClicked);
-                Debug.Log("멀티플레이 버튼 이벤트 연결 완료");
+                multiPlayerButton.interactable = false;
+                Debug.Log("멀티플레이 버튼 이벤트 연결 완료, 비활성화(스텁)");
             }
             else
             {
                 Debug.LogWarning("multiPlayerButton이 인스펙터에서 할당되지 않았습니다!");
             }
-            
+
             if (backButton != null)
             {
                 backButton.onClick.AddListener(OnBackButtonClicked);
@@ -53,14 +105,44 @@ namespace App.UI{
             {
                 Debug.LogWarning("backButton이 인스펙터에서 할당되지 않았습니다!");
             }
-            
+
             Debug.Log("ModeSelectionPanel 버튼 설정 완료");
         }
-        
+
+        private string TryGetDisplayNameNow()
+        {
+            // 1) CacheManager에 이미 라이트 동기화가 반영되어 있으면 그걸 사용
+            var cm = CacheManager.Instance;
+            var profile = cm?.GetUserProfile();
+            if (profile != null && !string.IsNullOrEmpty(profile.displayName))
+                return profile.displayName;
+
+            // 2) 로그인 응답을 UserDataCache가 이미 들고 있다면 그걸 사용
+            var udc = UserDataCache.Instance;
+            var user = udc?.GetCurrentUser();
+            if (user != null && !string.IsNullOrEmpty(user.display_name))
+                return user.display_name;
+
+            // (선택) 3) 정말 아무것도 없으면 null 반환 — 이벤트로 나중에 갱신
+            return null;
+        }
+
+        private void OnUserProfileUpdated(UserProfileData data)
+        {
+            if (GreatingMessage != null && data != null && !string.IsNullOrEmpty(data.displayName))
+                GreatingMessage.text = $"환영합니다! {data.displayName}님";
+        }
+
+        private void OnUserDataUpdated(UserInfo info)
+        {
+            if (GreatingMessage != null && info != null && !string.IsNullOrEmpty(info.display_name))
+                GreatingMessage.text = $"환영합니다! {info.display_name}님";
+        }
+
         public void OnSinglePlayerClicked()
         {
             Debug.Log("싱글플레이 버튼 클릭");
-            
+
             var uiManager = UIManager.GetInstanceSafe();
             if (uiManager != null)
             {
@@ -72,11 +154,11 @@ namespace App.UI{
                 Debug.LogError("[ModeSelectionPanel] UIManager를 찾을 수 없습니다!");
             }
         }
-        
+
         public void OnMultiPlayerClicked()
         {
             Debug.Log("멀티플레이 버튼 클릭");
-            
+
             var uiManager = UIManager.GetInstanceSafe();
             if (uiManager != null)
             {
@@ -88,11 +170,11 @@ namespace App.UI{
                 Debug.LogError("[ModeSelectionPanel] UIManager를 찾을 수 없습니다!");
             }
         }
-        
+
         public void OnBackButtonClicked()
         {
             Debug.Log("뒤로가기 버튼 클릭");
-            
+
             var uiManager = UIManager.GetInstanceSafe();
             if (uiManager != null)
             {

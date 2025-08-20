@@ -530,30 +530,6 @@ namespace App.Network{
             ));
         }
 
-        /// <summary>
-        /// 사용자 프로필 요청 - 실제 API 구조에 맞게 업데이트
-        /// </summary>
-        public void GetUserProfile()
-        {
-            StartCoroutine(SendGetRequest<UserProfile>(
-                "user/profile",
-                response => OnUserProfileReceived?.Invoke(response),
-                error => Debug.LogWarning($"사용자 프로필 요청 실패: {error}")
-            ));
-        }
-
-        /// <summary>
-        /// 사용자 상세 통계 요청
-        /// </summary>
-        public void GetUserStats()
-        {
-            StartCoroutine(SendGetRequest<UserProfile>(
-                "user/profile",
-                response => OnUserProfileReceived?.Invoke(response),
-                error => Debug.LogWarning($"사용자 프로필 요청 실패: {error}")
-            ));
-        }
-
         // ========================================
         // 오프라인 지원
         // ========================================
@@ -669,6 +645,7 @@ namespace App.Network{
         {
             public int user_id;
             public string username;
+            public string display_name;
             public int level;
             public int experience_points;
             public int single_player_level;
@@ -833,6 +810,7 @@ namespace App.Network{
         public class UserProfile
         {
             public string username;
+            public string display_name;
             public int single_player_level;
             public int max_stage_completed;
             public int total_single_games;

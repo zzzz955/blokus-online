@@ -13,6 +13,7 @@ namespace Shared.Models
     public class UserInfo
     {
         public string username = "익명";       // 사용자명
+        public string display_name = "익명";
         public int level = 1;                  // 경험치 레벨 (게임 수에 따라 증가)
         public int totalGames = 0;             // 총 게임 수
         public int wins = 0;                   // 승리 수

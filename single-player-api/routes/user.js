@@ -371,6 +371,7 @@ router.get('/sync/light',
       const userQuery = `
         SELECT 
           username,
+          display_name,
           single_player_level,
           max_stage_completed,
           total_single_games,
@@ -413,6 +414,7 @@ router.get('/sync/light',
       const responseData = {
         user_profile: {
           username: userProfile.username,
+          display_name: userProfile.display_name,
           level: userProfile.single_player_level || 1,
           max_stage_completed: userProfile.max_stage_completed || 0,
           total_games: userProfile.total_single_games || 0,

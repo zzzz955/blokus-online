@@ -3,7 +3,8 @@ using UnityEngine;
 using App.Network;
 using App.UI;
 using Shared.UI;
-namespace App.Core{
+namespace App.Core
+{
     /// <summary>
     /// Session manager for user authentication and session persistence
     /// Migration Plan: 로그인은 MainScene 로그인 패널에서 처리. 게스트 없음. 멀티 입장 시 캐싱된 ID/PW를 TCP 서버로 전송
@@ -22,6 +23,7 @@ namespace App.Core{
         private string cachedPassword = "";
         private string authToken = "";
         private int userId = 0;
+        private string displayName = "";
 
         // Events
         public event System.Action<bool> OnLoginStateChanged;
@@ -34,7 +36,7 @@ namespace App.Core{
                 Instance = this;
                 transform.SetParent(null);
                 DontDestroyOnLoad(gameObject);
-                
+
                 if (debugMode)
                     Debug.Log("SessionManager initialized with DontDestroyOnLoad");
             }
@@ -79,6 +81,11 @@ namespace App.Core{
         public int UserId => userId;
 
         /// <summary>
+        /// Get current user displayName
+        /// </summary>
+        public string DisplayName => displayName;
+
+        /// <summary>
         /// Login with username and password
         /// Migration Plan: 게스트 금지, ID/PW 입력 → REST 로그인 성공 시 메모리 캐시 저장
         /// </summary>
@@ -91,15 +98,15 @@ namespace App.Core{
             {
                 // Use HttpApiClient for REST login
                 var loginTask = new TaskCompletionSource<bool>();
-                
+
                 HttpApiClient.Instance.OnAuthResponse += OnLoginResponse;
                 HttpApiClient.Instance.OnUserInfoReceived += OnUserInfoResponse;
-                
+
                 HttpApiClient.Instance.Login(username, password);
-                
+
                 // Wait for response (timeout after 10 seconds)
                 bool loginSuccess = await WaitForLoginResult(loginTask, 10f);
-                
+
                 HttpApiClient.Instance.OnAuthResponse -= OnLoginResponse;
                 HttpApiClient.Instance.OnUserInfoReceived -= OnUserInfoResponse;
 
@@ -109,12 +116,12 @@ namespace App.Core{
                     cachedId = username;
                     cachedPassword = password;
                     isLoggedIn = true;
-                    
+
                     OnLoginStateChanged?.Invoke(true);
-                    
+
                     if (debugMode)
                         Debug.Log($"[SessionManager] Login successful: {username}");
-                    
+
                     return true;
                 }
                 else
@@ -122,7 +129,7 @@ namespace App.Core{
                     ClearSession();
                     if (debugMode)
                         Debug.Log($"[SessionManager] Login failed: {username}");
-                    
+
                     return false;
                 }
 
@@ -144,17 +151,22 @@ namespace App.Core{
                 void OnUserInfoResponse(HttpApiClient.AuthUserData userData)
                 {
                     userId = userData.user.user_id;
+                    cachedId = userData.user.username ?? cachedId;      // ★ 놓치지 말기
+                    displayName = userData.user.display_name ?? displayName; // ★ 여기!
                     OnUserDataReceived?.Invoke(userData.user.username, userId);
+
+                    if (debugMode)
+                        Debug.Log($"[SessionManager] OnUserInfoResponse: username='{cachedId}', displayName='{displayName}'");
                 }
             }
             catch (System.Exception ex)
             {
                 if (debugMode)
                     Debug.LogError($"[SessionManager] Login exception: {ex.Message}");
-                
+
                 // Migration Plan: 로그인 실패/네트워크 예외 시 사용자 피드백 명확
                 SystemMessageManager.ShowToast($"로그인 오류: {ex.Message}", MessagePriority.Error);
-                
+
                 ClearSession();
                 return false;
             }
@@ -172,7 +184,7 @@ namespace App.Core{
             {
                 HttpApiClient.Instance.Logout();
             }
-            
+
             ClearSession();
             OnLoginStateChanged?.Invoke(false);
         }
@@ -188,7 +200,7 @@ namespace App.Core{
                 Debug.LogWarning("[SessionManager] GetCredentialsForTcp called but user not logged in");
                 return ("", "");
             }
-            
+
             return (cachedId, cachedPassword);
         }
 
@@ -205,20 +217,20 @@ namespace App.Core{
             try
             {
                 var validateTask = new TaskCompletionSource<bool>();
-                
+
                 HttpApiClient.Instance.OnAuthResponse += OnValidateResponse;
                 HttpApiClient.Instance.ValidateToken();
-                
+
                 bool isValid = await WaitForLoginResult(validateTask, 5f);
-                
+
                 HttpApiClient.Instance.OnAuthResponse -= OnValidateResponse;
-                
+
                 if (!isValid)
                 {
                     ClearSession();
                     OnLoginStateChanged?.Invoke(false);
                 }
-                
+
                 return isValid;
 
                 void OnValidateResponse(bool success, string message, string token)
@@ -230,7 +242,7 @@ namespace App.Core{
             {
                 if (debugMode)
                     Debug.LogError($"[SessionManager] Session validation exception: {ex.Message}");
-                
+
                 ClearSession();
                 OnLoginStateChanged?.Invoke(false);
                 return false;
@@ -248,7 +260,8 @@ namespace App.Core{
             cachedPassword = "";
             authToken = "";
             userId = 0;
-            
+            displayName = "";
+
             if (debugMode)
                 Debug.Log("[SessionManager] Session cleared");
         }
@@ -257,15 +270,41 @@ namespace App.Core{
         {
             var timeoutTask = Task.Delay((int)(timeoutSeconds * 1000));
             var completedTask = await Task.WhenAny(taskSource.Task, timeoutTask);
-            
+
             if (completedTask == timeoutTask)
             {
                 // Timeout
                 SystemMessageManager.ShowToast("로그인 요청 시간 초과", MessagePriority.Error);
                 return false;
             }
-            
+
             return taskSource.Task.Result;
+        }
+
+        public void SetDisplayName(string dn)
+        {
+            displayName = dn ?? "";
+            if (debugMode)
+                Debug.Log($"[SessionManager] DisplayName set: '{displayName}'");
+        }
+
+        /// <summary>
+        /// 로그인 HTTP 응답(AuthUserData)로부터 세션을 즉시 채움
+        /// </summary>
+        public void SeedFromAuth(HttpApiClient.AuthUserData auth)
+        {
+            if (auth?.user == null) return;
+
+            cachedId = auth.user.username ?? "";
+            displayName = auth.user.display_name ?? "";   // ★ 여기!
+            userId = auth.user.user_id;
+            isLoggedIn = true;
+
+            if (debugMode)
+                Debug.Log($"[SessionManager] SeedFromAuth: username='{cachedId}', displayName='{displayName}', userId={userId}");
+
+            OnLoginStateChanged?.Invoke(true);
+            OnUserDataReceived?.Invoke(cachedId, userId); // 기존 시그니처 유지
         }
 
         // ========================================

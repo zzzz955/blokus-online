@@ -91,6 +91,7 @@ namespace App.Services{
             return new CommonUserInfo
             {
                 username = authData.user.username,
+                display_name = authData.user.display_name,
                 level = authData.user.single_player_level, // 싱글플레이어 레벨 사용
                 totalGames = authData.user.stats.total_games,
                 wins = authData.user.stats.wins,

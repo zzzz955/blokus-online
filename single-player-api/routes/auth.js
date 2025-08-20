@@ -38,7 +38,7 @@ router.post('/login',
 
       // 사용자 조회
       const userQuery = `
-        SELECT u.user_id, u.username, u.password_hash, u.is_active,
+        SELECT u.user_id, u.username, u.display_name, u.password_hash, u.is_active,
                COALESCE(s.total_games, 0) as total_games,
                COALESCE(s.wins, 0) as wins,
                COALESCE(s.losses, 0) as losses,
@@ -91,6 +91,7 @@ router.post('/login',
         user: {
           user_id: user.user_id,
           username: user.username,
+          display_name: user.display_name,
           level: user.level,
           experience_points: user.experience_points,
           single_player_level: user.single_player_level,

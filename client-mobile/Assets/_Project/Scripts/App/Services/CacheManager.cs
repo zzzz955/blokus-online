@@ -5,7 +5,8 @@ using UnityEngine;
 using App.Network;
 using Features.Single.Core;
 
-namespace App.Services{
+namespace App.Services
+{
     /// <summary>
     /// 새로운 캐싱 전략 관리자
     /// 라이트 동기화, 메타데이터 TTL, 버전 관리 등을 담당
@@ -52,7 +53,7 @@ namespace App.Services{
                 Instance = this;
                 transform.SetParent(null);
                 DontDestroyOnLoad(gameObject);
-                
+
                 if (debugMode)
                     Debug.Log("[CacheManager] 초기화 완료");
             }
@@ -93,7 +94,7 @@ namespace App.Services{
 
             // 1. 토큰 유효성 체크 (HttpApiClient 대기)
             yield return new WaitUntil(() => HttpApiClient.Instance != null);
-            
+
             if (!Features.Single.Core.UserDataCache.Instance.IsLoggedIn())
             {
                 if (debugMode)
@@ -112,12 +113,12 @@ namespace App.Services{
         {
             // 마지막 동기화로부터 N분이 지났는지 확인
             var timeSinceLastSync = DateTime.Now - lastLightSyncTime;
-            
+
             if (timeSinceLastSync.TotalMinutes >= lightSyncIntervalMinutes)
             {
                 if (debugMode)
                     Debug.Log($"[CacheManager] 포어그라운드 라이트 동기화 ({timeSinceLastSync.TotalMinutes:F1}분 경과)");
-                
+
                 yield return StartCoroutine(PerformLightSync());
             }
             else
@@ -193,7 +194,7 @@ namespace App.Services{
                     // 응답 처리
                     yield return StartCoroutine(ProcessLightSyncResponse(response));
                     lastLightSyncTime = DateTime.Now;
-                    
+
                     if (debugMode)
                         Debug.Log("[CacheManager] 라이트 동기화 완료");
                 }
@@ -218,6 +219,7 @@ namespace App.Services{
             var newUserProfile = new UserProfileData
             {
                 username = response.user_profile.username,
+                displayName = response.user_profile.display_name,
                 level = response.user_profile.level,
                 maxStageCompleted = response.user_profile.max_stage_completed,
                 totalGames = response.user_profile.total_games,
@@ -231,7 +233,7 @@ namespace App.Services{
             {
                 userProfile = newUserProfile;
                 OnUserProfileUpdated?.Invoke(userProfile);
-                
+
                 if (debugMode)
                     Debug.Log($"[CacheManager] 사용자 프로필 업데이트: Lv.{userProfile.level}, 최대스테이지: {userProfile.maxStageCompleted}");
             }
@@ -241,7 +243,7 @@ namespace App.Services{
             {
                 if (debugMode)
                     Debug.Log($"[CacheManager] 진행도 버전 불일치: {cachedProgressVersion} -> {response.user_profile.progress_version}");
-                
+
                 yield return StartCoroutine(SyncFullProgress());
             }
 
@@ -251,7 +253,7 @@ namespace App.Services{
             {
                 if (debugMode)
                     Debug.Log($"[CacheManager] 메타데이터 버전 불일치: {cachedMetadataVersion} -> {serverMetadataVersion}");
-                
+
                 yield return StartCoroutine(SyncStageMetadata());
             }
 
@@ -354,15 +356,15 @@ namespace App.Services{
             // TTL 확인
             var timeSinceLoad = DateTime.Now - metadataLoadTime;
             bool isTTLExpired = timeSinceLoad.TotalMinutes >= metadataTTLMinutes;
-            
+
             if (debugMode)
                 Debug.Log($"[CacheManager] EnsureMetadataLoaded 호출 - 로드됨: {isMetadataLoaded}, TTL만료: {isTTLExpired}");
-            
+
             if (!isMetadataLoaded || isTTLExpired)
             {
                 if (debugMode)
                     Debug.Log($"[CacheManager] 메타데이터 동기화 시작 (TTL만료: {isTTLExpired})");
-                
+
                 yield return StartCoroutine(SyncStageMetadata());
             }
             else
@@ -472,7 +474,7 @@ namespace App.Services{
         /// <summary>
         /// 스테이지 완료 후 로컬 캐시 즉시 갱신
         /// </summary>
-        public void UpdateProgressAfterCompletion(int stageNumber, int score, int stars, int completionTime, 
+        public void UpdateProgressAfterCompletion(int stageNumber, int score, int stars, int completionTime,
             CompleteStageResponse serverResponse)
         {
             if (serverResponse?.updated_progress != null)
@@ -501,6 +503,7 @@ namespace App.Services{
                     userProfile = new UserProfileData
                     {
                         username = userProfile?.username ?? "",
+                        displayName = userProfile?.displayName ?? "",
                         level = profile.level,
                         maxStageCompleted = profile.max_stage_completed,
                         totalGames = profile.total_games > 0 ? profile.total_games : (userProfile?.totalGames ?? 0),
@@ -602,6 +605,7 @@ namespace App.Services{
     public class UserProfileData : IEquatable<UserProfileData>
     {
         public string username;
+        public string displayName;
         public int level;
         public int maxStageCompleted;
         public int totalGames;
@@ -613,6 +617,7 @@ namespace App.Services{
         {
             if (other == null) return false;
             return username == other.username &&
+                    displayName == other.displayName &&
                    level == other.level &&
                    maxStageCompleted == other.maxStageCompleted &&
                    totalGames == other.totalGames &&
@@ -667,6 +672,7 @@ namespace App.Services{
     public class UserProfileResponse
     {
         public string username;
+        public string display_name;
         public int level;
         public int max_stage_completed;
         public int total_games;

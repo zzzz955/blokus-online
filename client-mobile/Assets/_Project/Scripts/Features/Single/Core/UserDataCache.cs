@@ -860,6 +860,7 @@ namespace Features.Single.Core
                 var userInfo = new UserInfo
                 {
                     username = apiProfile.username,
+                    display_name = apiProfile.display_name,
                     level = apiProfile.single_player_level,
                     maxStageCompleted = apiProfile.max_stage_completed,
                     totalGames = apiProfile.total_single_games,
