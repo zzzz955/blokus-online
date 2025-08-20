@@ -619,7 +619,6 @@ namespace Features.Single.UI.StageSelect
 
             // 🔥 수정: Scene 전환 먼저 실행 (GameObject 활성 상태에서)
             var uiManager = App.UI.UIManager.GetInstanceSafe();
-            var blokusUIManager = App.UI.BlokusUIManager.Instance;
 
             if (uiManager != null)
             {
@@ -629,17 +628,9 @@ namespace Features.Single.UI.StageSelect
                 // Scene 전환 후 모달 숨기기
                 StartCoroutine(HideModalAfterDelay());
             }
-            else if (blokusUIManager != null)
-            {
-                Debug.Log($"[StageInfoModal] BlokusUIManager 발견. 스테이지 {selectedStageNumber} 게임 시작");
-                blokusUIManager.OnStageSelected(selectedStageNumber);
-
-                // Scene 전환 후 모달 숨기기
-                StartCoroutine(HideModalAfterDelay());
-            }
             else
             {
-                Debug.LogError("[StageInfoModal] UI Manager를 찾을 수 없습니다! SceneFlowController로 직접 전환");
+                Debug.LogError("[StageInfoModal] UIManager를 찾을 수 없습니다! SceneFlowController로 직접 전환");
                 // 🔥 백업: SceneFlowController로 직접 전환 (GameObject 활성 상태에서 실행)
                 StartSingleGameplaySceneDirectly(selectedStageNumber);
 

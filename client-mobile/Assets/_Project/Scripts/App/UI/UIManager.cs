@@ -33,6 +33,10 @@ namespace App.UI
         // 🔥 추가: 게임 패널 (SingleGameplayScene 전환 시 사용)
         [Header("Game Integration")]
         [SerializeField] private bool enableGameIntegration = true;
+        
+        // 🔥 BlokusUIManager 기능 통합
+        [Header("Debug Settings")]
+        [SerializeField] private bool enableDebugLogs = true;
 
         private Dictionary<UIState, PanelBase> panels;
         private UIState currentState = (UIState)(-1); // 초기값을 무효한 값으로 설정
@@ -55,12 +59,7 @@ namespace App.UI
                 }
                 else
                 {
-                    // BlokusUIManager도 확인 (중복 제거 과정에서)
-                    var blokusUIManager = Object.FindObjectOfType<BlokusUIManager>();
-                    if (blokusUIManager != null)
-                    {
-                        Debug.LogWarning("[UIManager] BlokusUIManager 발견 - UIManager로 통합 필요");
-                    }
+                    Debug.LogWarning("[UIManager] UIManager Instance를 찾을 수 없습니다.");
                 }
             }
             return Instance;
@@ -154,7 +153,7 @@ namespace App.UI
             if (loginPanel == null)
             {
                 Debug.Log("[UIManager] LoginPanel이 null, 동적으로 찾는 중...");
-                loginPanel = Object.FindObjectOfType<LoginPanelController>()?.GetComponent<PanelBase>();
+                loginPanel = Object.FindObjectOfType<LoginPanel>()?.GetComponent<PanelBase>();
                 if (loginPanel != null) Debug.Log("[UIManager] LoginPanel 동적으로 찾음");
             }
             
@@ -243,9 +242,12 @@ namespace App.UI
         /// </summary>
         public void ShowPanel(UIState state, bool animated = true)
         {
-            Debug.Log($"=== ShowPanel 시작 ===");
-            Debug.Log($"요청된 State: {state}");
-            Debug.Log($"현재 State: {currentState}");
+            if (enableDebugLogs)
+            {
+                Debug.Log($"=== ShowPanel 시작 ===");
+                Debug.Log($"요청된 State: {state}");
+                Debug.Log($"현재 State: {currentState}");
+            }
             
             if (currentState == state && currentPanel != null) 
             {
@@ -534,5 +536,36 @@ namespace App.UI
 
             Debug.Log("Multi Gameplay Scene Loaded");
         }
+        
+        // ========================================
+        // 🔥 BlokusUIManager 호환성 메서드들
+        // ========================================
+        
+        /// <summary>
+        /// BlokusUIManager 호환: StartGoSingle() 래퍼 메서드
+        /// </summary>
+        public void StartGoSingle()
+        {
+            if (enableDebugLogs) Debug.Log("[UIManager] StartGoSingle() 호출됨 - GoSingle() 코루틴 시작");
+            
+            if (App.Core.SceneFlowController.Instance != null)
+            {
+                StartCoroutine(App.Core.SceneFlowController.Instance.GoSingle());
+            }
+            else
+            {
+                Debug.LogError("[UIManager] SceneFlowController.Instance가 null입니다!");
+            }
+        }
+        
+        /// <summary>
+        /// BlokusUIManager 호환: 디버그 로그 설정
+        /// </summary>
+        public void SetDebugLogs(bool enabled)
+        {
+            enableDebugLogs = enabled;
+            Debug.Log($"[UIManager] 디버그 로그 {(enabled ? "활성화" : "비활성화")}");
+        }
+        
     }
 }

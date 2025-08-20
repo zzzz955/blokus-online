@@ -413,23 +413,11 @@ namespace App.UI{
             else
             {
                 Debug.LogError("[LoginPanel] UIManager를 찾을 수 없습니다!");
+                SetStatusText("UI 매니저를 찾을 수 없어 화면 전환에 실패했습니다.", MessagePriority.Error);
                 
-                // 폴백: BlokusUIManager 시도 (레거시 지원)
-                var blokusUIManager = App.UI.BlokusUIManager.Instance;
-                if (blokusUIManager != null)
-                {
-                    Debug.Log("[LoginPanel] 폴백: BlokusUIManager 사용");
-                    blokusUIManager.OnLoginSuccess();
-                }
-                else
-                {
-                    Debug.LogError("[LoginPanel] 모든 UI Manager를 찾을 수 없습니다!");
-                    SetStatusText("UI 매니저를 찾을 수 없어 화면 전환에 실패했습니다.", MessagePriority.Error);
-                    
-                    // 최종 폴백: 수동으로 씬 새로고침
-                    Debug.Log("[LoginPanel] 최종 폴백: MainScene 새로고침 시도");
-                    StartCoroutine(RefreshMainSceneAfterDelay());
-                }
+                // 폴백: MainScene 새로고침 시도
+                Debug.Log("[LoginPanel] 폴백: MainScene 새로고침 시도");
+                StartCoroutine(RefreshMainSceneAfterDelay());
             }
         }
         
@@ -451,18 +439,8 @@ namespace App.UI{
             }
             else
             {
-                // 마지막으로 BlokusUIManager 시도
-                BlokusUIManager blokusUIManager = Object.FindObjectOfType<BlokusUIManager>();
-                if (blokusUIManager != null)
-                {
-                    Debug.Log("[LoginPanel] 새로고침 후 BlokusUIManager 발견! OnLoginSuccess() 호출");
-                    blokusUIManager.OnLoginSuccess();
-                }
-                else
-                {
-                    Debug.LogError("[LoginPanel] 새로고침 후에도 UI Manager를 찾을 수 없습니다.");
-                    SetStatusText("화면 전환에 실패했습니다. 게임을 재시작해주세요.", MessagePriority.Error);
-                }
+                Debug.LogError("[LoginPanel] 새로고침 후에도 UIManager를 찾을 수 없습니다.");
+                SetStatusText("화면 전환에 실패했습니다. 게임을 재시작해주세요.", MessagePriority.Error);
             }
         }
         

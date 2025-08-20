@@ -61,7 +61,6 @@ namespace App.UI{
         {
             Debug.Log("싱글플레이 버튼 클릭");
             
-            // UIManager 우선, BlokusUIManager 폴백
             var uiManager = UIManager.GetInstanceSafe();
             if (uiManager != null)
             {
@@ -70,8 +69,7 @@ namespace App.UI{
             }
             else
             {
-                Debug.Log("[ModeSelectionPanel] UIManager 없음, BlokusUIManager 폴백");
-                BlokusUIManager.Instance?.OnSingleModeSelected();
+                Debug.LogError("[ModeSelectionPanel] UIManager를 찾을 수 없습니다!");
             }
         }
         
@@ -79,7 +77,6 @@ namespace App.UI{
         {
             Debug.Log("멀티플레이 버튼 클릭");
             
-            // UIManager 우선, BlokusUIManager 폴백
             var uiManager = UIManager.GetInstanceSafe();
             if (uiManager != null)
             {
@@ -88,8 +85,7 @@ namespace App.UI{
             }
             else
             {
-                Debug.Log("[ModeSelectionPanel] UIManager 없음, BlokusUIManager 폴백");
-                BlokusUIManager.Instance?.OnMultiModeSelected();
+                Debug.LogError("[ModeSelectionPanel] UIManager를 찾을 수 없습니다!");
             }
         }
         
@@ -97,7 +93,6 @@ namespace App.UI{
         {
             Debug.Log("뒤로가기 버튼 클릭");
             
-            // UIManager 우선, BlokusUIManager 폴백
             var uiManager = UIManager.GetInstanceSafe();
             if (uiManager != null)
             {
@@ -106,8 +101,7 @@ namespace App.UI{
             }
             else
             {
-                Debug.Log("[ModeSelectionPanel] UIManager 없음, BlokusUIManager 폴백");
-                BlokusUIManager.Instance?.OnBackToMenu();
+                Debug.LogError("[ModeSelectionPanel] UIManager를 찾을 수 없습니다!");
             }
         }
     }
