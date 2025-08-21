@@ -5,6 +5,7 @@ const helmet = require('helmet')
 const compression = require('compression')
 const logger = require('./config/logger')
 const dbService = require('./config/database')
+const keyManager = require('./config/keys')
 
 // Import routes
 const wellKnownRoutes = require('./routes/well-known')
@@ -147,13 +148,30 @@ process.on('SIGINT', () => {
   process.exit(0)
 })
 
-// Start server
-app.listen(PORT, () => {
-  logger.info(`OIDC Auth Server started on port ${PORT}`, {
-    environment: process.env.NODE_ENV || 'development',
-    port: PORT,
-    timestamp: new Date().toISOString()
-  })
-})
+// Initialize and start server
+async function startServer() {
+  try {
+    // Initialize key manager first
+    await keyManager.initialize()
+    logger.info('Key manager initialized successfully')
+
+    // Start the server
+    app.listen(PORT, () => {
+      logger.info(`OIDC Auth Server started on port ${PORT}`, {
+        environment: process.env.NODE_ENV || 'development',
+        port: PORT,
+        timestamp: new Date().toISOString()
+      })
+    })
+  } catch (error) {
+    logger.error('Failed to start server', {
+      error: error.message,
+      stack: error.stack
+    })
+    process.exit(1)
+  }
+}
+
+startServer()
 
 module.exports = app

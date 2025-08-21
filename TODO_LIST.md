@@ -42,6 +42,17 @@
 - Comprehensive indexing for performance
 - Automatic cleanup functions and triggers
 
+✅ **API Server OIDC Integration** (Port 8080)
+- JWKS-based JWT verification with RS256 support
+- `/api/auth/login` → OIDC redirect with client type detection
+- `/api/auth/oidc-discovery` → OIDC server endpoints and client configs
+- `/api/auth/refresh` → OIDC token refresh guidance
+- `/api/auth/validate` → OIDC JWT token validation (JWKS cached)
+- `/api/auth/info` → OIDC user info extraction with standard claims
+- Guest token generation maintained for offline play
+- Environment-specific configurations (dev/prod)
+- Legacy compatibility with user_id mapping from sub claim
+
 ---
 
 # Context
@@ -78,7 +89,7 @@
 - [x] Define token lifetimes: Updated to AT=10m, RT=30d sliding (max 90d), with rotation on every refresh.
 - [x] DB schemas: refresh_token_family, refresh_token (jti, prev_jti, status, expires_at, last_used_at, device_fingerprint, max_expires_at).
 - [x] Implement reuse detection → on seeing an old RT jti used twice, revoke the whole family.
-- [ ] API server: replace local /login with redirect/links to IdP; keep JWT middleware (JWKS cached).
+- [x] API server: replace local /login with redirect/links to IdP; keep JWT middleware (JWKS cached).
 - [ ] TCP server: add RS256 JWT verifier (kid support), first message AUTH <JWT>; handle exp/nbf/aud/iss; add 30s grace period for re-auth.
 - [ ] Qt client: PKCE flow with system browser + loopback; store tokens in OS secure storage; implement silent refresh via RT rotation.
 - [ ] Unity client: system browser + app link; secure local storage (Keychain/Keystore); same refresh mechanics.

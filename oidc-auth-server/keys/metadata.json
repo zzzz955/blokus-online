@@ -1,0 +1,7 @@
+{
+  "kid": "oidc-key-1755754370277",
+  "algorithm": "RS256",
+  "use": "sig",
+  "createdAt": "2025-08-21T05:32:50.279Z",
+  "version": "1.0"
+}

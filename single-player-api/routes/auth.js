@@ -8,134 +8,206 @@ const dbService = require('../config/database')
 
 /**
  * POST /api/auth/login
- * 사용자 로그인 및 JWT 토큰 발급
+ * OIDC 기반 로그인 - 인증 서버로 리디렉트
+ * 모바일 앱에서 로그인 시도 시 OIDC 플로우로 안내
  */
-router.post('/login',
-  [
-    body('username').trim().isLength({ min: 3, max: 50 }).withMessage('Username must be 3-50 characters'),
-    body('password').isLength({ min: 4, max: 100 }).withMessage('Password must be 4-100 characters')
-  ],
-  async (req, res) => {
-    try {
-      // 입력 검증
-      const errors = validationResult(req)
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid input data',
-          error: 'VALIDATION_ERROR',
-          details: errors.array()
-        })
-      }
+router.post('/login', async (req, res) => {
+  try {
+    logger.info('Login redirect request (OIDC)', {
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      body: req.body
+    })
 
-      const { username, password } = req.body
-
-      logger.info('Login attempt', {
-        username,
-        ip: req.ip,
-        userAgent: req.get('User-Agent')
-      })
-
-      // 사용자 조회
-      const userQuery = `
-        SELECT u.user_id, u.username, u.display_name, u.password_hash, u.is_active,
-               COALESCE(s.total_games, 0) as total_games,
-               COALESCE(s.wins, 0) as wins,
-               COALESCE(s.losses, 0) as losses,
-               COALESCE(s.level, 1) as level,
-               COALESCE(s.experience_points, 0) as experience_points,
-               COALESCE(s.total_score, 0) as total_score,
-               COALESCE(s.best_score, 0) as best_score,
-               COALESCE(s.single_player_level, 1) as single_player_level,
-               COALESCE(s.max_stage_completed, 0) as max_stage_completed
-        FROM users u 
-        LEFT JOIN user_stats s ON u.user_id = s.user_id 
-        WHERE LOWER(u.username) = LOWER($1) AND u.is_active = true
-      `
-
-      const userResult = await dbService.query(userQuery, [username])
-
-      if (userResult.rows.length === 0) {
-        logger.warn('Login failed - user not found', { username, ip: req.ip })
-        return res.status(401).json({
-          success: false,
-          message: 'Invalid username or password',
-          error: 'INVALID_CREDENTIALS'
-        })
-      }
-
-      const user = userResult.rows[0]
-
-      // 비밀번호 검증
-      const isValidPassword = await argon2.verify(user.password_hash, password)
-
-      if (!isValidPassword) {
-        logger.warn('Login failed - invalid password', { username, ip: req.ip })
-        return res.status(401).json({
-          success: false,
-          message: 'Invalid username or password',
-          error: 'INVALID_CREDENTIALS'
-        })
-      }
-
-      // JWT 토큰 생성
-      const tokenPayload = {
-        user_id: user.user_id,
-        username: user.username
-      }
-
-      const token = generateToken(tokenPayload)
-
-      // 로그인 성공 응답
-      const responseData = {
-        user: {
-          user_id: user.user_id,
-          username: user.username,
-          display_name: user.display_name,
-          level: user.level,
-          experience_points: user.experience_points,
-          single_player_level: user.single_player_level,
-          max_stage_completed: user.max_stage_completed,
-          stats: {
-            total_games: user.total_games,
-            wins: user.wins,
-            losses: user.losses,
-            total_score: user.total_score,
-            best_score: user.best_score,
-            win_rate: user.total_games > 0 ? Math.round((user.wins / user.total_games) * 100) : 0
-          }
-        },
-        token,
-        expires_in: process.env.JWT_EXPIRE_IN || '7d'
-      }
-
-      logger.info('Login successful', {
-        username,
-        userId: user.user_id,
-        ip: req.ip
-      })
-
-      res.json({
-        success: true,
-        message: 'Login successful',
-        data: responseData
-      })
-    } catch (error) {
-      logger.error('Login error', {
-        error: error.message,
-        username: req.body?.username,
-        ip: req.ip,
-        stack: error.stack
-      })
-
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error during login',
-        error: 'INTERNAL_SERVER_ERROR'
-      })
+    // 클라이언트 타입 감지 (요청 본문이나 헤더에서)
+    const { client_type, redirect_uri, state } = req.body
+    const userAgent = req.get('User-Agent') || ''
+    
+    // Unity 모바일 클라이언트 감지
+    let detectedClientType = 'unity-mobile-client'
+    if (client_type) {
+      detectedClientType = client_type
+    } else if (userAgent.includes('Qt') || userAgent.includes('Desktop')) {
+      detectedClientType = 'qt-desktop-client'
     }
+
+    // 환경별 OIDC 서버 URL 결정
+    const isProduction = process.env.NODE_ENV === 'production'
+    const oidcBaseUrl = isProduction
+      ? (process.env.OIDC_BASE_URL_PROD || 'https://blokus-online.mooo.com')
+      : (process.env.OIDC_BASE_URL || 'http://localhost:9000')
+
+    // OIDC Authorization URL 구성
+    const authParams = new URLSearchParams({
+      response_type: 'code',
+      client_id: detectedClientType,
+      scope: 'openid profile email',
+      redirect_uri: redirect_uri || getDefaultRedirectUri(detectedClientType, isProduction),
+      state: state || generateRandomState()
+    })
+
+    // PKCE는 클라이언트에서 생성해야 함을 안내
+    const authUrl = `${oidcBaseUrl}/authorize?${authParams.toString()}`
+
+    // 모바일/데스크톱 클라이언트에서는 이 응답을 받아서 브라우저를 열어야 함
+    res.json({
+      success: false, // 직접 로그인이 아니므로 false
+      message: 'Authentication must be completed through OIDC flow',
+      error: 'OIDC_REDIRECT_REQUIRED',
+      data: {
+        auth_url: authUrl,
+        client_id: detectedClientType,
+        auth_type: 'oidc_pkce',
+        instructions: {
+          ko: 'OIDC 인증을 위해 시스템 브라우저에서 로그인을 완료해주세요.',
+          en: 'Please complete authentication in system browser for OIDC flow.'
+        },
+        flow_steps: [
+          '1. 클라이언트에서 PKCE challenge 생성',
+          '2. 시스템 브라우저에서 OIDC 인증',
+          '3. Authorization code 받기',
+          '4. Token endpoint로 Access Token 교환'
+        ],
+        pkce_required: detectedClientType !== 'nextjs-web-client',
+        endpoints: {
+          authorization: `${oidcBaseUrl}/authorize`,
+          token: `${oidcBaseUrl}/token`,
+          jwks: `${oidcBaseUrl}/jwks.json`,
+          discovery: `${oidcBaseUrl}/.well-known/openid-configuration`
+        }
+      }
+    })
+
+    logger.info('Login redirect provided (OIDC)', {
+      authUrl,
+      clientType: detectedClientType,
+      environment: isProduction ? 'production' : 'development',
+      ip: req.ip
+    })
+  } catch (error) {
+    logger.error('Login redirect error (OIDC)', {
+      error: error.message,
+      ip: req.ip,
+      stack: error.stack
+    })
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to provide OIDC authentication redirect',
+      error: 'INTERNAL_SERVER_ERROR'
+    })
   }
-)
+})
+
+/**
+ * 클라이언트 타입별 기본 리디렉트 URI 반환
+ */
+function getDefaultRedirectUri(clientType, isProduction) {
+  const redirectUris = {
+    'unity-mobile-client': isProduction 
+      ? 'blokus://auth/callback'
+      : 'http://localhost:7777/auth/callback',
+    'qt-desktop-client': isProduction
+      ? 'http://localhost:8080/auth/callback'  // 프로덕션에서도 로컬
+      : 'http://localhost:8080/auth/callback',
+    'nextjs-web-client': isProduction
+      ? 'https://blokus-online.mooo.com/api/auth/callback/blokus-oidc'
+      : 'http://localhost:3000/api/auth/callback/blokus-oidc'
+  }
+  
+  return redirectUris[clientType] || redirectUris['unity-mobile-client']
+}
+
+/**
+ * 랜덤 state 파라미터 생성
+ */
+function generateRandomState() {
+  return require('crypto').randomBytes(16).toString('hex')
+}
+
+/**
+ * GET /api/auth/oidc-discovery
+ * OIDC 서버 Discovery 정보 제공
+ */
+router.get('/oidc-discovery', async (req, res) => {
+  try {
+    // 환경별 OIDC 서버 URL 결정
+    const isProduction = process.env.NODE_ENV === 'production'
+    const oidcBaseUrl = isProduction
+      ? (process.env.OIDC_BASE_URL_PROD || 'https://blokus-online.mooo.com')
+      : (process.env.OIDC_BASE_URL || 'http://localhost:9000')
+
+    const discoveryData = {
+      oidc_server: {
+        issuer: oidcBaseUrl,
+        discovery_url: `${oidcBaseUrl}/.well-known/openid-configuration`,
+        endpoints: {
+          authorization: `${oidcBaseUrl}/authorize`,
+          token: `${oidcBaseUrl}/token`,
+          jwks: `${oidcBaseUrl}/jwks.json`,
+          introspection: `${oidcBaseUrl}/introspect`,
+          revocation: `${oidcBaseUrl}/revocation`
+        }
+      },
+      supported_clients: [
+        {
+          client_id: 'unity-mobile-client',
+          client_type: 'public',
+          pkce_required: true,
+          redirect_uris: [
+            isProduction ? 'blokus://auth/callback' : 'http://localhost:7777/auth/callback'
+          ]
+        },
+        {
+          client_id: 'qt-desktop-client', 
+          client_type: 'public',
+          pkce_required: true,
+          redirect_uris: ['http://localhost:8080/auth/callback']
+        },
+        {
+          client_id: 'nextjs-web-client',
+          client_type: 'confidential',
+          pkce_required: false,
+          redirect_uris: [
+            isProduction 
+              ? 'https://blokus-online.mooo.com/api/auth/callback/blokus-oidc'
+              : 'http://localhost:3000/api/auth/callback/blokus-oidc'
+          ]
+        }
+      ],
+      api_info: {
+        message: 'This API server only validates tokens via JWKS. All authentication must be done through OIDC server.',
+        token_validation_method: 'RS256 + JWKS',
+        supported_flows: ['authorization_code', 'refresh_token'],
+        environment: isProduction ? 'production' : 'development'
+      }
+    }
+
+    logger.debug('OIDC discovery info requested', {
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      environment: isProduction ? 'production' : 'development'
+    })
+
+    res.json({
+      success: true,
+      message: 'OIDC discovery information',
+      data: discoveryData
+    })
+  } catch (error) {
+    logger.error('OIDC discovery error', {
+      error: error.message,
+      ip: req.ip,
+      stack: error.stack
+    })
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve OIDC discovery information',
+      error: 'INTERNAL_SERVER_ERROR'
+    })
+  }
+})
 
 /**
  * POST /api/auth/register
@@ -284,39 +356,47 @@ router.post('/guest',
 
 /**
  * POST /api/auth/validate
- * JWT 토큰 유효성 검증
+ * OIDC JWT 토큰 유효성 검증 (JWKS 기반)
  */
 router.post('/validate',
   authenticateToken,
   async (req, res) => {
     try {
-      // authenticateToken 미들웨어를 통과했다면 토큰이 유효함
-      const { username, userId, iat, exp } = req.user
+      // authenticateToken 미들웨어를 통과했다면 토큰이 유효함 (OIDC 표준)
+      const { sub, username, userId, email, iat, exp, iss, aud } = req.user
 
-      logger.info('Token validation successful', {
+      logger.info('Token validation successful (OIDC)', {
+        sub,
         username,
-        userId,
+        email,
         ip: req.ip,
-        userAgent: req.get('User-Agent')
+        userAgent: req.get('User-Agent'),
+        issuer: iss
       })
 
-      // 토큰 정보 응답
+      // 토큰 정보 응답 (OIDC 표준 클레임)
       const responseData = {
         valid: true,
+        sub, // OIDC 표준 subject
         username,
-        user_id: userId,
+        user_id: userId, // 호환성을 위해 유지
+        email,
         issued_at: new Date(iat * 1000).toISOString(),
         expires_at: new Date(exp * 1000).toISOString(),
-        remaining_time: Math.max(0, exp - Math.floor(Date.now() / 1000))
+        remaining_time: Math.max(0, exp - Math.floor(Date.now() / 1000)),
+        issuer: iss,
+        audience: aud,
+        token_type: 'Bearer',
+        scope: 'openid profile email'
       }
 
       res.json({
         success: true,
-        message: 'Token is valid',
+        message: 'OIDC token is valid',
         data: responseData
       })
     } catch (error) {
-      logger.error('Token validation error', {
+      logger.error('Token validation error (OIDC)', {
         error: error.message,
         ip: req.ip,
         stack: error.stack
@@ -333,18 +413,20 @@ router.post('/validate',
 
 /**
  * GET /api/auth/info
- * 토큰에서 사용자 정보 추출 (검증 포함)
+ * OIDC 토큰에서 사용자 정보 추출 (검증 포함)
  */
 router.get('/info',
   authenticateToken,
   async (req, res) => {
     try {
-      const { username, userId, iat, exp } = req.user
+      const { sub, username, userId, email, iat, exp, iss, aud } = req.user
 
-      logger.debug('Auth info requested', {
+      logger.debug('Auth info requested (OIDC)', {
+        sub,
         username,
-        userId,
-        ip: req.ip
+        email,
+        ip: req.ip,
+        issuer: iss
       })
 
       // 토큰 만료까지 남은 시간 계산
@@ -354,24 +436,38 @@ router.get('/info',
       const remainingMinutes = Math.floor((remainingTime % 3600) / 60)
 
       const responseData = {
+        sub, // OIDC 표준 subject
         username,
-        user_id: userId,
+        user_id: userId, // 호환성을 위해 유지
+        email,
         token_info: {
+          type: 'Bearer',
+          issuer: iss,
+          audience: Array.isArray(aud) ? aud : [aud],
           issued_at: new Date(iat * 1000).toISOString(),
           expires_at: new Date(exp * 1000).toISOString(),
           remaining_seconds: remainingTime,
-          remaining_human: `${remainingHours}h ${remainingMinutes}m`
+          remaining_human: `${remainingHours}h ${remainingMinutes}m`,
+          scope: 'openid profile email'
+        },
+        oidc_claims: {
+          sub,
+          email,
+          preferred_username: username,
+          iss,
+          aud
         }
       }
 
       res.json({
         success: true,
-        message: 'Authentication info retrieved successfully',
+        message: 'OIDC authentication info retrieved successfully',
         data: responseData
       })
     } catch (error) {
-      logger.error('Failed to retrieve auth info', {
+      logger.error('Failed to retrieve OIDC auth info', {
         error: error.message,
+        sub: req.user?.sub,
         username: req.user?.username,
         stack: error.stack
       })
@@ -387,73 +483,94 @@ router.get('/info',
 
 /**
  * POST /api/auth/refresh
- * 토큰 갱신 (현재는 단순히 토큰 유효성만 확인)
- * 실제 토큰 갱신은 메인 서버에서 처리
+ * OIDC 토큰 갱신 - OIDC 서버로 리디렉트
+ * 실제 토큰 갱신은 OIDC 서버에서 처리
  */
-router.post('/refresh',
-  async (req, res) => {
-    try {
-      const authHeader = req.headers.authorization
+router.post('/refresh', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization
+    const { refresh_token, client_id } = req.body
 
-      if (!authHeader) {
-        return res.status(401).json({
-          success: false,
-          message: 'Authorization token required for refresh',
-          error: 'MISSING_TOKEN'
-        })
-      }
-
-      // Bearer 토큰 추출
-      const token = authHeader.startsWith('Bearer ')
-        ? authHeader.slice(7)
-        : authHeader
-
-      // 토큰 디코딩 (검증 없이)
-      const decoded = decodeToken(token)
-
-      if (!decoded) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid token format',
-          error: 'INVALID_TOKEN'
-        })
-      }
-
-      logger.info('Token refresh requested', {
-        username: decoded.username,
-        userId: decoded.user_id,
-        ip: req.ip
-      })
-
-      // 이 API 서버에서는 토큰을 새로 발급하지 않음
-      // 메인 서버(TCP 또는 Web)에서 새 토큰을 받아야 함을 안내
-      res.json({
+    if (!authHeader && !refresh_token) {
+      return res.status(401).json({
         success: false,
-        message: 'Token refresh must be done through the main authentication server',
-        error: 'REFRESH_NOT_SUPPORTED',
-        data: {
-          suggestion: 'Please re-authenticate through the main server to get a new token',
-          current_token_info: {
-            username: decoded.username,
-            expires_at: new Date(decoded.exp * 1000).toISOString(),
-            is_expired: decoded.exp < Math.floor(Date.now() / 1000)
-          }
-        }
-      })
-    } catch (error) {
-      logger.error('Token refresh error', {
-        error: error.message,
-        ip: req.ip,
-        stack: error.stack
-      })
-
-      res.status(500).json({
-        success: false,
-        message: 'Token refresh failed',
-        error: 'INTERNAL_SERVER_ERROR'
+        message: 'Authorization token or refresh token required',
+        error: 'MISSING_TOKEN'
       })
     }
+
+    // Bearer 토큰 추출 (있는 경우)
+    let currentToken = null
+    if (authHeader) {
+      currentToken = authHeader.startsWith('Bearer ')
+        ? authHeader.slice(7)
+        : authHeader
+    }
+
+    // 토큰 디코딩 (검증 없이 - 정보 확인용)
+    const decoded = currentToken ? decodeToken(currentToken) : null
+
+    logger.info('Token refresh redirect request (OIDC)', {
+      sub: decoded?.sub,
+      hasRefreshToken: !!refresh_token,
+      clientId: client_id,
+      ip: req.ip
+    })
+
+    // 환경별 OIDC 서버 URL 결정
+    const isProduction = process.env.NODE_ENV === 'production'
+    const oidcBaseUrl = isProduction
+      ? (process.env.OIDC_BASE_URL_PROD || 'https://blokus-online.mooo.com')
+      : (process.env.OIDC_BASE_URL || 'http://localhost:9000')
+
+    // 이 API 서버에서는 토큰을 새로 발급하지 않음
+    // OIDC 서버에서 새 토큰을 받아야 함을 안내
+    res.json({
+      success: false,
+      message: 'Token refresh must be done through OIDC server',
+      error: 'OIDC_REFRESH_REQUIRED',
+      data: {
+        suggestion: 'Use refresh token directly with OIDC token endpoint',
+        oidc_endpoints: {
+          token: `${oidcBaseUrl}/token`,
+          revocation: `${oidcBaseUrl}/revocation`,
+          discovery: `${oidcBaseUrl}/.well-known/openid-configuration`
+        },
+        refresh_flow: {
+          method: 'POST',
+          url: `${oidcBaseUrl}/token`,
+          content_type: 'application/x-www-form-urlencoded',
+          body_params: {
+            grant_type: 'refresh_token',
+            refresh_token: '[YOUR_REFRESH_TOKEN]',
+            client_id: client_id || 'unity-mobile-client'
+          }
+        },
+        current_token_info: decoded ? {
+          sub: decoded.sub,
+          expires_at: new Date(decoded.exp * 1000).toISOString(),
+          is_expired: decoded.exp < Math.floor(Date.now() / 1000),
+          issuer: decoded.iss
+        } : null,
+        instructions: {
+          ko: '리프레시 토큰으로 OIDC 서버에서 새로운 액세스 토큰을 받아주세요.',
+          en: 'Please obtain new access token from OIDC server using refresh token.'
+        }
+      }
+    })
+  } catch (error) {
+    logger.error('Token refresh redirect error (OIDC)', {
+      error: error.message,
+      ip: req.ip,
+      stack: error.stack
+    })
+
+    res.status(500).json({
+      success: false,
+      message: 'Token refresh redirect failed',
+      error: 'INTERNAL_SERVER_ERROR'
+    })
   }
-)
+})
 
 module.exports = router
