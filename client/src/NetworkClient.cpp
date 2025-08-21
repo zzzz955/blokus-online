@@ -188,6 +188,18 @@ namespace Blokus {
         qDebug() << QString::fromUtf8("로그인 요청 전송: %1").arg(username);
     }
 
+    void NetworkClient::loginWithJwt(const QString& jwtToken)
+    {
+        if (!isConnected()) {
+            emit loginResult(false, QString::fromUtf8("서버에 연결되지 않았습니다."));
+            return;
+        }
+        
+        QString message = QString("auth:%1").arg(jwtToken);
+        sendMessage(message);
+        qDebug() << QString::fromUtf8("JWT 토큰 로그인 요청 전송: %1...").arg(jwtToken.left(20));
+    }
+
     void NetworkClient::registerUser(const QString& username, const QString& password)
     {
         if (!isConnected()) {

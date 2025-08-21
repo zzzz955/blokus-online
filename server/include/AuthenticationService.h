@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ServerTypes.h"
+#include "JwtVerifier.h"
 #include <string>
 #include <memory>
 #include <future>
@@ -75,6 +76,9 @@ namespace Blokus {
             // �Խ�Ʈ �α��� (�ӽ� ����)
             AuthResult loginGuest(const std::string& guestName = "");
 
+            // JWT ��ū �α���
+            AuthResult loginWithJwt(const std::string& jwtToken);
+
             // �α׾ƿ�
             bool logoutUser(const std::string& sessionToken);
 
@@ -144,6 +148,7 @@ namespace Blokus {
 
         private:
             std::shared_ptr<DatabaseManager> m_dbManager;
+            std::unique_ptr<JwtVerifier> m_jwtVerifier;
 
             // ���� ����� (�޸� ��� - �ܼ�ȭ)
             mutable std::mutex m_sessionsMutex;

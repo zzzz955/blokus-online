@@ -53,6 +53,17 @@
 - Environment-specific configurations (dev/prod)
 - Legacy compatibility with user_id mapping from sub claim
 
+✅ **TCP Server JWT Authentication** (Port 9999)
+- JWT verification with RS256 and JWKS support using jwt-cpp library
+- JWKS client with background refresh (10-minute cache, 5-minute refresh)
+- Hybrid authentication: `AUTH <username>:<password>` OR `AUTH <JWT_token>`
+- JWT token auto-detection based on '.' separators (3-part structure)
+- RS256 signature verification with audience/issuer validation
+- 30-second grace period for token expiration (exp + 30s tolerance)
+- Claims extraction: sub, preferred_username, email, iat, exp, nbf
+- Integration with existing session management and user account system
+- Backward compatibility with existing username/password authentication
+
 ---
 
 # Context
@@ -90,7 +101,7 @@
 - [x] DB schemas: refresh_token_family, refresh_token (jti, prev_jti, status, expires_at, last_used_at, device_fingerprint, max_expires_at).
 - [x] Implement reuse detection → on seeing an old RT jti used twice, revoke the whole family.
 - [x] API server: replace local /login with redirect/links to IdP; keep JWT middleware (JWKS cached).
-- [ ] TCP server: add RS256 JWT verifier (kid support), first message AUTH <JWT>; handle exp/nbf/aud/iss; add 30s grace period for re-auth.
+- [x] TCP server: add RS256 JWT verifier (kid support), first message AUTH <JWT>; handle exp/nbf/aud/iss; add 30s grace period for re-auth.
 - [ ] Qt client: PKCE flow with system browser + loopback; store tokens in OS secure storage; implement silent refresh via RT rotation.
 - [ ] Unity client: system browser + app link; secure local storage (Keychain/Keystore); same refresh mechanics.
 - [ ] Web (Next.js): BFF pattern; NextAuth configured as OIDC client; server-to-server calls use AT, not exposing AT to the browser.

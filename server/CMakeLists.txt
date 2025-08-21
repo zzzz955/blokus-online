@@ -21,6 +21,7 @@ set(SERVER_SOURCES
     src/ServerTypes.cpp
     src/PlayerInfo.cpp
     src/VersionManager.cpp
+    src/JwtVerifier.cpp
 )
 
 # �ٽ� ��� ���ϵ�
@@ -55,6 +56,8 @@ target_include_directories(BlokusServer PRIVATE
 
 # PostgreSQL �� ��Ÿ ���̺귯�� ã��
 find_package(libpqxx CONFIG REQUIRED)
+find_package(jwt-cpp CONFIG REQUIRED)
+find_package(cpr CONFIG REQUIRED)
 
 # ���̺귯�� ��ũ
 target_link_libraries(BlokusServer PRIVATE
@@ -62,6 +65,8 @@ target_link_libraries(BlokusServer PRIVATE
     Boost::system
     libpqxx::pqxx
     unofficial::argon2::libargon2
+    jwt-cpp::jwt-cpp
+    cpr::cpr
 )
 
 # Windows ����

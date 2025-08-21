@@ -40,6 +40,7 @@ namespace Blokus {
         
         // 인증 관련
         void login(const QString& username, const QString& password);
+        void loginWithJwt(const QString& jwtToken);
         void registerUser(const QString& username, const QString& password);
         void logout();
         void sendHeartbeat();
