@@ -34,6 +34,14 @@
 - Sliding window expiration (30 days renewable, 90 days max)
 - RS256 signature with configurable key rotation
 
+✅ **Database Schema Implementation**
+- OIDC authorization_codes table with PKCE support
+- Refresh token families with device fingerprinting
+- Individual refresh tokens with rotation chain tracking
+- Sliding window support with max_expires_at field
+- Comprehensive indexing for performance
+- Automatic cleanup functions and triggers
+
 ---
 
 # Context
@@ -68,7 +76,7 @@
 # Todo List
 - [x] Stand up OIDC Auth Server with endpoints: /.well-known/openid-configuration, /authorize, /token, /jwks.json, /introspect (optional), /revocation.
 - [x] Define token lifetimes: Updated to AT=10m, RT=30d sliding (max 90d), with rotation on every refresh.
-- [ ] DB schemas: refresh_token_family, refresh_token (jti, prev_jti, status, expires_at, last_used_at, device_fingerprint, max_expires_at).
+- [x] DB schemas: refresh_token_family, refresh_token (jti, prev_jti, status, expires_at, last_used_at, device_fingerprint, max_expires_at).
 - [x] Implement reuse detection → on seeing an old RT jti used twice, revoke the whole family.
 - [ ] API server: replace local /login with redirect/links to IdP; keep JWT middleware (JWKS cached).
 - [ ] TCP server: add RS256 JWT verifier (kid support), first message AUTH <JWT>; handle exp/nbf/aud/iss; add 30s grace period for re-auth.

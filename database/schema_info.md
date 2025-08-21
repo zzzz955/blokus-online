@@ -209,30 +209,77 @@ Table: admin_users
 | role           | enum(AdminRole) | DEFAULT 'ADMIN', NOT NULL |
 | created\_at    | timestamp       | DEFAULT now()             |
 
+## 🔐 OIDC/OAuth 2.1 Authentication Tables
+
+Table: authorization_codes
+| Column                  | Type         | Constraints                                 |
+| ----------------------- | ------------ | ------------------------------------------- |
+| code\_id                | integer      | PK, AUTO INCREMENT                          |
+| code                    | varchar(255) | UNIQUE, NOT NULL                            |
+| client\_id              | varchar(255) | NOT NULL                                    |
+| user\_id                | integer      | FK → users(user\_id), ON DELETE CASCADE     |
+| redirect\_uri           | text         | NOT NULL                                    |
+| scope                   | text         | NOT NULL                                    |
+| code\_challenge         | varchar(255) | optional (PKCE)                             |
+| code\_challenge\_method | varchar(10)  | CHECK in ('S256'), optional                 |
+| expires\_at             | timestamp    | NOT NULL                                    |
+| created\_at             | timestamp    | DEFAULT now()                               |
+
+Indexes: idx_authorization_codes_code, idx_authorization_codes_expires, idx_authorization_codes_user
+
+Table: refresh_token_families
+| Column               | Type         | Constraints                               |
+| -------------------- | ------------ | ----------------------------------------- |
+| family\_id           | integer      | PK, AUTO INCREMENT                        |
+| user\_id             | integer      | FK → users(user\_id), ON DELETE CASCADE   |
+| client\_id           | varchar(255) | NOT NULL                                  |
+| device\_fingerprint  | varchar(255) | optional                                  |
+| status               | varchar(20)  | DEFAULT 'active', CHECK in ('active', 'revoked') |
+| created\_at          | timestamp    | DEFAULT now()                             |
+| last\_used\_at       | timestamp    | DEFAULT now()                             |
+| max\_expires\_at     | timestamp    | NOT NULL (90-day absolute limit)          |
+
+Indexes: idx_refresh_token_families_user, idx_refresh_token_families_client, idx_refresh_token_families_status, idx_refresh_token_families_max_expires
+
+Table: refresh_tokens
+| Column        | Type         | Constraints                                           |
+| ------------- | ------------ | ----------------------------------------------------- |
+| token\_id     | integer      | PK, AUTO INCREMENT                                    |
+| family\_id    | integer      | FK → refresh\_token\_families(family\_id), ON DELETE CASCADE |
+| jti           | varchar(255) | UNIQUE, NOT NULL (JWT ID)                             |
+| prev\_jti     | varchar(255) | optional (previous token for rotation chain)          |
+| status        | varchar(20)  | DEFAULT 'active', CHECK in ('active', 'used', 'revoked', 'expired') |
+| expires\_at   | timestamp    | NOT NULL                                              |
+| created\_at   | timestamp    | DEFAULT now()                                         |
+| last\_used\_at| timestamp    | DEFAULT now()                                         |
+
+Indexes: idx_refresh_tokens_jti, idx_refresh_tokens_family, idx_refresh_tokens_status, idx_refresh_tokens_expires, idx_refresh_tokens_prev_jti
+
+## 🔧 OIDC Database Functions
+
+**update_updated_at_column()**: Trigger function to auto-update last_used_at timestamps
+**cleanup_expired_tokens()**: Utility function to clean expired authorization codes and refresh tokens
+
 🔗 관계 요약 (외래키)
 
-user_stats.user_id → users.user_id
+**Core User Relations:**
+- user_stats.user_id → users.user_id
+- user_settings.user_id → users.user_id
+- user_stage_progress.user_id → users.user_id
+- user_stage_progress.stage_id → stages.stage_id
+- support_tickets.user_id → users.user_id
+- testimonials.user_id → users.user_id
 
-user_settings.user_id → users.user_id
+**Community Relations:**
+- posts.author_id → users.user_id
+- comments.author_id → users.user_id
+- comments.post_id → posts.id
+- comments.announcement_id → announcements.id
+- comments.patch_note_id → patch_notes.id
+- replies.author_id → users.user_id
+- replies.comment_id → comments.id
 
-user_stage_progress.user_id → users.user_id
-
-user_stage_progress.stage_id → stages.stage_id
-
-support_tickets.user_id → users.user_id
-
-testimonials.user_id → users.user_id
-
-posts.author_id → users.user_id
-
-comments.author_id → users.user_id
-
-comments.post_id → posts.id
-
-comments.announcement_id → announcements.id
-
-comments.patch_note_id → patch_notes.id
-
-replies.author_id → users.user_id
-
-replies.comment_id → comments.id
+**OIDC/OAuth Relations:**
+- authorization_codes.user_id → users.user_id (ON DELETE CASCADE)
+- refresh_token_families.user_id → users.user_id (ON DELETE CASCADE)
+- refresh_tokens.family_id → refresh_token_families.family_id (ON DELETE CASCADE)
