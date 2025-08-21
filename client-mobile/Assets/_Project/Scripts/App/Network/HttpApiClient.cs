@@ -5,6 +5,7 @@ using System.Text;
 using UnityEngine;
 using UnityEngine.Networking;
 using App.Services;
+using App.Utils;
 using Features.Single.Core;
 using Shared.Models;
 using MessagePriority = Shared.UI.MessagePriority;
@@ -105,11 +106,11 @@ namespace App.Network{
                 DontDestroyOnLoad(gameObject);
 
                 InitializeFromEnvironment();
-                Debug.Log("HttpApiClient 초기화 완료 - DontDestroyOnLoad 적용됨");
+                GameLogger.Log("HttpApiClient 초기화 완료 - DontDestroyOnLoad 적용됨");
             }
             else
             {
-                Debug.Log("HttpApiClient 중복 인스턴스 제거");
+                GameLogger.Log("HttpApiClient 중복 인스턴스 제거");
                 Destroy(gameObject);
             }
         }
@@ -140,7 +141,7 @@ namespace App.Network{
             authToken = token;
             currentUserId = userId;
             isOnline = true;
-            Debug.Log($"HTTP API 인증 설정 완료: User {userId}");
+            GameLogger.Log($"HTTP API 인증 설정 완료: User {userId}");
         }
 
         /// <summary>
@@ -150,7 +151,7 @@ namespace App.Network{
         {
             authToken = null;
             currentUserId = 0;
-            Debug.Log("HTTP API 인증 토큰 클리어됨");
+            GameLogger.Log("HTTP API 인증 토큰 클리어됨");
         }
 
         /// <summary>
