@@ -564,6 +564,55 @@ single-player-api/.jest/
 single-player-api/postgres_data/
 single-player-api/redis_data/
 
+# ========================================
+# OIDC Auth Server (oidc-auth-server/)
+# ========================================
+
+# Dependencies
+oidc-auth-server/node_modules/
+oidc-auth-server/npm-debug.log*
+oidc-auth-server/yarn-debug.log*
+oidc-auth-server/yarn-error.log*
+
+# Runtime and logs
+oidc-auth-server/logs/
+oidc-auth-server/*.log
+
+# Environment files
+oidc-auth-server/.env
+oidc-auth-server/.env.local
+oidc-auth-server/.env.development.local
+oidc-auth-server/.env.test.local
+oidc-auth-server/.env.production.local
+
+# Keys and certificates (SECURITY CRITICAL)
+oidc-auth-server/keys/private.jwk
+oidc-auth-server/keys/public.jwk
+oidc-auth-server/keys/*.pem
+oidc-auth-server/keys/*.key
+oidc-auth-server/keys/*.crt
+
+# Session storage and temp files
+oidc-auth-server/sessions/
+oidc-auth-server/tmp/
+oidc-auth-server/*.tmp
+
+# Testing and coverage
+oidc-auth-server/coverage/
+oidc-auth-server/.nyc_output/
+oidc-auth-server/test-results/
+
+# ESLint and cache
+oidc-auth-server/.eslintcache
+oidc-auth-server/.jest/
+
+# PM2 process management
+oidc-auth-server/ecosystem.config.js
+
+# OAuth client secrets
+oidc-auth-server/client-secrets.json
+oidc-auth-server/oauth-secrets/
+
 # Claude
 **CLAUDE**client-mobile/*.csproj
 client-mobile/*.sln

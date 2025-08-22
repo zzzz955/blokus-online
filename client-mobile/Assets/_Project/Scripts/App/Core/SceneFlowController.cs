@@ -11,7 +11,7 @@ namespace App.Core
 {
     /// <summary>
     /// Scene flow controller for additive scene loading and transition management
-    /// Migration Plan: 씬 로딩/언로딩/활성 관리 + 로딩 중 입력 잠금 + 인디케이터 표시
+    /// Migration Plan: 씬 로딩/언로딩/활성 관리 + 로딩 중 입력 잠금 + 인디케이터 표시 + 자동 로그인 체크
     /// </summary>
     public class SceneFlowController : MonoBehaviour
     {
@@ -27,6 +27,17 @@ namespace App.Core
 
         [Header("Debug")]
         [SerializeField] private bool debugMode = true;
+
+        // 🔥 추가: 자동 로그인 상태
+        public enum AutoLoginState
+        {
+            NotChecked,      // 아직 체크 안함
+            InProgress,      // 체크 진행 중
+            Success,         // 자동 로그인 성공
+            Failed          // 자동 로그인 실패 (로그인 필요)
+        }
+
+        public static AutoLoginState CurrentAutoLoginState { get; private set; } = AutoLoginState.NotChecked;
 
         void Awake()
         {
@@ -60,7 +71,7 @@ namespace App.Core
         }
 
         /// <summary>
-        /// Boot sequence from AppPersistent to MainScene
+        /// Boot sequence from AppPersistent to MainScene with auto-login check
         /// </summary>
         private IEnumerator BootToMainScene()
         {
@@ -81,6 +92,9 @@ namespace App.Core
 
             if (debugMode)
                 Debug.Log("[SceneFlowController] Systems ready, continuing boot sequence");
+
+            // 🔥 추가: 자동 로그인 체크
+            yield return CheckAutoLogin();
 
             // Wait a moment more for loading overlay to show
             yield return new WaitForSeconds(0.5f);
@@ -154,8 +168,15 @@ namespace App.Core
 
         private IEnumerator CoGoSingle(int? stageNumber, System.Action<bool, string> callback)
         {
-            // 1) SingleCore 확보
+            // 1) SingleCore 확보 - 사용자 변경 확인
+            bool wasAlreadyLoaded = IsSceneLoaded(SingleCoreScene);
             yield return EnsureLoaded(SingleCoreScene);
+
+            // 1.5) SingleCore가 이미 로드되어 있었다면 사용자 변경 확인 후 강제 재로딩
+            if (wasAlreadyLoaded)
+            {
+                yield return CheckAndReloadForUserChange();
+            }
 
             // 2) SingleCore 데이터 로딩 완료 대기
             yield return WaitForSingleCoreDataLoading();
@@ -201,6 +222,54 @@ namespace App.Core
             }
 
             callback(true, "");
+        }
+
+        /// <summary>
+        /// 🔥 사용자 변경 확인 및 강제 데이터 재로딩
+        /// </summary>
+        private IEnumerator CheckAndReloadForUserChange()
+        {
+            if (debugMode)
+                Debug.Log("[SceneFlowController] 사용자 변경 확인 중...");
+
+            SingleCoreBootstrap bootstrap = null;
+            float timeout = 3f;
+            float elapsed = 0f;
+
+            // SingleCoreBootstrap 인스턴스 대기
+            while (bootstrap == null && elapsed < timeout)
+            {
+                bootstrap = SingleCoreBootstrap.Instance;
+                if (bootstrap == null)
+                {
+                    elapsed += 0.1f;
+                    yield return new WaitForSeconds(0.1f);
+                }
+            }
+
+            if (bootstrap == null)
+            {
+                Debug.LogWarning("[SceneFlowController] SingleCoreBootstrap 인스턴스를 찾지 못했습니다.");
+                yield break;
+            }
+
+            // 사용자 변경 확인 및 강제 재로딩
+            bool userChanged = bootstrap.CheckUserChangedAndReload();
+            
+            if (userChanged)
+            {
+                LoadingOverlay.Show("사용자 변경 감지 - 데이터 재로딩 중...");
+                
+                if (debugMode)
+                    Debug.Log("[SceneFlowController] 사용자 변경으로 인한 데이터 강제 재로딩 완료");
+                
+                // 잠시 대기 후 다음 단계 진행
+                yield return new WaitForSeconds(0.5f);
+            }
+            else if (debugMode)
+            {
+                Debug.Log("[SceneFlowController] 사용자 변경 없음 - 기존 데이터 유지");
+            }
         }
 
         /// <summary>
@@ -254,7 +323,7 @@ namespace App.Core
             {
                 if (bootstrap.IsDataLoaded())
                 {
-                    if (debugMode) Debug.Log("[SceneFlowController] 데이터 이미 로딩 완료됨");
+                    if (debugMode) Debug.Log("[SceneFlowController] 완전한 동기화 이미 완료됨");
                     yield break;
                 }
 
@@ -278,11 +347,18 @@ namespace App.Core
 
                 if (elapsed >= timeout && !bootstrap.IsDataLoaded())
                 {
-                    Debug.LogWarning("[SceneFlowController] 데이터 로딩 타임아웃. 게임플레이는 계속 진행됩니다.");
+                    Debug.LogWarning("[SceneFlowController] 완전한 동기화 타임아웃. 게임플레이는 계속 진행됩니다.");
+                    
+                    // 🔥 추가: 동기화 상태 디버그 로그
+                    if (bootstrap.GetUserDataCache() != null)
+                    {
+                        bool syncCompleted = bootstrap.GetUserDataCache().IsInitialSyncCompleted;
+                        Debug.LogWarning($"[SceneFlowController] UserDataCache 동기화 상태: {syncCompleted}");
+                    }
                 }
                 else if (debugMode)
                 {
-                    Debug.Log("[SceneFlowController] ✅ 데이터 로딩 완료!");
+                    Debug.Log("[SceneFlowController] ✅ 완전한 동기화 완료!");
                 }
             }
             finally
@@ -539,6 +615,78 @@ namespace App.Core
             {
                 Debug.LogError($"[SceneFlowController] SetActive failed: {sceneName} is not loaded or invalid");
             }
+        }
+
+        // ========================================
+        // 자동 로그인 관련 메서드
+        // ========================================
+
+        /// <summary>
+        /// SecureStorage에서 refresh token을 확인하여 자동 로그인 시도
+        /// </summary>
+        private IEnumerator CheckAutoLogin()
+        {
+            if (debugMode)
+                Debug.Log("[SceneFlowController] 자동 로그인 체크 시작");
+
+            CurrentAutoLoginState = AutoLoginState.InProgress;
+            LoadingOverlay.Show("로그인 상태 확인 중...");
+
+            // HttpApiClient가 초기화될 때까지 대기
+            while (App.Network.HttpApiClient.Instance == null)
+            {
+                yield return new WaitForEndOfFrame();
+            }
+
+            bool autoLoginCompleted = false;
+            bool autoLoginSuccess = false;
+            string autoLoginMessage = "";
+
+            // 자동 로그인 완료 이벤트 구독
+            System.Action<bool, string> onAutoLoginComplete = (success, message) =>
+            {
+                autoLoginCompleted = true;
+                autoLoginSuccess = success;
+                autoLoginMessage = message;
+            };
+
+            App.Network.HttpApiClient.Instance.OnAutoLoginComplete += onAutoLoginComplete;
+
+            // 자동 로그인 시도
+            App.Network.HttpApiClient.Instance.ValidateRefreshTokenFromStorage();
+
+            // 자동 로그인 완료까지 대기 (최대 10초)
+            float timeout = 10f;
+            while (!autoLoginCompleted && timeout > 0)
+            {
+                timeout -= Time.deltaTime;
+                yield return new WaitForEndOfFrame();
+            }
+
+            // 이벤트 구독 해제
+            App.Network.HttpApiClient.Instance.OnAutoLoginComplete -= onAutoLoginComplete;
+
+            // 결과 처리
+            if (autoLoginCompleted && autoLoginSuccess)
+            {
+                CurrentAutoLoginState = AutoLoginState.Success;
+                if (debugMode)
+                    Debug.Log($"[SceneFlowController] 자동 로그인 성공: {autoLoginMessage}");
+            }
+            else
+            {
+                CurrentAutoLoginState = AutoLoginState.Failed;
+                if (debugMode)
+                    Debug.Log($"[SceneFlowController] 자동 로그인 실패: {autoLoginMessage}");
+            }
+        }
+
+        /// <summary>
+        /// 현재 자동 로그인 상태 반환 (UIManager에서 사용)
+        /// </summary>
+        public static AutoLoginState GetAutoLoginState()
+        {
+            return CurrentAutoLoginState;
         }
 
         // ========================================

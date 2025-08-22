@@ -761,8 +761,17 @@ namespace Features.Single.UI.StageSelect
             if (Features.Single.Core.UserDataCache.Instance != null)
             {
                 Features.Single.Core.UserDataCache.Instance.OnUserDataUpdated += OnUserDataUpdated;
+                Features.Single.Core.UserDataCache.Instance.OnLoginStatusChanged += OnLoginStatusChanged;
                 Debug.Log("[CandyCrushStageMapView] Features.Single.Core.UserDataCache 이벤트 핸들러 설정 완료");
                 Debug.Log("[CandyCrushStageMapView] 프로필 데이터 즉시 업데이트는 OnEnable에서 처리");
+            }
+
+            // 🔥 추가: HttpApiClient의 진행도 관련 이벤트 구독 (사용자 전환 시 즉시 UI 업데이트)
+            if (HttpApiClient.Instance != null)
+            {
+                HttpApiClient.Instance.OnBatchProgressReceived += OnProgressDataChanged;
+                HttpApiClient.Instance.OnCurrentStatusReceived += OnCurrentStatusChanged;
+                Debug.Log("[CandyCrushStageMapView] 진행도 변경 이벤트 핸들러 설정 완료");
             }
         }
 
@@ -784,6 +793,14 @@ namespace Features.Single.UI.StageSelect
             if (Features.Single.Core.UserDataCache.Instance != null)
             {
                 Features.Single.Core.UserDataCache.Instance.OnUserDataUpdated -= OnUserDataUpdated;
+                Features.Single.Core.UserDataCache.Instance.OnLoginStatusChanged -= OnLoginStatusChanged;
+            }
+
+            // 🔥 추가: HttpApiClient 이벤트 구독 해제
+            if (HttpApiClient.Instance != null)
+            {
+                HttpApiClient.Instance.OnBatchProgressReceived -= OnProgressDataChanged;
+                HttpApiClient.Instance.OnCurrentStatusReceived -= OnCurrentStatusChanged;
             }
         }
 
@@ -879,23 +896,201 @@ namespace Features.Single.UI.StageSelect
         }
 
         /// <summary>
-        /// 🔥 추가: 모든 활성 스테이지 버튼 상태 새로고침
+        /// 🔥 추가: 진행도 데이터 변경 시 UI 즉시 새로고침
+        /// 사용자 전환 시 바로 반영되도록 함
+        /// </summary>
+        private void OnProgressDataChanged(HttpApiClient.CompactUserProgress[] progressArray)
+        {
+            Debug.Log($"[CandyCrushStageMapView] 진행도 데이터 변경됨: {progressArray?.Length ?? 0}개");
+            
+            // 🔥 추가: 사용자 전환 감지 - 모든 진행도가 0인 경우 완전 리셋
+            bool allProgressIsZero = true;
+            if (progressArray != null && progressArray.Length > 0)
+            {
+                foreach (var progress in progressArray)
+                {
+                    if (progress.c == true || progress.s > 0) // 완료되었거나 별이 있음
+                    {
+                        allProgressIsZero = false;
+                        break;
+                    }
+                }
+                
+                if (allProgressIsZero && activeButtons.Count > 1)
+                {
+                    Debug.Log("[CandyCrushStageMapView] 🔄 새 사용자 감지 (모든 진행도 0) - UI 완전 리셋");
+                    ResetForUserSwitch();
+                }
+            }
+            
+            // 🔥 핵심: 진행도 데이터가 변경되면 즉시 UI 새로고림
+            RefreshAllStageButtons();
+            UpdateUIInfo();
+        }
+
+        /// <summary>
+        /// 🔥 추가: 현재 상태 변경 시 UI 즉시 새로고침
+        /// 사용자 전환 시 max_stage_completed 변경에 바로 반응
+        /// </summary>
+        private void OnCurrentStatusChanged(HttpApiClient.CurrentStatus currentStatus)
+        {
+            Debug.Log($"[CandyCrushStageMapView] 현재 상태 변경됨: max_stage_completed={currentStatus.max_stage_completed}");
+            
+            // 🔥 추가: max_stage_completed가 0이고 기존 버튼이 많이 있으면 사용자 전환으로 판단
+            if (currentStatus.max_stage_completed == 0 && activeButtons.Count > 1)
+            {
+                Debug.Log("[CandyCrushStageMapView] 🔄 새 사용자 감지 (max_completed=0) - UI 완전 리셋");
+                ResetForUserSwitch();
+            }
+            
+            // 🔥 핵심: 상태 데이터가 변경되면 즉시 UI 새로고침
+            RefreshAllStageButtons();
+            UpdateUIInfo();
+        }
+
+        /// <summary>
+        /// 🔥 추가: 로그인 상태 변경 시 처리 (로그아웃/사용자 전환)
+        /// </summary>
+        private void OnLoginStatusChanged()
+        {
+            Debug.Log("[CandyCrushStageMapView] 로그인 상태 변경됨");
+            
+            // 현재 로그인 상태 확인
+            bool isCurrentlyLoggedIn = Features.Single.Core.UserDataCache.Instance?.IsLoggedIn() ?? false;
+            
+            if (!isCurrentlyLoggedIn)
+            {
+                Debug.Log("[CandyCrushStageMapView] 사용자 로그아웃 감지 - UI 완전 초기화 시작");
+                ResetForUserSwitch();
+            }
+            else
+            {
+                Debug.Log("[CandyCrushStageMapView] 사용자 로그인/전환 감지 - 새 사용자 데이터 대기");
+                // 새 로그인의 경우, OnUserDataUpdated에서 처리됨
+            }
+        }
+
+        /// <summary>
+        /// 🔥 수정: 모든 스테이지 버튼 상태 새로고침 (증가/감소 모두 지원)
+        /// 사용자 진행도 변화에 따른 완전한 UI 동기화
         /// </summary>
         private void RefreshAllStageButtons()
         {
-            Debug.Log($"[CandyCrushStageMapView] RefreshAllStageButtons 시작 - 활성 버튼 수: {activeButtons.Count}");
+            Debug.Log($"[CandyCrushStageMapView] RefreshAllStageButtons 시작 - 기존 활성 버튼 수: {activeButtons.Count}");
 
-            // 현재 활성화된 모든 스테이지 버튼의 상태를 새로고침
-            foreach (var kvp in activeButtons)
+            // 현재 사용자의 진행도 기준으로 언락된 스테이지 수 계산
+            int maxStageCompleted = 0;
+            if (UserDataCache.Instance != null && UserDataCache.Instance.IsLoggedIn())
             {
-                int stageNumber = kvp.Key;
-                StageButton stageButton = kvp.Value;
-
-                Debug.Log($"[CandyCrushStageMapView] 스테이지 {stageNumber} 버튼 상태 새로고침 중...");
-                UpdateButtonState(stageButton, stageNumber);
+                maxStageCompleted = UserDataCache.Instance.MaxStageCompleted;
             }
 
-            Debug.Log($"[CandyCrushStageMapView] RefreshAllStageButtons 완료");
+            // 언락된 스테이지 수 = 완료된 스테이지 + 1 (도전 스테이지)
+            int targetUnlockedCount = maxStageCompleted + 1;
+            
+            Debug.Log($"[CandyCrushStageMapView] 🔥 사용자 진행도: max_completed={maxStageCompleted}, 목표 언락 수={targetUnlockedCount}");
+            
+            // 🔥 추가: 디버그 정보 - cachedMaxStageCompleted와 currentUser 값 확인
+            if (UserDataCache.Instance != null)
+            {
+                var currentUser = UserDataCache.Instance.GetCurrentUser();
+                Debug.Log($"[CandyCrushStageMapView] 🔍 디버그 - currentUser.max: {currentUser?.maxStageCompleted ?? -1}");
+                
+                // cachedMaxStageCompleted 값도 확인하기 위해 리플렉션 사용
+                var field = typeof(UserDataCache).GetField("cachedMaxStageCompleted", 
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                if (field != null)
+                {
+                    int cached = (int)field.GetValue(UserDataCache.Instance);
+                    Debug.Log($"[CandyCrushStageMapView] 🔍 디버그 - cachedMaxStageCompleted: {cached}");
+                }
+            }
+
+            // 🔥 수정: SetActiveCount 제거 - UX 개선을 위해 버튼은 유지하고 상태만 변경
+            // (모든 스테이지 버튼이 보이되, 잠김/언락 상태로 구분)
+
+            // 🔥 수정: UX 개선 - 모든 스테이지 버튼을 유지하고 상태만 변경
+            // 총 스테이지 수 확인 (메타데이터에서)
+            int totalStages = 14; // 기본값
+            if (UserDataCache.Instance != null)
+            {
+                var metadata = UserDataCache.Instance.GetStageMetadata();
+                if (metadata != null && metadata.Length > 0)
+                {
+                    totalStages = metadata.Length;
+                }
+            }
+
+            // 🔥 로그 축소: 중요한 정보만 출력
+            Debug.Log($"[CandyCrushStageMapView] 총 스테이지: {totalStages}, 활성 버튼: {activeButtons.Count}개");
+
+            // 모든 스테이지에 대해 버튼 확보 및 상태 업데이트
+            for (int stageNumber = 1; stageNumber <= totalStages; stageNumber++)
+            {
+                bool shouldBeUnlocked = stageNumber <= targetUnlockedCount;
+                
+                // 버튼이 없으면 새로 생성 (CreateStageButton 사용)
+                if (!activeButtons.ContainsKey(stageNumber))
+                {
+                    CreateStageButton(stageNumber);
+                }
+
+                // 버튼 상태 업데이트 (언락/잠금)
+                if (activeButtons.ContainsKey(stageNumber))
+                {
+                    UpdateButtonState(activeButtons[stageNumber], stageNumber);
+                    
+                    // 🔥 로그 축소: 상태 변경 시에만 출력
+                    if (!shouldBeUnlocked)
+                    {
+                        Debug.Log($"[CandyCrushStageMapView] 스테이지 {stageNumber} → 잠금");
+                    }
+                }
+            }
+
+            Debug.Log($"[CandyCrushStageMapView] RefreshAllStageButtons 완료 - 최종 활성 버튼 수: {activeButtons.Count}");
+        }
+
+        /// <summary>
+        /// 🔥 추가: 사용자 전환/로그아웃 시 UI 완전 초기화
+        /// 이전 사용자의 UI 상태가 새 사용자에게 영향주지 않도록 완전히 리셋
+        /// </summary>
+        public void ResetForUserSwitch()
+        {
+            Debug.Log("[CandyCrushStageMapView] 사용자 전환으로 인한 UI 완전 초기화 시작");
+
+            // 모든 활성 버튼 풀에 반환 및 상태 초기화
+            if (buttonPool != null)
+            {
+                buttonPool.ReturnAllButtons();
+                Debug.Log($"[CandyCrushStageMapView] 모든 버튼 풀에 반환 완료");
+            }
+
+            // activeButtons 딕셔너리 완전 정리
+            activeButtons.Clear();
+
+            // 스크롤 상태 초기화
+            firstVisibleStage = 1;
+            lastVisibleStage = 1;
+            
+            // 동기화 상태 초기화
+            hasSyncedOnce = false;
+            isProfileUpdateInProgress = false;
+
+            // UI 텍스트 초기화
+            if (progressText != null)
+                progressText.text = "";
+            if (totalStarsText != null)
+                totalStarsText.text = "⭐ 0";
+
+            // 스크롤을 맨 위로 리셋
+            if (scrollRect != null && scrollRect.content != null)
+            {
+                scrollRect.content.anchoredPosition = Vector2.zero;
+                lastScrollPosition = Vector2.zero;
+            }
+
+            Debug.Log("[CandyCrushStageMapView] 사용자 전환 UI 초기화 완료");
         }
 
         /// <summary>
@@ -1625,7 +1820,15 @@ namespace Features.Single.UI.StageSelect
 
         private Coroutine StartSafe(System.Collections.IEnumerator routine)
         {
-            return isActiveAndEnabled ? StartCoroutine(routine) : CoroutineRunner.Run(routine);
+            if (isActiveAndEnabled && gameObject.activeInHierarchy)
+            {
+                return StartCoroutine(routine);
+            }
+            else
+            {
+                Debug.Log("[CandyCrushStageMapView] GameObject 비활성화 상태 - CoroutineRunner 사용");
+                return App.Core.CoroutineRunner.Run(routine);
+            }
         }
 
         private void InvokeLater(float seconds, System.Action action)

@@ -93,14 +93,13 @@ namespace App.Services{
                 username = authData.user.username,
                 display_name = authData.user.display_name,
                 level = authData.user.single_player_level, // 싱글플레이어 레벨 사용
-                totalGames = authData.user.stats.total_games,
-                wins = authData.user.stats.wins,
-                losses = authData.user.stats.losses,
-                averageScore = authData.user.stats.total_score > 0 ?
-                    authData.user.stats.total_score / Math.Max(1, authData.user.stats.total_games) : 0,
+                totalGames = 0, // 싱글플레이어에서는 미사용
+                wins = 0, // 싱글플레이어에서는 미사용
+                losses = 0, // 싱글플레이어에서는 미사용
+                averageScore = 0, // 싱글플레이어에서는 미사용
                 isOnline = true,
                 status = "로비",
-                maxStageCompleted = authData.user.max_stage_completed // 🔥 추가: 최대 클리어 스테이지
+                maxStageCompleted = authData.user.max_stage_completed
             };
         }
         

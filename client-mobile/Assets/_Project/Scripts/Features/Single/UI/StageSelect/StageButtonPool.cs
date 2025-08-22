@@ -143,7 +143,21 @@ namespace Features.Single.UI.StageSelect{
             // 사용 중 리스트에서 제거
             if (usedButtons.Remove(button))
             {
-                // 풀로 반환
+                // 🔥 수정: 버튼 상태 완전 초기화 후 비활성화
+                try
+                {
+                    // 버튼을 잠김 상태로 초기화 (UpdateState 사용)
+                    button.UpdateState(false, null); // 잠김 상태, 진행도 없음
+                    
+                    // 스테이지 번호 초기화 (Initialize 사용)
+                    button.Initialize(0, null); // 기본 스테이지 번호, 콜백 없음
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogWarning($"[StageButtonPool] 버튼 상태 초기화 중 오류: {ex.Message}");
+                }
+                
+                // 풀로 반환 (GameObject 비활성화)
                 button.gameObject.SetActive(false);
                 availableButtons.Enqueue(button);
             }
@@ -261,6 +275,49 @@ namespace Features.Single.UI.StageSelect{
         public List<StageButton> GetUsedButtons()
         {
             return new List<StageButton>(usedButtons);
+        }
+
+        /// <summary>
+        /// 🔥 추가: 활성 버튼 수를 특정 개수로 설정 (증가/감소 모두 지원)
+        /// 사용자 진행도 변화에 따른 UI 동기화를 위해 사용
+        /// </summary>
+        public void SetActiveCount(int targetCount)
+        {
+            int currentCount = GetUsedButtonCount();
+            
+            if (targetCount == currentCount)
+            {
+                Debug.Log($"[StageButtonPool] SetActiveCount - 이미 목표 개수와 일치 ({targetCount})");
+                return;
+            }
+            
+            if (targetCount > currentCount)
+            {
+                // 버튼 추가 (증가)
+                int addCount = targetCount - currentCount;
+                Debug.Log($"[StageButtonPool] SetActiveCount - 버튼 {addCount}개 추가 ({currentCount} → {targetCount})");
+                
+                for (int i = 0; i < addCount; i++)
+                {
+                    GetButton(); // 새 버튼을 풀에서 가져와서 활성화
+                }
+            }
+            else
+            {
+                // 버튼 제거 (감소) - 사용자 전환 시 중요!
+                int removeCount = currentCount - targetCount;
+                Debug.Log($"[StageButtonPool] SetActiveCount - 버튼 {removeCount}개 제거 ({currentCount} → {targetCount})");
+                
+                var buttonsToReturn = new List<StageButton>(usedButtons);
+                
+                // 뒤에서부터 제거 (높은 스테이지 번호부터)
+                for (int i = 0; i < removeCount && i < buttonsToReturn.Count; i++)
+                {
+                    ReturnButton(buttonsToReturn[buttonsToReturn.Count - 1 - i]);
+                }
+            }
+            
+            Debug.Log($"[StageButtonPool] SetActiveCount 완료 - 최종 활성 버튼 수: {GetUsedButtonCount()}");
         }
         
         // ========================================

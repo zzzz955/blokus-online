@@ -33,7 +33,8 @@ class OIDCConfig {
         client_secret: null, // Public client (PKCE 사용)
         redirect_uris: [
           'blokus://auth/callback',
-          'http://localhost:7777/auth/callback' // 로컬 테스트용
+          'http://localhost:7777/auth/callback', // Unity 에디터 테스트용
+          'http://127.0.0.1:7777/auth/callback'  // Unity 에디터 대안
         ],
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
@@ -249,9 +250,9 @@ class OIDCConfig {
   // 환경별 설정 오버라이드
   applyEnvironmentOverrides() {
     if (process.env.NODE_ENV === 'production') {
-      // 프로덕션 환경 설정
-      this.issuer = process.env.OIDC_ISSUER || 'https://blokus-online.mooo.com'
-      this.baseUrl = process.env.OIDC_BASE_URL || 'https://blokus-online.mooo.com'
+      // 프로덕션 환경 설정 - Nginx 서브패스 프록시 사용
+      this.issuer = process.env.OIDC_ISSUER_PROD || 'https://blokus-online.mooo.com/oidc'
+      this.baseUrl = process.env.OIDC_BASE_URL_PROD || 'https://blokus-online.mooo.com/oidc'
 
       // 프로덕션에서는 localhost redirect URI 제거
       Object.values(this.clients).forEach(client => {
@@ -259,6 +260,11 @@ class OIDCConfig {
           !uri.includes('localhost') && !uri.includes('127.0.0.1')
         )
       })
+      
+      // Next.js 클라이언트는 포트 443 (Nginx를 통해 3000으로 프록시)
+      this.clients['nextjs-web-client'].redirect_uris = [
+        'https://blokus-online.mooo.com/api/auth/callback/blokus-oidc'
+      ]
     }
 
     logger.info('Applied environment-specific OIDC configuration', {

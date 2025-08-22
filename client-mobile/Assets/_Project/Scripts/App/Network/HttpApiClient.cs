@@ -89,11 +89,14 @@ namespace App.Network{
         public event System.Action<UserProfile> OnUserProfileReceived;
         public event System.Action<CompactStageMetadata[]> OnStageMetadataReceived;
         public event System.Action<CompactUserProgress[]> OnBatchProgressReceived;
+        public event System.Action<CurrentStatus> OnCurrentStatusReceived; // 🔥 추가: current_status 전달용
 
         // 인증 이벤트 
         public event System.Action<bool, string, string> OnAuthResponse; // success, message, token
         public event System.Action<AuthUserData> OnUserInfoReceived;
         public event System.Action<string> OnOAuthRegisterRedirect;
+        public event System.Action OnLogoutComplete; // 🔥 추가: 로그아웃 전용 이벤트
+        public event System.Action<bool, string> OnAutoLoginComplete; // 🔥 추가: 자동 로그인 완료 이벤트
 
         void Awake()
         {
@@ -106,13 +109,19 @@ namespace App.Network{
                 DontDestroyOnLoad(gameObject);
 
                 InitializeFromEnvironment();
-                GameLogger.Log("HttpApiClient 초기화 완료 - DontDestroyOnLoad 적용됨");
+                Debug.Log("HttpApiClient 초기화 완료 - DontDestroyOnLoad 적용됨");
             }
             else
             {
-                GameLogger.Log("HttpApiClient 중복 인스턴스 제거");
+                Debug.Log("HttpApiClient 중복 인스턴스 제거");
                 Destroy(gameObject);
             }
+        }
+
+        void Start()
+        {
+            // 🔥 제거: DelayedAutoLogin는 AppPersistent에서 호출하도록 변경
+            // SessionManager 초기화는 이제 AppPersistent/SceneFlowController에서 처리
         }
 
         // ========================================
@@ -141,7 +150,9 @@ namespace App.Network{
             authToken = token;
             currentUserId = userId;
             isOnline = true;
-            GameLogger.Log($"HTTP API 인증 설정 완료: User {userId}");
+            Debug.Log($"SetAuthToken Instance: {this.GetHashCode()}");
+            Debug.Log($"HTTP API 인증 설정 완료: User {userId}");
+            Debug.Log($"저장 후 authToken 상태: {authToken?.Substring(0, 20)}...");
         }
 
         /// <summary>
@@ -151,7 +162,7 @@ namespace App.Network{
         {
             authToken = null;
             currentUserId = 0;
-            GameLogger.Log("HTTP API 인증 토큰 클리어됨");
+            Debug.Log("HTTP API 인증 토큰 클리어됨");
         }
 
         /// <summary>
@@ -180,6 +191,9 @@ namespace App.Network{
         private IEnumerator SendGetRequest<T>(string endpoint, System.Action<T> onSuccess, System.Action<string> onError = null)
         {
             string url = $"{ApiBaseUrl}/{endpoint}";
+            
+            Debug.Log($"GET요청 Instance: {this.GetHashCode()}");
+            Debug.Log($"GET요청 authToken: {(string.IsNullOrEmpty(authToken) ? "NULL" : "EXISTS")}");
 
             using (UnityWebRequest request = UnityWebRequest.Get(url))
             {
@@ -187,6 +201,11 @@ namespace App.Network{
                 if (!string.IsNullOrEmpty(authToken))
                 {
                     request.SetRequestHeader("Authorization", $"Bearer {authToken}");
+                    Debug.Log($"Authorization 헤더 추가됨: Bearer {authToken.Substring(0, 20)}...");
+                }
+                else
+                {
+                    Debug.LogWarning($"인증 토큰이 없음 - 인스턴스: {this.GetHashCode()}");
                 }
 
                 request.SetRequestHeader("Content-Type", "application/json");
@@ -221,6 +240,14 @@ namespace App.Network{
                 }
                 else
                 {
+                    // 401 에러 시 자동 토큰 갱신 시도
+                    if (request.responseCode == 401)
+                    {
+                        Debug.LogWarning($"[HttpApiClient] 401 Unauthorized - 자동 토큰 갱신 시도: {endpoint}");
+                        yield return StartCoroutine(HandleUnauthorizedWithRefresh<T>(endpoint, null, "GET", onSuccess, onError));
+                        yield break;
+                    }
+
                     string errorMsg = GetUserFriendlyErrorMessage(request.responseCode, request.error);
                     Debug.LogError($"HTTP 오류: {request.error} (코드: {request.responseCode})");
 
@@ -253,6 +280,11 @@ namespace App.Network{
                 if (!string.IsNullOrEmpty(authToken))
                 {
                     request.SetRequestHeader("Authorization", $"Bearer {authToken}");
+                    Debug.Log($"Authorization 헤더 추가됨: Bearer {authToken.Substring(0, 20)}...");
+                }
+                else
+                {
+                    Debug.LogWarning("인증 토큰이 없음 - Authorization 헤더 없이 요청");
                 }
                 request.SetRequestHeader("Content-Type", "application/json");
                 request.timeout = requestTimeoutSeconds;
@@ -289,6 +321,14 @@ namespace App.Network{
                 }
                 else
                 {
+                    // 401 에러 시 자동 토큰 갱신 시도
+                    if (request.responseCode == 401)
+                    {
+                        Debug.LogWarning($"[HttpApiClient] 401 Unauthorized - 자동 토큰 갱신 시도: {endpoint}");
+                        yield return StartCoroutine(HandleUnauthorizedWithRefresh<T>(endpoint, requestData, "POST", onSuccess, onError));
+                        yield break;
+                    }
+
                     string errorMsg = GetUserFriendlyErrorMessage(request.responseCode, request.error);
                     Debug.LogError($"HTTP 오류: {request.error} (코드: {request.responseCode})");
 
@@ -318,17 +358,57 @@ namespace App.Network{
                 password = password
             };
 
-            StartCoroutine(SendPostRequest<AuthUserData>(
+            StartCoroutine(SendPostRequest<LoginResponseData>(
                 "auth/login",
                 loginData,
                 response =>
                 {
-                    // 성공시 토큰 저장 및 이벤트 발생
-                    SetAuthToken(response.token, response.user.user_id);
-                    OnAuthResponse?.Invoke(true, "로그인 성공", response.token);
+                    Debug.Log($"로그인 응답 파싱 성공: access_token={response?.access_token?.Substring(0, 20)}..., user_id={response?.user?.user_id}");
+                    Debug.Log($"토큰 null 체크: access_token={!string.IsNullOrEmpty(response?.access_token)}, user={response?.user != null}");
+                    
+                    // null 체크 후 토큰 저장
+                    if (!string.IsNullOrEmpty(response?.access_token) && response?.user != null)
+                    {
+                        Debug.Log($"SetAuthToken 호출 시작: token={response.access_token.Substring(0, 20)}..., userId={response.user.user_id}");
+                        SetAuthToken(response.access_token, response.user.user_id);
+                        
+                        // 🔥 수정: refresh token을 SecureStorage에 저장
+                        if (!string.IsNullOrEmpty(response.refresh_token))
+                        {
+                            App.Security.SecureStorage.StoreString("blokus_refresh_token", response.refresh_token);
+                            App.Security.SecureStorage.StoreString("blokus_user_id", response.user.user_id.ToString());
+                            App.Security.SecureStorage.StoreString("blokus_username", response.user.username ?? "");
+                        }
 
-                    // 사용자 정보 이벤트 발생
-                    OnUserInfoReceived?.Invoke(response);
+                        // SessionManager에 access token만 저장 (refresh_token은 SecureStorage에서 관리)
+                        if (App.Core.SessionManager.Instance != null)
+                        {
+                            App.Core.SessionManager.Instance.SetTokens(
+                                response.access_token, 
+                                "", // refresh_token은 SecureStorage에서 관리
+                                response.user.user_id
+                            );
+                        }
+                        
+                        OnAuthResponse?.Invoke(true, "로그인 성공", response.access_token);
+
+                        // 서버에서 제공하지 않는 필드들 기본값 설정
+                        if (string.IsNullOrEmpty(response.user.display_name))
+                            response.user.display_name = response.user.username;
+                        
+                        // 사용자 정보 이벤트 발생 (AuthUserData 형식으로 변환)
+                        var authData = new AuthUserData
+                        {
+                            token = response.access_token,
+                            user = response.user
+                        };
+                        OnUserInfoReceived?.Invoke(authData);
+                    }
+                    else
+                    {
+                        Debug.LogError($"로그인 응답에서 토큰 또는 사용자 정보가 없음: access_token={response?.access_token != null}, user={response?.user != null}");
+                        OnAuthResponse?.Invoke(false, "로그인 응답 오류", null);
+                    }
                 },
                 error => OnAuthResponse?.Invoke(false, error, null)
             ));
@@ -393,6 +473,213 @@ namespace App.Network{
         }
 
         /// <summary>
+        /// Refresh Token을 사용한 자동 로그인
+        /// </summary>
+        public void RefreshToken(string refreshToken)
+        {
+            if (string.IsNullOrEmpty(refreshToken))
+            {
+                OnAuthResponse?.Invoke(false, "Refresh token이 없습니다.", null);
+                return;
+            }
+
+            var refreshData = new RefreshTokenRequest
+            {
+                refresh_token = refreshToken
+            };
+
+            StartCoroutine(SendPostRequest<LoginResponseData>(
+                "auth/refresh",
+                refreshData,
+                response =>
+                {
+                    Debug.Log($"토큰 갱신 성공: access_token={response?.access_token?.Substring(0, 20)}..., user_id={response?.user?.user_id}");
+                    
+                    if (!string.IsNullOrEmpty(response?.access_token) && response?.user != null)
+                    {
+                        // 새로운 토큰으로 업데이트
+                        SetAuthToken(response.access_token, response.user.user_id);
+                        
+                        // SessionManager에 새로운 토큰들 저장 (새로운 refresh_token 포함)
+                        if (App.Core.SessionManager.Instance != null)
+                        {
+                            App.Core.SessionManager.Instance.SetTokens(
+                                response.access_token, 
+                                response.refresh_token, 
+                                response.user.user_id
+                            );
+                        }
+
+                        OnAuthResponse?.Invoke(true, "토큰 갱신 성공", response.access_token);
+
+                        // 사용자 정보 이벤트 발생
+                        var authData = new AuthUserData
+                        {
+                            token = response.access_token,
+                            user = response.user
+                        };
+                        OnUserInfoReceived?.Invoke(authData);
+                    }
+                    else
+                    {
+                        Debug.LogError("토큰 갱신 응답에서 토큰 또는 사용자 정보가 없음");
+                        OnAuthResponse?.Invoke(false, "토큰 갱신 응답 오류", null);
+                    }
+                },
+                error => 
+                {
+                    Debug.LogError($"토큰 갱신 실패: {error}");
+                    OnAuthResponse?.Invoke(false, $"토큰 갱신 실패: {error}", null);
+                }
+            ));
+        }
+
+        /// <summary>
+        /// SecureStorage에서 refresh token을 가져와 자동 로그인 시도
+        /// </summary>
+        public void ValidateRefreshTokenFromStorage()
+        {
+            Debug.Log("[HttpApiClient] SecureStorage에서 refresh token 자동 로그인 시도");
+
+            string savedRefreshToken = App.Security.SecureStorage.GetString("blokus_refresh_token");
+            if (string.IsNullOrEmpty(savedRefreshToken))
+            {
+                Debug.Log("[HttpApiClient] 저장된 refresh token이 없음 - 자동 로그인 실패");
+                OnAutoLoginComplete?.Invoke(false, "저장된 refresh token이 없음");
+                return;
+            }
+
+            Debug.Log("[HttpApiClient] 저장된 refresh token으로 자동 로그인 시도");
+            
+            // refresh token으로 새로운 access token 요청
+            var refreshData = new RefreshTokenRequest
+            {
+                refresh_token = savedRefreshToken
+            };
+
+            StartCoroutine(SendPostRequest<LoginResponseData>(
+                "auth/refresh",
+                refreshData,
+                response =>
+                {
+                    Debug.Log("[HttpApiClient] 자동 로그인 성공 - 새로운 토큰 받음");
+                    
+                    if (!string.IsNullOrEmpty(response?.access_token) && response?.user != null)
+                    {
+                        // 새로운 토큰으로 업데이트
+                        SetAuthToken(response.access_token, response.user.user_id);
+                        
+                        // 🔥 새로운 refresh token이 있다면 SecureStorage에 저장
+                        if (!string.IsNullOrEmpty(response.refresh_token))
+                        {
+                            App.Security.SecureStorage.StoreString("blokus_refresh_token", response.refresh_token);
+                            App.Security.SecureStorage.StoreString("blokus_user_id", response.user.user_id.ToString());
+                            App.Security.SecureStorage.StoreString("blokus_username", response.user.username ?? "");
+                        }
+                        
+                        // SessionManager에 토큰 설정 (refresh_token은 SecureStorage에서 관리하므로 빈 값 전달)
+                        if (App.Core.SessionManager.Instance != null)
+                        {
+                            App.Core.SessionManager.Instance.SetTokens(
+                                response.access_token, 
+                                "", // refresh_token은 SecureStorage에서 관리
+                                response.user.user_id
+                            );
+                        }
+
+                        OnAutoLoginComplete?.Invoke(true, "자동 로그인 성공");
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[HttpApiClient] 자동 로그인 응답이 불완전함");
+                        OnAutoLoginComplete?.Invoke(false, "자동 로그인 응답 오류");
+                    }
+                },
+                error =>
+                {
+                    Debug.LogWarning($"[HttpApiClient] 자동 로그인 실패: {error}");
+                    
+                    // 🔥 refresh token이 만료되었으면 SecureStorage에서 삭제
+                    App.Security.SecureStorage.DeleteKey("blokus_refresh_token");
+                    App.Security.SecureStorage.DeleteKey("blokus_user_id");
+                    App.Security.SecureStorage.DeleteKey("blokus_username");
+                    
+                    OnAutoLoginComplete?.Invoke(false, $"자동 로그인 실패: {error}");
+                }
+            ));
+        }
+
+        /// <summary>
+        /// 저장된 refresh token으로 자동 로그인 시도 (기존 메서드 - 호환성 유지)
+        /// </summary>
+        public void TryAutoLoginWithRefreshToken()
+        {
+            Debug.LogWarning("[HttpApiClient] TryAutoLoginWithRefreshToken is deprecated, use ValidateRefreshTokenFromStorage instead");
+            ValidateRefreshTokenFromStorage();
+        }
+
+        /// <summary>
+        /// 401 에러 시 자동 토큰 갱신 및 재시도
+        /// </summary>
+        private IEnumerator HandleUnauthorizedWithRefresh<T>(string endpoint, object requestData, string method, 
+            System.Action<T> onSuccess, System.Action<string> onError = null)
+        {
+            if (App.Core.SessionManager.Instance == null || !App.Core.SessionManager.Instance.HasRefreshToken())
+            {
+                Debug.LogWarning("[HttpApiClient] Refresh token이 없어서 401 자동 처리 불가능");
+                onError?.Invoke("로그인이 만료되었습니다. 다시 로그인해주세요.");
+                yield break;
+            }
+
+            Debug.Log("[HttpApiClient] 401 에러 - refresh token으로 자동 갱신 시도");
+            
+            bool refreshSuccess = false;
+            
+            // 토큰 갱신 완료 이벤트 구독
+            System.Action<bool, string, string> onRefreshComplete = (success, message, token) =>
+            {
+                refreshSuccess = success;
+            };
+            
+            OnAuthResponse += onRefreshComplete;
+            
+            // Refresh token으로 토큰 갱신 시도
+            string savedRefreshToken = App.Core.SessionManager.Instance.GetRefreshToken();
+            RefreshToken(savedRefreshToken);
+            
+            // 갱신 완료까지 대기 (최대 10초)
+            float timeout = 10f;
+            float elapsed = 0f;
+            
+            while (elapsed < timeout && !refreshSuccess)
+            {
+                yield return new WaitForSeconds(0.1f);
+                elapsed += 0.1f;
+            }
+            
+            OnAuthResponse -= onRefreshComplete;
+            
+            if (!refreshSuccess)
+            {
+                Debug.LogError("[HttpApiClient] 토큰 갱신 실패 - 로그인 필요");
+                onError?.Invoke("로그인이 만료되었습니다. 다시 로그인해주세요.");
+                yield break;
+            }
+            
+            Debug.Log("[HttpApiClient] 토큰 갱신 성공 - 원래 요청 재시도");
+            
+            // 원래 요청 재시도
+            if (method == "GET")
+            {
+                yield return StartCoroutine(SendGetRequest<T>(endpoint, onSuccess, onError));
+            }
+            else if (method == "POST")
+            {
+                yield return StartCoroutine(SendPostRequest<T>(endpoint, requestData, onSuccess, onError));
+            }
+        }
+
+        /// <summary>
         /// 로그아웃 (클라이언트 측 토큰 클리어만 수행)
         /// </summary>
         public void Logout()
@@ -402,8 +689,8 @@ namespace App.Network{
             
             ClearAuthToken();
             
-            // 로그아웃 완료 이벤트 발생 (필요시)
-            OnAuthResponse?.Invoke(true, "로그아웃 완료", "");
+            // 🔥 수정: OnAuthResponse 대신 OnLogoutComplete 이벤트 사용
+            OnLogoutComplete?.Invoke();
             
             Debug.Log("[HttpApiClient] 로그아웃 완료 - 토큰 클리어됨");
         }
@@ -446,6 +733,16 @@ namespace App.Network{
                 response =>
                 {
                     OnBatchProgressReceived?.Invoke(response.progress);
+                    // 🔥 추가: current_status도 전달
+                    if (response.current_status != null)
+                    {
+                        Debug.Log($"[HttpApiClient] 🔥 OnCurrentStatusReceived 이벤트 발생! max_stage_completed={response.current_status.max_stage_completed}");
+                        OnCurrentStatusReceived?.Invoke(response.current_status);
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[HttpApiClient] ⚠️ response.current_status가 null입니다!");
+                    }
                 },
                 error => Debug.LogWarning($"일괄 진행도 요청 실패: {error}")
             ));
@@ -621,6 +918,12 @@ namespace App.Network{
         }
 
         [System.Serializable]
+        public class RefreshTokenRequest
+        {
+            public string refresh_token;
+        }
+
+        [System.Serializable]
         public class AuthUserData
         {
             public UserData user;
@@ -629,16 +932,25 @@ namespace App.Network{
         }
 
         [System.Serializable]
+        public class LoginResponseData
+        {
+            public string access_token;
+            public string refresh_token;
+            public string token_type;
+            public int expires_in;
+            public UserData user;
+        }
+
+        [System.Serializable]
         public class UserData
         {
             public int user_id;
             public string username;
+            public string email;
             public string display_name;
-            public int level;
-            public int experience_points;
             public int single_player_level;
             public int max_stage_completed;
-            public UserStatsData stats;
+            public long single_player_score;
         }
 
         [System.Serializable]

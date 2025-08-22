@@ -64,6 +64,18 @@
 - Integration with existing session management and user account system
 - Backward compatibility with existing username/password authentication
 
+✅ **Qt Client OIDC Authentication** (Desktop)
+- Complete OIDC Authorization Code + PKCE implementation
+- PKCE code challenge/verifier generation with SHA256 base64url encoding
+- System browser launch via QDesktopServices for OAuth authorization
+- HTTP loopback server (QTcpServer) for authorization code capture
+- Dynamic port allocation (8080-8090 range) with timeout handling
+- Secure token storage using Windows Credential Manager (+ cross-platform fallback)
+- JWT token integration with existing NetworkClient authentication flow
+- Refresh token rotation logic with automatic token renewal
+- Complete LoginWindow UI integration with "Google로 로그인" button
+- Error handling, loading states, and user feedback
+
 ---
 
 # Context
@@ -102,7 +114,7 @@
 - [x] Implement reuse detection → on seeing an old RT jti used twice, revoke the whole family.
 - [x] API server: replace local /login with redirect/links to IdP; keep JWT middleware (JWKS cached).
 - [x] TCP server: add RS256 JWT verifier (kid support), first message AUTH <JWT>; handle exp/nbf/aud/iss; add 30s grace period for re-auth.
-- [ ] Qt client: PKCE flow with system browser + loopback; store tokens in OS secure storage; implement silent refresh via RT rotation.
+- [x] Qt client: PKCE flow with system browser + loopback; store tokens in OS secure storage; implement silent refresh via RT rotation.
 - [ ] Unity client: system browser + app link; secure local storage (Keychain/Keystore); same refresh mechanics.
 - [ ] Web (Next.js): BFF pattern; NextAuth configured as OIDC client; server-to-server calls use AT, not exposing AT to the browser.
 - [ ] Logout flows: revoke RT family; clear web session cookie; notify TCP server to drop sessions (optional via pub/sub).

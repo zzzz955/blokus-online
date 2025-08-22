@@ -149,16 +149,79 @@ namespace App.UI
         {
             Debug.Log("[UIManager] 자동 로그인 상태 확인 시작");
 
-            if (SessionManager.Instance != null && SessionManager.Instance.IsLoggedIn)
+            // 🔥 수정: SceneFlowController의 자동 로그인 상태를 확인
+            var autoLoginState = App.Core.SceneFlowController.GetAutoLoginState();
+            Debug.Log($"[UIManager] SceneFlowController 자동 로그인 상태: {autoLoginState}");
+
+            if (autoLoginState == App.Core.SceneFlowController.AutoLoginState.Success)
             {
-                Debug.Log("[UIManager] 이미 자동 로그인됨 - ModeSelection 패널 표시");
+                // 자동 로그인 성공 → ModeSelection 패널로 바로 이동
+                Debug.Log("[UIManager] 자동 로그인 성공 - ModeSelection 패널 표시");
                 ShowPanel(UIState.ModeSelection, false);
+            }
+            else if (autoLoginState == App.Core.SceneFlowController.AutoLoginState.Failed)
+            {
+                // 자동 로그인 실패 → Login 패널 표시
+                Debug.Log("[UIManager] 자동 로그인 실패 - Login 패널 표시");
+                ShowPanel(UIState.Login, false);
+            }
+            else if (autoLoginState == App.Core.SceneFlowController.AutoLoginState.InProgress)
+            {
+                // 자동 로그인 진행 중 → 잠시 후 다시 체크
+                Debug.Log("[UIManager] 자동 로그인 진행 중 - 1초 후 재체크");
+                StartCoroutine(DelayedAutoLoginCheck());
             }
             else
             {
-                Debug.Log("[UIManager] 자동 로그인 없음 - Login 패널 표시");
-                ShowPanel(UIState.Login, false);
+                // NotChecked 또는 기타 → 기존 로직으로 폴백
+                Debug.Log("[UIManager] 자동 로그인 상태 미확정 - 기존 로직 사용");
+                
+                if (SessionManager.Instance != null && SessionManager.Instance.IsLoggedIn)
+                {
+                    Debug.Log("[UIManager] SessionManager 기준 로그인됨 - ModeSelection 패널 표시");
+                    ShowPanel(UIState.ModeSelection, false);
+                }
+                else
+                {
+                    Debug.Log("[UIManager] SessionManager 기준 로그인 안됨 - Login 패널 표시");
+                    ShowPanel(UIState.Login, false);
+                }
             }
+        }
+
+        /// <summary>
+        /// 자동 로그인이 진행 중일 때 지연된 재체크
+        /// </summary>
+        private System.Collections.IEnumerator DelayedAutoLoginCheck()
+        {
+            // 최대 5초까지 기다리면서 자동 로그인 완료 대기
+            float timeout = 5f;
+            while (timeout > 0)
+            {
+                yield return new WaitForSeconds(1f);
+                timeout -= 1f;
+
+                var autoLoginState = App.Core.SceneFlowController.GetAutoLoginState();
+                Debug.Log($"[UIManager] 재체크 - 자동 로그인 상태: {autoLoginState}");
+
+                if (autoLoginState == App.Core.SceneFlowController.AutoLoginState.Success)
+                {
+                    Debug.Log("[UIManager] 지연된 자동 로그인 성공 - ModeSelection 패널 표시");
+                    ShowPanel(UIState.ModeSelection, false);
+                    yield break;
+                }
+                else if (autoLoginState == App.Core.SceneFlowController.AutoLoginState.Failed)
+                {
+                    Debug.Log("[UIManager] 지연된 자동 로그인 실패 - Login 패널 표시");
+                    ShowPanel(UIState.Login, false);
+                    yield break;
+                }
+                // InProgress면 계속 대기
+            }
+
+            // 타임아웃 - 기본적으로 Login 패널 표시
+            Debug.LogWarning("[UIManager] 자동 로그인 체크 타임아웃 - Login 패널 표시");
+            ShowPanel(UIState.Login, false);
         }
 
         /// <summary>

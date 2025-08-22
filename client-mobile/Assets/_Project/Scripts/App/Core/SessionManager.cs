@@ -31,6 +31,7 @@ namespace App.Core
         private string cachedId = "";
         private string cachedPassword = "";
         private string authToken = "";
+        private string refreshToken = "";
         private int userId = 0;
         private string displayName = "";
 
@@ -41,6 +42,7 @@ namespace App.Core
 
         // 세션 영속성을 위한 상수 (6시간 짧은 세션)
         private const string SAVED_ACCESS_TOKEN_KEY = "blokus_access_token";
+        private const string SAVED_REFRESH_TOKEN_KEY = "blokus_refresh_token";
         private const string SAVED_USER_ID_KEY = "blokus_user_id";
         private const string SAVED_USERNAME_KEY = "blokus_username";
         private const string SAVED_DISPLAY_NAME_KEY = "blokus_display_name";
@@ -208,6 +210,9 @@ namespace App.Core
                 HttpApiClient.Instance.Logout();
             }
 
+            // SingleCore 캐시 정리 (UserDataCache, StageProgress 등)
+            ClearSingleCoreCache();
+
             ClearSession();
             OnLoginStateChanged?.Invoke(false);
         }
@@ -225,6 +230,69 @@ namespace App.Core
             }
 
             return (cachedId, cachedPassword);
+        }
+
+        /// <summary>
+        /// Set tokens (access and refresh) for session management
+        /// </summary>
+        public void SetTokens(string accessToken, string refreshTokenValue, int userIdValue)
+        {
+            authToken = accessToken;
+            refreshToken = refreshTokenValue;
+            userId = userIdValue;
+            isLoggedIn = true; // 🔥 핵심 수정: 로그인 상태 플래그 설정
+
+            if (IsDebugEnabled)
+                Debug.Log($"[SessionManager] 토큰 설정 완료: User {userId}, Refresh Token: {(!string.IsNullOrEmpty(refreshToken) ? "있음" : "없음")}");
+
+            // 🔥 추가: UserDataCache가 이미 존재한다면 수동으로 사용자 정보 동기화
+            TrySyncUserDataCache();
+        }
+
+        /// <summary>
+        /// 🔥 추가: UserDataCache와 수동 동기화 (로그인 타이밍 문제 해결)
+        /// </summary>
+        private void TrySyncUserDataCache()
+        {
+            // UserDataCache가 존재하고 초기화된 상태인지 확인
+            if (Features.Single.Core.UserDataCache.Instance != null && 
+                Features.Single.Core.UserDataCache.Instance.IsInitialized)
+            {
+                // HttpApiClient에서 마지막 로그인 응답 정보를 가져와서 UserDataCache에 설정
+                if (App.Network.HttpApiClient.Instance != null)
+                {
+                    var httpClient = App.Network.HttpApiClient.Instance;
+                    
+                    // HttpApiClient의 LastLoginResponse 또는 유사한 정보가 있다면 사용
+                    // 없다면 UserDataCache의 SyncWithServer를 호출해서 서버에서 다시 가져오기
+                    Features.Single.Core.UserDataCache.Instance.SyncWithServer();
+                    
+                    if (IsDebugEnabled)
+                        Debug.Log($"[SessionManager] UserDataCache 수동 동기화 완료 - User {userId}");
+                }
+            }
+            else if (IsDebugEnabled)
+            {
+                Debug.Log($"[SessionManager] UserDataCache 미초기화 상태 - 나중에 자동 동기화됨");
+            }
+        }
+
+        /// <summary>
+        /// Get refresh token for automatic login
+        /// 🔥 수정: SecureStorage에서 refresh token 반환
+        /// </summary>
+        public string GetRefreshToken()
+        {
+            return App.Security.SecureStorage.GetString("blokus_refresh_token", "");
+        }
+
+        /// <summary>
+        /// Check if refresh token is available
+        /// 🔥 수정: SecureStorage에서 refresh token 확인
+        /// </summary>
+        public bool HasRefreshToken()
+        {
+            return App.Security.SecureStorage.HasKey("blokus_refresh_token");
         }
 
         /// <summary>
@@ -276,17 +344,52 @@ namespace App.Core
         // Private Methods
         // ========================================
 
-        private void ClearSession()
+        /// <summary>
+        /// 메모리 세션만 초기화 (SecureStorage는 보존)
+        /// </summary>
+        private void ClearMemorySession()
         {
             isLoggedIn = false;
             cachedId = "";
             cachedPassword = "";
             authToken = "";
+            refreshToken = "";
             userId = 0;
             displayName = "";
 
+            // HttpApiClient에게 토큰 삭제 알림 (자동 재로그인 방지)
+            if (HttpApiClient.Instance != null)
+            {
+                HttpApiClient.Instance.ClearAuthToken();
+            }
+            
             if (debugMode)
-                Debug.Log("[SessionManager] Session cleared");
+                Debug.Log("[SessionManager] Memory session cleared (SecureStorage 보존)");
+        }
+
+        /// <summary>
+        /// 완전한 세션 삭제 (SecureStorage 포함) - 로그아웃 시에만 사용
+        /// </summary>
+        private void ClearSecureSession()
+        {
+            // 메모리 세션 초기화
+            ClearMemorySession();
+
+            // 🔥 SecureStorage에서 refresh token 삭제
+            App.Security.SecureStorage.DeleteKey("blokus_refresh_token");
+            App.Security.SecureStorage.DeleteKey("blokus_user_id");
+            App.Security.SecureStorage.DeleteKey("blokus_username");
+            
+            if (debugMode)
+                Debug.Log("[SessionManager] Secure session cleared (SecureStorage + 메모리 삭제)");
+        }
+
+        /// <summary>
+        /// 호환성을 위한 기존 메서드 (로그아웃 시 사용)
+        /// </summary>
+        private void ClearSession()
+        {
+            ClearSecureSession();
         }
 
         // ========================================
@@ -309,6 +412,7 @@ namespace App.Core
 #if UNITY_EDITOR
                 // Unity 에디터에서는 EditorPrefs 사용 (더 안정적)
                 EditorPrefs.SetString(EDITOR_PREFIX + SAVED_ACCESS_TOKEN_KEY, authToken);
+                EditorPrefs.SetString(EDITOR_PREFIX + SAVED_REFRESH_TOKEN_KEY, refreshToken ?? "");
                 EditorPrefs.SetInt(EDITOR_PREFIX + SAVED_USER_ID_KEY, userId);
                 EditorPrefs.SetString(EDITOR_PREFIX + SAVED_USERNAME_KEY, cachedId);
                 EditorPrefs.SetString(EDITOR_PREFIX + SAVED_DISPLAY_NAME_KEY, displayName);
@@ -320,6 +424,7 @@ namespace App.Core
 #else
                 // 빌드에서는 PlayerPrefs 사용
                 PlayerPrefs.SetString(SAVED_ACCESS_TOKEN_KEY, authToken);
+                PlayerPrefs.SetString(SAVED_REFRESH_TOKEN_KEY, refreshToken ?? "");
                 PlayerPrefs.SetInt(SAVED_USER_ID_KEY, userId);
                 PlayerPrefs.SetString(SAVED_USERNAME_KEY, cachedId);
                 PlayerPrefs.SetString(SAVED_DISPLAY_NAME_KEY, displayName);
@@ -404,10 +509,12 @@ namespace App.Core
                         // 세션 복구
                         authToken = savedToken;
 #if UNITY_EDITOR
+                        refreshToken = EditorPrefs.GetString(EDITOR_PREFIX + SAVED_REFRESH_TOKEN_KEY, "");
                         userId = EditorPrefs.GetInt(EDITOR_PREFIX + SAVED_USER_ID_KEY, 0);
                         cachedId = EditorPrefs.GetString(EDITOR_PREFIX + SAVED_USERNAME_KEY, "");
                         displayName = EditorPrefs.GetString(EDITOR_PREFIX + SAVED_DISPLAY_NAME_KEY, "");
 #else
+                        refreshToken = PlayerPrefs.GetString(SAVED_REFRESH_TOKEN_KEY, "");
                         userId = PlayerPrefs.GetInt(SAVED_USER_ID_KEY, 0);
                         cachedId = PlayerPrefs.GetString(SAVED_USERNAME_KEY, "");
                         displayName = PlayerPrefs.GetString(SAVED_DISPLAY_NAME_KEY, "");
@@ -452,12 +559,14 @@ namespace App.Core
         {
 #if UNITY_EDITOR
             EditorPrefs.DeleteKey(EDITOR_PREFIX + SAVED_ACCESS_TOKEN_KEY);
+            EditorPrefs.DeleteKey(EDITOR_PREFIX + SAVED_REFRESH_TOKEN_KEY);
             EditorPrefs.DeleteKey(EDITOR_PREFIX + SAVED_USER_ID_KEY);
             EditorPrefs.DeleteKey(EDITOR_PREFIX + SAVED_USERNAME_KEY);
             EditorPrefs.DeleteKey(EDITOR_PREFIX + SAVED_DISPLAY_NAME_KEY);
             EditorPrefs.DeleteKey(EDITOR_PREFIX + SAVED_AT_KEY);
 #else
             PlayerPrefs.DeleteKey(SAVED_ACCESS_TOKEN_KEY);
+            PlayerPrefs.DeleteKey(SAVED_REFRESH_TOKEN_KEY);
             PlayerPrefs.DeleteKey(SAVED_USER_ID_KEY);
             PlayerPrefs.DeleteKey(SAVED_USERNAME_KEY);
             PlayerPrefs.DeleteKey(SAVED_DISPLAY_NAME_KEY);
@@ -504,6 +613,9 @@ namespace App.Core
             {
                 HttpApiClient.Instance.Logout();
             }
+
+            // SingleCore 캐시 정리 (UserDataCache, StageProgress 등)
+            ClearSingleCoreCache();
 
             // 메모리 세션 클리어
             ClearSession();
@@ -573,11 +685,11 @@ namespace App.Core
 
         void Start()
         {
-            // Initialize session state
-            ClearSession();
+            // 🔥 수정: 메모리 세션만 초기화 (SecureStorage는 보존)
+            ClearMemorySession();
             
-            // 저장된 세션 자동 복구 시도
-            CheckAndRestoreSession();
+            // 🔥 수정: 세션 자동 복구는 SceneFlowController에서 처리
+            // CheckAndRestoreSession();
         }
 
         void OnDestroy()
@@ -587,6 +699,48 @@ namespace App.Core
             {
                 HttpApiClient.Instance.OnAuthResponse -= null;
                 HttpApiClient.Instance.OnUserInfoReceived -= null;
+            }
+        }
+
+        /// <summary>
+        /// SingleCore 매니저들의 캐시 데이터 정리
+        /// </summary>
+        private void ClearSingleCoreCache()
+        {
+            if (debugMode)
+                Debug.Log("[SessionManager] SingleCore 캐시 정리 시작");
+
+            try
+            {
+                // UserDataCache 정리
+                if (Features.Single.Core.UserDataCache.Instance != null)
+                {
+                    Features.Single.Core.UserDataCache.Instance.LogoutUser();
+                    Debug.Log("[SessionManager] UserDataCache.LogoutUser() 호출 완료");
+                }
+
+                // StageProgressManager 정리 (있다면)
+                var stageProgressManager = FindObjectOfType<Features.Single.Core.StageProgressManager>();
+                if (stageProgressManager != null)
+                {
+                    stageProgressManager.ClearCache();
+                    Debug.Log("[SessionManager] StageProgressManager.ClearCache() 호출 완료");
+                }
+
+                // StageDataManager 정리 (있다면)
+                var stageDataManager = FindObjectOfType<Features.Single.Core.StageDataManager>();
+                if (stageDataManager != null)
+                {
+                    stageDataManager.ClearCache();
+                    Debug.Log("[SessionManager] StageDataManager.ClearCache() 호출 완료");
+                }
+
+                if (debugMode)
+                    Debug.Log("[SessionManager] SingleCore 캐시 정리 완료");
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[SessionManager] SingleCore 캐시 정리 중 오류 발생: {ex.Message}");
             }
         }
     }

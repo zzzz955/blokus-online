@@ -709,5 +709,25 @@ namespace Features.Single.Core
                 HttpApiClient.Instance.GetUserProgress(stageNumber);
             }
         }
+
+        /// <summary>
+        /// 캐시된 스테이지 데이터 완전 정리 (로그아웃 시 호출)
+        /// </summary>
+        public void ClearCache()
+        {
+            Debug.Log("[StageDataManager] 캐시 데이터 정리 시작");
+            
+            // 현재 선택된 스테이지 초기화
+            currentSelectedStage = null;
+            currentSelectedStageNumber = 0;
+            
+            // API 스테이지 매니저 정리
+            if (apiStageManager != null)
+            {
+                apiStageManager = null;
+            }
+            
+            Debug.Log("[StageDataManager] 캐시 데이터 정리 완료");
+        }
     }
 }

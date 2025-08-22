@@ -22,6 +22,7 @@ namespace Features.Single.Core{
         // 🔥 추가: 데이터 로딩 상태 관리
         private bool isDataLoaded = false;
         private bool isDataLoading = false;
+        private string lastLoadedUserId = null; // 마지막 로딩된 사용자 ID 추적
 
         // 🔥 추가: 데이터 로딩 완료 이벤트
         public event System.Action OnDataLoadingComplete;
@@ -43,6 +44,9 @@ namespace Features.Single.Core{
         {
             if (debugMode)
                 Debug.Log("[SingleCoreBootstrap] Start - Connecting dependencies");
+
+            // 🔥 추가: 이전 사용자 데이터 완전 정리
+            ClearAllCachedData();
 
             InitializeManagers();
             ConnectDependencies();
@@ -193,11 +197,11 @@ namespace Features.Single.Core{
         }
 
         /// <summary>
-        /// 🔥 추가: 데이터 로딩 완료 여부 확인
+        /// 🔥 추가: 데이터 로딩 완료 여부 확인 (완전한 동기화 기준)
         /// </summary>
         public bool IsDataLoaded()
         {
-            return isDataLoaded;
+            return isDataLoaded && (userDataCache?.IsInitialSyncCompleted ?? false);
         }
 
         /// <summary>
@@ -206,6 +210,61 @@ namespace Features.Single.Core{
         public bool IsDataLoading()
         {
             return isDataLoading;
+        }
+
+        /// <summary>
+        /// 🔥 추가: 사용자 변경 확인 및 강제 데이터 재로딩
+        /// </summary>
+        public bool CheckUserChangedAndReload()
+        {
+            // SessionManager의 로그인 상태를 직접 확인
+            if (App.Core.SessionManager.Instance == null || !App.Core.SessionManager.Instance.IsLoggedIn)
+            {
+                if (debugMode)
+                    Debug.Log("[SingleCoreBootstrap] SessionManager 로그인 상태가 아님");
+                return false;
+            }
+
+            string currentUserId = App.Core.SessionManager.Instance.UserId.ToString();
+            
+            if (string.IsNullOrEmpty(currentUserId))
+            {
+                if (debugMode)
+                    Debug.LogWarning("[SingleCoreBootstrap] 현재 사용자 ID가 없음");
+                return false;
+            }
+
+            // 사용자가 변경되었거나 아직 로딩된 적이 없는 경우
+            bool userChanged = (lastLoadedUserId != currentUserId);
+            
+            if (userChanged)
+            {
+                if (debugMode)
+                    Debug.Log($"[SingleCoreBootstrap] 사용자 변경 감지: {lastLoadedUserId} → {currentUserId}");
+                
+                // 강제 데이터 재로딩
+                ForceReloadData();
+                return true;
+            }
+            
+            return false;
+        }
+
+        /// <summary>
+        /// 🔥 추가: 강제 데이터 재로딩
+        /// </summary>
+        public void ForceReloadData()
+        {
+            if (debugMode)
+                Debug.Log("[SingleCoreBootstrap] 강제 데이터 재로딩 시작");
+
+            // 이전 데이터 완전 정리
+            ClearAllCachedData();
+            
+            // 다시 초기화 및 로딩 시작
+            InitializeManagers();
+            ConnectDependencies();
+            StartCoroutine(LoadInitialDataCoroutine());
         }
 
         /// <summary>
@@ -228,14 +287,13 @@ namespace Features.Single.Core{
             if (debugMode)
                 Debug.Log("[SingleCoreBootstrap] 매니저 초기화 완료. 서버 데이터 로딩 시작...");
 
-            // UserDataCache가 로그인된 상태인지 확인하고 데이터 로드
-            if (userDataCache != null && userDataCache.IsLoggedIn())
+            // SessionManager의 로그인 상태를 직접 확인하고 데이터 로드
+            if (App.Core.SessionManager.Instance != null && App.Core.SessionManager.Instance.IsLoggedIn)
             {
                 if (debugMode)
-                    Debug.Log("[SingleCoreBootstrap] 로그인된 사용자 - 서버 데이터 로드 시작");
+                    Debug.Log("[SingleCoreBootstrap] SessionManager 로그인 감지 - 서버 데이터 로드 시작");
 
-                // 데이터 로딩 완료 이벤트 구독
-                userDataCache.OnStageMetadataUpdated += OnStageMetadataLoaded;
+                // 🔥 수정: 메타데이터뿐만 아니라 완전한 동기화 대기
                 
                 // UserDataCache의 초기 데이터 로드 트리거
                 yield return StartCoroutine(TriggerUserDataLoad());
@@ -243,7 +301,7 @@ namespace Features.Single.Core{
             else
             {
                 if (debugMode)
-                    Debug.LogWarning("[SingleCoreBootstrap] 사용자가 로그인되지 않음 - 데이터 로딩 스킵");
+                    Debug.LogWarning("[SingleCoreBootstrap] SessionManager 로그인 상태가 아님 - 데이터 로딩 스킵");
                 
                 // 로그인되지 않은 상태에서도 완료 처리
                 CompleteDataLoading();
@@ -293,50 +351,25 @@ namespace Features.Single.Core{
                 yield break;
             }
 
-            // 메타데이터 로드 완료까지 대기 (최대 10초)
-            float timeout = 10f;
-            float elapsed = 0f;
+            // 🔥 수정: 완전한 동기화 완료까지 대기 (메타데이터 + 진행도 + 현재 상태)
+            yield return StartCoroutine(userDataCache.WaitUntilSynced(15f));
 
-            while (!IsMetadataLoaded() && elapsed < timeout)
+            if (!userDataCache.IsInitialSyncCompleted)
             {
-                yield return new WaitForSeconds(0.1f);
-                elapsed += 0.1f;
+                Debug.LogWarning("[SingleCoreBootstrap] 초기 동기화 타임아웃");
+                OnDataLoadingFailed?.Invoke("초기 동기화 타임아웃");
             }
-
-            if (elapsed >= timeout)
+            else
             {
-                Debug.LogWarning("[SingleCoreBootstrap] 메타데이터 로드 타임아웃");
-                OnDataLoadingFailed?.Invoke("메타데이터 로드 타임아웃");
+                // 동기화 완료 시 CompleteDataLoading 호출
+                CompleteDataLoading();
             }
         }
 
         /// <summary>
-        /// 🔥 추가: 메타데이터 로드 완료 확인
+        /// 🔥 제거됨: 이제 완전한 동기화를 위해 IsMetadataLoaded와 OnStageMetadataLoaded는 사용하지 않음
+        /// WaitUntilSynced()를 통해 metadata + progress + status 모두 대기
         /// </summary>
-        private bool IsMetadataLoaded()
-        {
-            if (userDataCache == null) return false;
-            
-            var metadata = userDataCache.GetStageMetadata();
-            return metadata != null && metadata.Length > 0;
-        }
-
-        /// <summary>
-        /// 🔥 추가: 스테이지 메타데이터 로드 완료 이벤트 핸들러
-        /// </summary>
-        private void OnStageMetadataLoaded(App.Network.HttpApiClient.CompactStageMetadata[] metadata)
-        {
-            if (debugMode)
-                Debug.Log($"[SingleCoreBootstrap] 메타데이터 로드 완료: {metadata?.Length ?? 0}개");
-
-            // 이벤트 구독 해제
-            if (userDataCache != null)
-            {
-                userDataCache.OnStageMetadataUpdated -= OnStageMetadataLoaded;
-            }
-
-            CompleteDataLoading();
-        }
 
         /// <summary>
         /// 🔥 추가: 데이터 로딩 완료 처리
@@ -345,6 +378,14 @@ namespace Features.Single.Core{
         {
             isDataLoading = false;
             isDataLoaded = true;
+
+            // 현재 사용자 ID 기록
+            if (userDataCache != null && userDataCache.IsLoggedIn())
+            {
+                lastLoadedUserId = userDataCache.GetCurrentUserId();
+                if (debugMode)
+                    Debug.Log($"[SingleCoreBootstrap] 데이터 로딩 완료 - 사용자 ID 기록: {lastLoadedUserId}");
+            }
 
             if (debugMode)
                 Debug.Log("[SingleCoreBootstrap] 🎉 데이터 로딩 완료!");
@@ -364,6 +405,55 @@ namespace Features.Single.Core{
             if (userDataCache != null && userDataCache.IsInitialized)
             {
                 userDataCache.SyncWithServer();
+            }
+        }
+
+        /// <summary>
+        /// 🔥 추가: 이전 사용자 데이터 완전 정리
+        /// SingleCore 로딩 시 이전 사용자의 캐시 데이터가 남아있지 않도록 정리
+        /// </summary>
+        private void ClearAllCachedData()
+        {
+            if (debugMode)
+                Debug.Log("[SingleCoreBootstrap] 이전 사용자 데이터 완전 정리 시작");
+
+            try
+            {
+                // UserDataCache 정리
+                if (userDataCache != null)
+                {
+                    userDataCache.ClearCache();
+                    if (debugMode)
+                        Debug.Log("[SingleCoreBootstrap] UserDataCache.ClearCache() 완료");
+                }
+
+                // StageDataManager 정리
+                if (stageDataManager != null)
+                {
+                    stageDataManager.ClearCache();
+                    if (debugMode)
+                        Debug.Log("[SingleCoreBootstrap] StageDataManager.ClearCache() 완료");
+                }
+
+                // StageProgressManager 정리
+                if (stageProgressManager != null)
+                {
+                    stageProgressManager.ClearCache();
+                    if (debugMode)
+                        Debug.Log("[SingleCoreBootstrap] StageProgressManager.ClearCache() 완료");
+                }
+
+                // 데이터 로딩 상태 초기화
+                isDataLoaded = false;
+                isDataLoading = false;
+                lastLoadedUserId = null;
+
+                if (debugMode)
+                    Debug.Log("[SingleCoreBootstrap] 이전 사용자 데이터 정리 완료");
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[SingleCoreBootstrap] 캐시 정리 중 오류 발생: {ex.Message}");
             }
         }
     }

@@ -1,8 +1,10 @@
 require('dotenv').config()
 const express = require('express')
+const session = require('express-session')
 const cors = require('cors')
 const helmet = require('helmet')
 const compression = require('compression')
+const passport = require('./config/passport')
 const logger = require('./config/logger')
 const dbService = require('./config/database')
 const keyManager = require('./config/keys')
@@ -15,6 +17,8 @@ const jwksRoutes = require('./routes/jwks')
 const introspectRoutes = require('./routes/introspect')
 const revocationRoutes = require('./routes/revocation')
 const adminRoutes = require('./routes/admin')
+const oauthRoutes = require('./routes/oauth')
+const manualAuthRoutes = require('./routes/manual-auth')
 
 const app = express()
 const PORT = process.env.PORT || 9000
@@ -33,20 +37,21 @@ app.use(helmet({
 }))
 
 // CORS configuration
+const isDevelopment = process.env.NODE_ENV !== 'production'
+
 const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true)
+  origin: isDevelopment ? true : function (origin, callback) {
+    // Production CORS logic
+    if (!origin || origin === 'null') return callback(null, true)
     
     const allowedOrigins = [
-      'http://localhost:3000',  // Next.js dev server
-      'http://localhost:8080',  // API server
-      'https://blokus-online.mooo.com'  // Production web
+      'https://blokus-online.mooo.com'  // Production web only
     ]
     
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true)
     } else {
+      logger.warn('CORS: Origin not allowed in production', { origin })
       callback(new Error('Not allowed by CORS'))
     }
   },
@@ -55,10 +60,32 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }
 
+if (isDevelopment) {
+  logger.info('CORS: Development mode - allowing all origins')
+} else {
+  logger.info('CORS: Production mode - restricted origins')
+}
+
 app.use(cors(corsOptions))
 app.use(compression())
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
+
+// Session configuration for OAuth flows
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'fallback-secret-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production', // HTTPS in production
+    httpOnly: true,
+    maxAge: 10 * 60 * 1000 // 10 minutes for OAuth flow
+  }
+}))
+
+// Passport middleware
+app.use(passport.initialize())
+app.use(passport.session())
 
 // Request logging middleware
 app.use((req, res, next) => {
@@ -104,6 +131,10 @@ app.use('/jwks.json', jwksRoutes)
 app.use('/introspect', introspectRoutes)
 app.use('/revocation', revocationRoutes)
 app.use('/admin', adminRoutes)
+
+// Mount OAuth routes
+app.use('/', oauthRoutes)
+app.use('/manual-auth', manualAuthRoutes)
 
 // 404 handler
 app.use('*', (req, res) => {

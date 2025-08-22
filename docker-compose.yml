@@ -228,6 +228,86 @@ services:
         max-size: "5m"
         max-file: "3"
 
+  # ========== OIDC Authentication Server (NEW) ==========
+  blokus-oidc-server:
+    build:
+      context: ./oidc-auth-server
+      dockerfile: Dockerfile
+    container_name: blokus-oidc-server
+    restart: unless-stopped
+    
+    environment:
+      # OIDC Server 설정
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 9000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      
+      # OIDC Issuer 설정
+      OIDC_ISSUER: ${OIDC_ISSUER:-https://blokus-online.mooo.com:9000}
+      OIDC_BASE_URL: ${OIDC_BASE_URL:-https://blokus-online.mooo.com:9000}
+      
+      # Token 수명
+      ACCESS_TOKEN_LIFETIME: ${ACCESS_TOKEN_LIFETIME:-10m}
+      REFRESH_TOKEN_LIFETIME: ${REFRESH_TOKEN_LIFETIME:-30d}
+      REFRESH_TOKEN_MAX_LIFETIME: ${REFRESH_TOKEN_MAX_LIFETIME:-90d}
+      AUTH_CODE_LIFETIME: ${AUTH_CODE_LIFETIME:-10m}
+      
+      # Database (postgres 컨테이너 연결)
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_POOL_MIN: 2
+      DB_POOL_MAX: 10
+      
+      # Google OAuth
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      
+      # Session & Security
+      SESSION_SECRET: ${SESSION_SECRET:-oidc-session-secret-change-in-production}
+      WEB_CLIENT_SECRET: ${WEB_CLIENT_SECRET:-web-client-secret-change-in-production}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-admin-token-change-in-production}
+      
+      # URLs
+      WEB_REGISTER_URL_PROD: https://${WEB_APP_URL:-blokus-online.mooo.com}/register
+      WEB_REGISTER_URL_DEV: http://localhost:3000/register
+      
+      # 시간대
+      TZ: Asia/Seoul
+    
+    ports:
+      # OIDC 서버는 9000 포트로 직접 노출 (Google OAuth 콜백용)
+      - "${OIDC_PORT:-9000}:9000"
+    
+    volumes:
+      # OIDC 로그
+      - ./oidc-auth-server/logs:/app/logs
+      # JWT 키 저장
+      - ./oidc-auth-server/keys:/app/keys
+    
+    networks:
+      - blokus-network
+    
+    depends_on:
+      postgres:
+        condition: service_healthy
+    
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:9000/.well-known/openid_configuration', (res) => process.exit(res.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # 로그 설정
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   # ========== Blokus Web Application ==========
   blokus-web:
     image: ${WEB_SERVER_IMAGE:-ghcr.io/zzzz955/blokus-online/blokus-web-server:${IMAGE_TAG:-latest}}
@@ -303,6 +383,7 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      - "9000:9000"  # OIDC 서버 (Google OAuth 콜백용)
       # Single Player API도 Nginx를 통해 라우팅 (선택사항)
       # - "8080:8080"  # 직접 접근도 허용
     
@@ -323,7 +404,8 @@ services:
     depends_on:
       - blokus-web
       - blokus-server
-      - blokus-single-api  # 새로 추가
+      - blokus-single-api
+      - blokus-oidc-server  # OIDC 서버 추가
     
     healthcheck:
       test: ["CMD", "nginx", "-t"]

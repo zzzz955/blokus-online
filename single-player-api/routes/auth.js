@@ -1,5 +1,6 @@
 const express = require('express')
 const router = express.Router()
+const jwt = require('jsonwebtoken')
 const logger = require('../config/logger')
 const { authenticateToken, decodeToken, generateToken } = require('../middleware/auth')
 const { body, validationResult } = require('express-validator')
@@ -13,10 +14,104 @@ const dbService = require('../config/database')
  */
 router.post('/login', async (req, res) => {
   try {
+    const { username, password } = req.body
+
+    // ID/PW 로그인 시도 (개발/프로덕션 모두 지원)
+    if (username && password) {
+      logger.info('Development direct login attempt', {
+        username,
+        ip: req.ip,
+        userAgent: req.get('User-Agent')
+      })
+
+      // 데이터베이스 기반 ID/PW 인증
+      try {
+        const user = await dbService.authenticateUser(username, password)
+        if (user) {
+          // 사용자 통계 정보 가져오기
+          const userStats = await dbService.getUserStats(user.user_id)
+          
+          const accessPayload = {
+            user_id: user.user_id,
+            username: user.username,
+            email: user.email,
+            iss: 'blokus-single-api',
+            aud: 'unity-mobile-client',
+            iat: Math.floor(Date.now() / 1000),
+            exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60) // 1일
+          }
+
+          const refreshPayload = {
+            user_id: user.user_id,
+            username: user.username,
+            type: 'refresh',
+            iss: 'blokus-single-api',
+            aud: 'unity-mobile-client',
+            iat: Math.floor(Date.now() / 1000),
+            exp: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60) // 30일
+          }
+
+          const accessToken = jwt.sign(accessPayload, process.env.JWT_SECRET)
+          const refreshToken = jwt.sign(refreshPayload, process.env.JWT_SECRET)
+
+          logger.info('Database login successful', {
+            username,
+            userId: user.user_id,
+            ip: req.ip
+          })
+
+          return res.json({
+            success: true,
+            message: 'Login successful',
+            data: {
+              access_token: accessToken,
+              refresh_token: refreshToken,
+              token_type: 'Bearer',
+              expires_in: 24 * 60 * 60, // access token 만료 시간
+              user: {
+                user_id: user.user_id,
+                username: user.username,
+                email: user.email,
+                display_name: user.username, // username을 display_name으로 사용
+                single_player_level: userStats?.single_player_level || 1,
+                max_stage_completed: userStats?.max_stage_completed || 0,
+                single_player_score: userStats?.single_player_score || 0
+              }
+            }
+          })
+        } else {
+          // DB에 사용자가 없거나 비밀번호 불일치
+          logger.warn('Database authentication failed - invalid credentials', {
+            username,
+            ip: req.ip
+          })
+          
+          return res.status(401).json({
+            success: false,
+            message: '아이디 또는 비밀번호가 올바르지 않습니다.',
+            error: 'INVALID_CREDENTIALS'
+          })
+        }
+      } catch (dbError) {
+        logger.error('Database authentication error', {
+          error: dbError.message,
+          username,
+          ip: req.ip
+        })
+        
+        return res.status(500).json({
+          success: false,
+          message: '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+          error: 'DATABASE_ERROR'
+        })
+      }
+    }
+
+    // DB 인증 실패 시에만 OIDC 플로우로 리다이렉트
     logger.info('Login redirect request (OIDC)', {
       ip: req.ip,
       userAgent: req.get('User-Agent'),
-      body: req.body
+      body: { username: req.body.username } // 비밀번호는 로그에 기록하지 않음
     })
 
     // 클라이언트 타입 감지 (요청 본문이나 헤더에서)
@@ -100,13 +195,124 @@ router.post('/login', async (req, res) => {
 })
 
 /**
+ * POST /api/auth/refresh
+ * Refresh Token을 사용한 Access Token 갱신
+ */
+router.post('/refresh', async (req, res) => {
+  try {
+    const { refresh_token } = req.body
+
+    if (!refresh_token) {
+      return res.status(400).json({
+        success: false,
+        message: 'Refresh token이 필요합니다.',
+        error: 'MISSING_REFRESH_TOKEN'
+      })
+    }
+
+    // Refresh Token 검증
+    let decoded
+    try {
+      decoded = jwt.verify(refresh_token, process.env.JWT_SECRET)
+    } catch (jwtError) {
+      logger.warn('Invalid refresh token', {
+        error: jwtError.message,
+        ip: req.ip
+      })
+
+      return res.status(401).json({
+        success: false,
+        message: 'Refresh token이 유효하지 않습니다.',
+        error: 'INVALID_REFRESH_TOKEN'
+      })
+    }
+
+    // Refresh Token인지 확인
+    if (decoded.type !== 'refresh') {
+      return res.status(401).json({
+        success: false,
+        message: '올바른 refresh token이 아닙니다.',
+        error: 'INVALID_TOKEN_TYPE'
+      })
+    }
+
+    // 사용자 정보 조회 (DB에서 최신 정보)
+    const user = await dbService.getUserById(decoded.user_id)
+    if (!user || !user.is_active) {
+      return res.status(401).json({
+        success: false,
+        message: '사용자 계정이 비활성화되었습니다.',
+        error: 'USER_DEACTIVATED'
+      })
+    }
+
+    // 새로운 Access Token 및 Refresh Token 발급
+    const newAccessPayload = {
+      user_id: user.user_id,
+      username: user.username,
+      email: user.email,
+      iss: 'blokus-single-api',
+      aud: 'unity-mobile-client',
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60) // 1일
+    }
+
+    const newRefreshPayload = {
+      user_id: user.user_id,
+      username: user.username,
+      type: 'refresh',
+      iss: 'blokus-single-api',
+      aud: 'unity-mobile-client',
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60) // 30일
+    }
+
+    const newAccessToken = jwt.sign(newAccessPayload, process.env.JWT_SECRET)
+    const newRefreshToken = jwt.sign(newRefreshPayload, process.env.JWT_SECRET)
+
+    logger.info('Token refresh successful', {
+      userId: user.user_id,
+      username: user.username,
+      ip: req.ip
+    })
+
+    res.json({
+      success: true,
+      message: 'Token refreshed successfully',
+      data: {
+        access_token: newAccessToken,
+        refresh_token: newRefreshToken,
+        token_type: 'Bearer',
+        expires_in: 24 * 60 * 60,
+        user: {
+          user_id: user.user_id,
+          username: user.username,
+          email: user.email
+        }
+      }
+    })
+
+  } catch (error) {
+    logger.error('Token refresh error', {
+      error: error.message,
+      stack: error.stack,
+      ip: req.ip
+    })
+
+    res.status(500).json({
+      success: false,
+      message: '토큰 갱신 중 오류가 발생했습니다.',
+      error: 'TOKEN_REFRESH_ERROR'
+    })
+  }
+})
+
+/**
  * 클라이언트 타입별 기본 리디렉트 URI 반환
  */
 function getDefaultRedirectUri(clientType, isProduction) {
   const redirectUris = {
-    'unity-mobile-client': isProduction 
-      ? 'blokus://auth/callback'
-      : 'http://localhost:7777/auth/callback',
+    'unity-mobile-client': 'blokus://auth/callback', // 개발/프로덕션 모두 동일한 Deep Link 사용
     'qt-desktop-client': isProduction
       ? 'http://localhost:8080/auth/callback'  // 프로덕션에서도 로컬
       : 'http://localhost:8080/auth/callback',
@@ -481,96 +687,5 @@ router.get('/info',
   }
 )
 
-/**
- * POST /api/auth/refresh
- * OIDC 토큰 갱신 - OIDC 서버로 리디렉트
- * 실제 토큰 갱신은 OIDC 서버에서 처리
- */
-router.post('/refresh', async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization
-    const { refresh_token, client_id } = req.body
-
-    if (!authHeader && !refresh_token) {
-      return res.status(401).json({
-        success: false,
-        message: 'Authorization token or refresh token required',
-        error: 'MISSING_TOKEN'
-      })
-    }
-
-    // Bearer 토큰 추출 (있는 경우)
-    let currentToken = null
-    if (authHeader) {
-      currentToken = authHeader.startsWith('Bearer ')
-        ? authHeader.slice(7)
-        : authHeader
-    }
-
-    // 토큰 디코딩 (검증 없이 - 정보 확인용)
-    const decoded = currentToken ? decodeToken(currentToken) : null
-
-    logger.info('Token refresh redirect request (OIDC)', {
-      sub: decoded?.sub,
-      hasRefreshToken: !!refresh_token,
-      clientId: client_id,
-      ip: req.ip
-    })
-
-    // 환경별 OIDC 서버 URL 결정
-    const isProduction = process.env.NODE_ENV === 'production'
-    const oidcBaseUrl = isProduction
-      ? (process.env.OIDC_BASE_URL_PROD || 'https://blokus-online.mooo.com')
-      : (process.env.OIDC_BASE_URL || 'http://localhost:9000')
-
-    // 이 API 서버에서는 토큰을 새로 발급하지 않음
-    // OIDC 서버에서 새 토큰을 받아야 함을 안내
-    res.json({
-      success: false,
-      message: 'Token refresh must be done through OIDC server',
-      error: 'OIDC_REFRESH_REQUIRED',
-      data: {
-        suggestion: 'Use refresh token directly with OIDC token endpoint',
-        oidc_endpoints: {
-          token: `${oidcBaseUrl}/token`,
-          revocation: `${oidcBaseUrl}/revocation`,
-          discovery: `${oidcBaseUrl}/.well-known/openid-configuration`
-        },
-        refresh_flow: {
-          method: 'POST',
-          url: `${oidcBaseUrl}/token`,
-          content_type: 'application/x-www-form-urlencoded',
-          body_params: {
-            grant_type: 'refresh_token',
-            refresh_token: '[YOUR_REFRESH_TOKEN]',
-            client_id: client_id || 'unity-mobile-client'
-          }
-        },
-        current_token_info: decoded ? {
-          sub: decoded.sub,
-          expires_at: new Date(decoded.exp * 1000).toISOString(),
-          is_expired: decoded.exp < Math.floor(Date.now() / 1000),
-          issuer: decoded.iss
-        } : null,
-        instructions: {
-          ko: '리프레시 토큰으로 OIDC 서버에서 새로운 액세스 토큰을 받아주세요.',
-          en: 'Please obtain new access token from OIDC server using refresh token.'
-        }
-      }
-    })
-  } catch (error) {
-    logger.error('Token refresh redirect error (OIDC)', {
-      error: error.message,
-      ip: req.ip,
-      stack: error.stack
-    })
-
-    res.status(500).json({
-      success: false,
-      message: 'Token refresh redirect failed',
-      error: 'INTERNAL_SERVER_ERROR'
-    })
-  }
-})
 
 module.exports = router

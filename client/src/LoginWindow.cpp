@@ -36,11 +36,20 @@ namespace Blokus
           m_loadingLabel(nullptr),
           m_loadingMovie(nullptr),
           m_isLoading(false),
+          m_oidcAuthenticator(new OidcAuthenticator(this)),
           m_animationTimer(new QTimer(this))
     {
         setupUI();
         setupStyles();
         createAnimations();
+        
+        // OIDC 시그널 연결
+        connect(m_oidcAuthenticator, &OidcAuthenticator::authenticationSucceeded,
+                this, &LoginWindow::onOidcAuthenticationSucceeded);
+        connect(m_oidcAuthenticator, &OidcAuthenticator::authenticationFailed,
+                this, &LoginWindow::onOidcAuthenticationFailed);
+        connect(m_oidcAuthenticator, &OidcAuthenticator::tokensRefreshed,
+                this, &LoginWindow::onOidcTokensRefreshed);
 
         setWindowTitle(QString::fromUtf8("블로커스 온라인 - 로그인"));
         setFixedSize(400, 600);
@@ -229,6 +238,13 @@ namespace Blokus
             "QPushButton { background-color: #3498db; color: white; } "
             "QPushButton:hover { background-color: #2980b9; }");
         m_loginButton->setMinimumSize(70, 26);
+        
+        // OIDC 로그인 버튼
+        m_oidcLoginButton = new QPushButton(QString::fromUtf8("Google로 로그인"));
+        m_oidcLoginButton->setStyleSheet(
+            "QPushButton { background-color: #4285f4; color: white; } "
+            "QPushButton:hover { background-color: #3367d6; }");
+        m_oidcLoginButton->setMinimumSize(70, 26);
 
         // 회원가입 버튼
         m_showRegisterButton = new QPushButton(QString::fromUtf8("회원가입"));
@@ -252,6 +268,8 @@ namespace Blokus
         layout->addSpacing(6); // 고정 스페이싱
         layout->addWidget(m_loginButton);
         layout->addSpacing(3); // 고정 스페이싱
+        layout->addWidget(m_oidcLoginButton);
+        layout->addSpacing(3); // 고정 스페이싱
         layout->addWidget(m_showRegisterButton);
         layout->addWidget(m_showPasswordResetButton);
 
@@ -261,6 +279,7 @@ namespace Blokus
         connect(m_usernameEdit, &QLineEdit::returnPressed, this, &LoginWindow::onLoginClicked);
         connect(m_passwordEdit, &QLineEdit::returnPressed, this, &LoginWindow::onLoginClicked);
         connect(m_loginButton, &QPushButton::clicked, this, &LoginWindow::onLoginClicked);
+        connect(m_oidcLoginButton, &QPushButton::clicked, this, &LoginWindow::onOidcLoginClicked);
         connect(m_showRegisterButton, &QPushButton::clicked, this, &LoginWindow::onShowRegisterForm);
         connect(m_showPasswordResetButton, &QPushButton::clicked, this, &LoginWindow::onShowPasswordResetForm);
 
@@ -509,6 +528,8 @@ namespace Blokus
             m_showRegisterButton->setEnabled(enabled);
         if (m_showPasswordResetButton)
             m_showPasswordResetButton->setEnabled(enabled);
+        if (m_oidcLoginButton)
+            m_oidcLoginButton->setEnabled(enabled);
     }
 
     void LoginWindow::showLoadingState(bool loading)
@@ -586,6 +607,36 @@ namespace Blokus
             "}");
 
         msgBox.exec();
+    }
+    
+    // OIDC 이벤트 핸들러들
+    void LoginWindow::onOidcLoginClicked()
+    {
+        showLoadingState(true);
+        m_loadingLabel->setText(QString::fromUtf8("OAuth 인증 중..."));
+        m_oidcAuthenticator->startAuthenticationFlow();
+    }
+    
+    void LoginWindow::onOidcAuthenticationSucceeded(const QString& accessToken, const OidcTokens& tokens)
+    {
+        Q_UNUSED(tokens); // 현재 사용하지 않는 매개변수
+        showLoadingState(false);
+        
+        // JWT 토큰으로 서버에 로그인 요청
+        emit jwtLoginRequested(accessToken);
+    }
+    
+    void LoginWindow::onOidcAuthenticationFailed(const QString& error)
+    {
+        showLoadingState(false);
+        showMessage(QString::fromUtf8("OAuth 로그인 실패"), error, true);
+    }
+    
+    void LoginWindow::onOidcTokensRefreshed(const QString& accessToken)
+    {
+        // 토큰이 자동으로 갱신된 경우
+        // 필요시 자동 재로그인 처리
+        emit jwtLoginRequested(accessToken);
     }
 
 } // namespace Blokus

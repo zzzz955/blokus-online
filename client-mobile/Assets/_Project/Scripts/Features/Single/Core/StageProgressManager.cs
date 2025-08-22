@@ -390,6 +390,26 @@ namespace Features.Single.Core{
             }
             return totalStars;
         }
+
+        /// <summary>
+        /// 캐시된 진행도 데이터 완전 정리 (로그아웃 시 호출)
+        /// </summary>
+        public void ClearCache()
+        {
+            Debug.Log("[StageProgressManager] 캐시 데이터 정리 시작");
+            
+            // 진행도 캐시 완전 정리
+            if (stageProgressCache != null)
+            {
+                stageProgressCache.Clear();
+                Debug.Log("[StageProgressManager] 진행도 캐시 정리 완료");
+            }
+            
+            // 최대 스테이지 초기화
+            maxStageCompleted = 0;
+            
+            Debug.Log("[StageProgressManager] 캐시 데이터 정리 완료");
+        }
     }
     
     // ========================================

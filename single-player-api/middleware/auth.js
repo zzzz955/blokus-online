@@ -32,8 +32,10 @@ const getSigningKey = (kid) => {
 }
 
 /**
- * JWT 토큰 검증 미들웨어 (JWKS 기반)
- * Authorization: Bearer <token> 헤더에서 토큰을 추출하고 OIDC 서버에서 검증
+ * JWT 토큰 검증 미들웨어 (하이브리드 - OIDC + 로컬 API 토큰 지원)
+ * Authorization: Bearer <token> 헤더에서 토큰을 추출하여 검증
+ * - OIDC 토큰 (RS256): kid 헤더 있음 → JWKS로 검증
+ * - 로컬 API 토큰 (HS256): kid 헤더 없음 → JWT_SECRET으로 검증
  */
 const authenticateToken = async (req, res, next) => {
   try {
@@ -61,29 +63,73 @@ const authenticateToken = async (req, res, next) => {
       })
     }
 
-    // 토큰 헤더에서 kid 추출
+    // 토큰 헤더 디코딩 (검증 없이)
     const decodedHeader = jwt.decode(token, { complete: true })
-    if (!decodedHeader || !decodedHeader.header.kid) {
+    if (!decodedHeader) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid token: missing key ID',
-        error: 'MISSING_KEY_ID'
+        message: 'Invalid token format',
+        error: 'INVALID_TOKEN_STRUCTURE'
       })
     }
 
-    const kid = decodedHeader.header.kid
+    let decoded
+    let tokenType = 'unknown'
 
-    // JWKS에서 공개키 가져오기
-    const signingKey = await getSigningKey(kid)
+    // 토큰 타입 판별 및 검증
+    if (decodedHeader.header.kid) {
+      // OIDC 토큰 (RS256) - kid 헤더 존재
+      try {
+        const kid = decodedHeader.header.kid
+        const signingKey = await getSigningKey(kid)
+        
+        decoded = jwt.verify(token, signingKey, {
+          algorithms: ['RS256'],
+          issuer: process.env.OIDC_ISSUER || 'http://localhost:9000',
+          audience: ['unity-mobile-client', 'qt-desktop-client', 'nextjs-web-client']
+        })
+        tokenType = 'OIDC'
+        
+        logger.debug('OIDC token verification successful', {
+          kid: kid,
+          issuer: decoded.iss,
+          subject: decoded.sub
+        })
+      } catch (error) {
+        logger.warn('OIDC token verification failed', { 
+          error: error.message, 
+          kid: decodedHeader.header.kid 
+        })
+        throw error
+      }
+    } else {
+      // 로컬 API 토큰 (HS256) - kid 헤더 없음
+      try {
+        if (!process.env.JWT_SECRET) {
+          throw new Error('JWT_SECRET not configured for local token verification')
+        }
+        
+        decoded = jwt.verify(token, process.env.JWT_SECRET, {
+          algorithms: ['HS256'],
+          issuer: 'blokus-single-api'
+        })
+        tokenType = 'Local'
+        
+        logger.debug('Local API token verification successful', {
+          issuer: decoded.iss,
+          userId: decoded.user_id || decoded.sub,
+          username: decoded.username
+        })
+      } catch (error) {
+        logger.warn('Local API token verification failed', { 
+          error: error.message,
+          issuer: decodedHeader.payload?.iss 
+        })
+        throw error
+      }
+    }
 
-    // JWT 토큰 검증 (RS256)
-    const decoded = jwt.verify(token, signingKey, {
-      algorithms: ['RS256'],
-      issuer: process.env.OIDC_ISSUER || 'http://localhost:9000',
-      audience: ['unity-mobile-client', 'qt-desktop-client', 'nextjs-web-client']
-    })
-
-    // 토큰이 유효한지 확인 (만료시간 등)
+    // 토큰 만료 확인
     const currentTime = Math.floor(Date.now() / 1000)
     if (decoded.exp && decoded.exp < currentTime) {
       return res.status(401).json({
@@ -93,30 +139,54 @@ const authenticateToken = async (req, res, next) => {
       })
     }
 
-    // 필수 클레임 확인 (OIDC 표준)
-    if (!decoded.sub) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid token payload: missing subject',
-        error: 'INVALID_TOKEN_PAYLOAD'
-      })
+    // 사용자 정보 추가 (토큰 타입에 따라 다른 구조)
+    if (tokenType === 'OIDC') {
+      // OIDC 표준 클레임 사용
+      if (!decoded.sub) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid OIDC token: missing subject',
+          error: 'INVALID_TOKEN_PAYLOAD'
+        })
+      }
+      
+      req.user = {
+        sub: decoded.sub,
+        username: decoded.preferred_username || decoded.sub,
+        userId: decoded.sub,
+        email: decoded.email,
+        iat: decoded.iat,
+        exp: decoded.exp,
+        iss: decoded.iss,
+        aud: decoded.aud,
+        tokenType: 'OIDC'
+      }
+    } else {
+      // 로컬 API 토큰 클레임 사용
+      if (!decoded.user_id && !decoded.username) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid local token: missing user identification',
+          error: 'INVALID_TOKEN_PAYLOAD'
+        })
+      }
+      
+      req.user = {
+        sub: decoded.user_id?.toString(),
+        username: decoded.username,
+        userId: decoded.user_id,
+        iat: decoded.iat,
+        exp: decoded.exp,
+        iss: decoded.iss,
+        is_guest: decoded.is_guest || false,
+        tokenType: 'Local'
+      }
     }
 
-    // 요청 객체에 사용자 정보 추가 (OIDC 표준 클레임 사용)
-    req.user = {
-      sub: decoded.sub,
-      username: decoded.preferred_username || decoded.sub,
-      userId: decoded.sub, // sub을 user_id로 사용
-      email: decoded.email,
-      iat: decoded.iat,
-      exp: decoded.exp,
-      iss: decoded.iss,
-      aud: decoded.aud
-    }
-
-    logger.debug('JWT authentication successful (OIDC)', {
-      sub: decoded.sub,
-      username: decoded.preferred_username,
+    logger.debug(`JWT authentication successful (${tokenType})`, {
+      userId: req.user.userId,
+      username: req.user.username,
+      tokenType: tokenType,
       ip: req.ip,
       userAgent: req.get('User-Agent'),
       issuer: decoded.iss
@@ -124,7 +194,7 @@ const authenticateToken = async (req, res, next) => {
 
     next()
   } catch (error) {
-    logger.warn('JWT authentication failed (OIDC)', {
+    logger.warn('JWT authentication failed', {
       error: error.message,
       ip: req.ip,
       userAgent: req.get('User-Agent'),
@@ -175,23 +245,16 @@ const authenticateToken = async (req, res, next) => {
 }
 
 /**
- * @deprecated 이 API 서버는 더 이상 토큰을 생성하지 않습니다.
- * 모든 토큰은 OIDC 서버에서 발급받아야 합니다.
- * 
- * JWT 토큰 생성 헬퍼 함수 (게스트 토큰용으로만 유지)
+ * JWT 토큰 생성 헬퍼 함수 (로컬 API 전용)
  * @param {Object} payload - 토큰에 포함할 데이터
  * @param {string} payload.username - 사용자명
  * @param {number} payload.userId - 사용자 ID
+ * @param {boolean} payload.is_guest - 게스트 여부 (옵션)
  * @param {string} expiresIn - 만료시간 (기본: 7d)
  * @returns {string} JWT 토큰
  */
 const generateToken = (payload, expiresIn = process.env.JWT_EXPIRE_IN || '7d') => {
   try {
-    // 게스트 토큰만 허용
-    if (!payload.is_guest) {
-      throw new Error('Token generation is only allowed for guest users. Use OIDC server for regular users.')
-    }
-
     const tokenPayload = {
       username: payload.username,
       user_id: payload.user_id || payload.userId, // 둘 다 지원
@@ -205,9 +268,10 @@ const generateToken = (payload, expiresIn = process.env.JWT_EXPIRE_IN || '7d') =
       algorithm: 'HS256'
     })
 
-    logger.debug('JWT guest token generated', {
+    logger.debug('JWT token generated', {
       username: payload.username,
       userId: payload.user_id || payload.userId,
+      isGuest: payload.is_guest || false,
       expiresIn
     })
 

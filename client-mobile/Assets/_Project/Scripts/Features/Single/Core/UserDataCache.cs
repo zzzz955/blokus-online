@@ -42,6 +42,11 @@ namespace Features.Single.Core
         // 중복 요청 방지
         private bool isBatchProgressLoading = false;
 
+        // 🔥 추가: 초기 동기화 상태 추적
+        private bool metadataReceived = false;
+        private bool progressBatchReceived = false;
+        private bool currentStatusReceived = false;
+
         // 이벤트
         public event System.Action<UserInfo> OnUserDataUpdated;
         public event System.Action<NetworkUserStageProgress> OnStageProgressUpdated;
@@ -58,6 +63,40 @@ namespace Features.Single.Core
             {
                 int fromProfile = currentUser != null ? currentUser.maxStageCompleted : 0;
                 return Mathf.Max(fromProfile, cachedMaxStageCompleted);
+            }
+        }
+
+        /// <summary>
+        /// 🔥 추가: 초기 동기화 완료 여부 확인
+        /// 메타데이터, 진행도 배치, 현재 상태가 모두 수신되었을 때만 true
+        /// </summary>
+        public bool IsInitialSyncCompleted
+        {
+            get
+            {
+                return metadataReceived && progressBatchReceived && currentStatusReceived;
+            }
+        }
+
+        /// <summary>
+        /// 🔥 추가: 초기 동기화 완료까지 대기하는 코루틴
+        /// </summary>
+        public System.Collections.IEnumerator WaitUntilSynced(float timeoutSeconds = 15f)
+        {
+            float elapsed = 0f;
+            while (!IsInitialSyncCompleted && elapsed < timeoutSeconds)
+            {
+                yield return new WaitForSeconds(0.1f);
+                elapsed += 0.1f;
+            }
+
+            if (elapsed >= timeoutSeconds)
+            {
+                Debug.LogWarning($"[UserDataCache] WaitUntilSynced 타임아웃 (metadata={metadataReceived}, batch={progressBatchReceived}, status={currentStatusReceived})");
+            }
+            else
+            {
+                Debug.Log($"[UserDataCache] 초기 동기화 완료 (elapsed={elapsed:F1}s)");
             }
         }
 
@@ -109,9 +148,80 @@ namespace Features.Single.Core
             if (isInitialized) return;
 
             SetupHttpApiEventHandlers();
+            
+            // 🔥 추가: 이미 로그인된 사용자가 있는지 확인하고 동기화
+            CheckExistingLoginAndSync();
+            
             isInitialized = true;
 
             Debug.Log("[UserDataCache] Initialized for SingleCore");
+        }
+
+        /// <summary>
+        /// 🔥 추가: 기존 로그인 상태 확인 및 동기화
+        /// </summary>
+        private void CheckExistingLoginAndSync()
+        {
+            // SessionManager가 이미 로그인 상태인지 확인
+            if (App.Core.SessionManager.Instance != null && App.Core.SessionManager.Instance.IsLoggedIn)
+            {
+                Debug.Log("[UserDataCache] 기존 로그인 상태 감지 - 사용자 정보 동기화 시작");
+                
+                // HttpApiClient가 준비될 때까지 대기한 후 동기화
+                StartCoroutine(DelayedSyncWithExistingLogin());
+            }
+        }
+
+        /// <summary>
+        /// 🔥 추가: 기존 로그인 상태와 지연 동기화
+        /// </summary>
+        private System.Collections.IEnumerator DelayedSyncWithExistingLogin()
+        {
+            // HttpApiClient가 준비될 때까지 대기
+            while (App.Network.HttpApiClient.Instance == null)
+            {
+                yield return new WaitForSeconds(0.1f);
+            }
+
+            // SessionManager에서 사용자 정보 가져와서 동기화
+            if (App.Core.SessionManager.Instance != null && App.Core.SessionManager.Instance.IsLoggedIn)
+            {
+                Debug.Log("[UserDataCache] SessionManager로부터 사용자 정보 동기화");
+                
+                // SessionManager의 사용자 정보로 UserDataCache 동기화
+                SyncWithSessionManager();
+            }
+        }
+
+        /// <summary>
+        /// 🔥 추가: SessionManager와 동기화
+        /// </summary>
+        private void SyncWithSessionManager()
+        {
+            var sessionManager = App.Core.SessionManager.Instance;
+            if (sessionManager == null || !sessionManager.IsLoggedIn)
+            {
+                Debug.LogWarning("[UserDataCache] SessionManager 로그인 상태가 아님");
+                return;
+            }
+
+            // UserInfo 생성 및 설정
+            var userInfo = new UserInfo
+            {
+                username = sessionManager.CachedId,
+                display_name = sessionManager.DisplayName
+            };
+
+            // 로그인 상태 및 토큰 설정
+            isLoggedIn = true;
+            authToken = sessionManager.AuthToken;
+            currentUser = userInfo;
+
+            Debug.Log($"[UserDataCache] SessionManager 동기화 완료 - User: {userInfo.username}");
+            
+            // 이벤트 발생
+            OnUserDataUpdated?.Invoke(userInfo);
+            OnLoginStatusChanged?.Invoke();
         }
 
         /// <summary>
@@ -198,11 +308,15 @@ namespace Features.Single.Core
 
             // 진행도 업데이트 이벤트 구독
             httpClient.OnBatchProgressReceived += OnBatchProgressReceived;
+            httpClient.OnCurrentStatusReceived += OnCurrentStatusReceived; // 🔥 추가: current_status 구독
             httpClient.OnStageProgressReceived += OnStageProgressReceived;
             httpClient.OnStageCompleteResponse += OnStageCompleteResponse;
 
             // 🔥 수정: 사용자 프로필 업데이트 이벤트 구독 추가
             httpClient.OnUserProfileReceived += OnUserProfileReceived;
+            
+            // 🔥 추가: 로그인 시 사용자 정보 수신 이벤트 구독
+            httpClient.OnUserInfoReceived += OnUserInfoReceived;
 
         }
 
@@ -215,11 +329,15 @@ namespace Features.Single.Core
             {
                 var httpClient = HttpApiClient.Instance;
                 httpClient.OnBatchProgressReceived -= OnBatchProgressReceived;
+                httpClient.OnCurrentStatusReceived -= OnCurrentStatusReceived; // 🔥 추가: 구독 해제
                 httpClient.OnStageProgressReceived -= OnStageProgressReceived;
                 httpClient.OnStageCompleteResponse -= OnStageCompleteResponse;
 
                 // 🔥 수정: 사용자 프로필 업데이트 이벤트 구독 해제 추가
                 httpClient.OnUserProfileReceived -= OnUserProfileReceived;
+                
+                // 🔥 추가: 로그인 시 사용자 정보 수신 이벤트 구독 해제
+                httpClient.OnUserInfoReceived -= OnUserInfoReceived;
             }
         }
 
@@ -357,6 +475,14 @@ namespace Features.Single.Core
         public UserInfo GetCurrentUser()
         {
             return currentUser;
+        }
+
+        /// <summary>
+        /// 현재 사용자 ID 반환
+        /// </summary>
+        public string GetCurrentUserId()
+        {
+            return currentUser?.username;
         }
 
         /// <summary>
@@ -533,6 +659,13 @@ namespace Features.Single.Core
             stageProgressCache.Clear();
             stageDataCache.Clear();
 
+            // 🔥 핵심 수정: cachedMaxStageCompleted도 초기화!
+            cachedMaxStageCompleted = 0;
+            Debug.Log("[UserDataCache] cachedMaxStageCompleted 초기화됨: 0");
+
+            // 🔥 추가: 동기화 상태 초기화
+            ResetSyncState();
+
             if (enablePersistentCache)
             {
                 PlayerPrefs.DeleteKey("UserDataCache_Progress");
@@ -540,7 +673,17 @@ namespace Features.Single.Core
                 PlayerPrefs.DeleteKey("UserDataCache_UserInfo");
                 PlayerPrefs.Save();
             }
+        }
 
+        /// <summary>
+        /// 🔥 추가: 동기화 상태 초기화 (사용자 전환 시 호출)
+        /// </summary>
+        private void ResetSyncState()
+        {
+            metadataReceived = false;
+            progressBatchReceived = false;
+            currentStatusReceived = false;
+            Debug.Log("[UserDataCache] 동기화 상태 초기화됨");
         }
 
         /// <summary>
@@ -690,6 +833,10 @@ namespace Features.Single.Core
                 Debug.LogWarning($"[UserDataCache] 스테이지 메타데이터 설정 - 데이터 없음");
             }
 
+            // 🔥 추가: 메타데이터 수신 플래그 설정
+            metadataReceived = true;
+            Debug.Log("[UserDataCache] 메타데이터 동기화 완료");
+
             OnStageMetadataUpdated?.Invoke(metadata);
         }
 
@@ -800,12 +947,49 @@ namespace Features.Single.Core
                     SetStageProgress(networkProgress);
                 }
                 RecomputeAndCacheMaxStageCompleted();
+                
+                // 🔥 추가: 진행도 배치 수신 플래그 설정
+                progressBatchReceived = true;
+                Debug.Log("[UserDataCache] 진행도 배치 동기화 완료");
+                
                 Debug.Log($"[UserDataCache] ✅ 일괄 진행도 캐시 완료 - 총 {progressArray.Length}개 처리됨");
             }
             else
             {
                 Debug.LogWarning($"[UserDataCache] ❌ 일괄 진행도 수신 - 데이터 없음 (중복 방지 플래그 초기화됨)");
             }
+        }
+
+        /// <summary>
+        /// 🔥 추가: 서버 current_status 수신 처리 (max_stage_completed 동기화)
+        /// </summary>
+        private void OnCurrentStatusReceived(App.Network.HttpApiClient.CurrentStatus currentStatus)
+        {
+            Debug.Log($"[UserDataCache] 📥 OnCurrentStatusReceived 호출됨! max_stage_completed={currentStatus.max_stage_completed}");
+
+            // StageProgressManager에 max_stage_completed 설정
+            var stageProgressManager = Features.Single.Core.StageProgressManager.Instance;
+            if (stageProgressManager != null)
+            {
+                stageProgressManager.SetMaxStageCompleted(currentStatus.max_stage_completed);
+                Debug.Log($"[UserDataCache] StageProgressManager에 서버 max_stage_completed={currentStatus.max_stage_completed} 설정 완료");
+            }
+            else
+            {
+                Debug.LogWarning("[UserDataCache] StageProgressManager.Instance가 null - max_stage_completed 설정 실패");
+            }
+
+            // currentUser 정보도 업데이트
+            if (currentUser != null)
+            {
+                currentUser.maxStageCompleted = currentStatus.max_stage_completed;
+                OnUserDataUpdated?.Invoke(currentUser);
+                Debug.Log($"[UserDataCache] currentUser.maxStageCompleted을 {currentStatus.max_stage_completed}로 업데이트");
+            }
+
+            // 🔥 추가: 현재 상태 수신 플래그 설정
+            currentStatusReceived = true;
+            Debug.Log("[UserDataCache] 현재 상태 동기화 완료");
         }
 
         /// <summary>
@@ -878,6 +1062,56 @@ namespace Features.Single.Core
             else
             {
                 Debug.LogWarning($"[UserDataCache] ❌ OnUserProfileReceived - apiProfile이 null입니다");
+            }
+        }
+
+        /// <summary>
+        /// 🔥 추가: 로그인 시 사용자 정보 수신 처리
+        /// </summary>
+        private void OnUserInfoReceived(App.Network.HttpApiClient.AuthUserData authData)
+        {
+            if (authData != null && authData.user != null)
+            {
+                Debug.Log($"[UserDataCache] 📥 OnUserInfoReceived 호출됨!");
+                Debug.Log($"[UserDataCache] 로그인 사용자 데이터: username={authData.user.username}, user_id={authData.user.user_id}, max_stage_completed={authData.user.max_stage_completed}");
+
+                // AuthUserData.user를 UserInfo로 변환 (실제 필드명 사용)
+                var userInfo = new UserInfo
+                {
+                    username = authData.user.username,
+                    display_name = authData.user.display_name,
+                    level = authData.user.single_player_level,
+                    maxStageCompleted = authData.user.max_stage_completed,
+                    totalGames = 0, // 기본값
+                    wins = 0, // 기본값
+                    losses = 0, // 기본값
+                    averageScore = 0, // 기본값
+                    isOnline = true,
+                    status = "로비"
+                };
+
+                // UserDataCache에 사용자 정보 및 토큰 직접 설정
+                currentUser = userInfo;
+                authToken = authData.token;
+                isLoggedIn = true;
+
+                // 🔥 추가: StageProgressManager에 max_stage_completed 동기화
+                var stageProgressManager = Features.Single.Core.StageProgressManager.Instance;
+                if (stageProgressManager != null)
+                {
+                    stageProgressManager.SetMaxStageCompleted(userInfo.maxStageCompleted);
+                    Debug.Log($"[UserDataCache] StageProgressManager에 max_stage_completed={userInfo.maxStageCompleted} 설정 완료");
+                }
+
+                // 데이터 저장 및 이벤트 발생
+                SaveUserDataToDisk();
+                OnUserDataUpdated?.Invoke(currentUser);
+
+                Debug.Log($"[UserDataCache] ✅ 로그인 사용자 정보 설정 완료 - username={userInfo.username}, max_stage_completed={userInfo.maxStageCompleted}");
+            }
+            else
+            {
+                Debug.LogWarning($"[UserDataCache] ❌ OnUserInfoReceived - authData 또는 user가 null입니다");
             }
         }
 

@@ -131,6 +131,8 @@ class DatabaseService {
         u.username,
         u.display_name,
         u.email,
+        u.oauth_id,
+        u.oauth_provider,
         u.is_active,
         u.created_at,
         u.last_login_at
@@ -139,6 +141,100 @@ class DatabaseService {
     `
 
     const result = await this.query(query, [userId])
+    return result.rows[0] || null
+  }
+
+  // 이메일로 사용자 조회 (OAuth용)
+  async getUserByEmail(email) {
+    const query = `
+      SELECT 
+        u.user_id,
+        u.username,
+        u.display_name,
+        u.email,
+        u.oauth_id,
+        u.oauth_provider,
+        u.password_hash,
+        u.is_active,
+        u.created_at,
+        u.last_login_at
+      FROM users u
+      WHERE LOWER(u.email) = LOWER($1) AND u.is_active = true
+    `
+
+    const result = await this.query(query, [email])
+    return result.rows[0] || null
+  }
+
+  // OAuth 사용자 생성
+  async createOAuthUser(userData) {
+    return await this.transaction(async (client) => {
+      // 사용자 생성
+      const userQuery = `
+        INSERT INTO users (
+          username, 
+          email, 
+          display_name, 
+          oauth_id,
+          oauth_provider,
+          password_hash,
+          level,
+          experience_points,
+          single_player_level,
+          max_stage_completed,
+          created_at,
+          updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, 1, 0, 1, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        RETURNING *
+      `
+
+      const userResult = await client.query(userQuery, [
+        userData.username,
+        userData.email,
+        userData.display_name,
+        userData.oauth_id,
+        userData.oauth_provider,
+        userData.password_hash // OAuth 사용자는 null
+      ])
+
+      const user = userResult.rows[0]
+
+      // 기본 사용자 통계 생성
+      const statsQuery = `
+        INSERT INTO user_stats (
+          user_id,
+          total_games,
+          wins,
+          losses,
+          total_score,
+          best_score
+        ) VALUES ($1, 0, 0, 0, 0, 0)
+      `
+
+      await client.query(statsQuery, [user.user_id])
+
+      logger.info('OAuth user created successfully', {
+        userId: user.user_id,
+        username: user.username,
+        email: user.email,
+        oauthId: user.oauth_id,
+        oauthProvider: user.oauth_provider
+      })
+
+      return user
+    })
+  }
+
+  // 기존 사용자에 OAuth ID 추가
+  async updateUserOAuthId(userId, oauthId, provider) {
+    const query = `
+      UPDATE users 
+      SET oauth_id = $1, oauth_provider = $2, updated_at = CURRENT_TIMESTAMP
+      WHERE user_id = $3
+      RETURNING *
+    `
+
+    const result = await this.query(query, [oauthId, provider, userId])
     return result.rows[0] || null
   }
 

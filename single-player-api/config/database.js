@@ -298,6 +298,98 @@ class DatabaseService {
     if (percentage >= 50) return 1
     return 0
   }
+
+  // 인증 관련 메서드들
+
+  /**
+   * 사용자 인증 (ID/PW)
+   */
+  async authenticateUser(username, password) {
+    const argon2 = require('argon2')
+    
+    const query = `
+      SELECT 
+        user_id,
+        username,
+        email,
+        password_hash,
+        is_active,
+        created_at,
+        last_login_at
+      FROM users 
+      WHERE username = $1 AND is_active = true
+    `
+    
+    const result = await this.query(query, [username])
+    const user = result.rows[0]
+    
+    if (!user) {
+      return null // 사용자 없음
+    }
+    
+    // 비밀번호 검증
+    try {
+      const isValid = await argon2.verify(user.password_hash, password)
+      if (!isValid) {
+        return null // 비밀번호 불일치
+      }
+      
+      // 마지막 로그인 시간 업데이트
+      await this.query(
+        'UPDATE users SET last_login_at = NOW() WHERE user_id = $1',
+        [user.user_id]
+      )
+      
+      // password_hash 제거 후 반환
+      delete user.password_hash
+      return user
+      
+    } catch (error) {
+      logger.error('Password verification error', {
+        error: error.message,
+        username
+      })
+      return null
+    }
+  }
+
+  /**
+   * 사용자 ID로 조회
+   */
+  async getUserById(userId) {
+    const query = `
+      SELECT 
+        user_id,
+        username,
+        email,
+        display_name,
+        is_active,
+        created_at,
+        last_login_at
+      FROM users 
+      WHERE user_id = $1
+    `
+    
+    const result = await this.query(query, [userId])
+    return result.rows[0] || null
+  }
+
+  /**
+   * 사용자 통계 조회
+   */
+  async getUserStats(userId) {
+    const query = `
+      SELECT 
+        us.single_player_level,
+        us.max_stage_completed,
+        us.single_player_score
+      FROM user_stats us
+      WHERE us.user_id = $1
+    `
+    
+    const result = await this.query(query, [userId])
+    return result.rows[0] || null
+  }
 }
 
 // 싱글톤 인스턴스
