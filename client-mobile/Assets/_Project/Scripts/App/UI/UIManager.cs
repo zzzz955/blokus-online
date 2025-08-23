@@ -527,7 +527,7 @@ namespace App.UI
         }
         
         /// <summary>
-        /// 🔥 추가: 스테이지 선택 모드에서 게임플레이 모드로 전환
+        /// 🔥 수정: 스테이지 선택 모드에서 게임플레이 모드로 전환 (Scene 재로딩 방지)
         /// </summary>
         private IEnumerator TransitionToGameplayMode()
         {
@@ -536,12 +536,40 @@ namespace App.UI
             // 1. MainScene 패널들 숨기기 (이제 실제 게임플레이 시작)
             HideAllMainScenePanels();
             
-            // 2. SingleGameManager 강제 재초기화 (이미 Scene은 로드되어 있음)
-            if (App.Core.SceneFlowController.Instance != null)
+            // 2. 🔥 핵심 수정: SingleGameManager 초기화 + UI 활성화
+            // Scene은 이미 로드되어 있으므로 SingleGameManager 직접 호출
+            var singleGameManager = Features.Single.Gameplay.SingleGameManager.Instance;
+            if (singleGameManager != null && Features.Single.Gameplay.SingleGameManager.CurrentStage > 0)
             {
-                // SceneFlowController의 EnsureSingleGameManagerActive를 통해 강제 초기화
-                Debug.Log("[UIManager] SingleGameManager 재초기화 요청");
-                yield return StartCoroutine(App.Core.SceneFlowController.Instance.GoSingle());
+                Debug.Log($"[UIManager] SingleGameManager 발견 - 스테이지 {Features.Single.Gameplay.SingleGameManager.CurrentStage} 초기화 시작");
+                
+                // 스테이지 데이터를 이용해 게임 초기화 (GameBoard, BlockPalette 등 초기화)
+                singleGameManager.RequestStartByNumber(Features.Single.Gameplay.SingleGameManager.CurrentStage);
+                Debug.Log("[UIManager] SingleGameManager 초기화 완료");
+                
+                // UI 활성화 (SingleGameManager.Init에서 OnGameReady 이벤트가 발생하여 자동 활성화됨)
+                yield return new WaitForSeconds(0.1f); // Init 완료 대기
+            }
+            else
+            {
+                Debug.LogError("[UIManager] SingleGameManager Instance가 없거나 CurrentStage가 설정되지 않음!");
+                
+                // 백업: UI만이라도 활성화
+                var screenController = Object.FindObjectOfType<Features.Single.UI.Scene.SingleGameplayUIScreenController>();
+                if (screenController != null)
+                {
+                    Debug.Log("[UIManager] 백업: UIScreenController를 통한 GamePanel 활성화");
+                    screenController.ShowGameplay();
+                }
+                else
+                {
+                    var gamePanel = GameObject.Find("GamePanel");
+                    if (gamePanel != null)
+                    {
+                        gamePanel.SetActive(true);
+                        Debug.Log("[UIManager] 백업: GamePanel 직접 활성화 완료");
+                    }
+                }
             }
             
             Debug.Log("[UIManager] ✅ 게임플레이 모드 전환 완료 - 게임 시작!");

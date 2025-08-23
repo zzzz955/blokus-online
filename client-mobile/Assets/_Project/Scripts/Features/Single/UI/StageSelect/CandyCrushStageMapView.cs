@@ -60,6 +60,11 @@ namespace Features.Single.UI.StageSelect
 
         // 🔥 추가: 중복 프로필 업데이트 방지
         private bool isProfileUpdateInProgress = false;
+        
+        // 🔥 추가: 중복 버튼 리프레시 방지
+        private bool isButtonRefreshInProgress = false;
+        private float lastButtonRefreshTime = 0f;
+        private const float BUTTON_REFRESH_THROTTLE = 0.5f; // 0.5초 간격으로 제한
 
         protected override void Awake()
         {
@@ -873,6 +878,12 @@ namespace Features.Single.UI.StageSelect
             Debug.Log($"[CandyCrushStageMapView] 사용자 데이터 업데이트됨: {userInfo.username}, maxStageCompleted={userInfo.maxStageCompleted}");
             Debug.Log($"[CandyCrushStageMapView] 프로필 로드 완료 - 모든 스테이지 버튼 상태 새로고침 시작");
 
+            // 🔥 추가: 메타데이터 기반으로 StageFeed의 총 스테이지 수 업데이트
+            if (stageFeed != null)
+            {
+                stageFeed.UpdateTotalStagesFromMetadata();
+            }
+
             // 🔥 추가: progressManager와 Features.Single.Core.UserDataCache 동기화
             if (progressManager != null && userInfo.maxStageCompleted > 0)
             {
@@ -976,6 +987,23 @@ namespace Features.Single.UI.StageSelect
         /// </summary>
         private void RefreshAllStageButtons()
         {
+            // 🔥 추가: 중복 리프레시 방지 - Throttling
+            float currentTime = Time.time;
+            if (isButtonRefreshInProgress)
+            {
+                Debug.Log("[CandyCrushStageMapView] RefreshAllStageButtons 진행 중 - 스킵");
+                return;
+            }
+            
+            if (currentTime - lastButtonRefreshTime < BUTTON_REFRESH_THROTTLE)
+            {
+                Debug.Log($"[CandyCrushStageMapView] RefreshAllStageButtons 너무 빠른 호출 - 스킵 (마지막: {lastButtonRefreshTime:F2}s, 현재: {currentTime:F2}s)");
+                return;
+            }
+            
+            isButtonRefreshInProgress = true;
+            lastButtonRefreshTime = currentTime;
+            
             Debug.Log($"[CandyCrushStageMapView] RefreshAllStageButtons 시작 - 기존 활성 버튼 수: {activeButtons.Count}");
 
             // 현재 사용자의 진행도 기준으로 언락된 스테이지 수 계산
@@ -1049,6 +1077,12 @@ namespace Features.Single.UI.StageSelect
             }
 
             Debug.Log($"[CandyCrushStageMapView] RefreshAllStageButtons 완료 - 최종 활성 버튼 수: {activeButtons.Count}");
+            
+            // 🔥 추가: UI 정보 업데이트 (진행률, 별 개수)
+            UpdateUIInfo();
+            
+            // 🔥 추가: Throttling 플래그 해제
+            isButtonRefreshInProgress = false;
         }
 
         /// <summary>
@@ -1490,24 +1524,69 @@ namespace Features.Single.UI.StageSelect
         /// </summary>
         private void UpdateUIInfo()
         {
-            if (progressManager == null) return;
-
-            int totalStages = stageFeed.GetTotalStages();
-
-            // 진행률 텍스트
-            if (progressText != null)
+            if (progressManager == null) 
             {
-                float progress = progressManager.GetOverallProgress(totalStages);
-                int maxUnlocked = progressManager.GetMaxUnlockedStage();
-                progressText.text = $"진행률: {progress:F1}% ({maxUnlocked}/{totalStages})";
+                Debug.LogWarning("[CandyCrushStageMapView] UpdateUIInfo - progressManager가 null입니다");
+                return;
             }
 
-            // 총 별 개수
+            int totalStages = stageFeed.GetTotalStages();
+            Debug.Log($"[CandyCrushStageMapView] UpdateUIInfo 시작 - totalStages: {totalStages}");
+
+            // 진행률 텍스트 (완료한 스테이지 / 총 스테이지)
+            if (progressText != null)
+            {
+                int maxCompleted = 0;
+                if (UserDataCache.Instance != null && UserDataCache.Instance.IsLoggedIn())
+                {
+                    maxCompleted = UserDataCache.Instance.MaxStageCompleted;
+                }
+                
+                float progress = (float)maxCompleted / totalStages * 100f;
+                string progressString = $"진행률: {progress:F1}% ({maxCompleted}/{totalStages})";
+                progressText.text = progressString;
+                
+                Debug.Log($"[CandyCrushStageMapView] 진행률 업데이트: {progressString}");
+            }
+            else
+            {
+                Debug.LogWarning("[CandyCrushStageMapView] progressText가 null입니다");
+            }
+
+            // 총 별 개수 (실제 획득한 별 / 총 가능한 별)
             if (totalStarsText != null)
             {
-                int earnedStars = progressManager.GetTotalStarsEarned();
+                int earnedStars = 0;
+                
+                // UserDataCache에서 실제 획득한 별 개수 계산
+                if (UserDataCache.Instance != null)
+                {
+                    Debug.Log($"[CandyCrushStageMapView] 별 개수 계산 시작 - 총 스테이지: {totalStages}");
+                    
+                    for (int i = 1; i <= totalStages; i++)
+                    {
+                        var progress = UserDataCache.Instance.GetStageProgress(i);
+                        if (progress != null && progress.starsEarned > 0)
+                        {
+                            earnedStars += progress.starsEarned;
+                            Debug.Log($"[CandyCrushStageMapView] 스테이지 {i} - 별: {progress.starsEarned}개 (누적: {earnedStars})");
+                        }
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning("[CandyCrushStageMapView] UserDataCache.Instance가 null입니다");
+                }
+                
                 int maxStars = totalStages * 3;
-                totalStarsText.text = $"별: {earnedStars}/{maxStars} ★";
+                string starsString = $"별: {earnedStars}/{maxStars} ★";
+                totalStarsText.text = starsString;
+                
+                Debug.Log($"[CandyCrushStageMapView] 별 정보 업데이트: {starsString}");
+            }
+            else
+            {
+                Debug.LogWarning("[CandyCrushStageMapView] totalStarsText가 null입니다");
             }
         }
 

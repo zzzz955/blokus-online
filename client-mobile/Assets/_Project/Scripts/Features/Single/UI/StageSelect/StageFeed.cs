@@ -11,7 +11,7 @@ namespace Features.Single.UI.StageSelect{
         [Header("레이아웃 설정")]
         [SerializeField] private float stageVerticalSpacing = 180f; // 간격 더 넓게
         [SerializeField] private float maxHorizontalOffset = 300f; // 좌우 범위도 더 넓게
-        [SerializeField] private int totalStages = 100;
+        [SerializeField] private int totalStages = 14; // 실제 구현된 스테이지 개수
         [SerializeField] private AnimationCurve horizontalPattern; // 에디터에서 패턴 조정 가능
         
         
@@ -133,6 +133,29 @@ namespace Features.Single.UI.StageSelect{
         public int GetTotalStages()
         {
             return totalStages;
+        }
+        
+        /// <summary>
+        /// 🔥 추가: 실제 메타데이터 기반으로 총 스테이지 수 업데이트
+        /// </summary>
+        public void UpdateTotalStagesFromMetadata()
+        {
+            if (Features.Single.Core.UserDataCache.Instance != null)
+            {
+                var metadata = Features.Single.Core.UserDataCache.Instance.GetStageMetadata();
+                if (metadata != null && metadata.Length > 0)
+                {
+                    int newTotalStages = metadata.Length;
+                    if (newTotalStages != totalStages)
+                    {
+                        totalStages = newTotalStages;
+                        Debug.Log($"[StageFeed] 총 스테이지 수 업데이트: {totalStages}개");
+                        
+                        // 경로 재생성
+                        GeneratePath();
+                    }
+                }
+            }
         }
         
         /// <summary>

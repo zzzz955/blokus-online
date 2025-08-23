@@ -649,8 +649,19 @@ namespace Features.Single.Core
 
             int maxStage = 0;
 
+            // 🔥 수정: 실제 메타데이터 기반으로 상한선 설정
+            int totalStages = 14; // 기본값
+            if (UserDataCache.Instance != null)
+            {
+                var metadata = UserDataCache.Instance.GetStageMetadata();
+                if (metadata != null && metadata.Length > 0)
+                {
+                    totalStages = metadata.Length;
+                }
+            }
+            
             // 캐시된 진행도에서 별점이 1개 이상인 스테이지 찾기
-            for (int i = 1; i <= 300; i++) // 합리적인 상한선 설정
+            for (int i = 1; i <= totalStages; i++)
             {
                 var progress = UserDataCache.Instance.GetStageProgress(i);
                 if (progress != null && progress.isCompleted && progress.starsEarned > 0)

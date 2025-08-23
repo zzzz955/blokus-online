@@ -207,7 +207,7 @@ namespace Features.Single.Core{
         /// 전체 진행률 계산 (UI 표시용)
         /// </summary>
         /// <param name="totalStages">총 스테이지 수</param>
-        public float GetOverallProgress(int totalStages = 1000)
+        public float GetOverallProgress(int totalStages = 14) // 실제 구현된 스테이지 개수
         {
             return (float)maxStageCompleted / totalStages * 100f;
         }

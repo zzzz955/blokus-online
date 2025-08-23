@@ -296,8 +296,28 @@ namespace Features.Single.Gameplay
             OnUndoCountChanged?.Invoke(RemainingUndo);
 
             // 보드 준비
-            if (!gameBoard) gameBoard = FindObjectOfType<GameBoard>(true);
-            if (!blockPalette) blockPalette = FindObjectOfType<BlockPalette>(true);
+            if (!gameBoard) 
+            {
+                gameBoard = FindObjectOfType<GameBoard>(true);
+                if (verboseLog && gameBoard) Debug.Log("[SingleGameManager] GameBoard 컴포넌트 발견됨");
+            }
+            if (!blockPalette) 
+            {
+                blockPalette = FindObjectOfType<BlockPalette>(true);
+                if (verboseLog && blockPalette) Debug.Log("[SingleGameManager] BlockPalette 컴포넌트 발견됨");
+            }
+
+            if (gameBoard == null)
+            {
+                Debug.LogError("[SingleGameManager] GameBoard를 찾을 수 없습니다! SingleGameplayScene에 GameBoard 컴포넌트가 있는지 확인하세요.");
+                return;
+            }
+            
+            if (blockPalette == null)
+            {
+                Debug.LogError("[SingleGameManager] BlockPalette를 찾을 수 없습니다! SingleGameplayScene에 BlockPalette 컴포넌트가 있는지 확인하세요.");
+                return;
+            }
 
             gameBoard.SetGameLogic(logic);
             gameBoard.ClearBoard();

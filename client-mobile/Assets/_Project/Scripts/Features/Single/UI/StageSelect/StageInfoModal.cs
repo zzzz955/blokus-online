@@ -656,8 +656,16 @@ namespace Features.Single.UI.StageSelect
                 Debug.Log($"[StageInfoModal] UIManager 발견. 스테이지 {selectedStageNumber} 게임 시작");
                 uiManager.OnStageSelected(selectedStageNumber);
 
-                // Scene 전환 후 모달 숨기기
-                StartCoroutine(HideModalAfterDelay());
+                // 🔥 수정: GameObject 활성 상태 확인 후 코루틴 시작
+                if (gameObject.activeInHierarchy)
+                {
+                    StartCoroutine(HideModalAfterDelay());
+                }
+                else
+                {
+                    Debug.Log("[StageInfoModal] GameObject가 비활성화됨 - 직접 모달 숨기기");
+                    HideModal();
+                }
             }
             else
             {
@@ -665,8 +673,16 @@ namespace Features.Single.UI.StageSelect
                 // 🔥 백업: SceneFlowController로 직접 전환 (GameObject 활성 상태에서 실행)
                 StartSingleGameplaySceneDirectly(selectedStageNumber);
 
-                // Scene 전환 후 모달 숨기기
-                StartCoroutine(HideModalAfterDelay());
+                // 🔥 수정: GameObject 활성 상태 확인 후 코루틴 시작
+                if (gameObject.activeInHierarchy)
+                {
+                    StartCoroutine(HideModalAfterDelay());
+                }
+                else
+                {
+                    Debug.Log("[StageInfoModal] GameObject가 비활성화됨 - 직접 모달 숨기기");
+                    HideModal();
+                }
             }
         }
 
