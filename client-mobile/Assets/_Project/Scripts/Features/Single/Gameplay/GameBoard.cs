@@ -43,6 +43,9 @@ namespace Features.Single.Gameplay{
 
         [Header("스킨")]
         [SerializeField] private Features.Single.Gameplay.Skins.BlockSkin skin;
+        
+        [Header("셀 스프라이트 시스템")]
+        [SerializeField] private CellSpriteProvider cellSpriteProvider;
 
         // 내부 상태
         private GameLogic gameLogic;
@@ -113,6 +116,9 @@ namespace Features.Single.Gameplay{
         {
             if (initialized) return;
             initialized = true;
+            
+            // CellSpriteProvider 연결 상태 디버깅
+            Debug.Log($"[GameBoard] Start() - CellSpriteProvider 연결됨: {cellSpriteProvider != null}");
 
             // cellParent 자동 연결
             if (cellParent == null)
@@ -290,7 +296,20 @@ namespace Features.Single.Gameplay{
             // Inner Image 획득
             Image inner = cellObj.transform.Find("Border/Inner")?.GetComponent<Image>();
             if (inner == null) inner = cellObj.GetComponent<Image>();
-            inner.color = emptyColor;
+            
+            // 스프라이트 시스템이 설정되어 있으면 빈 칸 스프라이트 적용
+            if (cellSpriteProvider != null)
+            {
+                Sprite emptySprite = cellSpriteProvider.GetSprite(PlayerColor.None);
+                inner.sprite = emptySprite;
+                inner.color = Color.white; // 스프라이트 원본 색상 유지
+                // Debug.Log($"[GameBoard] CreateCellAt({row},{col}) - 빈 칸 스프라이트 설정: {(emptySprite != null ? emptySprite.name : "NULL")}");
+            }
+            else
+            {
+                inner.color = emptyColor; // 폴백: 기존 색상 시스템
+                Debug.LogWarning($"[GameBoard] CreateCellAt({row},{col}) - cellSpriteProvider가 null, 색상 시스템 사용");
+            }
 
             // 클릭/호버 전달
             var bc = cellObj.GetComponent<BoardCell>();
@@ -322,9 +341,23 @@ namespace Features.Single.Gameplay{
             innerObj.transform.SetParent(borderObj.transform, false);
 
             var innerImage = innerObj.AddComponent<Image>();
-            innerImage.sprite = uiFallbackSprite; // ★추가
+            
+            // 스프라이트 시스템이 설정되어 있으면 빈 칸 스프라이트 적용
+            if (cellSpriteProvider != null)
+            {
+                Sprite emptySprite = cellSpriteProvider.GetSprite(PlayerColor.None);
+                innerImage.sprite = emptySprite;
+                innerImage.color = Color.white; // 스프라이트 원본 색상 유지
+                // Debug.Log($"[GameBoard] CreateCellBorder - 빈 칸 스프라이트 설정: {(emptySprite != null ? emptySprite.name : "NULL")}");
+            }
+            else
+            {
+                innerImage.sprite = uiFallbackSprite;
+                innerImage.color = emptyColor; // 폴백: 기존 색상 시스템
+                Debug.LogWarning($"[GameBoard] CreateCellBorder - cellSpriteProvider가 null, uiFallbackSprite 사용");
+            }
+            
             innerImage.type = Image.Type.Simple;
-            innerImage.color = emptyColor;
 
             var innerRect = innerObj.GetComponent<RectTransform>();
             innerRect.anchorMin = Vector2.zero;
@@ -359,17 +392,37 @@ namespace Features.Single.Gameplay{
         private void UpdateCellVisual(int row, int col, PlayerColor color)
         {
             var img = cellImages[row, col];
-            if (img == null) return;
-
-            img.color = color switch
+            if (img == null) 
             {
-                PlayerColor.Blue => blueColor,
-                PlayerColor.Yellow => yellowColor,
-                PlayerColor.Red => redColor,
-                PlayerColor.Green => greenColor,
-                PlayerColor.Obstacle => obstacleColor,
-                _ => emptyColor
-            };
+                Debug.LogError($"[GameBoard] UpdateCellVisual({row},{col}) - cellImages가 null입니다!");
+                return;
+            }
+
+            // 디버그 로그
+            // Debug.Log($"[GameBoard] UpdateCellVisual({row},{col}) - Color: {color}, cellSpriteProvider: {cellSpriteProvider != null}");
+
+            // 스프라이트 시스템이 설정되어 있으면 스프라이트 사용
+            if (cellSpriteProvider != null)
+            {
+                Sprite sprite = cellSpriteProvider.GetSprite(color);
+                img.sprite = sprite;
+                img.color = Color.white; // 스프라이트는 원본 색상 유지
+                // Debug.Log($"[GameBoard] 스프라이트 설정: ({row},{col}) = {color} → {(sprite != null ? sprite.name : "NULL")}");
+            }
+            else
+            {
+                Debug.LogWarning($"[GameBoard] cellSpriteProvider가 null입니다! 기존 색상 시스템 사용");
+                // 폴백: 기존 색상 시스템 사용
+                img.color = color switch
+                {
+                    PlayerColor.Blue => blueColor,
+                    PlayerColor.Yellow => yellowColor,
+                    PlayerColor.Red => redColor,
+                    PlayerColor.Green => greenColor,
+                    PlayerColor.Obstacle => obstacleColor,
+                    _ => emptyColor
+                };
+            }
         }
 
         // ========================================
@@ -419,7 +472,18 @@ namespace Features.Single.Gameplay{
                 if (gameLogic.GetCellColor(pos) == PlayerColor.None)
                 {
                     var img = cellImages[pos.row, pos.col];
-                    if (img != null) img.color = col;
+                    if (img != null)
+                    {
+                        // 스프라이트 시스템에서는 색상 틴트로 프리뷰 표현
+                        if (cellSpriteProvider != null)
+                        {
+                            img.color = col; // 스프라이트에 색상 틴트 적용
+                        }
+                        else
+                        {
+                            img.color = col; // 기존 방식 유지
+                        }
+                    }
                 }
             }
             // PositionActionButtonsAtBlock() 제거 - ShowActionButtons에서 이미 처리됨
@@ -438,7 +502,19 @@ namespace Features.Single.Gameplay{
                 if (gameLogic.GetCellColor(pos) == PlayerColor.None)
                 {
                     var img = cellImages[pos.row, pos.col];
-                    if (img != null) img.color = emptyColor;
+                    if (img != null)
+                    {
+                        // 스프라이트 시스템에서는 빈 칸 스프라이트로 복원
+                        if (cellSpriteProvider != null)
+                        {
+                            img.sprite = cellSpriteProvider.GetSprite(PlayerColor.None);
+                            img.color = Color.white;
+                        }
+                        else
+                        {
+                            img.color = emptyColor; // 기존 방식 유지
+                        }
+                    }
                 }
             }
 

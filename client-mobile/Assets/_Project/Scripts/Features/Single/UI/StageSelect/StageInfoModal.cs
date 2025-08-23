@@ -48,6 +48,8 @@ namespace Features.Single.UI.StageSelect
         [SerializeField] private Features.Single.Gameplay.BlockButton blockButtonPrefab;
         // 모달에서는 선택할 필요가 없으므로 미리보기용 플레이어 컬러(색상만 사용)
         [SerializeField] private Shared.Models.PlayerColor previewPlayerColor = Shared.Models.PlayerColor.Blue;
+        // CellSpriteProvider 참조 (블록 셀 스프라이트 제공)
+        [SerializeField] private Features.Single.Gameplay.CellSpriteProvider cellSpriteProvider;
         [SerializeField] private Features.Single.Gameplay.Skins.BlockSkin previewSkin;
 
         [Header("서버 URL 설정")]
@@ -621,6 +623,17 @@ namespace Features.Single.UI.StageSelect
             // 모달에선 "미리보기"만 필요하므로 클릭 비활성화 + 하이라이트 없이 사용
             var uibutton = btn.GetComponent<UnityEngine.UI.Button>();
             if (uibutton != null) uibutton.interactable = false;
+
+            // CellSpriteProvider 설정 (있는 경우)
+            if (cellSpriteProvider != null)
+            {
+                btn.SetCellSpriteProvider(cellSpriteProvider);
+                Debug.Log($"[StageInfoModal] BlockButton({blockType})에 CellSpriteProvider 설정 완료");
+            }
+            else
+            {
+                Debug.LogWarning($"[StageInfoModal] cellSpriteProvider가 null - BlockButton({blockType})에 설정하지 못함");
+            }
 
             // Init(owner, type, player, baseColor, title)
             // owner는 선택 로직에만 필요 -> null 전달해도 OK

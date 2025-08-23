@@ -64,7 +64,16 @@ namespace Features.Single.UI.StageSelect
         // 🔥 추가: 중복 버튼 리프레시 방지
         private bool isButtonRefreshInProgress = false;
         private float lastButtonRefreshTime = 0f;
-        private const float BUTTON_REFRESH_THROTTLE = 0.5f; // 0.5초 간격으로 제한
+        private const float BUTTON_REFRESH_THROTTLE = 0.2f; // 0.2초로 단축
+
+        // 🔥 추가: 중복 UI 업데이트 방지
+        private bool isUIUpdateInProgress = false;
+        private float lastUIUpdateTime = 0f;
+        private const float UI_UPDATE_THROTTLE = 0.1f; // 0.1초로 단축
+        
+        // 🔥 신규: 비동기 업데이트 큐 및 상태 관리
+        private readonly Queue<System.Action> updateQueue = new Queue<System.Action>();
+        private bool isProcessingQueue = false;
 
         protected override void Awake()
         {
@@ -878,7 +887,8 @@ namespace Features.Single.UI.StageSelect
             Debug.Log($"[CandyCrushStageMapView] 사용자 데이터 업데이트됨: {userInfo.username}, maxStageCompleted={userInfo.maxStageCompleted}");
             Debug.Log($"[CandyCrushStageMapView] 프로필 로드 완료 - 모든 스테이지 버튼 상태 새로고침 시작");
 
-            // 🔥 추가: 메타데이터 기반으로 StageFeed의 총 스테이지 수 업데이트
+            // 🔥 최적화: StageFeed 업데이트는 선택적 (GetActualTotalStages()에서 직접 메타데이터 사용)
+            // StageFeed의 totalStages도 동기화하여 일관성 유지 (경로 재생성 등에서 사용)
             if (stageFeed != null)
             {
                 stageFeed.UpdateTotalStagesFromMetadata();
@@ -899,25 +909,27 @@ namespace Features.Single.UI.StageSelect
                 }
             }
 
-            // 🔥 핵심: 프로필 로드 후 모든 활성 스테이지 버튼의 상태를 새로고침
-            RefreshAllStageButtons();
+            // 🔥 개선: 프로필 로드 후에는 전체 새로고침 필요 (사용자 전환)
+            RefreshChangedStageButtons(null);
 
             // 진행도 텍스트 업데이트  
             UpdateUIInfo();
         }
 
         /// <summary>
-        /// 🔥 추가: 진행도 데이터 변경 시 UI 즉시 새로고침
-        /// 사용자 전환 시 바로 반영되도록 함
+        /// 🔥 수정: 진행도 데이터 변경 시 UI 즉시 새로고침
+        /// 사용자 전환 감지 로직 개선 - 스테이지 완료와 구분
         /// </summary>
         private void OnProgressDataChanged(HttpApiClient.CompactUserProgress[] progressArray)
         {
             Debug.Log($"[CandyCrushStageMapView] 진행도 데이터 변경됨: {progressArray?.Length ?? 0}개");
             
-            // 🔥 추가: 사용자 전환 감지 - 모든 진행도가 0인 경우 완전 리셋
-            bool allProgressIsZero = true;
+            // 🔥 수정: 사용자 전환 감지 조건 강화 - 더 엄격한 조건
+            bool shouldReset = false;
             if (progressArray != null && progressArray.Length > 0)
             {
+                // 모든 진행도가 0인지 확인
+                bool allProgressIsZero = true;
                 foreach (var progress in progressArray)
                 {
                     if (progress.c == true || progress.s > 0) // 완료되었거나 별이 있음
@@ -927,36 +939,105 @@ namespace Features.Single.UI.StageSelect
                     }
                 }
                 
-                if (allProgressIsZero && activeButtons.Count > 1)
+                // 🔥 수정: 사용자 전환 감지 조건 강화
+                // 1. 모든 진행도가 0이고
+                // 2. 기존에 많은 버튼이 있었고 (5개 이상)
+                // 3. 현재 로그인 상태이지만 maxStageCompleted가 0인 경우만
+                if (allProgressIsZero && activeButtons.Count > 5)
                 {
-                    Debug.Log("[CandyCrushStageMapView] 🔄 새 사용자 감지 (모든 진행도 0) - UI 완전 리셋");
-                    ResetForUserSwitch();
+                    int currentMaxCompleted = 0;
+                    if (UserDataCache.Instance != null && UserDataCache.Instance.IsLoggedIn())
+                    {
+                        currentMaxCompleted = UserDataCache.Instance.MaxStageCompleted;
+                    }
+                    
+                    // maxStageCompleted가 0인 경우에만 사용자 전환으로 판단
+                    if (currentMaxCompleted == 0)
+                    {
+                        Debug.Log("[CandyCrushStageMapView] 🔄 새 사용자 감지 (모든 진행도 0 + maxCompleted 0) - UI 완전 리셋");
+                        shouldReset = true;
+                    }
+                    else
+                    {
+                        // 🔥 로그 축소: 스테이지 완료 후 정상 갱신은 일반적이므로 로그 생략
+                    }
                 }
             }
             
-            // 🔥 핵심: 진행도 데이터가 변경되면 즉시 UI 새로고림
-            RefreshAllStageButtons();
-            UpdateUIInfo();
+            if (shouldReset)
+            {
+                ResetForUserSwitch();
+                return; // 리셋 후에는 업데이트 불필요
+            }
+            
+            // 🔥 개선: 순차적 업데이트 큐에 추가
+            HashSet<int> changedStages = ExtractChangedStages(progressArray);
+            if (changedStages.Count > 0)
+            {
+                Debug.Log($"[CandyCrushStageMapView] 진행도 변경 감지 - 업데이트할 스테이지: {string.Join(", ", changedStages)}");
+                QueueUpdate(() => RefreshChangedStageButtons(changedStages));
+            }
+            else
+            {
+                Debug.Log("[CandyCrushStageMapView] 진행도 변경 없음 - UI 업데이트 스킵");
+            }
         }
 
         /// <summary>
-        /// 🔥 추가: 현재 상태 변경 시 UI 즉시 새로고침
-        /// 사용자 전환 시 max_stage_completed 변경에 바로 반응
+        /// 🔥 수정: 현재 상태 변경 시 UI 즉시 새로고침
+        /// 사용자 전환 감지 로직 개선 - 스테이지 완료와 구분
         /// </summary>
         private void OnCurrentStatusChanged(HttpApiClient.CurrentStatus currentStatus)
         {
             Debug.Log($"[CandyCrushStageMapView] 현재 상태 변경됨: max_stage_completed={currentStatus.max_stage_completed}");
             
-            // 🔥 추가: max_stage_completed가 0이고 기존 버튼이 많이 있으면 사용자 전환으로 판단
-            if (currentStatus.max_stage_completed == 0 && activeButtons.Count > 1)
+            // 🔥 수정: 사용자 전환 감지 조건 강화
+            // max_stage_completed가 0이고 기존 버튼이 많이 있으면서 (5개 이상)
+            // 현재 UserDataCache의 maxStageCompleted도 실제로 0인 경우에만 리셋
+            bool shouldReset = false;
+            if (currentStatus.max_stage_completed == 0 && activeButtons.Count > 5)
             {
-                Debug.Log("[CandyCrushStageMapView] 🔄 새 사용자 감지 (max_completed=0) - UI 완전 리셋");
-                ResetForUserSwitch();
+                // 실제 UserDataCache에서도 maxStageCompleted가 0인지 확인
+                int cachedMaxCompleted = 0;
+                if (UserDataCache.Instance != null && UserDataCache.Instance.IsLoggedIn())
+                {
+                    cachedMaxCompleted = UserDataCache.Instance.MaxStageCompleted;
+                }
+                
+                if (cachedMaxCompleted == 0)
+                {
+                    Debug.Log("[CandyCrushStageMapView] 🔄 새 사용자 감지 (max_completed=0 + 캐시도 0) - UI 완전 리셋");
+                    shouldReset = true;
+                }
+                else
+                {
+                    // 🔥 로그 축소: 일시적 동기화 문제는 정상적이므로 로그 생략
+                }
             }
             
-            // 🔥 핵심: 상태 데이터가 변경되면 즉시 UI 새로고침
-            RefreshAllStageButtons();
-            UpdateUIInfo();
+            if (shouldReset)
+            {
+                ResetForUserSwitch();
+                return; // 리셋 후에는 업데이트 불필요
+            }
+            
+            // 🔥 개선: 상태 변경으로 인한 언락 스테이지 변화만 업데이트
+            // 이전 maxStageCompleted와 비교하여 변경된 스테이지만 감지
+            HashSet<int> changedStages = new HashSet<int>();
+            int newMaxCompleted = currentStatus.max_stage_completed;
+            
+            // 새로 언락된 스테이지 (maxCompleted + 1)만 업데이트
+            int newUnlockedStage = newMaxCompleted + 1;
+            if (newUnlockedStage > 0)
+            {
+                changedStages.Add(newUnlockedStage);
+            }
+            
+            if (changedStages.Count > 0)
+            {
+                Debug.Log($"[CandyCrushStageMapView] 상태 변경으로 업데이트할 스테이지: {string.Join(", ", changedStages)}");
+                QueueUpdate(() => RefreshChangedStageButtons(changedStages));
+            }
         }
 
         /// <summary>
@@ -982,30 +1063,54 @@ namespace Features.Single.UI.StageSelect
         }
 
         /// <summary>
-        /// 🔥 수정: 모든 스테이지 버튼 상태 새로고침 (증가/감소 모두 지원)
-        /// 사용자 진행도 변화에 따른 완전한 UI 동기화
+        /// 🔥 개선: 변경된 스테이지만 선택적으로 업데이트 (성능 최적화)
+        /// 전체 새로고침 대신 변경 사항만 적용
         /// </summary>
-        private void RefreshAllStageButtons()
+        private void RefreshChangedStageButtons(HashSet<int> changedStages = null)
         {
             // 🔥 추가: 중복 리프레시 방지 - Throttling
             float currentTime = Time.time;
             if (isButtonRefreshInProgress)
             {
-                Debug.Log("[CandyCrushStageMapView] RefreshAllStageButtons 진행 중 - 스킵");
+                Debug.Log("[CandyCrushStageMapView] RefreshStageButtons 진행 중 - 스킵");
                 return;
             }
             
             if (currentTime - lastButtonRefreshTime < BUTTON_REFRESH_THROTTLE)
             {
-                Debug.Log($"[CandyCrushStageMapView] RefreshAllStageButtons 너무 빠른 호출 - 스킵 (마지막: {lastButtonRefreshTime:F2}s, 현재: {currentTime:F2}s)");
+                Debug.Log($"[CandyCrushStageMapView] RefreshStageButtons 너무 빠른 호출 - 스킵 (마지막: {lastButtonRefreshTime:F2}s, 현재: {currentTime:F2}s)");
                 return;
             }
             
             isButtonRefreshInProgress = true;
             lastButtonRefreshTime = currentTime;
             
-            Debug.Log($"[CandyCrushStageMapView] RefreshAllStageButtons 시작 - 기존 활성 버튼 수: {activeButtons.Count}");
+            // 🔥 개선: 변경된 스테이지만 업데이트하여 성능 최적화
+            if (changedStages == null)
+            {
+                Debug.Log($"[CandyCrushStageMapView] 전체 새로고침 모드 - 기존 활성 버튼 수: {activeButtons.Count}");
+                // 전체 새로고침이 필요한 경우 (사용자 전환 등)
+                RefreshAllStageButtonsInternal();
+            }
+            else
+            {
+                Debug.Log($"[CandyCrushStageMapView] 선택적 업데이트 모드 - 변경된 스테이지: [{string.Join(", ", changedStages)}]");
+                // 변경된 스테이지만 업데이트
+                RefreshSpecificStageButtons(changedStages);
+            }
+            
+            // 🔥 추가: UI 정보 업데이트 (진행률, 별 개수)
+            UpdateUIInfo();
+            
+            // 🔥 추가: Throttling 플래그 해제
+            isButtonRefreshInProgress = false;
+        }
 
+        /// <summary>
+        /// 🔥 신규: 전체 스테이지 버튼 새로고침 (기존 로직 유지)
+        /// </summary>
+        private void RefreshAllStageButtonsInternal()
+        {
             // 현재 사용자의 진행도 기준으로 언락된 스테이지 수 계산
             int maxStageCompleted = 0;
             if (UserDataCache.Instance != null && UserDataCache.Instance.IsLoggedIn())
@@ -1016,28 +1121,8 @@ namespace Features.Single.UI.StageSelect
             // 언락된 스테이지 수 = 완료된 스테이지 + 1 (도전 스테이지)
             int targetUnlockedCount = maxStageCompleted + 1;
             
-            Debug.Log($"[CandyCrushStageMapView] 🔥 사용자 진행도: max_completed={maxStageCompleted}, 목표 언락 수={targetUnlockedCount}");
-            
-            // 🔥 추가: 디버그 정보 - cachedMaxStageCompleted와 currentUser 값 확인
-            if (UserDataCache.Instance != null)
-            {
-                var currentUser = UserDataCache.Instance.GetCurrentUser();
-                Debug.Log($"[CandyCrushStageMapView] 🔍 디버그 - currentUser.max: {currentUser?.maxStageCompleted ?? -1}");
-                
-                // cachedMaxStageCompleted 값도 확인하기 위해 리플렉션 사용
-                var field = typeof(UserDataCache).GetField("cachedMaxStageCompleted", 
-                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                if (field != null)
-                {
-                    int cached = (int)field.GetValue(UserDataCache.Instance);
-                    Debug.Log($"[CandyCrushStageMapView] 🔍 디버그 - cachedMaxStageCompleted: {cached}");
-                }
-            }
+            Debug.Log($"[CandyCrushStageMapView] 사용자 진행도: max_completed={maxStageCompleted}, 목표 언락 수={targetUnlockedCount}");
 
-            // 🔥 수정: SetActiveCount 제거 - UX 개선을 위해 버튼은 유지하고 상태만 변경
-            // (모든 스테이지 버튼이 보이되, 잠김/언락 상태로 구분)
-
-            // 🔥 수정: UX 개선 - 모든 스테이지 버튼을 유지하고 상태만 변경
             // 총 스테이지 수 확인 (메타데이터에서)
             int totalStages = 14; // 기본값
             if (UserDataCache.Instance != null)
@@ -1049,40 +1134,189 @@ namespace Features.Single.UI.StageSelect
                 }
             }
 
-            // 🔥 로그 축소: 중요한 정보만 출력
-            Debug.Log($"[CandyCrushStageMapView] 총 스테이지: {totalStages}, 활성 버튼: {activeButtons.Count}개");
-
             // 모든 스테이지에 대해 버튼 확보 및 상태 업데이트
             for (int stageNumber = 1; stageNumber <= totalStages; stageNumber++)
             {
                 bool shouldBeUnlocked = stageNumber <= targetUnlockedCount;
                 
-                // 버튼이 없으면 새로 생성 (CreateStageButton 사용)
-                if (!activeButtons.ContainsKey(stageNumber))
+                // 버튼이 없거나 비활성화되어 있으면 새로 생성/활성화
+                if (!activeButtons.ContainsKey(stageNumber) || 
+                    (activeButtons.ContainsKey(stageNumber) && activeButtons[stageNumber] != null && !activeButtons[stageNumber].gameObject.activeSelf))
                 {
-                    CreateStageButton(stageNumber);
+                    if (activeButtons.ContainsKey(stageNumber) && activeButtons[stageNumber] != null && !activeButtons[stageNumber].gameObject.activeSelf)
+                    {
+                        activeButtons[stageNumber].gameObject.SetActive(true);
+                    }
+                    else
+                    {
+                        CreateStageButton(stageNumber);
+                    }
                 }
 
                 // 버튼 상태 업데이트 (언락/잠금)
-                if (activeButtons.ContainsKey(stageNumber))
+                if (activeButtons.ContainsKey(stageNumber) && activeButtons[stageNumber] != null)
                 {
                     UpdateButtonState(activeButtons[stageNumber], stageNumber);
-                    
-                    // 🔥 로그 축소: 상태 변경 시에만 출력
-                    if (!shouldBeUnlocked)
+                }
+            }
+
+            Debug.Log($"[CandyCrushStageMapView] 전체 새로고침 완료 - 최종 활성 버튼 수: {activeButtons.Count}");
+        }
+
+        /// <summary>
+        /// 🔥 신규: 특정 스테이지들만 선택적 업데이트 (성능 최적화)
+        /// </summary>
+        private void RefreshSpecificStageButtons(HashSet<int> changedStages)
+        {
+            // 현재 사용자의 진행도 확인
+            int maxStageCompleted = 0;
+            if (UserDataCache.Instance != null && UserDataCache.Instance.IsLoggedIn())
+            {
+                maxStageCompleted = UserDataCache.Instance.MaxStageCompleted;
+            }
+            int targetUnlockedCount = maxStageCompleted + 1;
+
+            foreach (int stageNumber in changedStages)
+            {
+                bool shouldBeUnlocked = stageNumber <= targetUnlockedCount;
+                
+                // 버튼이 없으면 생성
+                if (!activeButtons.ContainsKey(stageNumber))
+                {
+                    Debug.Log($"[CandyCrushStageMapView] 스테이지 {stageNumber} 버튼 생성 (선택적 업데이트)");
+                    CreateStageButton(stageNumber);
+                }
+                
+                // 버튼이 비활성화되어 있으면 활성화
+                if (activeButtons.ContainsKey(stageNumber) && activeButtons[stageNumber] != null)
+                {
+                    if (!activeButtons[stageNumber].gameObject.activeSelf)
                     {
-                        Debug.Log($"[CandyCrushStageMapView] 스테이지 {stageNumber} → 잠금");
+                        Debug.Log($"[CandyCrushStageMapView] 스테이지 {stageNumber} 버튼 재활성화");
+                        activeButtons[stageNumber].gameObject.SetActive(true);
+                    }
+                    
+                    // 상태 업데이트
+                    UpdateButtonState(activeButtons[stageNumber], stageNumber);
+                    // 🔥 로그 축소: 핵심 변경사항만 출력
+                    if (shouldBeUnlocked)
+                    {
+                        Debug.Log($"[CandyCrushStageMapView] ✅ 스테이지 {stageNumber} 언락 상태 업데이트");
                     }
                 }
             }
 
-            Debug.Log($"[CandyCrushStageMapView] RefreshAllStageButtons 완료 - 최종 활성 버튼 수: {activeButtons.Count}");
+            Debug.Log($"[CandyCrushStageMapView] 선택적 업데이트 완료 - {changedStages.Count}개 스테이지 처리됨");
+        }
+
+        /// <summary>
+        /// 🔥 신규: 진행도 배열에서 변경된 스테이지 감지 (성능 최적화)
+        /// </summary>
+        private HashSet<int> ExtractChangedStages(HttpApiClient.CompactUserProgress[] progressArray)
+        {
+            HashSet<int> changedStages = new HashSet<int>();
             
-            // 🔥 추가: UI 정보 업데이트 (진행률, 별 개수)
-            UpdateUIInfo();
+            if (progressArray == null) return changedStages;
+
+            foreach (var progress in progressArray)
+            {
+                int stageNum = progress.n;
+                
+                // 기존 캐시와 비교하여 변경 사항 확인
+                var cachedProgress = UserDataCache.Instance?.GetStageProgress(stageNum);
+                
+                bool hasChanged = false;
+                
+                if (cachedProgress == null && (progress.c || progress.s > 0))
+                {
+                    // 새로 완료된 스테이지
+                    hasChanged = true;
+                }
+                else if (cachedProgress != null)
+                {
+                    // 기존 진행도와 비교
+                    if (cachedProgress.isCompleted != progress.c || 
+                        cachedProgress.starsEarned != progress.s)
+                    {
+                        hasChanged = true;
+                    }
+                }
+                
+                if (hasChanged)
+                {
+                    changedStages.Add(stageNum);
+                    
+                    // 언락 상태도 변경될 수 있으므로 다음 스테이지도 확인
+                    if (progress.c) // 완료된 경우 다음 스테이지가 언락됨
+                    {
+                        int nextStage = stageNum + 1;
+                        int totalStages = UserDataCache.Instance?.GetStageMetadata()?.Length ?? 14;
+                        if (nextStage <= totalStages)
+                        {
+                            changedStages.Add(nextStage);
+                        }
+                    }
+                }
+            }
             
-            // 🔥 추가: Throttling 플래그 해제
-            isButtonRefreshInProgress = false;
+            return changedStages;
+        }
+
+        /// <summary>
+        /// 🔥 신규: 업데이트 작업을 큐에 추가하여 순차적 처리
+        /// </summary>
+        private void QueueUpdate(System.Action updateAction)
+        {
+            updateQueue.Enqueue(updateAction);
+            
+            if (!isProcessingQueue)
+            {
+                StartSafe(ProcessUpdateQueue());
+            }
+        }
+
+        /// <summary>
+        /// 🔥 신규: 업데이트 큐 순차 처리 (LoadingOverlay 지원)
+        /// </summary>
+        private System.Collections.IEnumerator ProcessUpdateQueue()
+        {
+            if (isProcessingQueue) yield break;
+            
+            isProcessingQueue = true;
+            
+            // LoadingOverlay 표시 (큐에 2개 이상의 작업이 있는 경우)
+            bool shouldShowLoading = updateQueue.Count > 1;
+            
+            if (shouldShowLoading && App.UI.LoadingOverlay.Instance != null)
+            {
+                App.UI.LoadingOverlay.Show("스테이지 정보 업데이트 중...");
+                yield return new WaitForSeconds(0.1f); // 로딩 화면 표시 시간
+            }
+            
+            while (updateQueue.Count > 0)
+            {
+                var updateAction = updateQueue.Dequeue();
+                
+                try
+                {
+                    updateAction?.Invoke();
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogError($"[CandyCrushStageMapView] 업데이트 처리 중 오류: {ex.Message}");
+                }
+                
+                // 각 업데이트 작업 사이에 프레임 대기
+                yield return null;
+            }
+            
+            // LoadingOverlay 숨김
+            if (shouldShowLoading && App.UI.LoadingOverlay.Instance != null)
+            {
+                App.UI.LoadingOverlay.Hide();
+            }
+            
+            isProcessingQueue = false;
         }
 
         /// <summary>
@@ -1154,8 +1388,8 @@ namespace Features.Single.UI.StageSelect
 
             Debug.Log($"[CandyCrushStageMapView] DelayedProfileUpdate 실행: {userInfo.username} (대기시간={waitTime:F1}s, 활성버튼={activeButtons.Count}개)");
 
-            // 🔥 수정: 직접 RefreshAllStageButtons 호출 (OnUserDataUpdated 대신)
-            RefreshAllStageButtons();
+            // 🔥 개선: 직접 전체 새로고침 호출 (DelayedProfileUpdate는 전체 새로고침 필요)
+            RefreshChangedStageButtons(null);
             UpdateUIInfo();
 
             // 🔥 추가: 완료 후 플래그 초기화
@@ -1476,43 +1710,41 @@ namespace Features.Single.UI.StageSelect
         // ========================================
 
         /// <summary>
-        /// 스테이지 완료 이벤트
+        /// 🔥 개선: 스테이지 완료 이벤트 - 완료된 스테이지와 새로 언락된 스테이지만 업데이트
         /// </summary>
         private void OnStageCompleted(int stageNumber, int score, int stars)
         {
-            Debug.Log($"스테이지 {stageNumber} 완료: {score}점, {stars}별");
+            Debug.Log($"[CandyCrushStageMapView] 스테이지 {stageNumber} 완료: {score}점, {stars}별");
 
-            // 해당 버튼 업데이트
-            if (activeButtons.ContainsKey(stageNumber))
+            // 🔥 개선: 변경된 스테이지만 선택적 업데이트
+            HashSet<int> changedStages = new HashSet<int>();
+            changedStages.Add(stageNumber); // 완료된 스테이지
+            
+            // 다음 스테이지가 새로 언락될 수 있으므로 추가
+            int nextStage = stageNumber + 1;
+            int totalStages = UserDataCache.Instance?.GetStageMetadata()?.Length ?? 14;
+            if (nextStage <= totalStages)
             {
-                UpdateButtonState(activeButtons[stageNumber], stageNumber);
-
-                // StageButton은 자체적으로 클릭 애니메이션을 처리하므로 별도 애니메이션 불필요
+                changedStages.Add(nextStage);
             }
 
-            // UI 정보 업데이트
-            UpdateUIInfo();
+            Debug.Log($"[CandyCrushStageMapView] 스테이지 완료로 업데이트할 스테이지: [{string.Join(", ", changedStages)}]");
+            RefreshChangedStageButtons(changedStages);
         }
 
         /// <summary>
-        /// 스테이지 언락 이벤트
+        /// 🔥 개선: 스테이지 언락 이벤트 - 언락된 스테이지만 업데이트
         /// </summary>
         private void OnStageUnlocked(int unlockedStageNumber)
         {
-            Debug.Log($"스테이지 {unlockedStageNumber} 언락!");
+            Debug.Log($"[CandyCrushStageMapView] 스테이지 {unlockedStageNumber} 언락!");
 
-            // 해당 버튼 업데이트
-            if (activeButtons.ContainsKey(unlockedStageNumber))
-            {
-                UpdateButtonState(activeButtons[unlockedStageNumber], unlockedStageNumber);
-                // StageButton은 자체적으로 상태 변화 애니메이션을 처리
-            }
+            // 🔥 개선: 언락된 스테이지만 선택적 업데이트
+            HashSet<int> changedStages = new HashSet<int> { unlockedStageNumber };
+            RefreshChangedStageButtons(changedStages);
 
             // 새로 언락된 스테이지로 스크롤
             ScrollToStage(unlockedStageNumber);
-
-            // UI 정보 업데이트
-            UpdateUIInfo();
         }
 
         // ========================================
@@ -1530,7 +1762,25 @@ namespace Features.Single.UI.StageSelect
                 return;
             }
 
-            int totalStages = stageFeed.GetTotalStages();
+            // 🔥 추가: 중복 업데이트 방지 - Throttling
+            float currentTime = Time.time;
+            if (isUIUpdateInProgress)
+            {
+                Debug.Log("[CandyCrushStageMapView] UpdateUIInfo 진행 중 - 스킵");
+                return;
+            }
+            
+            if (currentTime - lastUIUpdateTime < UI_UPDATE_THROTTLE)
+            {
+                Debug.Log($"[CandyCrushStageMapView] UpdateUIInfo 너무 빠른 호출 - 스킵 (마지막: {lastUIUpdateTime:F2}s, 현재: {currentTime:F2}s)");
+                return;
+            }
+            
+            isUIUpdateInProgress = true;
+            lastUIUpdateTime = currentTime;
+
+            // 🔥 수정: 실제 메타데이터에서 총 스테이지 수 가져오기
+            int totalStages = GetActualTotalStages();
             Debug.Log($"[CandyCrushStageMapView] UpdateUIInfo 시작 - totalStages: {totalStages}");
 
             // 진행률 텍스트 (완료한 스테이지 / 총 스테이지)
@@ -1588,6 +1838,9 @@ namespace Features.Single.UI.StageSelect
             {
                 Debug.LogWarning("[CandyCrushStageMapView] totalStarsText가 null입니다");
             }
+
+            // 🔥 추가: Throttling 플래그 해제
+            isUIUpdateInProgress = false;
         }
 
         /// <summary>
@@ -1918,6 +2171,36 @@ namespace Features.Single.UI.StageSelect
                 if (this != null) action?.Invoke();
             }
             StartSafe(Wrapper());
+        }
+
+        /// <summary>
+        /// 🔥 추가: 실제 메타데이터 기반으로 총 스테이지 수 가져오기
+        /// stageFeed.GetTotalStages()가 Inspector 설정에 의존하는 대신, 실제 데이터에서 가져옴
+        /// </summary>
+        private int GetActualTotalStages()
+        {
+            // 1. UserDataCache의 메타데이터에서 실제 스테이지 수 가져오기 (우선순위)
+            if (Features.Single.Core.UserDataCache.Instance != null)
+            {
+                var metadata = Features.Single.Core.UserDataCache.Instance.GetStageMetadata();
+                if (metadata != null && metadata.Length > 0)
+                {
+                    Debug.Log($"[CandyCrushStageMapView] 실제 메타데이터 기반 총 스테이지 수: {metadata.Length}개");
+                    return metadata.Length;
+                }
+            }
+
+            // 2. StageFeed 백업 (Inspector 설정)
+            if (stageFeed != null)
+            {
+                int stageFeedTotal = stageFeed.GetTotalStages();
+                Debug.LogWarning($"[CandyCrushStageMapView] 메타데이터 없음. StageFeed 백업 사용: {stageFeedTotal}개");
+                return stageFeedTotal;
+            }
+
+            // 3. 최종 백업 (기본값)
+            Debug.LogError("[CandyCrushStageMapView] 총 스테이지 수를 가져올 수 없음. 기본값 14 사용");
+            return 14;
         }
     }
 }

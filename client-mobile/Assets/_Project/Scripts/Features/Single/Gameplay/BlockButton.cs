@@ -22,6 +22,9 @@ namespace Features.Single.Gameplay{
 
         [Header("Skin (optional)")]
         [SerializeField] private Features.Single.Gameplay.Skins.BlockSkin skin; // 없으면 기본 색
+        
+        [Header("Cell Sprite System")]
+        [SerializeField] private CellSpriteProvider cellSpriteProvider; // 셀 스프라이트 제공자
 
         public BlockType Type { get; private set; }
         public PlayerColor Player { get; private set; }
@@ -131,6 +134,20 @@ namespace Features.Single.Gameplay{
             rt.sizeDelta = new Vector2(160f, 160f);
         }
 
+        /// <summary>
+        /// 셀 스프라이트 제공자 설정 (BlockPalette에서 호출)
+        /// </summary>
+        public void SetCellSpriteProvider(CellSpriteProvider provider)
+        {
+            cellSpriteProvider = provider;
+            
+            // 이미 초기화된 상태라면 블록 시각화 재생성
+            if (Type != default(BlockType) && Player != default(PlayerColor))
+            {
+                CreateBlockVisualization(Type, Player);
+            }
+        }
+
         private void CreateBlockVisualization(BlockType blockType, PlayerColor player)
         {
             // 기존 시각화 전부 제거
@@ -234,9 +251,21 @@ namespace Features.Single.Gameplay{
                 );
 
                 var cellImage = cellObj.GetComponent<Image>();
-                cellImage.sprite = White1x1();
+                
+                // 스프라이트 시스템이 설정되어 있으면 스프라이트 사용
+                if (cellSpriteProvider != null)
+                {
+                    cellImage.sprite = cellSpriteProvider.GetSprite(player);
+                    cellImage.color = Color.white; // 스프라이트 원본 색상 유지
+                }
+                else
+                {
+                    // 폴백: 기존 색상 시스템 사용
+                    cellImage.sprite = White1x1();
+                    cellImage.color = blockColor; // 블록 색상이 정상적으로 보임
+                }
+                
                 cellImage.type = Image.Type.Simple;
-                cellImage.color = blockColor; // 블록 색상이 정상적으로 보임
                 cellImage.raycastTarget = false;
             }
         }

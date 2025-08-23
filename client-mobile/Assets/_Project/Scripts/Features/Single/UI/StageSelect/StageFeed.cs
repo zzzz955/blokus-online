@@ -136,7 +136,7 @@ namespace Features.Single.UI.StageSelect{
         }
         
         /// <summary>
-        /// 🔥 추가: 실제 메타데이터 기반으로 총 스테이지 수 업데이트
+        /// 🔥 최적화: 실제 메타데이터 기반으로 총 스테이지 수 업데이트 (중복 방지)
         /// </summary>
         public void UpdateTotalStagesFromMetadata()
         {
@@ -148,13 +148,26 @@ namespace Features.Single.UI.StageSelect{
                     int newTotalStages = metadata.Length;
                     if (newTotalStages != totalStages)
                     {
+                        int previousTotal = totalStages;
                         totalStages = newTotalStages;
-                        Debug.Log($"[StageFeed] 총 스테이지 수 업데이트: {totalStages}개");
+                        Debug.Log($"[StageFeed] 총 스테이지 수 업데이트: {previousTotal}개 → {totalStages}개");
                         
-                        // 경로 재생성
+                        // 경로 재생성 (스테이지 수가 변경된 경우에만)
                         GeneratePath();
                     }
+                    else
+                    {
+                        Debug.Log($"[StageFeed] 총 스테이지 수 변경 없음: {totalStages}개 유지");
+                    }
                 }
+                else
+                {
+                    Debug.LogWarning($"[StageFeed] 메타데이터 없음 또는 빈 배열. 기존 totalStages={totalStages} 유지");
+                }
+            }
+            else
+            {
+                Debug.LogWarning("[StageFeed] UserDataCache.Instance가 null입니다");
             }
         }
         

@@ -13,6 +13,9 @@ namespace Features.Single.Gameplay{
         [Header("Refs")]
         [SerializeField] private RectTransform blockContainer; // ScrollView/Viewport/Content
         [SerializeField] private GameObject blockButtonPrefab; // 선택: 없으면 코드로 기본 생성
+        
+        [Header("Cell Sprite System")]
+        [SerializeField] private CellSpriteProvider cellSpriteProvider; // 셀 스프라이트 제공자
 
         public event Action<Block> OnBlockSelected;
 
@@ -58,6 +61,7 @@ namespace Features.Single.Gameplay{
         public void InitializePalette(List<BlockType> blocks, PlayerColor player)
         {
             _player = player;
+            Debug.Log($"[BlockPalette] InitializePalette - CellSpriteProvider 연결됨: {cellSpriteProvider != null}");
             Clear();
             foreach (var type in blocks)
             {
@@ -128,6 +132,12 @@ namespace Features.Single.Gameplay{
                 return;
             }
 
+            // CellSpriteProvider 설정 (있는 경우)
+            if (cellSpriteProvider != null)
+            {
+                blockButton.SetCellSpriteProvider(cellSpriteProvider);
+            }
+            
             // 정상 시각화 초기화
             blockButton.Init(this, type, _player, Color.white, type.ToString());
 
@@ -298,6 +308,18 @@ namespace Features.Single.Gameplay{
             }
 
             var bb = go.GetComponent<BlockButton>();
+            
+            // CellSpriteProvider 설정 (있는 경우)
+            if (cellSpriteProvider != null)
+            {
+                bb.SetCellSpriteProvider(cellSpriteProvider);
+                Debug.Log($"[BlockPalette] BlockButton({type})에 CellSpriteProvider 설정 완료");
+            }
+            else
+            {
+                Debug.LogWarning($"[BlockPalette] cellSpriteProvider가 null - BlockButton({type})에 설정하지 못함");
+            }
+            
             bb.Init(this, type, player, Color.white, type.ToString());
 
             var le = go.GetComponent<LayoutElement>();
