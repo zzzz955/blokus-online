@@ -69,13 +69,67 @@ namespace Features.Single.UI.Scene
         }
 
         /// <summary>
-        /// 외부에서 '선택 화면'으로 복귀할 때 사용 (GamePanel만 OFF)
+        /// 🔥 수정: 외부에서 '선택 화면'으로 복귀할 때 사용 (GamePanel만 OFF, UI 안정화 보장)
         /// </summary>
         public void ShowSelection()
         {
-            if (stageSelectPanelRoot && !stageSelectPanelRoot.activeSelf) stageSelectPanelRoot.SetActive(true);
-            if (gamePanelRoot && gamePanelRoot.activeSelf) gamePanelRoot.SetActive(false);
+            // 🔥 수정: StageSelectPanel 강제 활성화 우선 처리
+            if (stageSelectPanelRoot)
+            {
+                if (!stageSelectPanelRoot.activeSelf)
+                {
+                    stageSelectPanelRoot.SetActive(true);
+                    if (verboseLog) Debug.Log("[UIScreenController] ShowSelection → StageSelectPanel 강제 활성화");
+                }
+                
+                // 🔥 추가: CandyCrushStageMapView 컴포넌트 즉시 활성화 확인
+                var stageMapView = stageSelectPanelRoot.GetComponent<Features.Single.UI.StageSelect.CandyCrushStageMapView>();
+                if (stageMapView != null && !stageMapView.gameObject.activeSelf)
+                {
+                    stageMapView.gameObject.SetActive(true);
+                    if (verboseLog) Debug.Log("[UIScreenController] ShowSelection → CandyCrushStageMapView 강제 활성화");
+                }
+            }
+            
+            // GamePanel 비활성화
+            if (gamePanelRoot && gamePanelRoot.activeSelf)
+            {
+                gamePanelRoot.SetActive(false);
+                if (verboseLog) Debug.Log("[UIScreenController] ShowSelection → GamePanel 비활성화");
+            }
+            
             if (verboseLog) Debug.Log("[UIScreenController] ShowSelection → GamePanel OFF, StageSelect ON");
+            
+            // 🔥 추가: UI 안정화를 위한 코루틴 시작
+            StartCoroutine(EnsureUIStabilityAfterShowSelection());
+        }
+        
+        /// <summary>
+        /// 🔥 신규: ShowSelection 후 UI 안정화 보장 코루틴
+        /// </summary>
+        private System.Collections.IEnumerator EnsureUIStabilityAfterShowSelection()
+        {
+            // 1프레임 대기로 UI 업데이트 완료 보장
+            yield return null;
+            
+            // StageSelectPanel 재확인
+            if (stageSelectPanelRoot && !stageSelectPanelRoot.activeSelf)
+            {
+                Debug.LogWarning("[UIScreenController] UI 안정화 - StageSelectPanel 재활성화");
+                stageSelectPanelRoot.SetActive(true);
+            }
+            
+            // 🔥 추가: CandyCrushStageMapView의 버튼 위치 재검증
+            if (stageSelectPanelRoot)
+            {
+                var stageMapView = stageSelectPanelRoot.GetComponent<Features.Single.UI.StageSelect.CandyCrushStageMapView>();
+                if (stageMapView != null)
+                {
+                    // ForceRefreshStageButtons 메서드 호출로 위치 재보정
+                    stageMapView.SendMessage("ForceRefreshStageButtons", SendMessageOptions.DontRequireReceiver);
+                    if (verboseLog) Debug.Log("[UIScreenController] UI 안정화 - CandyCrushStageMapView 강제 리프레시 완료");
+                }
+            }
         }
 
         /// <summary>

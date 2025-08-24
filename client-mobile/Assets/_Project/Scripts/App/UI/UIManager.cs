@@ -527,14 +527,15 @@ namespace App.UI
         }
         
         /// <summary>
-        /// 🔥 수정: 스테이지 선택 모드에서 게임플레이 모드로 전환 (Scene 재로딩 방지)
+        /// 🔥 수정: 스테이지 선택 모드에서 게임플레이 모드로 전환 (StageSelectPanel 유지)
+        /// 기획 의도: StageSelectPanel 비활성화하지 않고 GamePanel만 활성화
         /// </summary>
         private IEnumerator TransitionToGameplayMode()
         {
             Debug.Log("[UIManager] 게임플레이 모드 전환 시작");
             
-            // 1. MainScene 패널들 숨기기 (이제 실제 게임플레이 시작)
-            HideAllMainScenePanels();
+            // 🔥 핵심 수정: MainScene 패널들 숨기되, StageSelectPanel은 유지
+            HideMainScenePanelsForGameplay();
             
             // 2. 🔥 핵심 수정: SingleGameManager 초기화 + UI 활성화
             // Scene은 이미 로드되어 있으므로 SingleGameManager 직접 호출
@@ -576,7 +577,42 @@ namespace App.UI
         }
         
         /// <summary>
-        /// 🔥 추가: MainScene의 모든 패널 숨기기 (게임플레이 시작 시)
+        /// 🔥 신규: 게임플레이 시작 시 MainScene 패널 숨기기 (StageSelectPanel 제외)
+        /// 기획 의도: StageSelectPanel은 유지하고 다른 패널들만 숨김
+        /// </summary>
+        private void HideMainScenePanelsForGameplay()
+        {
+            Debug.Log("[UIManager] 게임플레이 시작 - MainScene 패널들 숨기기 (StageSelectPanel 제외)");
+            
+            // Login과 ModeSelection 패널만 숨기기 (StageSelect는 유지)
+            if (panels.TryGetValue(UIState.Login, out var loginPanel) && loginPanel != null)
+            {
+                Debug.Log("[UIManager] Login 패널 숨기기");
+                loginPanel.Hide();
+            }
+            
+            if (panels.TryGetValue(UIState.ModeSelection, out var modePanel) && modePanel != null)
+            {
+                Debug.Log("[UIManager] ModeSelection 패널 숨기기");
+                modePanel.Hide();
+            }
+            
+            // 🔥 핵심: StageSelect 패널은 유지 (기획 의도)
+            if (panels.TryGetValue(UIState.StageSelect, out var stagePanel) && stagePanel != null)
+            {
+                if (!stagePanel.gameObject.activeSelf)
+                {
+                    Debug.Log("[UIManager] StageSelect 패널 활성화 유지");
+                    stagePanel.Show();
+                }
+            }
+            
+            // currentPanel과 currentState는 무효화하지 않음 (StageSelect 상태 유지)
+            Debug.Log("[UIManager] MainScene 패널 숨기기 완료 - StageSelectPanel 유지됨");
+        }
+
+        /// <summary>
+        /// 🔥 기존: MainScene의 모든 패널 숨기기 (완전 게임플레이 모드 또는 씬 전환 시)
         /// </summary>
         private void HideAllMainScenePanels()
         {

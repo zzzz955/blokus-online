@@ -38,12 +38,18 @@ jobs:
     outputs:
       game-server-changed: ${{ steps.changes.outputs.game-server }}
       web-changed: ${{ steps.changes.outputs.web }}
+      single-api-changed: ${{ steps.changes.outputs.single-api }}
+      oidc-changed: ${{ steps.changes.outputs.oidc }}
       infrastructure-changed: ${{ steps.changes.outputs.infrastructure }}
       deploy-game-server: ${{ steps.deploy-decision.outputs.deploy-game-server }}
       deploy-web: ${{ steps.deploy-decision.outputs.deploy-web }}
+      deploy-single-api: ${{ steps.deploy-decision.outputs.deploy-single-api }}
+      deploy-oidc: ${{ steps.deploy-decision.outputs.deploy-oidc }}
       deploy-infrastructure: ${{ steps.deploy-decision.outputs.deploy-infrastructure }}
       build-cache-key-game: ${{ steps.cache-keys.outputs.game-cache-key }}
       build-cache-key-web: ${{ steps.cache-keys.outputs.web-cache-key }}
+      build-cache-key-single-api: ${{ steps.cache-keys.outputs.single-api-cache-key }}
+      build-cache-key-oidc: ${{ steps.cache-keys.outputs.oidc-cache-key }}
     
     steps:
     - name: Checkout
@@ -78,6 +84,18 @@ jobs:
           WEB_CHANGED=true
         fi
         
+        # Single Player API 변경사항
+        SINGLE_API_CHANGED=false
+        if echo "$CHANGED_FILES" | grep -qE '^single-player-api/'; then
+          SINGLE_API_CHANGED=true
+        fi
+        
+        # OIDC Auth Server 변경사항
+        OIDC_CHANGED=false
+        if echo "$CHANGED_FILES" | grep -qE '^oidc-auth-server/'; then
+          OIDC_CHANGED=true
+        fi
+        
         # 인프라 변경사항
         INFRA_CHANGED=false
         if echo "$CHANGED_FILES" | grep -qE '^(docker-compose\.yml|\.github/|\.env\.example)'; then
@@ -86,6 +104,8 @@ jobs:
         
         echo "game-server=$GAME_CHANGED" >> $GITHUB_OUTPUT
         echo "web=$WEB_CHANGED" >> $GITHUB_OUTPUT
+        echo "single-api=$SINGLE_API_CHANGED" >> $GITHUB_OUTPUT
+        echo "oidc=$OIDC_CHANGED" >> $GITHUB_OUTPUT
         echo "infrastructure=$INFRA_CHANGED" >> $GITHUB_OUTPUT
         
     - name: Generate cache keys
@@ -99,8 +119,18 @@ jobs:
         WEB_DEPS_HASH=$(find web -name "package*.json" -o -name "*.ts" -o -name "*.tsx" | head -20 | xargs cat 2>/dev/null | sha256sum | cut -d' ' -f1 || echo "default")
         WEB_CACHE_KEY="web-server-v2-$WEB_DEPS_HASH"
         
+        # Single Player API 캐시 키
+        SINGLE_API_DEPS_HASH=$(find single-player-api -name "package*.json" -o -name "*.js" | head -10 | xargs cat 2>/dev/null | sha256sum | cut -d' ' -f1 || echo "default")
+        SINGLE_API_CACHE_KEY="single-api-v2-$SINGLE_API_DEPS_HASH"
+        
+        # OIDC Auth Server 캐시 키
+        OIDC_DEPS_HASH=$(find oidc-auth-server -name "package*.json" -o -name "*.js" | head -10 | xargs cat 2>/dev/null | sha256sum | cut -d' ' -f1 || echo "default")
+        OIDC_CACHE_KEY="oidc-server-v2-$OIDC_DEPS_HASH"
+        
         echo "game-cache-key=$GAME_CACHE_KEY" >> $GITHUB_OUTPUT
         echo "web-cache-key=$WEB_CACHE_KEY" >> $GITHUB_OUTPUT
+        echo "single-api-cache-key=$SINGLE_API_CACHE_KEY" >> $GITHUB_OUTPUT
+        echo "oidc-cache-key=$OIDC_CACHE_KEY" >> $GITHUB_OUTPUT
         
     - name: Setup SSH for deployment status check
       run: |
@@ -120,6 +150,8 @@ jobs:
         # 변경사항 기반 초기 결정
         DEPLOY_GAME="${{ steps.changes.outputs.game-server }}"
         DEPLOY_WEB="${{ steps.changes.outputs.web }}"
+        DEPLOY_SINGLE_API="${{ steps.changes.outputs.single-api }}"
+        DEPLOY_OIDC="${{ steps.changes.outputs.oidc }}"
         DEPLOY_INFRA="${{ steps.changes.outputs.infrastructure }}"
         
         # 이전 배포 실패 확인

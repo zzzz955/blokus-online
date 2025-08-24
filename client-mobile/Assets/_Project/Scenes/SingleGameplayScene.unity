@@ -2582,7 +2582,7 @@ MonoBehaviour:
   contentTransform: {fileID: 971486566}
   viewportTransform: {fileID: 913984413}
   stageFeed: {fileID: 322564332}
-  buttonPool: {fileID: 0}
+  buttonPool: {fileID: 824605555}
   progressText: {fileID: 216557658}
   totalStarsText: {fileID: 639431570}
   backButton: {fileID: 1323806838}

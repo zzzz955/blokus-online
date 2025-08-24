@@ -31,6 +31,9 @@ namespace Features.Single.UI.StageSelect
         [Header("스테이지 시스템")]
         [SerializeField] private StageFeed stageFeed;
         [SerializeField] private StageButtonPool buttonPool;
+        
+        // 🔥 추가: StageFeed 초기화 완료 플래그
+        private bool stageFeedInitialized = false;
 
         [Header("UI 컴포넌트")]
         [SerializeField] private TextMeshProUGUI progressText;
@@ -74,6 +77,11 @@ namespace Features.Single.UI.StageSelect
         // 🔥 신규: 비동기 업데이트 큐 및 상태 관리
         private readonly Queue<System.Action> updateQueue = new Queue<System.Action>();
         private bool isProcessingQueue = false;
+
+        // 🔥 추가: 총 스테이지 수 캐싱 및 로그 스팸 방지
+        private int cachedTotalStages = -1;
+        private float lastTotalStagesLogTime = 0f;
+        private const float TOTAL_STAGES_LOG_THROTTLE = 5f; // 5초마다 로그
 
         protected override void Awake()
         {
@@ -138,6 +146,9 @@ namespace Features.Single.UI.StageSelect
                 scrollRect.vertical = true;
             }
 
+            // 🔥 추가: 데이터 로딩 상태를 먼저 확인하여 StageFeed 초기화
+            CheckAndInitializeStageFeed();
+
             InitializeStageMap();
 
             // Features.Single.Core.StageDataManager 이벤트 구독
@@ -152,6 +163,16 @@ namespace Features.Single.UI.StageSelect
         {
             // 초기화되지 않았으면 스킵
             if (!isInitialized || stageFeed == null || scrollRect == null) return;
+
+            // 🔥 추가: GameObject 활성화 상태 검증
+            if (!this.gameObject.activeSelf) return;
+
+            // 🔥 추가: 메타데이터 로딩 상태 검증
+            if (Features.Single.Core.UserDataCache.Instance == null || 
+                Features.Single.Core.UserDataCache.Instance.GetStageMetadata() == null)
+            {
+                return; // 메타데이터가 로딩되지 않은 상태에서는 Update 스킵
+            }
 
             // 스크롤 위치가 실제로 변경되었을 때만 업데이트
             Vector2 currentScrollPosition = scrollRect.normalizedPosition;
@@ -375,6 +396,18 @@ namespace Features.Single.UI.StageSelect
         {
             if (stageFeed == null || contentTransform == null) return;
 
+            // 🔥 안전장치: StageFeed의 totalStages 값 검증 후 Content Height 계산
+            int safeTotalStages = stageFeed.GetTotalStages(); // 안전장치가 적용된 값
+            
+            // 🔥 추가: 데이터 로딩 실패시 ScrollContent 설정 건너뛰기
+            if (safeTotalStages == 0)
+            {
+                Debug.LogError("[CandyCrushStageMapView] 스테이지 데이터 없음 - ScrollContent 설정 건너뛰기");
+                return;
+            }
+            
+            Debug.Log($"[CandyCrushStageMapView] SetupScrollContent - safeTotalStages: {safeTotalStages}개");
+            
             // 콘텐츠 크기 설정 (상단 여백 추가)
             float totalHeight = stageFeed.GetTotalHeight() + topPadding;
             float totalWidth = stageFeed.GetTotalWidth();
@@ -406,10 +439,17 @@ namespace Features.Single.UI.StageSelect
             // 첫 번째 스테이지가 보이지 않으면 강제로 처음 몇 개 스테이지 표시
             if (activeButtons.Count == 0)
             {
+                int totalStages = stageFeed.GetTotalStages();
+                if (totalStages == 0)
+                {
+                    Debug.LogError("활성 버튼 없음 + 스테이지 데이터 없음 - 초기화 건너뛰기");
+                    yield break;
+                }
+                
                 Debug.LogWarning("활성 버튼이 없음. 강제로 첫 20개 스테이지 표시");
-                UpdateVisibleButtons(1, Mathf.Min(20, stageFeed.GetTotalStages()));
+                UpdateVisibleButtons(1, Mathf.Min(20, totalStages));
                 firstVisibleStage = 1;
-                lastVisibleStage = Mathf.Min(20, stageFeed.GetTotalStages());
+                lastVisibleStage = Mathf.Min(20, totalStages);
             }
 
         }
@@ -429,6 +469,21 @@ namespace Features.Single.UI.StageSelect
         {
             if (stageFeed == null || viewportTransform == null) return;
 
+            // 🔥 추가: StageFeed 초기화 완료 확인
+            if (!stageFeedInitialized)
+            {
+                //Debug.Log("[CandyCrushStageMapView] StageFeed가 아직 초기화되지 않았습니다. UpdateViewport 건너뜀");
+                return;
+            }
+
+            // 🔥 추가: 총 스테이지 수 검증으로 무한 루프 방지
+            int actualTotalStages = GetActualTotalStages();
+            if (actualTotalStages <= 0 || actualTotalStages > 1000)
+            {
+                Debug.LogError($"[CandyCrushStageMapView] UpdateViewport - 비정상적인 총 스테이지 수: {actualTotalStages}. 뷰포트 업데이트 중단.");
+                return;
+            }
+
             // 현재 뷰포트 범위 계산
             Vector2 viewportMin, viewportMax;
             GetViewportBounds(out viewportMin, out viewportMax);
@@ -440,6 +495,13 @@ namespace Features.Single.UI.StageSelect
             // 가시 스테이지 범위 계산
             int newFirstVisible, newLastVisible;
             CalculateVisibleStageRange(viewportMin, viewportMax, out newFirstVisible, out newLastVisible);
+
+            // 🔥 추가: 계산된 범위 재검증 (무효한 범위 차단)
+            if (newFirstVisible < 1 || newLastVisible > actualTotalStages || newFirstVisible > newLastVisible)
+            {
+                Debug.LogError($"[CandyCrushStageMapView] UpdateViewport - 비정상적인 가시 범위: [{newFirstVisible}, {newLastVisible}] (총 스테이지: {actualTotalStages})");
+                return;
+            }
 
             // 범위가 변경되었다면 버튼 업데이트
             if (newFirstVisible != firstVisibleStage || newLastVisible != lastVisibleStage)
@@ -475,7 +537,15 @@ namespace Features.Single.UI.StageSelect
             firstVisible = int.MaxValue;
             lastVisible = 0;
 
-            int totalStages = stageFeed.GetTotalStages();
+            // 🔥 수정: 실제 메타데이터 기반 스테이지 수 사용
+            int totalStages = GetActualTotalStages();
+            
+            // 🔥 추가: 총 스테이지 수 유효성 검증
+            if (totalStages <= 0 || totalStages > 1000)
+            {
+                Debug.LogError($"[CandyCrushStageMapView] 비정상적인 총 스테이지 수: {totalStages}. 기본값 14 사용.");
+                totalStages = 14;
+            }
 
             // 모든 스테이지를 검사하여 뷰포트 내에 있는지 확인
             for (int stage = 1; stage <= totalStages; stage++)
@@ -497,6 +567,10 @@ namespace Features.Single.UI.StageSelect
                 firstVisible = 1;
                 lastVisible = Mathf.Min(10, totalStages);
             }
+            
+            // 🔥 추가: 계산된 범위가 유효한지 재검증
+            firstVisible = Mathf.Clamp(firstVisible, 1, totalStages);
+            lastVisible = Mathf.Clamp(lastVisible, firstVisible, totalStages);
         }
 
         /// <summary>
@@ -532,9 +606,17 @@ namespace Features.Single.UI.StageSelect
                 }
             }
 
-            // 새로운 범위에서 아직 생성되지 않은 버튼들 생성
+            // 🔥 수정: 새로운 범위에서 아직 생성되지 않은 버튼들 생성 (경계 검증 추가)
+            int actualTotalStages = GetActualTotalStages();
             for (int stage = newFirstVisible; stage <= newLastVisible; stage++)
             {
+                // 🔥 추가: 유효한 스테이지 범위 검증
+                if (stage < 1 || stage > actualTotalStages)
+                {
+                    Debug.LogError($"[CandyCrushStageMapView] 유효하지 않은 스테이지 번호 스킵: {stage} (총 스테이지: {actualTotalStages})");
+                    continue;
+                }
+
                 if (!activeButtons.ContainsKey(stage))
                 {
                     CreateStageButton(stage);
@@ -563,6 +645,13 @@ namespace Features.Single.UI.StageSelect
         {
             if (!stageFeed.IsValidStage(stageNumber)) return;
 
+            // 🔥 수정: GameObject 활성화 상태 검증 및 강제 활성화
+            if (!this.gameObject.activeSelf)
+            {
+                Debug.LogWarning($"[CandyCrushStageMapView] CreateStageButton({stageNumber}) - GameObject 비활성화 상태에서 호출됨. 강제 활성화.");
+                this.gameObject.SetActive(true);
+            }
+
             // 풀에서 버튼 가져오기
             StageButton button = buttonPool.GetButton();
             if (button == null) return;
@@ -571,8 +660,33 @@ namespace Features.Single.UI.StageSelect
             Vector2 stagePosition = stageFeed.GetStagePosition(stageNumber);
             Vector3 adjustedPosition = new Vector3(stagePosition.x, stagePosition.y - topPadding, 0);
 
+            // 🔥 추가: 위치 유효성 검증
+            if (Mathf.Abs(adjustedPosition.y) > 10000f || Mathf.Abs(adjustedPosition.x) > 5000f)
+            {
+                Debug.LogError($"[CandyCrushStageMapView] 비정상적인 버튼 위치 감지! Stage={stageNumber}, Position={adjustedPosition}, Original={stagePosition}");
+                
+                // 🔥 비상 위치 보정: 스테이지 번호 기반으로 안전한 위치 계산
+                float safeY = -(stageNumber - 1) * 180f - topPadding;
+                float safeX = 0f;
+                adjustedPosition = new Vector3(safeX, safeY, 0);
+                
+                Debug.LogWarning($"[CandyCrushStageMapView] 비상 위치 보정 적용: Stage={stageNumber}, SafePosition={adjustedPosition}");
+            }
+
             button.transform.SetParent(contentTransform, false);
             button.transform.localPosition = adjustedPosition;
+
+            // 🔥 추가: 설정 후 위치 재검증
+            Vector3 finalPosition = button.transform.localPosition;
+            if (Mathf.Abs(finalPosition.y) > 10000f || Mathf.Abs(finalPosition.x) > 5000f)
+            {
+                Debug.LogError($"[CandyCrushStageMapView] 버튼 위치 설정 실패! Stage={stageNumber}, FinalPosition={finalPosition}");
+                
+                // 🔥 최종 비상 조치: 직접 안전한 위치 재설정
+                float emergencyY = -(stageNumber - 1) * 180f - topPadding;
+                button.transform.localPosition = new Vector3(0, emergencyY, 0);
+                Debug.LogWarning($"[CandyCrushStageMapView] 최종 비상 위치 적용: Stage={stageNumber}, EmergencyPosition={button.transform.localPosition}");
+            }
 
             // StageButton 초기화 (기존 API 사용)
             button.Initialize(stageNumber, OnStageButtonClicked);
@@ -770,6 +884,21 @@ namespace Features.Single.UI.StageSelect
                 InvokeLater(1f, SetupApiEventHandlers);
             }
 
+            // 🔥 추가: SingleCoreBootstrap 데이터 로딩 완료 이벤트 구독
+            if (Features.Single.Core.SingleCoreBootstrap.Instance != null)
+            {
+                Features.Single.Core.SingleCoreBootstrap.Instance.OnDataLoadingComplete += OnDataLoadingComplete;
+                Features.Single.Core.SingleCoreBootstrap.Instance.OnDataLoadingFailed += OnDataLoadingFailed;
+                Debug.Log("[CandyCrushStageMapView] SingleCoreBootstrap 데이터 로딩 이벤트 핸들러 설정 완료");
+                
+                // 🔥 핵심 수정: 이미 데이터가 로드되어 있다면 즉시 StageFeed 초기화
+                if (Features.Single.Core.SingleCoreBootstrap.Instance.IsDataLoaded())
+                {
+                    Debug.Log("[CandyCrushStageMapView] 데이터 이미 로드됨 - 즉시 StageFeed 초기화");
+                    OnDataLoadingComplete();
+                }
+            }
+
             // Features.Single.Core.UserDataCache 이벤트 구독(기존 유지)
             Debug.Log($"[CandyCrushStageMapView] Features.Single.Core.UserDataCache.Instance null 여부: {Features.Single.Core.UserDataCache.Instance == null}");
             if (Features.Single.Core.UserDataCache.Instance != null)
@@ -795,6 +924,13 @@ namespace Features.Single.UI.StageSelect
         /// </summary>
         private void CleanupApiEventHandlers()
         {
+            // 🔥 추가: SingleCoreBootstrap 이벤트 해제
+            if (Features.Single.Core.SingleCoreBootstrap.Instance != null)
+            {
+                Features.Single.Core.SingleCoreBootstrap.Instance.OnDataLoadingComplete -= OnDataLoadingComplete;
+                Features.Single.Core.SingleCoreBootstrap.Instance.OnDataLoadingFailed -= OnDataLoadingFailed;
+            }
+
             if (HttpApiClient.Instance != null)
             {
                 HttpApiClient.Instance.OnStageDataReceived -= OnStageDataReceived;
@@ -820,6 +956,9 @@ namespace Features.Single.UI.StageSelect
 
         private void OnStageMetadataReceived(HttpApiClient.CompactStageMetadata[] metadata)
         {
+            // 🔥 추가: 메타데이터 변경 시 캐시 무효화
+            InvalidateTotalStagesCache();
+            
             if (pendingStageNumber <= 0) return; // 대기 중인 스테이지 없음
 
             // 캐시에 방금 들어온 메타데이터가 있는지 확인
@@ -1068,6 +1207,21 @@ namespace Features.Single.UI.StageSelect
         /// </summary>
         private void RefreshChangedStageButtons(HashSet<int> changedStages = null)
         {
+            // 🔥 수정: GameObject 활성화 상태 검증
+            if (!this.gameObject.activeSelf)
+            {
+                Debug.LogWarning("[CandyCrushStageMapView] RefreshStageButtons - GameObject 비활성화 상태에서 호출됨. 강제 활성화.");
+                this.gameObject.SetActive(true);
+            }
+
+            // 🔥 추가: StageSelectPanel 활성화 상태 검증
+            var stageSelectPanel = GameObject.Find("StageSelectPanel");
+            if (stageSelectPanel != null && !stageSelectPanel.activeSelf)
+            {
+                Debug.LogWarning("[CandyCrushStageMapView] RefreshStageButtons - StageSelectPanel 비활성화 상태 감지. 활성화.");
+                stageSelectPanel.SetActive(true);
+            }
+
             // 🔥 추가: 중복 리프레시 방지 - Throttling
             float currentTime = Time.time;
             if (isButtonRefreshInProgress)
@@ -1207,6 +1361,90 @@ namespace Features.Single.UI.StageSelect
             }
 
             Debug.Log($"[CandyCrushStageMapView] 선택적 업데이트 완료 - {changedStages.Count}개 스테이지 처리됨");
+        }
+
+        /// <summary>
+        /// 🔥 신규: 강제 스테이지 버튼 리프레시 (Throttling 무시, 게임 완료 후 사용)
+        /// GameResultModal에서 호출되어 즉시 UI 업데이트를 보장
+        /// </summary>
+        public void ForceRefreshStageButtons()
+        {
+            Debug.Log("[CandyCrushStageMapView] ForceRefreshStageButtons 호출됨 - Throttling 무시하고 즉시 실행");
+            
+            // 🔥 핵심: GameObject와 StageSelectPanel 강제 활성화
+            if (!this.gameObject.activeSelf)
+            {
+                Debug.LogWarning("[CandyCrushStageMapView] ForceRefresh - GameObject 강제 활성화");
+                this.gameObject.SetActive(true);
+            }
+
+            var stageSelectPanel = GameObject.Find("StageSelectPanel");
+            if (stageSelectPanel != null && !stageSelectPanel.activeSelf)
+            {
+                Debug.LogWarning("[CandyCrushStageMapView] ForceRefresh - StageSelectPanel 강제 활성화");
+                stageSelectPanel.SetActive(true);
+            }
+
+            // 🔥 핵심: Throttling 플래그 강제 초기화 (즉시 실행 보장)
+            isButtonRefreshInProgress = false;
+            lastButtonRefreshTime = 0f; // 강제 리셋으로 즉시 실행 허용
+            
+            // 🔥 추가: StageFeed 업데이트 및 Content Height 재계산 보장
+            if (stageFeed != null)
+            {
+                stageFeed.UpdateTotalStagesFromMetadata(); // totalStages 업데이트 → GeneratePath() 호출 → OnPathGenerated() → SetupScrollContent()
+            }
+            
+            // 🔥 현재 완료된 스테이지 기반으로 선택적 업데이트
+            HashSet<int> priorityStages = new HashSet<int>();
+            
+            // 최근 완료된 스테이지 포함 (현재 스테이지가 있다면)
+            int currentStage = Features.Single.Gameplay.SingleGameManager.CurrentStage;
+            if (currentStage > 0)
+            {
+                priorityStages.Add(currentStage);
+                
+                // 새로 언락될 가능성이 있는 다음 스테이지도 포함
+                int totalStages = 14; // 기본값
+                if (UserDataCache.Instance != null)
+                {
+                    var metadata = UserDataCache.Instance.GetStageMetadata();
+                    if (metadata != null && metadata.Length > 0)
+                    {
+                        // 🔥 안전장치: 비정상적으로 큰 값일 때 기본값 사용
+                        if (metadata.Length > 100)
+                        {
+                            Debug.LogError($"[CandyCrushStageMapView] ForceRefresh - 비정상적인 메타데이터 길이: {metadata.Length}개. 기본값 14개 사용.");
+                            totalStages = 14;
+                        }
+                        else
+                        {
+                            totalStages = metadata.Length;
+                        }
+                    }
+                }
+                
+                if (currentStage + 1 <= totalStages)
+                {
+                    priorityStages.Add(currentStage + 1);
+                }
+            }
+            
+            // 전체 활성 버튼들의 위치 재검증 및 보정
+            foreach (var kvp in activeButtons)
+            {
+                if (kvp.Value != null && kvp.Value.gameObject.activeSelf)
+                {
+                    priorityStages.Add(kvp.Key);
+                }
+            }
+            
+            Debug.Log($"[CandyCrushStageMapView] ForceRefresh - 우선순위 스테이지: [{string.Join(", ", priorityStages)}]");
+            
+            // 선택적 업데이트 호출 (throttling 이미 해제됨)
+            RefreshChangedStageButtons(priorityStages.Count > 0 ? priorityStages : null);
+            
+            Debug.Log("[CandyCrushStageMapView] ForceRefreshStageButtons 완료");
         }
 
         /// <summary>
@@ -1850,6 +2088,14 @@ namespace Features.Single.UI.StageSelect
         {
             if (!stageFeed.IsValidStage(stageNumber) || scrollRect == null) return;
 
+            // 🔥 추가: 데이터 로딩 실패시 스크롤 건너뛰기
+            int totalStages = stageFeed.GetTotalStages();
+            if (totalStages == 0)
+            {
+                Debug.LogError($"[CandyCrushStageMapView] 스테이지 데이터 없음 - ScrollToStage({stageNumber}) 건너뛰기");
+                return;
+            }
+
             Vector2 stagePosition = stageFeed.GetStagePosition(stageNumber);
             float totalHeight = stageFeed.GetTotalHeight();
 
@@ -2179,14 +2425,38 @@ namespace Features.Single.UI.StageSelect
         /// </summary>
         private int GetActualTotalStages()
         {
+            // 🔥 추가: 캐시된 값이 있으면 재사용 (메타데이터는 자주 변경되지 않음)
+            if (cachedTotalStages > 0)
+            {
+                return cachedTotalStages;
+            }
+
             // 1. UserDataCache의 메타데이터에서 실제 스테이지 수 가져오기 (우선순위)
             if (Features.Single.Core.UserDataCache.Instance != null)
             {
                 var metadata = Features.Single.Core.UserDataCache.Instance.GetStageMetadata();
                 if (metadata != null && metadata.Length > 0)
                 {
-                    Debug.Log($"[CandyCrushStageMapView] 실제 메타데이터 기반 총 스테이지 수: {metadata.Length}개");
-                    return metadata.Length;
+                    // 🔥 안전장치: 비정상적으로 큰 값일 때 기본값 사용
+                    if (metadata.Length > 100)
+                    {
+                        Debug.LogError($"[CandyCrushStageMapView] 비정상적인 메타데이터 길이 감지: {metadata.Length}개. 기본값 14개 사용.");
+                        cachedTotalStages = 14;
+                    }
+                    else
+                    {
+                        cachedTotalStages = metadata.Length;
+                    }
+                    
+                    // 🔥 수정: 로그 스팸 방지 - 5초마다만 로그 출력
+                    float currentTime = Time.time;
+                    if (currentTime - lastTotalStagesLogTime > TOTAL_STAGES_LOG_THROTTLE)
+                    {
+                        Debug.Log($"[CandyCrushStageMapView] 실제 메타데이터 기반 총 스테이지 수: {cachedTotalStages}개 (원본 길이: {metadata.Length})");
+                        lastTotalStagesLogTime = currentTime;
+                    }
+                    
+                    return cachedTotalStages;
                 }
             }
 
@@ -2194,13 +2464,88 @@ namespace Features.Single.UI.StageSelect
             if (stageFeed != null)
             {
                 int stageFeedTotal = stageFeed.GetTotalStages();
+                cachedTotalStages = stageFeedTotal;
                 Debug.LogWarning($"[CandyCrushStageMapView] 메타데이터 없음. StageFeed 백업 사용: {stageFeedTotal}개");
-                return stageFeedTotal;
+                return cachedTotalStages;
             }
 
             // 3. 최종 백업 (기본값)
+            cachedTotalStages = 14;
             Debug.LogError("[CandyCrushStageMapView] 총 스테이지 수를 가져올 수 없음. 기본값 14 사용");
-            return 14;
+            return cachedTotalStages;
+        }
+
+        /// <summary>
+        /// 🔥 추가: 메타데이터 변경 시 캐시 무효화
+        /// </summary>
+        private void InvalidateTotalStagesCache()
+        {
+            cachedTotalStages = -1;
+        }
+
+        /// <summary>
+        /// 🔥 추가: SingleCoreBootstrap 데이터 로딩 완료 이벤트 핸들러
+        /// </summary>
+        private void OnDataLoadingComplete()
+        {
+            Debug.Log("[CandyCrushStageMapView] 데이터 로딩 완료됨 - StageFeed 초기화 시작");
+            
+            // 🔥 핵심: 데이터 로딩 완료 즉시 StageFeed 업데이트
+            if (stageFeed != null)
+            {
+                stageFeed.UpdateTotalStagesFromMetadata();
+                stageFeedInitialized = true; // 🔥 추가: StageFeed 초기화 완료 플래그 설정
+                Debug.Log("[CandyCrushStageMapView] StageFeed 데이터 기반 초기화 완료");
+            }
+            
+            // 🔥 추가: 스테이지 맵 새로고침
+            RefreshStageMap();
+        }
+
+        /// <summary>
+        /// 🔥 추가: SingleCoreBootstrap 데이터 로딩 실패 이벤트 핸들러
+        /// </summary>
+        private void OnDataLoadingFailed(string error)
+        {
+            Debug.LogError($"[CandyCrushStageMapView] 데이터 로딩 실패: {error}");
+            
+            // 🔥 데이터 로딩 실패시 StageFeed 기능 비활성화
+            stageFeedInitialized = false; // 🔥 추가: StageFeed 초기화 실패 플래그 설정
+            if (stageFeed != null)
+            {
+                // StageFeed에게 데이터 로딩 실패를 알려서 기능 비활성화하도록 함
+                stageFeed.UpdateTotalStagesFromMetadata(); // UserDataCache가 null이므로 비활성화됨
+            }
+            
+            // 사용자에게 알림
+            SystemMessageManager.ShowToast("스테이지 데이터를 불러올 수 없습니다", MessagePriority.Error);
+        }
+
+        /// <summary>
+        /// 🔥 추가: 데이터 로딩 상태 확인 및 StageFeed 초기화
+        /// </summary>
+        private void CheckAndInitializeStageFeed()
+        {
+            Debug.Log("[CandyCrushStageMapView] 데이터 로딩 상태 확인 중...");
+            
+            // SingleCoreBootstrap이 있고 이미 데이터가 로드되어 있다면
+            if (Features.Single.Core.SingleCoreBootstrap.Instance != null && 
+                Features.Single.Core.SingleCoreBootstrap.Instance.IsDataLoaded())
+            {
+                Debug.Log("[CandyCrushStageMapView] 데이터 이미 로드 완료 - StageFeed 즉시 초기화");
+                
+                // StageFeed 초기화
+                if (stageFeed != null)
+                {
+                    stageFeed.UpdateTotalStagesFromMetadata();
+                    stageFeedInitialized = true; // 🔥 추가: StageFeed 초기화 완료 플래그 설정
+                    Debug.Log("[CandyCrushStageMapView] StageFeed 데이터 기반 초기화 완료");
+                }
+            }
+            else
+            {
+                Debug.Log("[CandyCrushStageMapView] 데이터 로딩 대기 중 - 이벤트로 나중에 초기화");
+            }
         }
     }
 }

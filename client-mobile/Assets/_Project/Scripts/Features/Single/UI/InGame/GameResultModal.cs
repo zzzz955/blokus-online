@@ -190,13 +190,61 @@ namespace Features.Single.UI.InGame
             if (modalPanel && modalPanel.activeSelf)
                 modalPanel.SetActive(false);
 
+            // 🔥 수정: UI 안정화를 위한 지연된 처리
+            StartCoroutine(DelayedCloseToSelection());
+        }
+
+        /// <summary>
+        /// 🔥 수정: UI 안정화를 위한 지연된 화면 전환 (StageSelectPanel 강제 활성화 보장)
+        /// </summary>
+        private System.Collections.IEnumerator DelayedCloseToSelection()
+        {
+            // 🔥 수정: 2프레임 대기로 UI 상태 완전 안정화
+            yield return null;
+            yield return null;
+
+            // 🔥 수정: StageSelectPanel 먼저 강제 활성화 (우선순위 최고)
+            var stageSelectPanel = GameObject.Find("StageSelectPanel");
+            if (stageSelectPanel != null)
+            {
+                if (!stageSelectPanel.activeSelf)
+                {
+                    Debug.Log("[GameResultModal] StageSelectPanel 강제 활성화 - 최우선");
+                    stageSelectPanel.SetActive(true);
+                }
+                
+                // 🔥 추가: StageSelectPanel의 CandyCrushStageMapView 강제 리프레시 (throttling 무시)
+                var stageMapView = stageSelectPanel.GetComponent<Features.Single.UI.StageSelect.CandyCrushStageMapView>();
+                if (stageMapView != null)
+                {
+                    Debug.Log("[GameResultModal] CandyCrushStageMapView 강제 리프레시 요청");
+                    // ForceRefreshStageButtons 메서드 호출 (throttling 무시)
+                    stageMapView.SendMessage("ForceRefreshStageButtons", SendMessageOptions.DontRequireReceiver);
+                }
+            }
+            else
+            {
+                Debug.LogError("[GameResultModal] StageSelectPanel GameObject를 찾을 수 없음!");
+            }
+
             // 컨트롤러에만 위임 (형제 패널 직접 제어 금지)
             if (!uiController)
                 uiController = FindObjectOfType<Features.Single.UI.Scene.SingleGameplayUIScreenController>(true);
 
             if (uiController)
             {
-                uiController.ShowSelection(); // GamePanel OFF, StageSelect ON(또는 활성 유지 전략)
+                Debug.Log("[GameResultModal] UIController 발견 - ShowSelection 호출");
+                uiController.ShowSelection(); // GamePanel OFF, StageSelect ON
+                
+                // 🔥 수정: ShowSelection 후 더 긴 대기 시간으로 UI 업데이트 완료 보장
+                yield return new WaitForSeconds(0.2f);
+                
+                // 🔥 추가: 최종 검증 - StageSelectPanel 활성화 재확인
+                if (stageSelectPanel != null && !stageSelectPanel.activeSelf)
+                {
+                    Debug.LogWarning("[GameResultModal] 최종 검증 실패 - StageSelectPanel 재활성화");
+                    stageSelectPanel.SetActive(true);
+                }
             }
             else
             {
