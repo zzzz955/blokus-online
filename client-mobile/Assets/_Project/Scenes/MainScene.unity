@@ -1379,7 +1379,6 @@ MonoBehaviour:
   socialLoginButtons:
   - {fileID: 1401648037}
   registerButton: {fileID: 1089548972}
-  webRegisterUrl: http://localhost:3000/register
   autoLoginWithRefreshToken: 1
   enableTestMode: 0
   testUsername: testuser

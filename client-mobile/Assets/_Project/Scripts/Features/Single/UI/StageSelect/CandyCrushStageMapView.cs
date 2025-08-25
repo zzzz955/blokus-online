@@ -2031,7 +2031,7 @@ namespace Features.Single.UI.StageSelect
                 }
                 
                 float progress = (float)maxCompleted / totalStages * 100f;
-                string progressString = $"진행률: {progress:F1}% ({maxCompleted}/{totalStages})";
+                string progressString = $"Stages({maxCompleted}/{totalStages})";
                 progressText.text = progressString;
                 
                 Debug.Log($"[CandyCrushStageMapView] 진행률 업데이트: {progressString}");
@@ -2067,7 +2067,7 @@ namespace Features.Single.UI.StageSelect
                 }
                 
                 int maxStars = totalStages * 3;
-                string starsString = $"별: {earnedStars}/{maxStars} ★";
+                string starsString = $"{earnedStars}/{maxStars}";
                 totalStarsText.text = starsString;
                 
                 Debug.Log($"[CandyCrushStageMapView] 별 정보 업데이트: {starsString}");
