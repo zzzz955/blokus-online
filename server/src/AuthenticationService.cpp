@@ -51,7 +51,7 @@ namespace Blokus {
                 // JWT 검증기 초기화
                 std::string jwksUrl = "http://localhost:9000/jwks.json";
                 std::string issuer = "http://localhost:9000";
-                std::vector<std::string> audiences = {"blokus-game-client"};
+                std::vector<std::string> audiences = {"blokus-desktop-client"};
                 
                 m_jwtVerifier = std::make_unique<JwtVerifier>(jwksUrl, issuer, audiences);
                 if (!m_jwtVerifier->initialize()) {

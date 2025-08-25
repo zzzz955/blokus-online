@@ -15,13 +15,12 @@ class OIDCConfig {
 
     // 지원하는 클라이언트들
     this.clients = {
-      'qt-desktop-client': {
-        client_id: 'qt-desktop-client',
+      'blokus-desktop-client': {
+        client_id: 'blokus-desktop-client',
         client_secret: null, // Public client (PKCE 사용)
         redirect_uris: [
-          'qt-desktop-client://auth/callback',
-          'http://localhost:8080/auth/callback',
-          'http://127.0.0.1:8080/auth/callback'
+          'qt-desktop-client://auth/callback'
+          // 동적 localhost 포트는 validateRedirectUri에서 패턴 매칭으로 처리
         ],
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
@@ -164,6 +163,15 @@ class OIDCConfig {
       return false
     }
 
+    // Qt 클라이언트는 동적 localhost 포트 허용
+    if (clientId === 'blokus-desktop-client') {
+      // localhost:임의포트/callback 패턴 허용
+      const localhostPattern = /^http:\/\/(localhost|127\.0\.0\.1):\d+\/callback$/
+      if (localhostPattern.test(redirectUri)) {
+        return true
+      }
+    }
+
     return client.redirect_uris.includes(redirectUri)
   }
 
@@ -255,11 +263,13 @@ class OIDCConfig {
       this.issuer = process.env.OIDC_ISSUER_PROD || 'https://blokus-online.mooo.com/oidc'
       this.baseUrl = process.env.OIDC_BASE_URL_PROD || 'https://blokus-online.mooo.com/oidc'
 
-      // 프로덕션에서는 localhost redirect URI 제거
-      Object.values(this.clients).forEach(client => {
-        client.redirect_uris = client.redirect_uris.filter(uri => 
-          !uri.includes('localhost') && !uri.includes('127.0.0.1')
-        )
+      // 프로덕션에서는 localhost redirect URI 제거 (단, Qt 클라이언트는 예외)
+      Object.entries(this.clients).forEach(([clientId, client]) => {
+        if (clientId !== 'blokus-desktop-client') {
+          client.redirect_uris = client.redirect_uris.filter(uri => 
+            !uri.includes('localhost') && !uri.includes('127.0.0.1')
+          )
+        }
       })
       
       // Next.js 클라이언트는 포트 443 (Nginx를 통해 3000으로 프록시)

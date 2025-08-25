@@ -808,7 +808,8 @@ namespace Blokus {
         
         // 인증 관련 에러는 각각의 시그널로도 전달
         if (error.contains(QString::fromUtf8("사용자명")) || error.contains(QString::fromUtf8("비밀번호")) || 
-            error.contains(QString::fromUtf8("로그인"))) {
+            error.contains(QString::fromUtf8("로그인")) || error.contains(QString::fromUtf8("인증 토큰")) ||
+            error.contains(QString::fromUtf8("토큰이 유효하지 않습니다"))) {
             emit loginResult(false, error);
         }
         else if (error.contains(QString::fromUtf8("회원가입")) || error.contains(QString::fromUtf8("이미 사용 중")) ||

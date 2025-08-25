@@ -619,15 +619,26 @@ namespace Blokus
     
     void LoginWindow::onOidcAuthenticationSucceeded(const QString& accessToken, const OidcTokens& tokens)
     {
+        qDebug() << QString::fromUtf8("=== onOidcAuthenticationSucceeded 호출됨 ===");
+        qDebug() << QString::fromUtf8("Access Token 길이: %1").arg(accessToken.length());
+        qDebug() << QString::fromUtf8("Access Token 앞 20자: %1").arg(accessToken.left(20));
+        
         Q_UNUSED(tokens); // 현재 사용하지 않는 매개변수
+        
+        qDebug() << QString::fromUtf8("로딩 상태 해제 중...");
         showLoadingState(false);
         
+        qDebug() << QString::fromUtf8("jwtLoginRequested 시그널 emit 중...");
         // JWT 토큰으로 서버에 로그인 요청
         emit jwtLoginRequested(accessToken);
+        qDebug() << QString::fromUtf8("jwtLoginRequested 시그널 emit 완료");
     }
     
     void LoginWindow::onOidcAuthenticationFailed(const QString& error)
     {
+        qDebug() << QString::fromUtf8("=== onOidcAuthenticationFailed 호출됨 ===");
+        qDebug() << QString::fromUtf8("에러 메시지: %1").arg(error);
+        
         showLoadingState(false);
         showMessage(QString::fromUtf8("OAuth 로그인 실패"), error, true);
     }

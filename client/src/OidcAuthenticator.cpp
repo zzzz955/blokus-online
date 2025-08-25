@@ -7,6 +7,7 @@
 #include <QDir>
 #include <QDebug>
 #include <QApplication>
+#include <QTimer>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -34,11 +35,11 @@ OidcAuthenticator::OidcAuthenticator(QObject* parent)
         m_config.tokenEndpoint = "http://localhost:9000/token";
         qDebug() << QString::fromUtf8("🔧 디버그 모드: localhost OIDC 서버 사용");
     #else
-        // Release 모드: 프로덕션 서버 사용 (Nginx를 통한 HTTPS 9000 포트)
-        m_config.issuer = "https://blokus-online.mooo.com:9000";
-        m_config.authorizationEndpoint = "https://blokus-online.mooo.com:9000/authorize";
-        m_config.tokenEndpoint = "https://blokus-online.mooo.com:9000/token";
-        qDebug() << QString::fromUtf8("🚀 릴리즈 모드: 프로덕션 OIDC 서버 사용 (https://blokus-online.mooo.com:9000)");
+        // Release 모드: 프로덕션 서버 사용 (Nginx 서브패스 프록시)
+        m_config.issuer = "https://blokus-online.mooo.com/oidc";
+        m_config.authorizationEndpoint = "https://blokus-online.mooo.com/oidc/authorize";
+        m_config.tokenEndpoint = "https://blokus-online.mooo.com/oidc/token";
+        qDebug() << QString::fromUtf8("🚀 릴리즈 모드: 프로덕션 OIDC 서버 사용 (https://blokus-online.mooo.com/oidc)");
     #endif
     m_config.clientId = "blokus-desktop-client";
     m_config.redirectUri = "http://localhost:{PORT}/callback"; // PORT는 동적으로 설정
@@ -359,47 +360,101 @@ void OidcAuthenticator::exchangeCodeForTokens(const QString& authCode)
 
 void OidcAuthenticator::onTokenExchangeFinished()
 {
+    qDebug() << "=== onTokenExchangeFinished 호출됨 ===";
+    
     QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
-    if (!reply) return;
-
-    reply->deleteLater();
-    stopLoopbackServer();
-
-    if (reply->error() != QNetworkReply::NoError) {
-        qDebug() << "토큰 교환 네트워크 오류:" << reply->errorString();
-        emit authenticationFailed("토큰 교환 실패: " + reply->errorString());
+    if (!reply) {
+        qDebug() << "reply가 null입니다!";
         return;
     }
 
-    QByteArray responseData = reply->readAll();
-    QJsonDocument doc = QJsonDocument::fromJson(responseData);
-    
-    if (!doc.isObject()) {
-        emit authenticationFailed("잘못된 토큰 응답 형식");
-        return;
+    try {
+        qDebug() << "HTTP 응답 코드:" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        
+        // 로컬 서버 중지를 나중으로 연기 (크래시 방지)
+        qDebug() << "로컬 서버는 나중에 정리됩니다";
+        
+        qDebug() << "에러 체크 중...";
+        if (reply->error() != QNetworkReply::NoError) {
+            qDebug() << "토큰 교환 네트워크 오류:" << reply->errorString();
+            qDebug() << "에러 코드:" << reply->error();
+            reply->deleteLater();
+            emit authenticationFailed("토큰 교환 실패: " + reply->errorString());
+            return;
+        }
+
+        qDebug() << "응답 데이터 읽기 시작...";
+        QByteArray responseData = reply->readAll();
+        qDebug() << "응답 데이터 크기:" << responseData.size() << "bytes";
+        qDebug() << "응답 내용 (첫 100자):" << responseData.left(100);
+        
+        // reply 사용 완료 후 삭제 예약
+        reply->deleteLater();
+        
+        qDebug() << "JSON 파싱 시작...";
+        QJsonDocument doc = QJsonDocument::fromJson(responseData);
+        
+        if (!doc.isObject()) {
+            qDebug() << "JSON 파싱 실패 - 유효한 객체가 아님";
+            emit authenticationFailed("잘못된 토큰 응답 형식");
+            return;
+        }
+
+        QJsonObject obj = doc.object();
+        qDebug() << "JSON 객체 키 목록:" << obj.keys();
+        
+        if (obj.contains("error")) {
+            QString error = obj["error"].toString();
+            QString errorDescription = obj.value("error_description").toString();
+            qDebug() << "토큰 교환 서버 오류:" << error << "-" << errorDescription;
+            emit authenticationFailed(QString("토큰 오류: %1 - %2").arg(error, errorDescription));
+            return;
+        }
+
+        qDebug() << "토큰 응답 파싱 중...";
+        m_currentTokens = parseTokenResponse(obj);
+        
+        qDebug() << "Access Token 길이:" << m_currentTokens.accessToken.length();
+        if (m_currentTokens.accessToken.isEmpty()) {
+            qDebug() << "Access Token이 비어있음!";
+            emit authenticationFailed("Access Token을 받지 못했습니다.");
+            return;
+        }
+
+        qDebug() << "토큰 저장 시작...";
+        // 토큰 안전하게 저장 (예외 처리 추가)
+        try {
+            saveTokensSecurely(m_currentTokens);
+            qDebug() << "토큰 저장 완료";
+        } catch (const std::exception& e) {
+            qDebug() << "토큰 저장 실패, 계속 진행:" << e.what();
+            // 저장 실패해도 인증은 성공으로 처리
+        }
+
+        qDebug() << "토큰 교환 성공";
+        qDebug() << "authenticationSucceeded 시그널 emit 중...";
+        emit authenticationSucceeded(m_currentTokens.accessToken, m_currentTokens);
+        qDebug() << "authenticationSucceeded 시그널 emit 완료";
+        
+        // 모든 처리 완료 후 로컬 서버 정리 (QTimer::singleShot으로 안전하게)
+        qDebug() << "로컬 서버 정리 예약...";
+        QTimer::singleShot(100, [this]() {
+            qDebug() << "지연된 로컬 서버 정리 시작...";
+            try {
+                stopLoopbackServer();
+                qDebug() << "지연된 로컬 서버 정리 완료";
+            } catch (...) {
+                qDebug() << "지연된 로컬 서버 정리 중 예외 (무시됨)";
+            }
+        });
+        
+    } catch (const std::exception& e) {
+        qDebug() << "onTokenExchangeFinished 예외 발생:" << e.what();
+        emit authenticationFailed("토큰 처리 중 예외 발생: " + QString(e.what()));
+    } catch (...) {
+        qDebug() << "onTokenExchangeFinished 알 수 없는 예외 발생";
+        emit authenticationFailed("토큰 처리 중 알 수 없는 예외 발생");
     }
-
-    QJsonObject obj = doc.object();
-    
-    if (obj.contains("error")) {
-        QString error = obj["error"].toString();
-        QString errorDescription = obj.value("error_description").toString();
-        emit authenticationFailed(QString("토큰 오류: %1 - %2").arg(error, errorDescription));
-        return;
-    }
-
-    m_currentTokens = parseTokenResponse(obj);
-    
-    if (m_currentTokens.accessToken.isEmpty()) {
-        emit authenticationFailed("Access Token을 받지 못했습니다.");
-        return;
-    }
-
-    // 토큰 안전하게 저장
-    saveTokensSecurely(m_currentTokens);
-
-    qDebug() << "토큰 교환 성공";
-    emit authenticationSucceeded(m_currentTokens.accessToken, m_currentTokens);
 }
 
 void OidcAuthenticator::onTokenRefreshFinished()
@@ -491,19 +546,25 @@ void OidcAuthenticator::saveTokensSecurely(const OidcTokens& tokens)
     QJsonDocument doc(obj);
     QByteArray data = doc.toJson(QJsonDocument::Compact);
     
-    // Windows Credential Manager에 저장
-    CREDENTIALW cred = {};
-    cred.Type = CRED_TYPE_GENERIC;
-    cred.TargetName = (LPWSTR)CREDENTIAL_SERVICE_NAME.utf16();
-    cred.UserName = (LPWSTR)CREDENTIAL_USERNAME.utf16();
-    cred.CredentialBlob = (LPBYTE)data.data();
-    cred.CredentialBlobSize = data.size();
-    cred.Persist = CRED_PERSIST_LOCAL_MACHINE;
-    
-    if (CredWriteW(&cred, 0)) {
-        qDebug() << "토큰이 안전하게 저장됨";
-    } else {
-        qDebug() << "토큰 저장 실패";
+    // Windows Credential Manager에 저장 (안전성 개선)
+    try {
+        CREDENTIALW cred = {};
+        cred.Type = CRED_TYPE_GENERIC;
+        cred.TargetName = (LPWSTR)CREDENTIAL_SERVICE_NAME.utf16();
+        cred.UserName = (LPWSTR)CREDENTIAL_USERNAME.utf16();
+        cred.CredentialBlob = (LPBYTE)data.data();
+        cred.CredentialBlobSize = data.size();
+        cred.Persist = CRED_PERSIST_LOCAL_MACHINE;
+        
+        if (CredWriteW(&cred, 0)) {
+            qDebug() << "토큰이 안전하게 저장됨";
+        } else {
+            DWORD error = GetLastError();
+            qDebug() << "토큰 저장 실패, 오류 코드:" << error;
+            // 저장 실패해도 예외는 발생시키지 않음
+        }
+    } catch (...) {
+        qDebug() << "Credential Manager 접근 실패 - 토큰 저장 건너뜀";
     }
 #else
     // 다른 플랫폼의 경우 임시로 로컬 파일에 저장 (보안상 권장되지 않음)

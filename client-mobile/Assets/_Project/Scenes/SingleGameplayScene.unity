@@ -299,7 +299,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: c27b850ddcc64d2489191d0fed4992d3, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 60903d8248cdcd2469e66a9b1935f38e, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -1380,7 +1380,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &424487997
 RectTransform:
   m_ObjectHideFlags: 0
@@ -4643,7 +4643,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -113, y: 0}
+  m_AnchoredPosition: {x: -184, y: 0}
   m_SizeDelta: {x: 200, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &991033767
@@ -4911,7 +4911,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 250, y: 0}
+  m_AnchoredPosition: {x: 78, y: 0}
   m_SizeDelta: {x: 200, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1024849984
@@ -5644,6 +5644,8 @@ MonoBehaviour:
   flipButton: {fileID: 984949817}
   placeButton: {fileID: 87595097}
   uiFallbackSprite: {fileID: 0}
+  placeButtonEnabledSprite: {fileID: 21300000, guid: 60903d8248cdcd2469e66a9b1935f38e, type: 3}
+  placeButtonDisabledSprite: {fileID: 21300000, guid: 88651a29f6908de46b59615ae9676ad5, type: 3}
   skin: {fileID: 0}
   cellSpriteProvider: {fileID: 744234952}
 --- !u!1 &1284520526
@@ -6245,10 +6247,6 @@ MonoBehaviour:
   previewPlayerColor: 1
   cellSpriteProvider: {fileID: 744234952}
   previewSkin: {fileID: 0}
-  developmentWebServerUrl: http://localhost:3000
-  productionWebServerUrl: https://blokus-online.mooo.com:3000
-  developmentApiServerUrl: http://localhost:8080
-  productionApiServerUrl: https://blokus-online.mooo.com:8080
   activeStarColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   inactiveStarColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   difficultyColors:
@@ -7396,7 +7394,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 677a28bf8d9428c4fa4a929f19aa52a7, type: 3}
+  m_Sprite: {fileID: -1493227799, guid: 4edb54fd6e3979a4aaddf09c0916d1b0, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -8468,8 +8466,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 350, y: 0}
-  m_SizeDelta: {x: 80, y: 80}
+  m_AnchoredPosition: {x: 300, y: 0}
+  m_SizeDelta: {x: 150, y: 150}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1846201250
 MonoBehaviour:
@@ -9634,8 +9632,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 475, y: 0}
-  m_SizeDelta: {x: 80, y: 80}
+  m_AnchoredPosition: {x: 450, y: 0}
+  m_SizeDelta: {x: 150, y: 150}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2130510048
 MonoBehaviour:

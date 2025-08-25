@@ -91,6 +91,9 @@ namespace Blokus {
             // Base64 URL 디코딩
             std::string base64UrlDecode(const std::string& input);
 
+            // JWK를 PEM 형식으로 변환
+            std::string jwkToPem(const std::string& n, const std::string& e);
+
             // 백그라운드 캐시 새로고침
             void startBackgroundRefresh();
             void stopBackgroundRefresh();

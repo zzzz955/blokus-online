@@ -70,6 +70,19 @@ private slots:
         m_networkClient->login(username, password);
     }
 
+    void handleJwtLoginRequest(const QString &jwtToken)
+    {
+        qDebug() << QString::fromUtf8("JWT 로그인 시도");
+
+        if (!m_networkClient->isConnected())
+        {
+            m_loginWindow->setLoginResult(false, QString::fromUtf8("서버에 연결되지 않았습니다."));
+            return;
+        }
+
+        // JWT 토큰을 TCP 서버에 전송하여 인증 요청
+        m_networkClient->loginWithJwt(jwtToken);
+    }
 
     void handleLoginSuccess(const QString &username)
     {
@@ -1432,6 +1445,8 @@ private:
         // 로그인 시그널 연결
         connect(m_loginWindow, &Blokus::LoginWindow::loginRequested,
                 this, &AppController::handleLoginRequest);
+        connect(m_loginWindow, &Blokus::LoginWindow::jwtLoginRequested,
+                this, &AppController::handleJwtLoginRequest);
         connect(m_loginWindow, &Blokus::LoginWindow::loginSuccessful, [this](const QString& username) {
             handleLoginSuccess(username);
             transitionToLobbyBGM();  // 🎵 로그인 성공 → 로비 BGM

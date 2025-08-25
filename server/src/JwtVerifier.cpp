@@ -5,6 +5,8 @@
 #include <nlohmann/json.hpp>
 #include <thread>
 #include <regex>
+#include <vector>
+#include <cstdint>
 
 namespace Blokus {
     namespace Server {
@@ -262,9 +264,13 @@ namespace Blokus {
 
         JwtVerificationResult JwtVerifier::verifyTokenWithKey(const std::string& token, const JwksKey& key) {
             try {
-                // JWT 검증자 생성 (키 컴포넌트를 직접 사용)
+                // JWK 컴포넌트를 PEM 형식 공개키로 변환
+                std::string publicKeyPem = jwkToPem(key.n, key.e);
+                spdlog::debug("JWK를 PEM으로 변환 완료 - kid: {}", key.kid);
+                
+                // JWT 검증자 생성 (PEM 형식 공개키 사용)
                 auto verifier = jwt::verify()
-                    .allow_algorithm(jwt::algorithm::rs256(key.n, key.e))
+                    .allow_algorithm(jwt::algorithm::rs256(publicKeyPem, "", "", ""))
                     .with_issuer(m_issuer);
 
                 // Audience 검증 추가 (복수 audience 지원)
@@ -330,9 +336,102 @@ namespace Blokus {
 
         std::string JwtVerifier::base64UrlDecode(const std::string& input) {
             try {
-                return jwt::base::decode<jwt::alphabet::base64url>(input);
+                // Base64 URL 패딩 정규화
+                std::string paddedInput = input;
+                
+                // Base64 URL 문자를 Base64 문자로 변환
+                std::replace(paddedInput.begin(), paddedInput.end(), '-', '+');
+                std::replace(paddedInput.begin(), paddedInput.end(), '_', '/');
+                
+                // 필요한 경우 패딩 추가
+                size_t remainder = paddedInput.length() % 4;
+                if (remainder > 0) {
+                    paddedInput.append(4 - remainder, '=');
+                }
+                
+                return jwt::base::decode<jwt::alphabet::base64>(paddedInput);
             } catch (const std::exception& e) {
-                spdlog::error("Base64 URL 디코딩 실패: {}", e.what());
+                spdlog::error("Base64 URL 디코딩 실패: {} (입력: {})", e.what(), input);
+                throw;
+            }
+        }
+
+        std::string JwtVerifier::jwkToPem(const std::string& n, const std::string& e) {
+            try {
+                // Base64 URL 디코딩
+                std::string n_binary = base64UrlDecode(n);
+                std::string e_binary = base64UrlDecode(e);
+                
+                spdlog::debug("RSA 컴포넌트 디코딩 완료 - n: {} bytes, e: {} bytes", n_binary.size(), e_binary.size());
+                
+                // ASN.1 길이 인코딩 헬퍼 함수
+                auto encodeLength = [](std::vector<uint8_t>& der, size_t len) {
+                    if (len < 128) {
+                        der.push_back(static_cast<uint8_t>(len));
+                    } else if (len <= 0xFF) {
+                        der.push_back(0x81);  // 1바이트로 길이 표현
+                        der.push_back(static_cast<uint8_t>(len));
+                    } else if (len <= 0xFFFF) {
+                        der.push_back(0x82);  // 2바이트로 길이 표현
+                        der.push_back(static_cast<uint8_t>((len >> 8) & 0xFF));
+                        der.push_back(static_cast<uint8_t>(len & 0xFF));
+                    } else if (len <= 0xFFFFFF) {
+                        der.push_back(0x83);  // 3바이트로 길이 표현
+                        der.push_back(static_cast<uint8_t>((len >> 16) & 0xFF));
+                        der.push_back(static_cast<uint8_t>((len >> 8) & 0xFF));
+                        der.push_back(static_cast<uint8_t>(len & 0xFF));
+                    } else {
+                        throw std::runtime_error("길이가 너무 큽니다");
+                    }
+                };
+                
+                // INTEGER 인코딩 헬퍼 함수
+                auto encodeInteger = [&](std::vector<uint8_t>& der, const std::string& value) {
+                    der.push_back(0x02); // INTEGER 태그
+                    
+                    // 음수로 해석되지 않도록 필요시 0x00 패딩 추가
+                    bool need_padding = !value.empty() && (static_cast<uint8_t>(value[0]) & 0x80) != 0;
+                    size_t content_len = value.size() + (need_padding ? 1 : 0);
+                    
+                    encodeLength(der, content_len);
+                    
+                    if (need_padding) {
+                        der.push_back(0x00);
+                    }
+                    der.insert(der.end(), value.begin(), value.end());
+                };
+                
+                // 먼저 내용물을 임시 벡터에 생성 (전체 길이 계산을 위해)
+                std::vector<uint8_t> content;
+                encodeInteger(content, n_binary);  // modulus
+                encodeInteger(content, e_binary);  // exponent
+                
+                // 최종 DER 구조 생성
+                std::vector<uint8_t> der;
+                der.push_back(0x30);  // SEQUENCE 태그
+                encodeLength(der, content.size());
+                der.insert(der.end(), content.begin(), content.end());
+                
+                // DER을 Base64로 인코딩
+                std::string der_base64 = jwt::base::encode<jwt::alphabet::base64>(
+                    std::string(der.begin(), der.end())
+                );
+                
+                // PEM 형식으로 포맷
+                std::string pem = "-----BEGIN RSA PUBLIC KEY-----\n";
+                
+                // 64자씩 줄바꿈
+                for (size_t i = 0; i < der_base64.length(); i += 64) {
+                    pem += der_base64.substr(i, 64) + "\n";
+                }
+                
+                pem += "-----END RSA PUBLIC KEY-----\n";
+                
+                spdlog::debug("PEM 형식 변환 완료 - DER 길이: {} bytes, PEM 길이: {} bytes", der.size(), pem.size());
+                return pem;
+                
+            } catch (const std::exception& e) {
+                spdlog::error("JWK를 PEM으로 변환 실패: {}", e.what());
                 throw;
             }
         }

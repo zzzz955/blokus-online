@@ -23,7 +23,7 @@ router.post('/',
     
     // Authorization Code Grant 필수 파라미터
     body('code').optional().isLength({ min: 10 }).withMessage('Invalid authorization code'),
-    body('redirect_uri').optional().isURL().withMessage('Invalid redirect_uri'),
+    // redirect_uri는 런타임에서 검증 (express-validator 우회)
     body('code_verifier').optional().isLength({ min: 43, max: 128 }).withMessage('Invalid code_verifier'),
     
     // Refresh Token Grant 필수 파라미터
@@ -106,6 +106,14 @@ async function handleAuthorizationCodeGrant(req, res, client) {
     return res.status(400).json({
       error: 'invalid_request',
       error_description: 'code and redirect_uri are required for authorization_code grant'
+    })
+  }
+
+  // redirect_uri 형식 검증 (express-validator 우회)
+  if (!redirect_uri.startsWith('http://') && !redirect_uri.startsWith('https://') && !redirect_uri.startsWith('blokus://')) {
+    return res.status(400).json({
+      error: 'invalid_request',
+      error_description: 'Invalid redirect_uri format'
     })
   }
 
@@ -334,6 +342,25 @@ async function generateTokens(user, client, scope, familyId, refreshTokenJti = n
     .setExpirationTime(now + accessTokenLifetime)
     .sign(keyManager.getPrivateKey())
 
+  // ID Token 생성 (OIDC 표준 준수)
+  const idTokenPayload = {
+    sub: user.user_id.toString(),
+    aud: client.client_id,
+    iss: oidcConfig.issuer,
+    email: user.email,
+    email_verified: true,
+    name: user.display_name || user.username,
+    preferred_username: user.username,
+    auth_time: now
+  }
+
+  const idToken = await new SignJWT(idTokenPayload)
+    .setProtectedHeader({ alg: 'RS256', kid: keyManager.getKid() })
+    .setIssuer(oidcConfig.issuer)
+    .setIssuedAt(now)
+    .setExpirationTime(now + accessTokenLifetime) // ID Token은 Access Token과 같은 수명
+    .sign(keyManager.getPrivateKey())
+
   // Refresh Token 생성 (새로운 JTI 또는 제공된 JTI 사용)
   const jti = refreshTokenJti || uuidv4()
   const refreshTokenPayload = {
@@ -363,6 +390,7 @@ async function generateTokens(user, client, scope, familyId, refreshTokenJti = n
 
   return {
     access_token: accessToken,
+    id_token: idToken,
     token_type: 'Bearer',
     expires_in: accessTokenLifetime,
     refresh_token: refreshToken,

@@ -52,7 +52,7 @@ namespace Blokus {
                 passwordSaltRounds = getEnvInt("PASSWORD_SALT_ROUNDS", 12);
 
                 // 로깅 설정
-                logLevel = getEnvString("LOG_LEVEL", "info");
+                logLevel = getEnvString("LOG_LEVEL", "warn");
                 logDirectory = getEnvString("LOG_DIRECTORY", "logs");
 
                 // 개발 설정
