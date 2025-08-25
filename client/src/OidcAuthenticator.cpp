@@ -19,6 +19,9 @@ namespace Blokus {
 const QString OidcAuthenticator::CREDENTIAL_SERVICE_NAME = "BlokusOnline_OIDC";
 const QString OidcAuthenticator::CREDENTIAL_USERNAME = "oauth_tokens";
 
+// Qt::QueuedConnection을 위한 Meta-Type 등록 (생성자 전에 실행)
+static const int oidcTokensTypeId = qRegisterMetaType<Blokus::OidcTokens>("OidcTokens");
+
 OidcAuthenticator::OidcAuthenticator(QObject* parent)
     : QObject(parent)
     , m_networkManager(new QNetworkAccessManager(this))

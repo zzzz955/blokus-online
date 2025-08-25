@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import { getAdminFromRequest, requireAdmin } from '@/lib/admin-auth';
+import { getAdminFromRequest, requireAdmin } from '@/lib/server/admin-auth';
 
 const prisma = new PrismaClient();
 

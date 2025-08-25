@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminFromRequest } from '@/lib/admin-auth';
+import { getAdminFromRequest } from '@/lib/server/admin-auth';
 import { prisma } from '@/lib/prisma';
 
 // 관리자용 게시글 삭제 (DELETE /api/admin/posts/[id])

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { adminFetch } from '@/lib/admin-auth';
+import { adminFetch } from '@/lib/client/admin-fetch';
 
 interface DashboardStats {
   announcements: {

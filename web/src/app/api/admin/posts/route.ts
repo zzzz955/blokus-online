@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminFromRequest } from '@/lib/admin-auth';
+import { getAdminFromRequest } from '@/lib/server/admin-auth';
 import { prisma } from '@/lib/prisma';
 import { PostCategory } from '@/types';
 

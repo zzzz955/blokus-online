@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { PostCategory, Post } from '@/types';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
-import { adminFetch } from '@/lib/admin-auth';
+import { adminFetch } from '@/lib/client/admin-fetch';
 
 const CATEGORY_LABELS: Record<PostCategory, string> = {
   QUESTION: '질문',

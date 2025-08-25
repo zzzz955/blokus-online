@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { adminFetch } from '@/lib/admin-auth';
+import { adminFetch } from '@/lib/client/admin-fetch';
 import RichTextEditor from '@/components/ui/RichTextEditor';
 
 interface PatchNote {

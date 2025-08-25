@@ -1442,15 +1442,15 @@ private:
         // m_loginWindow->resize(windowConfig.width, windowConfig.height);
         // m_loginWindow->setMinimumSize(windowConfig.min_width, windowConfig.min_height);
 
-        // 로그인 시그널 연결
+        // 로그인 시그널 연결 (Qt::QueuedConnection으로 스레드 안전성 보장)
         connect(m_loginWindow, &Blokus::LoginWindow::loginRequested,
-                this, &AppController::handleLoginRequest);
+                this, &AppController::handleLoginRequest, Qt::QueuedConnection);
         connect(m_loginWindow, &Blokus::LoginWindow::jwtLoginRequested,
-                this, &AppController::handleJwtLoginRequest);
-        connect(m_loginWindow, &Blokus::LoginWindow::loginSuccessful, [this](const QString& username) {
+                this, &AppController::handleJwtLoginRequest, Qt::QueuedConnection);
+        connect(m_loginWindow, &Blokus::LoginWindow::loginSuccessful, this, [this](const QString& username) {
             handleLoginSuccess(username);
             transitionToLobbyBGM();  // 🎵 로그인 성공 → 로비 BGM
-        });
+        }, Qt::QueuedConnection);
 
         // 로그인 창이 닫히면 애플리케이션 종료
         connect(m_loginWindow, &QMainWindow::destroyed,

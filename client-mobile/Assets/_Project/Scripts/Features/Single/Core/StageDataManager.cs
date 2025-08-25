@@ -437,21 +437,35 @@ namespace Features.Single.Core
                 bool isNewBest = score > cacheProgress.bestScore;
                 bool isFirstComplete = !cacheProgress.isCompleted;
 
+                // 🔥 수정: GameEndResult 규칙 적용 - stars >= 1일 때만 isCompleted = true
+                bool isActuallyCompleted = stars >= 1;
+                
                 // 진행도 업데이트
                 var updatedProgress = new NetworkUserStageProgress
                 {
                     stageNumber = stageNumber,
-                    isCompleted = true,
+                    isCompleted = isActuallyCompleted, // 🔥 별점 기반 클리어 판정
                     starsEarned = Mathf.Max(stars, cacheProgress.starsEarned),
                     bestScore = Mathf.Max(score, cacheProgress.bestScore),
                     bestCompletionTime = (completionTime > 0 && (cacheProgress.bestCompletionTime == 0 || completionTime < cacheProgress.bestCompletionTime)) ? completionTime : cacheProgress.bestCompletionTime,
                     totalAttempts = cacheProgress.totalAttempts + 1,
-                    successfulAttempts = cacheProgress.successfulAttempts + 1,
+                    successfulAttempts = isActuallyCompleted ? cacheProgress.successfulAttempts + 1 : cacheProgress.successfulAttempts,
                     lastPlayedAt = System.DateTime.Now
                 };
 
                 UserDataCache.Instance.SetStageProgress(updatedProgress);
-                Debug.Log($"[StageDataManager] 로컬 스테이지 진행도 업데이트: {stageNumber} (별: {stars})");
+                
+                // 🔥 규칙 검증 로그
+                if (stars == 0 && isActuallyCompleted)
+                {
+                    Debug.LogError($"🚨 [StageDataManager] 규칙 위반: Stage {stageNumber}에서 0별인데 isCompleted=true");
+                }
+                if (stars > 0 && !isActuallyCompleted)
+                {
+                    Debug.LogError($"🚨 [StageDataManager] 규칙 위반: Stage {stageNumber}에서 {stars}별인데 isCompleted=false");
+                }
+                
+                Debug.Log($"[StageDataManager] 로컬 스테이지 진행도 업데이트: Stage {stageNumber}, Stars {stars}, Completed {isActuallyCompleted}, Score {score}");
             }
         }
 

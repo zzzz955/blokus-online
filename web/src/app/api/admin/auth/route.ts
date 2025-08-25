@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateAdmin, createAdminUser, verifyRefreshToken, generateNewAccessToken, type AdminLoginRequest } from '@/lib/admin-auth';
+import { authenticateAdmin, createAdminUser, verifyRefreshToken, generateNewAccessToken, type AdminLoginRequest } from '@/lib/server/admin-auth';
 
 /**
  * 관리자 로그인 API

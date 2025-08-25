@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyRefreshToken, generateNewAccessToken } from '@/lib/admin-auth';
+import { verifyRefreshToken, generateNewAccessToken } from '@/lib/server/admin-auth';
 
 /**
  * Token Refresh API

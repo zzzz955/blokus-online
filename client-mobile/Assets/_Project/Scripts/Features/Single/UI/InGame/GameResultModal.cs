@@ -70,14 +70,27 @@ namespace Features.Single.UI.InGame
 
         // ---------------- Public API ----------------
 
-        public void ShowResult(int score, int optimalScore, float elapsedTime, bool isSuccess)
+        /// <summary>
+        /// 🔥 GameEndResult 기반 결과 표시 (단일 진실원천)
+        /// </summary>
+        public void ShowResult(GameEndResult gameResult, Action onClosed = null)
         {
-            ShowResult(score, optimalScore, elapsedTime, isSuccess, onClosed: null);
-        }
+            if (gameResult == null)
+            {
+                Debug.LogError("[GameResultModal] GameEndResult가 null입니다!");
+                onClosed?.Invoke();
+                return;
+            }
 
-        public void ShowResult(int score, int optimalScore, float elapsedTime, bool isSuccess, Action onClosed)
-        {
             _onClosed = onClosed;
+
+            // 🚨 규칙 위반 검사
+            if (gameResult.stars == 0 && gameResult.isCleared)
+            {
+                Debug.LogError($"[GameResultModal] 🚨 규칙 위반: GameEndResult가 0별인데 isCleared=true - Stage {gameResult.stageNumber}");
+            }
+
+            Debug.Log($"[GameResultModal] 결과 표시 요청: {gameResult}");
 
             // 🔥 디버깅 코드 추가
             Debug.Log($"[GameResultModal] modalPanel null check: {modalPanel == null}");
@@ -116,30 +129,83 @@ namespace Features.Single.UI.InGame
             if (modalPanel != null)
                 Debug.Log($"[GameResultModal] After SetActive - activeSelf: {modalPanel.activeSelf}, activeInHierarchy: {modalPanel.activeInHierarchy}");
 
-            if (resultTitleText)
-            {
-                resultTitleText.text  = isSuccess ? successTitle : failureTitle;
-                resultTitleText.color = isSuccess ? successColor : failureColor;
-            }
-            if (scoreText)        scoreText.text        = $"획득 점수: {score:N0}";
-            if (optimalScoreText) optimalScoreText.text = $"최대 점수: {optimalScore:N0}";
+            // 🔥 GameEndResult 기반 UI 업데이트 (하드코딩 제거)
+            UpdateUI(gameResult);
+            
+            Debug.Log($"[GameResultModal] 표시 완료: {gameResult}");
+        }
 
-            if (timeText)
-            {
-                int m = Mathf.FloorToInt(elapsedTime / 60f);
-                int s = Mathf.FloorToInt(elapsedTime % 60f);
-                timeText.text = $"소요 시간: {m:00}:{s:00}";
-            }
+        /// <summary>
+        /// 레거시 호환성 (deprecated - GameEndResult 사용 권장)
+        /// </summary>
+        [System.Obsolete("Use ShowResult(GameEndResult) instead")]
+        public void ShowResult(int score, int optimalScore, float elapsedTime, bool isSuccess)
+        {
+            ShowResult(score, optimalScore, elapsedTime, isSuccess, onClosed: null);
+        }
 
+        /// <summary>
+        /// 레거시 호환성 (deprecated - GameEndResult 사용 권장)
+        /// </summary>
+        [System.Obsolete("Use ShowResult(GameEndResult) instead")]
+        public void ShowResult(int score, int optimalScore, float elapsedTime, bool isSuccess, Action onClosed)
+        {
+            Debug.LogWarning("[GameResultModal] 레거시 ShowResult 호출 - GameEndResult 사용을 권장합니다.");
+            
+            // 임시로 GameEndResult 생성하여 새로운 메서드 호출
             int stars = CalculateStars(score, optimalScore, isSuccess);
-            DisplayStars(stars);
-            UpdateStageProgress(score, stars, elapsedTime, isSuccess);
-
-            Debug.Log($"[GameResultModal] 표시: score={score}/{optimalScore}, time={elapsedTime:F1}s, success={isSuccess}, stars={stars}");
+            var tempResult = new GameEndResult(
+                stageNumber: SingleGameManager.CurrentStage,
+                stageName: $"Stage {SingleGameManager.CurrentStage}",
+                finalScore: score,
+                optimalScore: optimalScore,
+                elapsedTime: elapsedTime,
+                stars: stars,
+                isNewBest: false,
+                endReason: "Legacy call"
+            );
+            
+            ShowResult(tempResult, onClosed);
         }
 
         // ---------------- Internals ----------------
 
+        /// <summary>
+        /// 🔥 GameEndResult 기반 UI 업데이트 (단일 진실원천)
+        /// </summary>
+        private void UpdateUI(GameEndResult gameResult)
+        {
+            // 타이틀 및 색상 (GameEndResult 기반)
+            if (resultTitleText)
+            {
+                resultTitleText.text = gameResult.GetResultTitle();
+                resultTitleText.color = gameResult.GetResultColor();
+            }
+
+            // 점수 정보
+            if (scoreText) scoreText.text = $"획득 점수: {gameResult.finalScore:N0}";
+            if (optimalScoreText) optimalScoreText.text = $"최대 점수: {gameResult.optimalScore:N0}";
+
+            // 시간 정보
+            if (timeText)
+            {
+                int m = Mathf.FloorToInt(gameResult.elapsedTime / 60f);
+                int s = Mathf.FloorToInt(gameResult.elapsedTime % 60f);
+                timeText.text = $"소요 시간: {m:00}:{s:00}";
+            }
+
+            // 🔥 별점 표시: GameEndResult의 정확한 stars 값 사용 (하드코딩 제거)
+            DisplayStars(gameResult.stars);
+
+            // 🔥 서버 진행도 업데이트: GameEndResult 기반
+            UpdateStageProgress(gameResult);
+
+            Debug.Log($"[GameResultModal] UI 업데이트 완료: {gameResult}");
+        }
+
+        /// <summary>
+        /// 레거시 별점 계산 (GameEndResult에서는 사용 안 함)
+        /// </summary>
         private int CalculateStars(int score, int optimalScore, bool isSuccess)
         {
             if (!isSuccess) return 0;
@@ -169,7 +235,10 @@ namespace Features.Single.UI.InGame
             Debug.Log($"[GameResultModal] 별점 표시 완료 - {starCount}개");
         }
 
-        private void UpdateStageProgress(int score, int starCount, float elapsedTime, bool isSuccess)
+        /// <summary>
+        /// 🔥 GameEndResult 기반 진행도 업데이트 (단일 진실원천)
+        /// </summary>
+        private void UpdateStageProgress(GameEndResult gameResult)
         {
             var gm = SingleGameManager.Instance;
             if (gm == null)
@@ -178,11 +247,42 @@ namespace Features.Single.UI.InGame
                 return;
             }
 
-            int stageNumber = SingleGameManager.CurrentStage;
-            bool completed  = isSuccess && starCount > 0;
+            // 🔥 GameEndResult의 isCleared 값 사용 (stars >= 1 규칙 준수)
+            bool completed = gameResult.isCleared;
 
-            Debug.Log($"[GameResultModal] 서버 진행도 업데이트 요청: stage={stageNumber}, done={completed}, stars={starCount}, score={score}, t={elapsedTime:F1}s");
-            gm.UpdateStageProgress(stageNumber, completed, starCount, score, elapsedTime);
+            Debug.Log($"[GameResultModal] 서버 진행도 업데이트 요청: stage={gameResult.stageNumber}, " +
+                     $"done={completed}, stars={gameResult.stars}, score={gameResult.finalScore}, " +
+                     $"t={gameResult.elapsedTime:F1}s");
+
+            // 🚨 규칙 위반 재검증
+            if (gameResult.stars == 0 && completed)
+            {
+                Debug.LogError($"[GameResultModal] 🚨 규칙 위반: 0별인데 completed=true로 전송 시도 - Stage {gameResult.stageNumber}");
+            }
+
+            gm.UpdateStageProgress(gameResult.stageNumber, completed, gameResult.stars, 
+                                 gameResult.finalScore, gameResult.elapsedTime);
+        }
+
+        /// <summary>
+        /// 레거시 진행도 업데이트 (deprecated)
+        /// </summary>
+        [System.Obsolete("Use UpdateStageProgress(GameEndResult) instead")]
+        private void UpdateStageProgress(int score, int starCount, float elapsedTime, bool isSuccess)
+        {
+            // 임시로 GameEndResult 생성하여 새로운 메서드 호출
+            var tempResult = new GameEndResult(
+                stageNumber: SingleGameManager.CurrentStage,
+                stageName: $"Stage {SingleGameManager.CurrentStage}",
+                finalScore: score,
+                optimalScore: 0, // 불명
+                elapsedTime: elapsedTime,
+                stars: starCount,
+                isNewBest: false,
+                endReason: "Legacy progress update"
+            );
+            
+            UpdateStageProgress(tempResult);
         }
 
         private void CloseToSelection()

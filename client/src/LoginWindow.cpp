@@ -43,13 +43,13 @@ namespace Blokus
         setupStyles();
         createAnimations();
         
-        // OIDC 시그널 연결
+        // OIDC 시그널 연결 (Qt::QueuedConnection으로 UI 스레드 안전성 보장)
         connect(m_oidcAuthenticator, &OidcAuthenticator::authenticationSucceeded,
-                this, &LoginWindow::onOidcAuthenticationSucceeded);
+                this, &LoginWindow::onOidcAuthenticationSucceeded, Qt::QueuedConnection);
         connect(m_oidcAuthenticator, &OidcAuthenticator::authenticationFailed,
-                this, &LoginWindow::onOidcAuthenticationFailed);
+                this, &LoginWindow::onOidcAuthenticationFailed, Qt::QueuedConnection);
         connect(m_oidcAuthenticator, &OidcAuthenticator::tokensRefreshed,
-                this, &LoginWindow::onOidcTokensRefreshed);
+                this, &LoginWindow::onOidcTokensRefreshed, Qt::QueuedConnection);
 
         setWindowTitle(QString::fromUtf8("블로커스 온라인 - 로그인"));
         setFixedSize(400, 600);

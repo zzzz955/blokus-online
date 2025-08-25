@@ -590,42 +590,72 @@ namespace Features.Single.Gameplay
 
             var scores = logic?.CalculateScores();
             int currentScore = (scores != null && scores.ContainsKey(playerColor)) ? scores[playerColor] : 0;
+            int optimalScore = payload?.ParScore ?? 0;
 
-            ReportStageCompletion(currentScore, false);
+            // 🔥 Exit 시에도 GameEndResult 기반 처리 (stars 계산으로 정확한 실패/성공 판정)
+            int stars = App.Services.ApiDataConverter.CalculateStars(currentScore, optimalScore);
+            var gameResult = new GameEndResult(
+                stageNumber: CurrentStage,
+                stageName: payload?.StageName ?? $"Stage {CurrentStage}",
+                finalScore: currentScore,
+                optimalScore: optimalScore,
+                elapsedTime: ElapsedSeconds,
+                stars: stars,
+                isNewBest: false,
+                endReason: "Exit requested"
+            );
+
+            Debug.Log($"[SingleGame] Exit 처리: {gameResult}");
+            ReportStageCompletion(gameResult);
         }
 
-        private void ReportStageCompletion(int score, bool completed)
+        /// <summary>
+        /// 🔥 GameEndResult 기반 완료 보고 - 단일 진실원천 패턴
+        /// </summary>
+        private void ReportStageCompletion(GameEndResult gameResult)
         {
-            int stageNumber = CurrentStage;
-            if (stageNumber <= 0)
+            if (gameResult.stageNumber <= 0)
             {
-                Debug.LogWarning("[SingleGame] 스테이지 번호를 확인할 수 없어 완료 보고를 건너뜁니다.");
+                Debug.LogWarning("[SingleGame] 유효하지 않은 스테이지 번호 → 보고 건너뜀");
                 return;
             }
 
-            int stars = 0;
-            if (completed && payload != null && payload.ParScore > 0)
-            {
-                stars = App.Services.ApiDataConverter.CalculateStars(score, payload.ParScore);
-                if (verboseLog) Debug.Log($"[SingleGame] 별점 계산: {score}/{payload.ParScore} = {stars}별");
-            }
-
-            if (StageManager != null)
-            {
-                if (completed)
-                {
-                    StageManager.CompleteStage(stageNumber, score, stars, ElapsedSeconds);
-                    if (verboseLog) Debug.Log($"[SingleGame] ✅ 완료 보고: stage={stageNumber}, score={score}, stars={stars}, t={ElapsedSeconds}s");
-                }
-                else
-                {
-                    StageManager.FailStage(stageNumber);
-                    if (verboseLog) Debug.Log($"[SingleGame] ❌ 실패/포기 보고: stage={stageNumber}, score={score}, t={ElapsedSeconds}s");
-                }
-            }
-            else
+            if (StageManager == null)
             {
                 Debug.LogWarning("[SingleGame] StageDataManager 미존재 → 보고 건너뜀");
+                return;
+            }
+
+            // 🔥 GameEndResult 기반 올바른 API 호출 분리
+            if (gameResult.isCleared) // stars >= 1
+            {
+                // ✅ 클리어 성공: 완료 API만 호출
+                StageManager.CompleteStage(gameResult.stageNumber, gameResult.finalScore, 
+                                         gameResult.stars, Mathf.FloorToInt(gameResult.elapsedTime));
+                
+                if (verboseLog) 
+                    Debug.Log($"[SingleGame] ✅ 완료 보고: stage={gameResult.stageNumber}, " +
+                             $"score={gameResult.finalScore}, stars={gameResult.stars}, " +
+                             $"t={gameResult.elapsedTime:F1}s");
+            }
+            else // stars == 0
+            {
+                // ❌ 클리어 실패: 실패 처리 (완료 API 호출 금지)
+                StageManager.FailStage(gameResult.stageNumber);
+                
+                if (verboseLog) 
+                    Debug.Log($"[SingleGame] ❌ 실패 보고: stage={gameResult.stageNumber}, " +
+                             $"score={gameResult.finalScore}, stars={gameResult.stars}, " +
+                             $"t={gameResult.elapsedTime:F1}s");
+                
+                // 🚨 중요: 완료 API를 호출하지 않음으로써 서버에서 completed=true 응답 방지
+                Debug.Log($"[SingleGame] 스테이지 {gameResult.stageNumber} 실패 처리: 완료 API 호출 금지됨 (0별)");
+            }
+
+            // 🚨 규칙 위반 재검증
+            if (gameResult.stars == 0 && gameResult.isCleared)
+            {
+                Debug.LogError($"[SingleGame] 🚨 심각한 규칙 위반: GameEndResult가 0별인데 isCleared=true");
             }
         }
 
@@ -751,18 +781,36 @@ namespace Features.Single.Gameplay
             int myScore = scores.ContainsKey(playerColor) ? scores[playerColor] : 0;
             int optimalScore = payload?.ParScore ?? 0;
             float elapsedTime = ElapsedSeconds;
-            bool isSuccess = true;
 
-            Debug.Log($"[SingleGame] 게임 종료: {reason}, 최종 점수: {myScore}/{optimalScore}, 시간: {elapsedTime}s");
+            // 🔥 단일 진실원천: GameEndResult 생성 (별점 기반 클리어 판정)
+            int stars = App.Services.ApiDataConverter.CalculateStars(myScore, optimalScore);
+            var gameResult = new GameEndResult(
+                stageNumber: CurrentStage,
+                stageName: payload?.StageName ?? $"Stage {CurrentStage}",
+                finalScore: myScore,
+                optimalScore: optimalScore,
+                elapsedTime: elapsedTime,
+                stars: stars,
+                isNewBest: false, // TODO: 최고점수 비교 로직 필요시 추가
+                endReason: reason
+            );
+
+            Debug.Log($"[SingleGame] 게임 종료: {gameResult}");
+
+            // 🚨 규칙 위반 검사: 0별인데 완료 처리하려는 경우 경고
+            if (gameResult.stars == 0 && gameResult.isCleared)
+            {
+                Debug.LogError($"[SingleGame] 🚨 규칙 위반 감지: 0별인데 완료 처리 시도 - Stage {CurrentStage}");
+            }
 
             // 🔥 (2) StageSelectPanel을 먼저 켜서, 비활성 코루틴 에러 방지
             EnsureStageSelectPanelActive();
 
-            // 완료 보고
-            ReportStageCompletion(myScore, isSuccess);
+            // 🔥 완료 보고: GameEndResult 기반으로 올바른 API 호출
+            ReportStageCompletion(gameResult);
 
-            // 🔥 (3) 결과 모달 표시 + (4) 닫힘 콜백으로 패널 토글
-            ShowGameResult(myScore, optimalScore, elapsedTime, isSuccess,
+            // 🔥 (3) 결과 모달 표시: GameEndResult 전달
+            ShowGameResult(gameResult,
                 onClosed: () =>
                 {
                     // (4) 모달 닫힐 때 GamePanel 닫고 (5) StageSelect가 드러나도록
@@ -787,12 +835,15 @@ namespace Features.Single.Gameplay
             }
         }
 
-        private void ShowGameResult(int score, int optimalScore, float elapsedTime, bool isSuccess, System.Action onClosed = null)
+        /// <summary>
+        /// 🔥 GameEndResult 기반 결과 모달 표시
+        /// </summary>
+        private void ShowGameResult(GameEndResult gameResult, System.Action onClosed = null)
         {
             if (gameResultModal != null)
             {
-                // 🔥 GameResultModal에 콜백 인자 받는 오버로드를 추가(아래 2) 참고)
-                gameResultModal.ShowResult(score, optimalScore, elapsedTime, isSuccess, onClosed);
+                // GameResultModal에 GameEndResult 전달 (단일 진실원천)
+                gameResultModal.ShowResult(gameResult, onClosed);
             }
             else
             {

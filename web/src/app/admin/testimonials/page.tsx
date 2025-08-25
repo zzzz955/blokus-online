@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { adminFetch } from '@/lib/admin-auth';
+import { adminFetch } from '@/lib/client/admin-fetch';
 import { Star, Pin, Eye, EyeOff, Trash2, RotateCcw } from 'lucide-react';
 
 interface Testimonial {

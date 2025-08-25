@@ -11,6 +11,7 @@
 #include <QJsonObject>
 #include <QTimer>
 #include <QCryptographicHash>
+#include <QMetaType>
 #include <memory>
 
 namespace Blokus {
@@ -133,3 +134,6 @@ namespace Blokus {
     };
 
 } // namespace Blokus
+
+// Qt Meta-Type 시스템에 OidcTokens 등록 (Qt::QueuedConnection 사용을 위해 필수)
+Q_DECLARE_METATYPE(Blokus::OidcTokens)

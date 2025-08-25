@@ -106,7 +106,8 @@ namespace Features.Single.Core
             foreach (var kv in stageProgressCache)
             {
                 var p = kv.Value;
-                if (p != null && p.isCompleted && kv.Key > computed)
+                // 🔥 수정: isCompleted AND starsEarned >= 1 조건으로 변경 (GameEndResult 규칙 준수)
+                if (p != null && p.isCompleted && p.starsEarned >= 1 && kv.Key > computed)
                     computed = kv.Key;
             }
 
