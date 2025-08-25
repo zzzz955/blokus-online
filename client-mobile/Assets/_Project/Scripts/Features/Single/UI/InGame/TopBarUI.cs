@@ -22,7 +22,7 @@ namespace Features.Single.UI.InGame
         [SerializeField] private ConfirmationModal confirmationModal;
 
         [Header("Config")]
-        [SerializeField] private string scoreFormat = "점수: {0}";
+        [SerializeField] private string scoreFormat = "{0}";
         [SerializeField] private bool showExitConfirm = true; // Exit 확인 모달 표시 여부
 
         // 점수 관련 상태
@@ -111,7 +111,7 @@ namespace Features.Single.UI.InGame
 
         private void RefreshUndo(int remain)
         {
-            if (undoCountText != null) undoCountText.text = $"UNDO {remain}";
+            if (undoCountText != null) undoCountText.text = $"{remain}";
 
             var gm = SingleGameManager.Instance;
             bool can = (gm != null && gm.CanUndo());     // 🔥 실제 되돌릴 게 있어야 true

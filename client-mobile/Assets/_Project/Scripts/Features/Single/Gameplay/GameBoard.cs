@@ -7,7 +7,8 @@ using Features.Single.Core;
 using Features.Single.UI.InGame;
 using Shared.Models;
 using App.Core; // GameLogic
-namespace Features.Single.Gameplay{
+namespace Features.Single.Gameplay
+{
     /// <summary>
     /// 2D 게임보드(UI) 시각화 및 터치 상호작용
     /// </summary>
@@ -40,14 +41,14 @@ namespace Features.Single.Gameplay{
         [SerializeField] private UnityEngine.UI.Button flipButton;
         [SerializeField] private UnityEngine.UI.Button placeButton;
         [SerializeField] private Sprite uiFallbackSprite;
-        
+
         [Header("Action Button Sprites")]
         [SerializeField] private Sprite placeButtonEnabledSprite;   // 배치 가능 시 sprite
         [SerializeField] private Sprite placeButtonDisabledSprite;  // 배치 불가 시 sprite
 
         [Header("스킨")]
         [SerializeField] private Features.Single.Gameplay.Skins.BlockSkin skin;
-        
+
         [Header("셀 스프라이트 시스템")]
         [SerializeField] private CellSpriteProvider cellSpriteProvider;
 
@@ -77,7 +78,7 @@ namespace Features.Single.Gameplay{
         public float CellSize => cellSize;
         public int BoardSize => boardSize;
         public RectTransform CellParent => cellParent;
-        
+
         /// <summary>
         /// 플레이어 색상 반환 (BlockButton과 색상 통일을 위함)
         /// 블록 스킨이 설정되어 있으면 스킨 색상을 우선 사용
@@ -89,7 +90,7 @@ namespace Features.Single.Gameplay{
             {
                 return skin.GetTint(player);
             }
-            
+
             // 기본 색상 사용
             return player switch
             {
@@ -104,7 +105,7 @@ namespace Features.Single.Gameplay{
         private void Awake()
         {
             if (gameLogic == null) gameLogic = new GameLogic();
-            
+
             // ActionButtonPanel을 즉시 숨김 (Inspector에서 활성화되어 있을 수 있음)
             if (actionButtonPanel != null)
             {
@@ -120,7 +121,7 @@ namespace Features.Single.Gameplay{
         {
             if (initialized) return;
             initialized = true;
-            
+
             // CellSpriteProvider 연결 상태 디버깅
             Debug.Log($"[GameBoard] Start() - CellSpriteProvider 연결됨: {cellSpriteProvider != null}");
 
@@ -151,11 +152,11 @@ namespace Features.Single.Gameplay{
                 // ★ 패널 배경이 보드 클릭을 가로채지 않도록 차단
                 var bg = actionButtonPanel.GetComponent<Image>();
                 if (bg != null) bg.raycastTarget = false;
-                
+
                 // 초기에는 숨김 상태
                 actionButtonPanel.gameObject.SetActive(false);
                 actionButtonsVisible = false;
-                
+
                 Debug.Log("[GameBoard] ActionButtonPanel 초기화 완료 - 숨김 상태로 설정");
             }
             else
@@ -300,7 +301,7 @@ namespace Features.Single.Gameplay{
             // Inner Image 획득
             Image inner = cellObj.transform.Find("Border/Inner")?.GetComponent<Image>();
             if (inner == null) inner = cellObj.GetComponent<Image>();
-            
+
             // 스프라이트 시스템이 설정되어 있으면 빈 칸 스프라이트 적용
             if (cellSpriteProvider != null)
             {
@@ -327,6 +328,7 @@ namespace Features.Single.Gameplay{
 
         private void CreateCellBorder(GameObject cellObj)
         {
+            float overflow = 5f;
             var borderObj = new GameObject("Border", typeof(RectTransform));
             borderObj.transform.SetParent(cellObj.transform, false);
 
@@ -338,14 +340,14 @@ namespace Features.Single.Gameplay{
             var borderRect = borderObj.GetComponent<RectTransform>();
             borderRect.anchorMin = Vector2.zero;
             borderRect.anchorMax = Vector2.one;
-            borderRect.offsetMin = Vector2.zero;
-            borderRect.offsetMax = Vector2.zero;
+            borderRect.offsetMin = new Vector2(-overflow, -overflow); // 왼/아래 바깥으로
+            borderRect.offsetMax = new Vector2(overflow, overflow);  // 오른/위 바깥으로
 
             var innerObj = new GameObject("Inner", typeof(RectTransform));
             innerObj.transform.SetParent(borderObj.transform, false);
 
             var innerImage = innerObj.AddComponent<Image>();
-            
+
             // 스프라이트 시스템이 설정되어 있으면 빈 칸 스프라이트 적용
             if (cellSpriteProvider != null)
             {
@@ -360,14 +362,14 @@ namespace Features.Single.Gameplay{
                 innerImage.color = emptyColor; // 폴백: 기존 색상 시스템
                 Debug.LogWarning($"[GameBoard] CreateCellBorder - cellSpriteProvider가 null, uiFallbackSprite 사용");
             }
-            
+
             innerImage.type = Image.Type.Simple;
 
             var innerRect = innerObj.GetComponent<RectTransform>();
             innerRect.anchorMin = Vector2.zero;
             innerRect.anchorMax = Vector2.one;
-            innerRect.offsetMin = Vector2.one * gridLineWidth;
-            innerRect.offsetMax = Vector2.one * -gridLineWidth;
+            innerRect.offsetMin = Vector2.one * Mathf.Max(0, gridLineWidth - overflow);
+            innerRect.offsetMax = Vector2.one * -Mathf.Max(0, gridLineWidth - overflow);
         }
 
         // ========================================
@@ -378,25 +380,25 @@ namespace Features.Single.Gameplay{
             if (cellImages == null) return;
 
             int nonEmptyCount = 0;
-            
+
             for (int r = 0; r < boardSize; r++)
                 for (int c = 0; c < boardSize; c++)
                 {
                     var color = gameLogic.GetBoardCell(r, c);
                     UpdateCellVisual(r, c, color);
-                    
+
                     // 비어있지 않은 셀 카운트
                     if (color != PlayerColor.None)
                         nonEmptyCount++;
                 }
-                
+
             Debug.Log($"[GameBoard] RefreshBoard 완료 - 채워진 셀 수: {nonEmptyCount}");
         }
 
         private void UpdateCellVisual(int row, int col, PlayerColor color)
         {
             var img = cellImages[row, col];
-            if (img == null) 
+            if (img == null)
             {
                 Debug.LogError($"[GameBoard] UpdateCellVisual({row},{col}) - cellImages가 null입니다!");
                 return;
@@ -530,7 +532,7 @@ namespace Features.Single.Gameplay{
         public void SetTouchPreview(Block block, Position position)
         {
             // Debug.Log($"[GameBoard] SetTouchPreview 호출됨 - Block: {block?.Type}, Position: ({position.row}, {position.col})");
-            
+
             if (block == null || !ValidationUtility.IsValidPosition(position))
             {
                 Debug.Log("[GameBoard] SetTouchPreview - 잘못된 블록 또는 위치로 인한 클리어");
@@ -541,12 +543,12 @@ namespace Features.Single.Gameplay{
             // 이전 상태 완전 클리어
             ClearPreview();
             HideActionButtons();
-            
+
             // 새로운 블록 설정
             pendingBlock = block;
             pendingPosition = position;
             hasPendingPlacement = true;
-            
+
             // Debug.Log($"[GameBoard] pendingBlock 설정됨: {pendingBlock.Type} at ({pendingPosition.row}, {pendingPosition.col})");
 
             // 미리보기 표시
@@ -555,7 +557,7 @@ namespace Features.Single.Gameplay{
             // 배치 가능 여부 확인 및 액션 버튼 표시
             bool canPlace = gameLogic.CanPlaceBlock(block, position);
             // Debug.Log($"[GameBoard] 블록 배치 가능 여부: {canPlace}");
-            
+
             ShowActionButtons(canPlace);
 
             // Debug.Log($"터치 미리보기 완료: {block.Type} @ ({position.row},{position.col}) - {(canPlace ? "가능" : "불가")}");
@@ -565,12 +567,12 @@ namespace Features.Single.Gameplay{
         {
             ClearPreview();
             HideActionButtons();
-            
+
             // 펜딩 상태 초기화
             pendingBlock = null;
             pendingPosition = new Position(-1, -1);
             hasPendingPlacement = false;
-            
+
             Debug.Log("[GameBoard] 터치 미리보기 클리어 - ActionButtonPanel 숨김");
         }
 
@@ -584,7 +586,7 @@ namespace Features.Single.Gameplay{
             pendingBlock.RotateClockwise();
             SetPreview(pendingBlock, pendingPosition);
             bool canPlace = gameLogic.CanPlaceBlock(pendingBlock, pendingPosition);
-            
+
             // 배치 가능성에 따른 버튼 상태 업데이트
             ShowActionButtons(canPlace);
         }
@@ -599,7 +601,7 @@ namespace Features.Single.Gameplay{
             pendingBlock.FlipHorizontal();
             SetPreview(pendingBlock, pendingPosition);
             bool canPlace = gameLogic.CanPlaceBlock(pendingBlock, pendingPosition);
-            
+
             // 배치 가능성에 따른 버튼 상태 업데이트
             ShowActionButtons(canPlace);
         }
@@ -635,12 +637,12 @@ namespace Features.Single.Gameplay{
                 Debug.LogError("[GameBoard] ActionButtonPanel이 연결되지 않았습니다! Inspector에서 ActionButtonPanel을 연결해주세요.");
                 return;
             }
-            
+
             Vector2 beforePosition = actionButtonPanel.anchoredPosition;
-            
+
             actionButtonsVisible = true;
             actionButtonPanel.gameObject.SetActive(true);
-            
+
             // Debug.Log($"[GameBoard] ★ ActionButtonPanel 표시됨 ★ - 배치 가능: {canPlace}, 현재 위치: {beforePosition}");
 
             if (placeButton != null)
@@ -669,7 +671,7 @@ namespace Features.Single.Gameplay{
             }
 
             PositionActionButtonsAtBlock();
-            
+
             Vector2 afterPosition = actionButtonPanel.anchoredPosition;
             // Debug.Log($"[GameBoard] ★ ActionButtonPanel 위치 업데이트 완료 ★ - {beforePosition} → {afterPosition}");
         }
@@ -677,7 +679,7 @@ namespace Features.Single.Gameplay{
         private void HideActionButtons()
         {
             if (actionButtonPanel == null) return;
-            
+
             // Debug.Log("[GameBoard] ActionButtonPanel 숨김 처리");
             actionButtonsVisible = false;
             actionButtonPanel.gameObject.SetActive(false);
@@ -739,7 +741,7 @@ namespace Features.Single.Gameplay{
             {
                 Vector2 panelSize = buttonRect.sizeDelta;
                 float safeMargin = 20f; // 안전 마진 증가
-                
+
                 // 여러 위치 후보를 시도 (우선순위: 우상 → 좌상 → 우하 → 좌하)
                 Vector3[] candidateWorldPositions = new Vector3[]
                 {
@@ -748,7 +750,7 @@ namespace Features.Single.Gameplay{
                     BoardToWorld(new Position(maxRow, maxCol)), // 우측 하단
                     BoardToWorld(new Position(maxRow, minCol))  // 좌측 하단
                 };
-                
+
                 Vector2[] offsets = new Vector2[]
                 {
                     new Vector2(cellSize * 0.5f + panelSize.x * 0.5f + safeMargin, cellSize * 0.5f + panelSize.y * 0.5f + safeMargin),   // 우상
@@ -767,7 +769,7 @@ namespace Features.Single.Gameplay{
                     if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screenPos, uiCamera, out var localPos))
                     {
                         Vector2 candidatePosition = localPos + offsets[i];
-                        
+
                         // 화면 경계 체크 (실제 화면 크기 기준)
                         if (IsPositionWithinScreenBounds(candidatePosition, panelSize, canvasRect, safeMargin))
                         {
@@ -791,7 +793,7 @@ namespace Features.Single.Gameplay{
 
                 // 최종 위치 설정
                 buttonRect.anchoredPosition = finalPosition;
-                
+
                 // Debug.Log($"[GameBoard] ActionButtonPanel 위치 설정 완료 - 최종: {finalPosition}");
             }
         }
@@ -803,12 +805,12 @@ namespace Features.Single.Gameplay{
         {
             Vector2 canvasSize = canvasRect.sizeDelta;
             Vector2 panelHalfSize = panelSize * 0.5f;
-            
+
             float minX = -canvasSize.x * 0.5f + panelHalfSize.x + safeMargin;
             float maxX = canvasSize.x * 0.5f - panelHalfSize.x - safeMargin;
             float minY = -canvasSize.y * 0.5f + panelHalfSize.y + safeMargin;
             float maxY = canvasSize.y * 0.5f - panelHalfSize.y - safeMargin;
-            
+
             return position.x >= minX && position.x <= maxX && position.y >= minY && position.y <= maxY;
         }
 
@@ -819,12 +821,12 @@ namespace Features.Single.Gameplay{
         {
             Vector2 canvasSize = canvasRect.sizeDelta;
             Vector2 panelHalfSize = panelSize * 0.5f;
-            
+
             float minX = -canvasSize.x * 0.5f + panelHalfSize.x + safeMargin;
             float maxX = canvasSize.x * 0.5f - panelHalfSize.x - safeMargin;
             float minY = -canvasSize.y * 0.5f + panelHalfSize.y + safeMargin;
             float maxY = canvasSize.y * 0.5f - panelHalfSize.y - safeMargin;
-            
+
             return new Vector2(
                 Mathf.Clamp(position.x, minX, maxX),
                 Mathf.Clamp(position.y, minY, maxY)

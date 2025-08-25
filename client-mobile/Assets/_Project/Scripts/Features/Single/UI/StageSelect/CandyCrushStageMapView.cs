@@ -2031,7 +2031,7 @@ namespace Features.Single.UI.StageSelect
                 }
                 
                 float progress = (float)maxCompleted / totalStages * 100f;
-                string progressString = $"Stages({maxCompleted}/{totalStages})";
+                string progressString = $"{maxCompleted}/{totalStages}";
                 progressText.text = progressString;
                 
                 Debug.Log($"[CandyCrushStageMapView] 진행률 업데이트: {progressString}");
