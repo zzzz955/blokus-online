@@ -6,7 +6,7 @@
  */
 
 const { PrismaClient } = require('@prisma/client');
-const bcrypt = require('bcryptjs');
+const argon2 = require('argon2');
 
 const prisma = new PrismaClient();
 
@@ -31,7 +31,12 @@ async function createAdminUser() {
     }
 
     // 비밀번호 해싱
-    const hashedPassword = await bcrypt.hash(adminPassword, 12);
+    const hashedPassword = await argon2.hash(adminPassword, {
+      type: argon2.argon2id,
+      memoryCost: 65536, // 64MB
+      timeCost: 2,
+      parallelism: 1,
+    });
 
     // 관리자 계정 생성
     const admin = await prisma.adminUser.create({

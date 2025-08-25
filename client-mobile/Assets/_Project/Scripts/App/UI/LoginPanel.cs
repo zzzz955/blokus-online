@@ -5,6 +5,7 @@ using App.Network;
 using Features.Single.Core;
 using Shared.UI;
 using App.Core;
+using App.Config;
 using System;
 using System.Collections;
 using Newtonsoft.Json;
@@ -27,7 +28,6 @@ namespace App.UI
         [SerializeField] private Button registerButton;
 
         [Header("설정")]
-        [SerializeField] private string webRegisterUrl = "http://localhost:3000/register";
         [SerializeField] private bool autoLoginWithRefreshToken = true;
 
         [Header("개발용 설정")]
@@ -276,8 +276,9 @@ namespace App.UI
         {
             // 웹 애플리케이션으로 리다이렉트
             SetStatusText("웹 브라우저에서 회원가입을 진행해주세요", MessagePriority.Info);
-            Application.OpenURL(webRegisterUrl);
-            Debug.Log($"회원가입 페이지 열기: {webRegisterUrl}");
+            var registerUrl = $"{EnvironmentConfig.WebServerUrl}/register";
+            Application.OpenURL(registerUrl);
+            Debug.Log($"회원가입 페이지 열기: {registerUrl}");
         }
 
         // ==========================================

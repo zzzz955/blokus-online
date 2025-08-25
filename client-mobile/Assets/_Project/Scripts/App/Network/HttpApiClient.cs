@@ -6,6 +6,7 @@ using UnityEngine;
 using UnityEngine.Networking;
 using App.Services;
 using App.Utils;
+using App.Config;
 using Features.Single.Core;
 using Shared.Models;
 using MessagePriority = Shared.UI.MessagePriority;
@@ -52,23 +53,16 @@ namespace App.Network{
 
     public class HttpApiClient : MonoBehaviour
     {
-        [Header("API 서버 설정")]
-        [SerializeField] private string developmentApiUrl = "http://localhost:8080/api";
-        [SerializeField] private string productionApiUrl = "https://your-production-server.com/api";
-        
         public string ApiBaseUrl => GetApiBaseUrl();
+        [Header("API 서버 설정")]
         [SerializeField] private int requestTimeoutSeconds = 10;
 
         /// <summary>
-        /// 환경별 API URL 반환
+        /// 환경별 API URL 반환 (EnvironmentConfig 사용)
         /// </summary>
         private string GetApiBaseUrl()
         {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-            return developmentApiUrl;
-#else
-            return productionApiUrl;
-#endif
+            return EnvironmentConfig.ApiServerUrl;
         }
 
         // 인증 토큰
@@ -134,7 +128,7 @@ namespace App.Network{
             if (!string.IsNullOrEmpty(envApiUrl))
             {
                 // 환경변수가 있으면 개발 URL 오버라이드
-                developmentApiUrl = envApiUrl;
+                // developmentApiUrl = envApiUrl;
                 Debug.Log($"API URL 환경변수 설정: {envApiUrl}");
             }
             

@@ -26,10 +26,20 @@ OidcAuthenticator::OidcAuthenticator(QObject* parent)
     , m_loopbackPort(0)
     , m_authTimeoutTimer(new QTimer(this))
 {
-    // 기본 OIDC 설정
-    m_config.issuer = "http://localhost:9000";
-    m_config.authorizationEndpoint = "http://localhost:9000/authorize";
-    m_config.tokenEndpoint = "http://localhost:9000/token";
+    // 기본 OIDC 설정: 빌드 모드에 따른 하드코딩된 값 사용
+    #ifdef _DEBUG
+        // Debug 모드: localhost 사용
+        m_config.issuer = "http://localhost:9000";
+        m_config.authorizationEndpoint = "http://localhost:9000/authorize";
+        m_config.tokenEndpoint = "http://localhost:9000/token";
+        qDebug() << QString::fromUtf8("🔧 디버그 모드: localhost OIDC 서버 사용");
+    #else
+        // Release 모드: 프로덕션 서버 사용 (Nginx를 통한 HTTPS 9000 포트)
+        m_config.issuer = "https://blokus-online.mooo.com:9000";
+        m_config.authorizationEndpoint = "https://blokus-online.mooo.com:9000/authorize";
+        m_config.tokenEndpoint = "https://blokus-online.mooo.com:9000/token";
+        qDebug() << QString::fromUtf8("🚀 릴리즈 모드: 프로덕션 OIDC 서버 사용 (https://blokus-online.mooo.com:9000)");
+    #endif
     m_config.clientId = "blokus-desktop-client";
     m_config.redirectUri = "http://localhost:{PORT}/callback"; // PORT는 동적으로 설정
     m_config.scopes = QStringList({"openid", "profile", "email"});

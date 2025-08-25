@@ -19,6 +19,7 @@ class OIDCConfig {
         client_id: 'qt-desktop-client',
         client_secret: null, // Public client (PKCE 사용)
         redirect_uris: [
+          'qt-desktop-client://auth/callback',
           'http://localhost:8080/auth/callback',
           'http://127.0.0.1:8080/auth/callback'
         ],

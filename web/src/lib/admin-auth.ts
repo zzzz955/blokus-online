@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
+import * as argon2 from 'argon2';
 import { PrismaClient } from '@prisma/client';
 
 // Helper function to get JWT secret with validation
@@ -64,7 +64,7 @@ export async function authenticateAdmin(credentials: AdminLoginRequest): Promise
     }
 
     // 비밀번호 검증
-    const isPasswordValid = await bcrypt.compare(password, adminUser.password_hash);
+    const isPasswordValid = await argon2.verify(adminUser.password_hash, password);
     if (!isPasswordValid) {
       return {
         success: false,
@@ -285,7 +285,12 @@ export function requireAdmin(adminRole?: 'ADMIN' | 'SUPER_ADMIN') {
  * 비밀번호 해싱
  */
 export async function hashPassword(password: string): Promise<string> {
-  return await bcrypt.hash(password, 12);
+  return argon2.hash(password, {
+    type: argon2.argon2id,
+    memoryCost: 65536, // 64MB
+    timeCost: 2,
+    parallelism: 1,
+  });
 }
 
 /**

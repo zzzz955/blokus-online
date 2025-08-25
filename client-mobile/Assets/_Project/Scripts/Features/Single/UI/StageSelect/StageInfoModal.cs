@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using App.Network;
+using App.Config;
 using Features.Single.Gameplay;
 using Features.Single.Gameplay.Skins;
 using Shared.Models;
@@ -52,11 +53,7 @@ namespace Features.Single.UI.StageSelect
         [SerializeField] private Features.Single.Gameplay.CellSpriteProvider cellSpriteProvider;
         [SerializeField] private Features.Single.Gameplay.Skins.BlockSkin previewSkin;
 
-        [Header("서버 URL 설정")]
-        [SerializeField] private string developmentWebServerUrl = "http://localhost:3000";
-        [SerializeField] private string productionWebServerUrl = "https://web.blokus-online.com";
-        [SerializeField] private string developmentApiServerUrl = "http://localhost:8080";
-        [SerializeField] private string productionApiServerUrl = "https://api.blokus-online.com";
+        [Header("서버 URL 설정 (제거됨 - EnvironmentConfig 사용)")]
 
         [Header("색상 설정 (Fallback)")]
         [SerializeField] private Color activeStarColor = Color.yellow;
@@ -77,11 +74,7 @@ namespace Features.Single.UI.StageSelect
         {
             get
             {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-                return developmentWebServerUrl;
-#else
-                return productionWebServerUrl;
-#endif
+                return EnvironmentConfig.WebServerUrl;
             }
         }
 
@@ -89,11 +82,7 @@ namespace Features.Single.UI.StageSelect
         {
             get
             {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-                return developmentApiServerUrl;
-#else
-                return productionApiServerUrl;
-#endif
+                return EnvironmentConfig.ApiServerUrl.Replace("/api", ""); // 기존 코드와 호환성 위해 /api 제거
             }
         }
 

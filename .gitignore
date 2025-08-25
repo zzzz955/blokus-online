@@ -269,6 +269,7 @@ settings.ini
 *.config
 .env
 client/.env
+.env.prod
 
 # SSL certificates
 *.pem

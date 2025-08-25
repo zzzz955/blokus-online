@@ -6,6 +6,7 @@ using System.Text;
 using UnityEngine;
 using UnityEngine.Networking;
 using Newtonsoft.Json;
+using App.Config;
 
 namespace App.Network
 {
@@ -17,7 +18,6 @@ namespace App.Network
     public class OidcAuthenticator : MonoBehaviour
     {
         [Header("OIDC Configuration")]
-        [SerializeField] private string oidcServerUrl = "http://localhost:9000";
         [SerializeField] private string clientId = "unity-mobile-client";
         [SerializeField] private string redirectUri = "blokus://auth/callback";
         [SerializeField] private string scope = "openid profile email";
@@ -112,10 +112,10 @@ namespace App.Network
                 LogDebug("Editor 테스트 모드: HTTP 콜백 URI 사용");
             }
             
-            // Production URL override
-            if (useProduction)
+            // 환경별 OIDC 서버 URL 설정
+            var oidcServerUrl = EnvironmentConfig.OidcServerUrl;
+            if (!EnvironmentConfig.IsDevelopment)
             {
-                oidcServerUrl = "https://blokus-online.mooo.com";
                 enableDebugLogs = false;
             }
             
@@ -206,7 +206,8 @@ namespace App.Network
         #region OIDC Discovery
         private IEnumerator LoadDiscoveryDocument()
         {
-            string discoveryUrl = $"{oidcServerUrl}/.well-known/openid-configuration";
+            var currentOidcUrl = EnvironmentConfig.OidcServerUrl;
+            string discoveryUrl = $"{currentOidcUrl}/.well-known/openid-configuration";
             LogDebug($"Loading OIDC discovery document from: {discoveryUrl}");
 
             using (UnityWebRequest request = UnityWebRequest.Get(discoveryUrl))

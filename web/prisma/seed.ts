@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
+import * as argon2 from 'argon2';
 
 const prisma = new PrismaClient();
 
@@ -9,7 +9,12 @@ async function main() {
   // 관리자 계정 생성
   const adminUsername = process.env.ADMIN_USERNAME || 'admin';
   const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
-  const hashedPassword = await bcrypt.hash(adminPassword, 12);
+  const hashedPassword = await argon2.hash(adminPassword, {
+    type: argon2.argon2id,
+    memoryCost: 65536, // 64MB
+    timeCost: 2,
+    parallelism: 1,
+  });
 
   const admin = await prisma.adminUser.upsert({
     where: { username: adminUsername },

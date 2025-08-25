@@ -41,7 +41,7 @@ namespace Blokus {
 
                 // 설정 로드
                 m_sessionDuration = std::chrono::hours(ConfigManager::sessionTimeoutHours);
-                m_minPasswordLength = 6; // 기본값 또는 설정에서 로드
+                m_minPasswordLength = 6; // 상수값: 보안 요구사항에 따른 최소 길이
 
                 // OpenSSL 초기화 확인
                 if (RAND_status() != 1) {

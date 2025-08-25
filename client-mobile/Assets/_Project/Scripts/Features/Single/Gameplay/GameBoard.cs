@@ -40,6 +40,10 @@ namespace Features.Single.Gameplay{
         [SerializeField] private UnityEngine.UI.Button flipButton;
         [SerializeField] private UnityEngine.UI.Button placeButton;
         [SerializeField] private Sprite uiFallbackSprite;
+        
+        [Header("Action Button Sprites")]
+        [SerializeField] private Sprite placeButtonEnabledSprite;   // 배치 가능 시 sprite
+        [SerializeField] private Sprite placeButtonDisabledSprite;  // 배치 불가 시 sprite
 
         [Header("스킨")]
         [SerializeField] private Features.Single.Gameplay.Skins.BlockSkin skin;
@@ -643,7 +647,25 @@ namespace Features.Single.Gameplay{
             {
                 placeButton.interactable = canPlace;
                 var img = placeButton.GetComponent<UnityEngine.UI.Image>();
-                if (img != null) img.color = canPlace ? Color.green : Color.red;
+                if (img != null)
+                {
+                    // sprite 기반 상태 변경 (색상 변경 대신)
+                    if (canPlace && placeButtonEnabledSprite != null)
+                    {
+                        img.sprite = placeButtonEnabledSprite;
+                        img.color = Color.white; // sprite 원본 색상 유지
+                    }
+                    else if (!canPlace && placeButtonDisabledSprite != null)
+                    {
+                        img.sprite = placeButtonDisabledSprite;
+                        img.color = Color.white; // sprite 원본 색상 유지
+                    }
+                    else
+                    {
+                        // 폴백: sprite가 설정되지 않은 경우 기존 색상 시스템 사용
+                        img.color = canPlace ? Color.green : Color.red;
+                    }
+                }
             }
 
             PositionActionButtonsAtBlock();
@@ -705,9 +727,6 @@ namespace Features.Single.Gameplay{
             }
             if (minRow == int.MaxValue) return;
 
-            // 블록의 가장 우측 상단 셀의 우측상단 가장자리 계산
-            Vector3 targetWorldPos = BoardToWorld(new Position(minRow, maxCol));
-
             // Canvas 좌표로 변환/적용
             Canvas canvas = GetComponentInParent<Canvas>();
             if (canvas == null) return;
@@ -718,57 +737,98 @@ namespace Features.Single.Gameplay{
 
             if (buttonRect != null && uiCamera != null)
             {
-                Vector2 screenPos = uiCamera.WorldToScreenPoint(targetWorldPos);
-                if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screenPos, uiCamera, out var localPos))
+                Vector2 panelSize = buttonRect.sizeDelta;
+                float safeMargin = 20f; // 안전 마진 증가
+                
+                // 여러 위치 후보를 시도 (우선순위: 우상 → 좌상 → 우하 → 좌하)
+                Vector3[] candidateWorldPositions = new Vector3[]
                 {
-                    // 우측상단 가장자리에 패널이 위치하도록 오프셋 조정
-                    // X: 셀의 우측 가장자리 + 패널 너비의 절반
-                    // Y: 셀의 상단 가장자리 + 패널 높이의 절반
-                    Vector2 buttonOffset = new Vector2(
-                        cellSize * 0.5f + (buttonRect.sizeDelta.x * 0.5f) + 10f, // 10f는 여백
-                        cellSize * 0.5f + (buttonRect.sizeDelta.y * 0.5f) + 10f  // 10f는 여백
-                    );
-                    
-                    Vector2 currentPosition = buttonRect.anchoredPosition;
-                    Vector2 targetPosition = localPos + buttonOffset;
-                    
-                    // Debug.Log($"[GameBoard] ActionButtonPanel 위치 변경 - 현재: {currentPosition} → 목표: {targetPosition}");
-                    
-                    // 화면 경계 내에 패널이 위치하도록 보정
-                    Vector2 canvasSize = canvasRect.sizeDelta;
-                    Vector2 panelHalfSize = buttonRect.sizeDelta * 0.5f;
-                    
-                    // Debug.Log($"[GameBoard] 클램핑 계산 - Canvas크기: {canvasSize}, Panel크기: {buttonRect.sizeDelta}, Panel반크기: {panelHalfSize}");
-                    
-                    // 클램핑 범위가 너무 작으면 클램핑 없이 직접 사용
-                    Vector2 clampedPosition = targetPosition;
-                    
-                    // Canvas 크기가 유효한 경우에만 클램핑 적용
-                    if (canvasSize.x > 100 && canvasSize.y > 100) // 최소 크기 체크
+                    BoardToWorld(new Position(minRow, maxCol)), // 우측 상단
+                    BoardToWorld(new Position(minRow, minCol)), // 좌측 상단  
+                    BoardToWorld(new Position(maxRow, maxCol)), // 우측 하단
+                    BoardToWorld(new Position(maxRow, minCol))  // 좌측 하단
+                };
+                
+                Vector2[] offsets = new Vector2[]
+                {
+                    new Vector2(cellSize * 0.5f + panelSize.x * 0.5f + safeMargin, cellSize * 0.5f + panelSize.y * 0.5f + safeMargin),   // 우상
+                    new Vector2(-(cellSize * 0.5f + panelSize.x * 0.5f + safeMargin), cellSize * 0.5f + panelSize.y * 0.5f + safeMargin), // 좌상
+                    new Vector2(cellSize * 0.5f + panelSize.x * 0.5f + safeMargin, -(cellSize * 0.5f + panelSize.y * 0.5f + safeMargin)), // 우하
+                    new Vector2(-(cellSize * 0.5f + panelSize.x * 0.5f + safeMargin), -(cellSize * 0.5f + panelSize.y * 0.5f + safeMargin)) // 좌하
+                };
+
+                Vector2 finalPosition = Vector2.zero;
+                bool positionFound = false;
+
+                // 각 위치 후보를 시도하여 화면 안에 들어오는 첫 번째 위치 사용
+                for (int i = 0; i < candidateWorldPositions.Length; i++)
+                {
+                    Vector2 screenPos = uiCamera.WorldToScreenPoint(candidateWorldPositions[i]);
+                    if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screenPos, uiCamera, out var localPos))
                     {
-                        float minX = -canvasSize.x * 0.5f + panelHalfSize.x;
-                        float maxX = canvasSize.x * 0.5f - panelHalfSize.x;
-                        float minY = -canvasSize.y * 0.5f + panelHalfSize.y;
-                        float maxY = canvasSize.y * 0.5f - panelHalfSize.y;
+                        Vector2 candidatePosition = localPos + offsets[i];
                         
-                        // Debug.Log($"[GameBoard] 클램핑 범위 - X: {minX} ~ {maxX}, Y: {minY} ~ {maxY}");
-                        
-                        clampedPosition = new Vector2(
-                            Mathf.Clamp(targetPosition.x, minX, maxX),
-                            Mathf.Clamp(targetPosition.y, minY, maxY)
-                        );
+                        // 화면 경계 체크 (실제 화면 크기 기준)
+                        if (IsPositionWithinScreenBounds(candidatePosition, panelSize, canvasRect, safeMargin))
+                        {
+                            finalPosition = candidatePosition;
+                            positionFound = true;
+                            break;
+                        }
                     }
-                    else
-                    {
-                        // Debug.LogWarning($"[GameBoard] Canvas 크기가 잘못됨, 클램핑 없이 직접 사용: {canvasSize}");
-                    }
-                    
-                    // 실제 위치 설정
-                    buttonRect.anchoredPosition = clampedPosition;
-                    
-                    // Debug.Log($"[GameBoard] ActionButtonPanel 위치 설정 완료 - 최종: {clampedPosition}, 클램핑 전: {targetPosition}");
                 }
+
+                // 모든 후보가 실패하면 강제 클램핑으로 화면 안에 위치시키기
+                if (!positionFound)
+                {
+                    Vector2 screenPos = uiCamera.WorldToScreenPoint(candidateWorldPositions[0]);
+                    if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screenPos, uiCamera, out var localPos))
+                    {
+                        Vector2 targetPosition = localPos + offsets[0];
+                        finalPosition = ClampPositionToScreenBounds(targetPosition, panelSize, canvasRect, safeMargin);
+                    }
+                }
+
+                // 최종 위치 설정
+                buttonRect.anchoredPosition = finalPosition;
+                
+                // Debug.Log($"[GameBoard] ActionButtonPanel 위치 설정 완료 - 최종: {finalPosition}");
             }
+        }
+
+        /// <summary>
+        /// 주어진 위치가 화면 경계 안에 있는지 확인
+        /// </summary>
+        private bool IsPositionWithinScreenBounds(Vector2 position, Vector2 panelSize, RectTransform canvasRect, float safeMargin)
+        {
+            Vector2 canvasSize = canvasRect.sizeDelta;
+            Vector2 panelHalfSize = panelSize * 0.5f;
+            
+            float minX = -canvasSize.x * 0.5f + panelHalfSize.x + safeMargin;
+            float maxX = canvasSize.x * 0.5f - panelHalfSize.x - safeMargin;
+            float minY = -canvasSize.y * 0.5f + panelHalfSize.y + safeMargin;
+            float maxY = canvasSize.y * 0.5f - panelHalfSize.y - safeMargin;
+            
+            return position.x >= minX && position.x <= maxX && position.y >= minY && position.y <= maxY;
+        }
+
+        /// <summary>
+        /// 위치를 화면 경계 안으로 강제 클램핑
+        /// </summary>
+        private Vector2 ClampPositionToScreenBounds(Vector2 position, Vector2 panelSize, RectTransform canvasRect, float safeMargin)
+        {
+            Vector2 canvasSize = canvasRect.sizeDelta;
+            Vector2 panelHalfSize = panelSize * 0.5f;
+            
+            float minX = -canvasSize.x * 0.5f + panelHalfSize.x + safeMargin;
+            float maxX = canvasSize.x * 0.5f - panelHalfSize.x - safeMargin;
+            float minY = -canvasSize.y * 0.5f + panelHalfSize.y + safeMargin;
+            float maxY = canvasSize.y * 0.5f - panelHalfSize.y - safeMargin;
+            
+            return new Vector2(
+                Mathf.Clamp(position.x, minX, maxX),
+                Mathf.Clamp(position.y, minY, maxY)
+            );
         }
 
         private void EnsureFallbackSprite()
