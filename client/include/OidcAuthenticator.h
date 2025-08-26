@@ -12,7 +12,9 @@
 #include <QTimer>
 #include <QCryptographicHash>
 #include <QMetaType>
+#include <QThread>
 #include <memory>
+#include <atomic>
 
 namespace Blokus {
 
@@ -81,6 +83,9 @@ namespace Blokus {
         void onLoopbackSocketReadyRead();
         void onTokenExchangeFinished();
         void onTokenRefreshFinished();
+        
+        // 재진입 방지용 가드 슬롯
+        void cleanupWithGuard();
 
     private:
         // PKCE 관련
@@ -127,6 +132,10 @@ namespace Blokus {
         // Server settings
         quint16 m_loopbackPort = 0;
         QTimer* m_authTimeoutTimer;
+        
+        // 재진입 방지 가드
+        std::atomic<bool> m_isCleaningUp{false};
+        std::atomic<bool> m_authenticationCompleted{false};
         
         static const int AUTH_TIMEOUT_MS = 300000; // 5분
         static const QString CREDENTIAL_SERVICE_NAME;
