@@ -21,10 +21,10 @@ const DEFAULT_OPTIONS: Required<ThumbnailOptions> = {
   backgroundColor: '#1a1a1a', // Dark background
   obstacleColor: '#666666',   // Gray for obstacles
   preplacedColors: [
-    '#3b82f6', // Blue
-    '#ef4444', // Red  
-    '#22c55e', // Green
-    '#f59e0b'  // Yellow
+    '#3b82f6', // Blue (color 1)
+    '#f59e0b', // Yellow (color 2)  
+    '#ef4444', // Red (color 3)
+    '#22c55e'  // Green (color 4)
   ],
   gridColor: '#333333',
   showGrid: true
