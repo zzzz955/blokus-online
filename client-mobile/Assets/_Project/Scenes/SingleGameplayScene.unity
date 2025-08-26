@@ -5699,9 +5699,9 @@ MonoBehaviour:
   timeText: {fileID: 1756463928}
   optimalScoreText: {fileID: 549081143}
   starImages:
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
+  - {fileID: 1750387699}
+  - {fileID: 1643436459}
+  - {fileID: 1479812595}
   activeStarSprite: {fileID: 21300000, guid: 89c2601013eb25145a4de556def22d2f, type: 3}
   inactiveStarSprite: {fileID: 21300000, guid: ce0759a83281ec14c8d46f6204875622, type: 3}
   successTitle: "\uD074\uB9AC\uC5B4 \uC131\uACF5!"

@@ -5,6 +5,7 @@ using UnityEngine.UI;
 using TMPro;
 using UnityEngine.EventSystems;
 using Features.Single.Gameplay;
+using Shared.Models;
 
 namespace Features.Single.UI.InGame
 {
@@ -220,17 +221,38 @@ namespace Features.Single.UI.InGame
 
         private void DisplayStars(int starCount)
         {
-            if (starImages == null) return;
+            if (starImages == null) 
+            {
+                Debug.LogWarning("[GameResultModal] starImages 배열이 null입니다!");
+                return;
+            }
+
+            Debug.Log($"[GameResultModal] 별점 표시 시작 - 요청: {starCount}개, 배열 크기: {starImages.Length}");
 
             for (int i = 0; i < starImages.Length; i++)
             {
                 var img = starImages[i];
-                if (!img) continue;
+                if (!img) 
+                {
+                    Debug.LogWarning($"[GameResultModal] starImages[{i}]가 null입니다!");
+                    continue;
+                }
 
                 bool on = (i < starCount);
-                img.sprite = on ? activeStarSprite : inactiveStarSprite;
-                img.color  = on ? Color.white : new Color(0.5f, 0.5f, 0.5f, 1f);
+                Sprite targetSprite = on ? activeStarSprite : inactiveStarSprite;
+                Color targetColor = on ? Color.white : new Color(0.5f, 0.5f, 0.5f, 1f);
+                
+                img.sprite = targetSprite;
+                img.color = targetColor;
+
+                Debug.Log($"[GameResultModal] 별 {i}: on={on}, sprite={targetSprite?.name}, color={targetColor}");
             }
+
+            // 🔥 추가 검증: 스프라이트가 올바르게 설정되었는지 확인
+            if (activeStarSprite == null)
+                Debug.LogError("[GameResultModal] activeStarSprite가 Inspector에서 할당되지 않았습니다!");
+            if (inactiveStarSprite == null)
+                Debug.LogError("[GameResultModal] inactiveStarSprite가 Inspector에서 할당되지 않았습니다!");
 
             Debug.Log($"[GameResultModal] 별점 표시 완료 - {starCount}개");
         }
