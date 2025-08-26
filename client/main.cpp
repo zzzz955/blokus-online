@@ -70,6 +70,19 @@ private slots:
         m_networkClient->login(username, password);
     }
 
+    void handleJwtLoginRequest(const QString &jwtToken)
+    {
+        qDebug() << QString::fromUtf8("JWT 로그인 시도");
+
+        if (!m_networkClient->isConnected())
+        {
+            m_loginWindow->setLoginResult(false, QString::fromUtf8("서버에 연결되지 않았습니다."));
+            return;
+        }
+
+        // JWT 토큰을 TCP 서버에 전송하여 인증 요청
+        m_networkClient->loginWithJwt(jwtToken);
+    }
 
     void handleLoginSuccess(const QString &username)
     {
@@ -77,11 +90,14 @@ private slots:
 
         m_currentUsername = username;
 
-        // 로그인 창 숨기기
-        if (m_loginWindow)
-        {
-            m_loginWindow->hide();
-        }
+        // UI 변경을 메인 스레드에서 실행
+        QMetaObject::invokeMethod(this, [this]() {
+            // 로그인 창 숨기기
+            if (m_loginWindow)
+            {
+                m_loginWindow->hide();
+            }
+        }, Qt::QueuedConnection);
 
         // 초기 설정 로딩 플래그 설정 및 사용자 설정 요청
         m_isLoadingInitialSettings = true;
@@ -94,7 +110,10 @@ private slots:
         {
             qWarning() << QString::fromUtf8("네트워크 연결이 없어 기본 설정으로 로비 생성");
             m_isLoadingInitialSettings = false;
-            createLobbyWindow();
+            // 로비 창 생성도 메인 스레드에서 실행
+            QMetaObject::invokeMethod(this, [this]() {
+                createLobbyWindow();
+            }, Qt::QueuedConnection);
         }
 
         // 로그인 성공 시 서버에서 자동으로 로비 진입 및 정보 전송하므로 별도 요청 불필요
@@ -1319,100 +1338,100 @@ private:
         // 설정을 사용하여 NetworkClient 생성
         m_networkClient = new NetworkClient(this);
         
-        // 네트워크 연결 상태 시그널
+        // 네트워크 연결 상태 시그널 - Qt::QueuedConnection으로 스레드 안전 보장
         connect(m_networkClient, &NetworkClient::connected,
-                this, &AppController::onNetworkConnected);
+                this, &AppController::onNetworkConnected, Qt::QueuedConnection);
         connect(m_networkClient, &NetworkClient::disconnected,
-                this, &AppController::onNetworkDisconnected);
+                this, &AppController::onNetworkDisconnected, Qt::QueuedConnection);
         connect(m_networkClient, &NetworkClient::connectionError,
-                this, &AppController::onNetworkError);
+                this, &AppController::onNetworkError, Qt::QueuedConnection);
 
-        // 인증 관련 시그널
+        // 인증 관련 시그널 - Qt::QueuedConnection으로 스레드 안전 보장
         connect(m_networkClient, &NetworkClient::loginResult,
-                this, &AppController::onLoginResult);
+                this, &AppController::onLoginResult, Qt::QueuedConnection);
         connect(m_networkClient, &NetworkClient::userProfileReceived,
-                this, &AppController::onUserProfileReceived);
+                this, &AppController::onUserProfileReceived, Qt::QueuedConnection);
 
-        // 일반 에러 시그널 추가
+        // 일반 에러 시그널 추가 - Qt::QueuedConnection으로 스레드 안전 보장
         connect(m_networkClient, &NetworkClient::errorReceived,
-                this, &AppController::onGeneralError);
+                this, &AppController::onGeneralError, Qt::QueuedConnection);
 
-        // 로비 관련 시그널
+        // 로비 관련 시그널 - Qt::QueuedConnection으로 스레드 안전 보장
         connect(m_networkClient, &NetworkClient::lobbyEntered,
-                this, &AppController::onLobbyEntered);
+                this, &AppController::onLobbyEntered, Qt::QueuedConnection);
         connect(m_networkClient, &NetworkClient::lobbyUserListReceived,
-                this, &AppController::onLobbyUserListReceived);
+                this, &AppController::onLobbyUserListReceived, Qt::QueuedConnection);
         connect(m_networkClient, &NetworkClient::lobbyUserJoined,
-                this, &AppController::onLobbyUserJoined);
+                this, &AppController::onLobbyUserJoined, Qt::QueuedConnection);
         connect(m_networkClient, &NetworkClient::lobbyUserLeft,
-                this, &AppController::onLobbyUserLeft);
+                this, &AppController::onLobbyUserLeft, Qt::QueuedConnection);
         connect(m_networkClient, &NetworkClient::roomListReceived,
-                this, &AppController::onRoomListReceived);
+                this, &AppController::onRoomListReceived, Qt::QueuedConnection);
         connect(m_networkClient, &NetworkClient::userStatsReceived,
-                this, &AppController::onUserStatsReceived);
+                this, &AppController::onUserStatsReceived, Qt::QueuedConnection);
         connect(m_networkClient, &NetworkClient::myStatsUpdated,
-                this, &AppController::onMyStatsUpdated);
+                this, &AppController::onMyStatsUpdated, Qt::QueuedConnection);
 
-        // 설정 관련 시그널
+        // 설정 관련 시그널 - Qt::QueuedConnection으로 스레드 안전 보장
         connect(m_networkClient, &NetworkClient::userSettingsReceived,
-                this, &AppController::onUserSettingsReceived);
+                this, &AppController::onUserSettingsReceived, Qt::QueuedConnection);
         connect(m_networkClient, &NetworkClient::userSettingsUpdateResult,
-                this, &AppController::onUserSettingsUpdateResult);
+                this, &AppController::onUserSettingsUpdateResult, Qt::QueuedConnection);
 
         // 방 관련 시그널 추가
-        connect(m_networkClient, &NetworkClient::roomCreated, [this](int roomId, const QString& roomName) {
+        connect(m_networkClient, &NetworkClient::roomCreated, this, [this](int roomId, const QString& roomName) {
             onRoomCreated(roomId, roomName);
             transitionToGameRoomBGM();  // 🎵 방 생성 성공 → 게임룸 BGM
-        });
-        connect(m_networkClient, &NetworkClient::roomJoined, [this](int roomId, const QString& roomName) {
+        }, Qt::QueuedConnection);
+        connect(m_networkClient, &NetworkClient::roomJoined, this, [this](int roomId, const QString& roomName) {
             onRoomJoined(roomId, roomName);
             transitionToGameRoomBGM();  // 🎵 방 참여 성공 → 게임룸 BGM
-        });
-        connect(m_networkClient, &NetworkClient::roomLeft, [this]() {
+        }, Qt::QueuedConnection);
+        connect(m_networkClient, &NetworkClient::roomLeft, this, [this]() {
             onRoomLeft();
             transitionToLobbyBGM();  // 🎵 방 나가기 성공 → 로비 BGM
-        });
+        }, Qt::QueuedConnection);
         connect(m_networkClient, &NetworkClient::lobbyLeft,
-                this, &AppController::onRoomLeft);
+                this, &AppController::onRoomLeft, Qt::QueuedConnection);
         connect(m_networkClient, &NetworkClient::roomError,
-                this, &AppController::onRoomError);
+                this, &AppController::onRoomError, Qt::QueuedConnection);
 
-        // 채팅 관련 시그널
+        // 채팅 관련 시그널 - Qt::QueuedConnection으로 스레드 안전 보장
         connect(m_networkClient, &NetworkClient::chatMessageReceived,
-                this, &AppController::onChatMessageReceived);
+                this, &AppController::onChatMessageReceived, Qt::QueuedConnection);
         connect(m_networkClient, &NetworkClient::chatMessageReceivedWithDisplayName,
-                this, &AppController::onChatMessageReceivedWithDisplayName);
+                this, &AppController::onChatMessageReceivedWithDisplayName, Qt::QueuedConnection);
 
-        // 방 정보 동기화 시그널
+        // 방 정보 동기화 시그널 - Qt::QueuedConnection으로 스레드 안전 보장
         connect(m_networkClient, &NetworkClient::roomInfoReceived,
-                this, &AppController::onRoomInfoReceived);
+                this, &AppController::onRoomInfoReceived, Qt::QueuedConnection);
 
-        // 게임룸 상호작용 시그널
+        // 게임룸 상호작용 시그널 - Qt::QueuedConnection으로 스레드 안전 보장
         connect(m_networkClient, &NetworkClient::playerJoined,
-                this, &AppController::onPlayerJoined);
+                this, &AppController::onPlayerJoined, Qt::QueuedConnection);
         connect(m_networkClient, &NetworkClient::playerLeft,
-                this, &AppController::onPlayerLeft);
+                this, &AppController::onPlayerLeft, Qt::QueuedConnection);
         connect(m_networkClient, &NetworkClient::playerReady,
-                this, &AppController::onPlayerReady);
+                this, &AppController::onPlayerReady, Qt::QueuedConnection);
         connect(m_networkClient, &NetworkClient::hostChanged,
-                this, &AppController::onHostChanged);
+                this, &AppController::onHostChanged, Qt::QueuedConnection);
         
-        // displayName 지원 시그널들
+        // displayName 지원 시그널들 - Qt::QueuedConnection으로 스레드 안전 보장
         connect(m_networkClient, &NetworkClient::playerJoinedWithDisplayName,
-                this, &AppController::onPlayerJoinedWithDisplayName);
+                this, &AppController::onPlayerJoinedWithDisplayName, Qt::QueuedConnection);
         connect(m_networkClient, &NetworkClient::playerLeftWithDisplayName,
-                this, &AppController::onPlayerLeftWithDisplayName);
+                this, &AppController::onPlayerLeftWithDisplayName, Qt::QueuedConnection);
         connect(m_networkClient, &NetworkClient::hostChangedWithDisplayName,
-                this, &AppController::onHostChangedWithDisplayName);
+                this, &AppController::onHostChangedWithDisplayName, Qt::QueuedConnection);
         
         connect(m_networkClient, &NetworkClient::gameStarted,
-                this, &AppController::onGameStarted);
+                this, &AppController::onGameStarted, Qt::QueuedConnection);
         connect(m_networkClient, &NetworkClient::gameEnded,
-                this, &AppController::onGameEnded);
+                this, &AppController::onGameEnded, Qt::QueuedConnection);
         connect(m_networkClient, &NetworkClient::gameResult,
-                this, &AppController::onGameResult);
+                this, &AppController::onGameResult, Qt::QueuedConnection);
         connect(m_networkClient, &NetworkClient::gameReset,
-                this, &AppController::onGameReset);
+                this, &AppController::onGameReset, Qt::QueuedConnection);
 
         qDebug() << QString::fromUtf8("네트워크 클라이언트 설정 완료");
     }
@@ -1429,13 +1448,15 @@ private:
         // m_loginWindow->resize(windowConfig.width, windowConfig.height);
         // m_loginWindow->setMinimumSize(windowConfig.min_width, windowConfig.min_height);
 
-        // 로그인 시그널 연결
+        // 로그인 시그널 연결 (Qt::QueuedConnection으로 스레드 안전성 보장)
         connect(m_loginWindow, &Blokus::LoginWindow::loginRequested,
-                this, &AppController::handleLoginRequest);
-        connect(m_loginWindow, &Blokus::LoginWindow::loginSuccessful, [this](const QString& username) {
+                this, &AppController::handleLoginRequest, Qt::QueuedConnection);
+        connect(m_loginWindow, &Blokus::LoginWindow::jwtLoginRequested,
+                this, &AppController::handleJwtLoginRequest, Qt::QueuedConnection);
+        connect(m_loginWindow, &Blokus::LoginWindow::loginSuccessful, this, [this](const QString& username) {
             handleLoginSuccess(username);
             transitionToLobbyBGM();  // 🎵 로그인 성공 → 로비 BGM
-        });
+        }, Qt::QueuedConnection);
 
         // 로그인 창이 닫히면 애플리케이션 종료
         connect(m_loginWindow, &QMainWindow::destroyed,
@@ -1543,28 +1564,28 @@ private:
             connect(m_gameRoomWindow, &Blokus::GameRoomWindow::settingsRequested,
                     this, &AppController::handleSettingsRequest);
 
-            // 게임 상태 동기화 시그널 연결 (게임 진행 중 보드 상태 및 턴 동기화)
+            // 게임 상태 동기화 시그널 연결 - Qt::QueuedConnection으로 스레드 안전 보장
             connect(m_networkClient, &Blokus::NetworkClient::gameStateUpdated,
-                    m_gameRoomWindow, &Blokus::GameRoomWindow::onGameStateUpdated);
+                    m_gameRoomWindow, &Blokus::GameRoomWindow::onGameStateUpdated, Qt::QueuedConnection);
             connect(m_networkClient, &Blokus::NetworkClient::blockPlaced,
-                    m_gameRoomWindow, &Blokus::GameRoomWindow::onBlockPlaced);
+                    m_gameRoomWindow, &Blokus::GameRoomWindow::onBlockPlaced, Qt::QueuedConnection);
             connect(m_networkClient, &Blokus::NetworkClient::turnChanged,
-                    m_gameRoomWindow, &Blokus::GameRoomWindow::onTurnChanged);
+                    m_gameRoomWindow, &Blokus::GameRoomWindow::onTurnChanged, Qt::QueuedConnection);
             qDebug() << QString::fromUtf8("⏰ [TIMER_DEBUG] turnChanged 시그널 연결 완료");
 
-            // AFK 관련 시그널 연결
+            // AFK 관련 시그널 연결 - Qt::QueuedConnection으로 스레드 안전 보장
             connect(m_networkClient, &Blokus::NetworkClient::afkModeActivated,
-                    m_gameRoomWindow, &Blokus::GameRoomWindow::onAfkModeActivated);
+                    m_gameRoomWindow, &Blokus::GameRoomWindow::onAfkModeActivated, Qt::QueuedConnection);
             connect(m_gameRoomWindow, &Blokus::GameRoomWindow::afkUnblockRequested,
-                    m_networkClient, &Blokus::NetworkClient::sendAfkUnblock);
+                    m_networkClient, &Blokus::NetworkClient::sendAfkUnblock, Qt::QueuedConnection);
             
-            // 🔥 FIX: 게임 종료 시 AFK 모달 처리 (GameRoomWindow를 통해 중계)
+            // 🔥 FIX: 게임 종료 시 AFK 모달 처리 - Qt::QueuedConnection으로 스레드 안전 보장
             connect(m_networkClient, &Blokus::NetworkClient::gameEnded,
-                    m_gameRoomWindow, &Blokus::GameRoomWindow::onGameEndedForAfk);
+                    m_gameRoomWindow, &Blokus::GameRoomWindow::onGameEndedForAfk, Qt::QueuedConnection);
             
-            // 🔥 FIX: AFK 해제 에러 처리 (GameRoomWindow를 통해 중계)
+            // 🔥 FIX: AFK 해제 에러 처리 - Qt::QueuedConnection으로 스레드 안전 보장
             connect(m_networkClient, &Blokus::NetworkClient::afkUnblockError,
-                    m_gameRoomWindow, &Blokus::GameRoomWindow::onAfkUnblockErrorForAfk);
+                    m_gameRoomWindow, &Blokus::GameRoomWindow::onAfkUnblockErrorForAfk, Qt::QueuedConnection);
             
             qDebug() << QString::fromUtf8("🚨 AFK 관련 시그널 연결 완료 (게임 종료 & 에러 처리 포함)");
 

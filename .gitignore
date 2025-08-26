@@ -269,6 +269,7 @@ settings.ini
 *.config
 .env
 client/.env
+.env.prod
 
 # SSL certificates
 *.pem
@@ -339,6 +340,9 @@ installer/output/
 # ========================================
 # Unity Mobile Client (client-mobile/)
 # ========================================
+
+# 유니티 에셋 버전관리
+AssetsExportHistory/
 
 # Unity generated files
 client-mobile/[Ll]ibrary/
@@ -431,6 +435,191 @@ screenshots/
 userdata/
 saves/
 
+# ========================================
+# Single Player API Server (Node.js)
+# ========================================
+
+# Dependencies
+single-player-api/node_modules/
+single-player-api/npm-debug.log*
+single-player-api/yarn-debug.log*
+single-player-api/yarn-error.log*
+single-player-api/pnpm-debug.log*
+single-player-api/lerna-debug.log*
+
+# Runtime data
+single-player-api/pids/
+single-player-api/*.pid
+single-player-api/*.seed
+single-player-api/*.pid.lock
+
+# Coverage directory used by tools like istanbul
+single-player-api/coverage/
+single-player-api/*.lcov
+
+# nyc test coverage
+single-player-api/.nyc_output
+
+# Grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-task-files)
+single-player-api/.grunt
+
+# Bower dependency directory (https://bower.io/)
+single-player-api/bower_components
+
+# node-waf configuration
+single-player-api/.lock-wscript
+
+# Compiled binary addons (https://nodejs.org/api/addons.html)
+single-player-api/build/Release
+
+# Dependency directories
+single-player-api/node_modules/
+single-player-api/jspm_packages/
+
+# TypeScript cache
+single-player-api/*.tsbuildinfo
+
+# Optional npm cache directory
+single-player-api/.npm
+
+# Optional eslint cache
+single-player-api/.eslintcache
+
+# Microbundle cache
+single-player-api/.rpt2_cache/
+single-player-api/.rts2_cache_cjs/
+single-player-api/.rts2_cache_es/
+single-player-api/.rts2_cache_umd/
+
+# Optional REPL history
+single-player-api/.node_repl_history
+
+# Output of 'npm pack'
+single-player-api/*.tgz
+
+# Yarn Integrity file
+single-player-api/.yarn-integrity
+
+# dotenv environment variables file
+single-player-api/.env
+single-player-api/.env.local
+single-player-api/.env.development.local
+single-player-api/.env.test.local
+single-player-api/.env.production.local
+
+# parcel-bundler cache (https://parceljs.org/)
+single-player-api/.cache
+single-player-api/.parcel-cache
+
+# Next.js build output (if used)
+single-player-api/.next
+single-player-api/out
+
+# Nuxt.js build / generate output (if used)
+single-player-api/.nuxt
+single-player-api/dist
+
+# Gatsby files (if used)
+single-player-api/.cache/
+single-player-api/public
+
+# Vuepress build output (if used)
+single-player-api/.vuepress/dist
+
+# Serverless directories
+single-player-api/.serverless/
+
+# FuseBox cache
+single-player-api/.fusebox/
+
+# DynamoDB Local files
+single-player-api/.dynamodb/
+
+# TernJS port file
+single-player-api/.tern-port
+
+# Stores VSCode versions used for testing VSCode extensions
+single-player-api/.vscode-test
+
+# yarn v2
+single-player-api/.yarn/cache
+single-player-api/.yarn/unplugged
+single-player-api/.yarn/build-state.yml
+single-player-api/.yarn/install-state.gz
+single-player-api/.pnp.*
+
+# Application logs
+single-player-api/logs/
+single-player-api/*.log
+
+# PM2 ecosystem file
+single-player-api/ecosystem.config.js
+
+# ESLint cache
+single-player-api/.eslintcache
+
+# Jest cache
+single-player-api/.jest/
+
+# Docker volumes (if using local docker-compose)
+single-player-api/postgres_data/
+single-player-api/redis_data/
+
+# ========================================
+# OIDC Auth Server (oidc-auth-server/)
+# ========================================
+
+# Dependencies
+oidc-auth-server/node_modules/
+oidc-auth-server/npm-debug.log*
+oidc-auth-server/yarn-debug.log*
+oidc-auth-server/yarn-error.log*
+
+# Runtime and logs
+oidc-auth-server/logs/
+oidc-auth-server/*.log
+
+# Environment files
+oidc-auth-server/.env
+oidc-auth-server/.env.local
+oidc-auth-server/.env.development.local
+oidc-auth-server/.env.test.local
+oidc-auth-server/.env.production.local
+
+# Keys and certificates (SECURITY CRITICAL)
+oidc-auth-server/keys/private.jwk
+oidc-auth-server/keys/public.jwk
+oidc-auth-server/keys/*.pem
+oidc-auth-server/keys/*.key
+oidc-auth-server/keys/*.crt
+
+# Session storage and temp files
+oidc-auth-server/sessions/
+oidc-auth-server/tmp/
+oidc-auth-server/*.tmp
+
+# Testing and coverage
+oidc-auth-server/coverage/
+oidc-auth-server/.nyc_output/
+oidc-auth-server/test-results/
+
+# ESLint and cache
+oidc-auth-server/.eslintcache
+oidc-auth-server/.jest/
+
+# PM2 process management
+oidc-auth-server/ecosystem.config.js
+
+# OAuth client secrets
+oidc-auth-server/client-secrets.json
+oidc-auth-server/oauth-secrets/
+
 # Claude
 **CLAUDE**client-mobile/*.csproj
 client-mobile/*.sln
+CLAUDE.md
+
+# ETC
+prompt.txt
+last_log.txt
+*.keystore

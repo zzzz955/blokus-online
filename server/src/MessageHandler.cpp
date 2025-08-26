@@ -233,16 +233,35 @@ namespace Blokus::Server
             return;
         }
 
-        if (params.size() < 2)
+        if (params.size() < 1)
         {
-            sendError("사용법: auth:사용자명:비밀번호");
+            sendError("사용법: auth:사용자명:비밀번호 또는 auth:JWT_토큰");
             return;
         }
 
-        std::string username = params[0];
-        std::string password = params[1];
+        AuthResult result;
 
-        auto result = authService_->loginUser(username, password);
+        // JWT 토큰인지 확인 (JWT는 '.'로 구분된 3개 부분으로 구성)
+        if (params.size() == 1 && std::count(params[0].begin(), params[0].end(), '.') == 2)
+        {
+            // JWT 토큰 인증
+            std::string jwtToken = params[0];
+            result = authService_->loginWithJwt(jwtToken);
+            spdlog::info("JWT 토큰 인증 시도: {}", jwtToken.substr(0, 20) + "...");
+        }
+        else if (params.size() >= 2)
+        {
+            // 기존 username/password 인증
+            std::string username = params[0];
+            std::string password = params[1];
+            result = authService_->loginUser(username, password);
+            spdlog::info("사용자명/비밀번호 인증 시도: {}", username);
+        }
+        else
+        {
+            sendError("사용법: auth:사용자명:비밀번호 또는 auth:JWT_토큰");
+            return;
+        }
 
         if (result.success)
         {
@@ -296,19 +315,19 @@ namespace Blokus::Server
             {
                 std::string statsResponse = generateUserStatsResponse();
                 sendResponse(statsResponse);
-                spdlog::debug("✅ 로그인 후 사용자 통계 전송 완료: '{}'", username);
+                spdlog::debug("✅ 로그인 후 사용자 통계 전송 완료: '{}'", result.username);
             }
             catch (const std::exception &e)
             {
                 spdlog::warn("로그인 후 사용자 통계 전송 실패: {}", e.what());
             }
 
-            spdlog::info("✅ 로그인 성공: {} ({}) - 로비 진입 및 정보 전송 완료", username, session_->getSessionId());
+            spdlog::info("✅ 로그인 성공: {} ({}) - 로비 진입 및 정보 전송 완료", result.username, session_->getSessionId());
         }
         else
         {
             sendError(result.message);
-            spdlog::warn("❌ 로그인 실패: {} - {}", username, result.message);
+            spdlog::warn("❌ 로그인 실패: {} - {}", result.username.empty() ? "알 수 없음" : result.username, result.message);
         }
 
         // 🔥 콜백 제거: 직접 처리 완료

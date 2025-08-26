@@ -9,6 +9,8 @@
     "nlohmann-json",
     "libpqxx",
     "openssl",
-    "argon2"
+    "argon2",
+    "jwt-cpp",
+    "cpr"
   ]
 }

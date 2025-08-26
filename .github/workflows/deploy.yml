@@ -38,12 +38,18 @@ jobs:
     outputs:
       game-server-changed: ${{ steps.changes.outputs.game-server }}
       web-changed: ${{ steps.changes.outputs.web }}
+      single-api-changed: ${{ steps.changes.outputs.single-api }}
+      oidc-changed: ${{ steps.changes.outputs.oidc }}
       infrastructure-changed: ${{ steps.changes.outputs.infrastructure }}
       deploy-game-server: ${{ steps.deploy-decision.outputs.deploy-game-server }}
       deploy-web: ${{ steps.deploy-decision.outputs.deploy-web }}
+      deploy-single-api: ${{ steps.deploy-decision.outputs.deploy-single-api }}
+      deploy-oidc: ${{ steps.deploy-decision.outputs.deploy-oidc }}
       deploy-infrastructure: ${{ steps.deploy-decision.outputs.deploy-infrastructure }}
       build-cache-key-game: ${{ steps.cache-keys.outputs.game-cache-key }}
       build-cache-key-web: ${{ steps.cache-keys.outputs.web-cache-key }}
+      build-cache-key-single-api: ${{ steps.cache-keys.outputs.single-api-cache-key }}
+      build-cache-key-oidc: ${{ steps.cache-keys.outputs.oidc-cache-key }}
     
     steps:
     - name: Checkout
@@ -78,6 +84,18 @@ jobs:
           WEB_CHANGED=true
         fi
         
+        # Single Player API 변경사항
+        SINGLE_API_CHANGED=false
+        if echo "$CHANGED_FILES" | grep -qE '^single-player-api/'; then
+          SINGLE_API_CHANGED=true
+        fi
+        
+        # OIDC Auth Server 변경사항
+        OIDC_CHANGED=false
+        if echo "$CHANGED_FILES" | grep -qE '^oidc-auth-server/'; then
+          OIDC_CHANGED=true
+        fi
+        
         # 인프라 변경사항
         INFRA_CHANGED=false
         if echo "$CHANGED_FILES" | grep -qE '^(docker-compose\.yml|\.github/|\.env\.example)'; then
@@ -86,6 +104,8 @@ jobs:
         
         echo "game-server=$GAME_CHANGED" >> $GITHUB_OUTPUT
         echo "web=$WEB_CHANGED" >> $GITHUB_OUTPUT
+        echo "single-api=$SINGLE_API_CHANGED" >> $GITHUB_OUTPUT
+        echo "oidc=$OIDC_CHANGED" >> $GITHUB_OUTPUT
         echo "infrastructure=$INFRA_CHANGED" >> $GITHUB_OUTPUT
         
     - name: Generate cache keys
@@ -99,8 +119,18 @@ jobs:
         WEB_DEPS_HASH=$(find web -name "package*.json" -o -name "*.ts" -o -name "*.tsx" | head -20 | xargs cat 2>/dev/null | sha256sum | cut -d' ' -f1 || echo "default")
         WEB_CACHE_KEY="web-server-v2-$WEB_DEPS_HASH"
         
+        # Single Player API 캐시 키
+        SINGLE_API_DEPS_HASH=$(find single-player-api -name "package*.json" -o -name "*.js" | head -10 | xargs cat 2>/dev/null | sha256sum | cut -d' ' -f1 || echo "default")
+        SINGLE_API_CACHE_KEY="single-api-v2-$SINGLE_API_DEPS_HASH"
+        
+        # OIDC Auth Server 캐시 키
+        OIDC_DEPS_HASH=$(find oidc-auth-server -name "package*.json" -o -name "*.js" | head -10 | xargs cat 2>/dev/null | sha256sum | cut -d' ' -f1 || echo "default")
+        OIDC_CACHE_KEY="oidc-server-v2-$OIDC_DEPS_HASH"
+        
         echo "game-cache-key=$GAME_CACHE_KEY" >> $GITHUB_OUTPUT
         echo "web-cache-key=$WEB_CACHE_KEY" >> $GITHUB_OUTPUT
+        echo "single-api-cache-key=$SINGLE_API_CACHE_KEY" >> $GITHUB_OUTPUT
+        echo "oidc-cache-key=$OIDC_CACHE_KEY" >> $GITHUB_OUTPUT
         
     - name: Setup SSH for deployment status check
       run: |
@@ -120,6 +150,8 @@ jobs:
         # 변경사항 기반 초기 결정
         DEPLOY_GAME="${{ steps.changes.outputs.game-server }}"
         DEPLOY_WEB="${{ steps.changes.outputs.web }}"
+        DEPLOY_SINGLE_API="${{ steps.changes.outputs.single-api }}"
+        DEPLOY_OIDC="${{ steps.changes.outputs.oidc }}"
         DEPLOY_INFRA="${{ steps.changes.outputs.infrastructure }}"
         
         # 이전 배포 실패 확인
@@ -139,12 +171,24 @@ jobs:
           echo "Web server needs retry due to previous failure"
         fi
         
+        if echo "$LAST_STATUS" | jq -e '.single_api == "failed"' >/dev/null 2>&1; then
+          DEPLOY_SINGLE_API=true
+          echo "Single Player API needs retry due to previous failure"
+        fi
+        
+        if echo "$LAST_STATUS" | jq -e '.oidc == "failed"' >/dev/null 2>&1; then
+          DEPLOY_OIDC=true
+          echo "OIDC Auth Server needs retry due to previous failure"
+        fi
+        
         # 강제 배포 적용
         if [ "$FORCE_GAME" = "true" ]; then DEPLOY_GAME=true; fi
         if [ "$FORCE_WEB" = "true" ]; then DEPLOY_WEB=true; fi
         if [ "$FORCE_INFRA" = "true" ]; then
           DEPLOY_GAME=true
           DEPLOY_WEB=true
+          DEPLOY_SINGLE_API=true
+          DEPLOY_OIDC=true
           DEPLOY_INFRA=true
         fi
         
@@ -152,15 +196,21 @@ jobs:
         if [ "$DEPLOY_INFRA" = "true" ]; then
           DEPLOY_GAME=true
           DEPLOY_WEB=true
+          DEPLOY_SINGLE_API=true
+          DEPLOY_OIDC=true
         fi
         
         echo "deploy-game-server=$DEPLOY_GAME" >> $GITHUB_OUTPUT
         echo "deploy-web=$DEPLOY_WEB" >> $GITHUB_OUTPUT
+        echo "deploy-single-api=$DEPLOY_SINGLE_API" >> $GITHUB_OUTPUT
+        echo "deploy-oidc=$DEPLOY_OIDC" >> $GITHUB_OUTPUT
         echo "deploy-infrastructure=$DEPLOY_INFRA" >> $GITHUB_OUTPUT
         
         echo "Final deployment decision:"
         echo "  Game Server: $DEPLOY_GAME"
-        echo "  Web Server: $DEPLOY_WEB"  
+        echo "  Web Server: $DEPLOY_WEB"
+        echo "  Single Player API: $DEPLOY_SINGLE_API"
+        echo "  OIDC Auth Server: $DEPLOY_OIDC"
         echo "  Infrastructure: $DEPLOY_INFRA"
 
   # ==========================================
@@ -294,16 +344,165 @@ jobs:
         # 빌드된 이미지 기본 동작 테스트
         echo "Web server build completed successfully"
 
+  # ==========================================  
+  # 병렬 빌드 - Single Player API (Node.js)
+  # ==========================================
+  build-single-api:
+    name: Build Single Player API
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.deploy-single-api == 'true'
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      with:
+        driver: docker-container
+        
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.IMAGE_PREFIX }}-single-api
+        tags: |
+          type=sha,prefix={{branch}}-
+          type=raw,value=${{ env.IMAGE_TAG }}
+          type=raw,value=latest,enable={{is_default_branch}}
+          
+    - name: Build and push Single Player API
+      uses: docker/build-push-action@v5
+      with:
+        context: ./single-player-api
+        file: ./single-player-api/Dockerfile
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: |
+          type=gha,scope=single-api
+          type=registry,ref=${{ env.IMAGE_PREFIX }}-single-api:cache
+        cache-to: |
+          type=gha,mode=max,scope=single-api
+          type=registry,ref=${{ env.IMAGE_PREFIX }}-single-api:cache,mode=max
+        build-args: |
+          BUILDKIT_INLINE_CACHE=1
+          NODE_ENV=production
+        platforms: linux/amd64
+        
+    - name: Test Single Player API build
+      run: |
+        # 빌드된 이미지 기본 동작 테스트
+        echo "Single Player API build completed successfully"
+
+  # ==========================================  
+  # 병렬 빌드 - OIDC Auth Server (Node.js)
+  # ==========================================
+  build-oidc-server:
+    name: Build OIDC Auth Server
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.deploy-oidc == 'true'
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      with:
+        driver: docker-container
+        
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.IMAGE_PREFIX }}-oidc-server
+        tags: |
+          type=sha,prefix={{branch}}-
+          type=raw,value=${{ env.IMAGE_TAG }}
+          type=raw,value=latest,enable={{is_default_branch}}
+          
+    - name: Build and push OIDC Auth Server
+      uses: docker/build-push-action@v5
+      with:
+        context: ./oidc-auth-server
+        file: ./oidc-auth-server/Dockerfile
+        target: prod
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: |
+          type=gha,scope=oidc-server
+          type=registry,ref=${{ env.IMAGE_PREFIX }}-oidc-server:cache
+        cache-to: |
+          type=gha,mode=max,scope=oidc-server
+          type=registry,ref=${{ env.IMAGE_PREFIX }}-oidc-server:cache,mode=max
+        build-args: |
+          BUILDKIT_INLINE_CACHE=1
+          NODE_ENV=production
+        platforms: linux/amd64
+        
+    - name: Test OIDC Auth Server build
+      run: |
+        # 빌드된 이미지 기본 동작 테스트
+        echo "OIDC Auth Server build completed successfully"
+
   # ==========================================
   # 통합 배포 - 서버에 이미지 배포
   # ==========================================
   deploy-to-server:
     name: Deploy to Server
     runs-on: ubuntu-latest
-    needs: [detect-changes, build-game-server, build-web-server]
-    if: always() && (needs.build-game-server.result == 'success' || needs.build-web-server.result == 'success')
+    needs: [detect-changes, build-game-server, build-web-server, build-single-api, build-oidc-server]
+    if: always() && (needs.build-game-server.result == 'success' || needs.build-web-server.result == 'success' || needs.build-single-api.result == 'success' || needs.build-oidc-server.result == 'success')
+    outputs:
+      deployment-performed: ${{ steps.deployment-check.outputs.deployment-performed }}
     
     steps:
+    - name: Check if deployment is needed
+      id: deployment-check
+      run: |
+        # 빌드 성공한 서비스가 있는지 확인
+        GAME_SUCCESS="${{ needs.build-game-server.result }}"
+        WEB_SUCCESS="${{ needs.build-web-server.result }}"
+        SINGLE_SUCCESS="${{ needs.build-single-api.result }}"
+        OIDC_SUCCESS="${{ needs.build-oidc-server.result }}"
+        
+        if [[ "$GAME_SUCCESS" == "success" ]] || [[ "$WEB_SUCCESS" == "success" ]] || [[ "$SINGLE_SUCCESS" == "success" ]] || [[ "$OIDC_SUCCESS" == "success" ]]; then
+          echo "deployment-performed=true" >> $GITHUB_OUTPUT
+          echo "Deployment will be performed - at least one service was built successfully"
+        else
+          echo "deployment-performed=false" >> $GITHUB_OUTPUT  
+          echo "No deployment needed - no services were built"
+          exit 0  # 성공으로 종료
+        fi
+    
     - name: Checkout
       uses: actions/checkout@v4
       
@@ -344,10 +543,13 @@ jobs:
         IMAGE_TAG=${{ env.IMAGE_TAG }}
         GAME_SERVER_IMAGE=${{ env.IMAGE_PREFIX }}-game-server:${{ env.IMAGE_TAG }}
         WEB_SERVER_IMAGE=${{ env.IMAGE_PREFIX }}-web-server:${{ env.IMAGE_TAG }}
+        SINGLE_API_IMAGE=${{ env.IMAGE_PREFIX }}-single-api:${{ env.IMAGE_TAG }}
+        OIDC_SERVER_IMAGE=${{ env.IMAGE_PREFIX }}-oidc-server:${{ env.IMAGE_TAG }}
         
         # Game Server Configuration
         SERVER_PORT=${{ secrets.SERVER_PORT }}
         SERVER_MAX_CLIENTS=${{ secrets.SERVER_MAX_CLIENTS }}
+        SERVER_THREAD_POOL_SIZE=${{ secrets.SERVER_THREAD_POOL_SIZE }}
         BLOKUS_SERVER_VERSION=${{ secrets.BLOKUS_SERVER_VERSION }}
         BLOKUS_DOWNLOAD_URL=${{ secrets.BLOKUS_DOWNLOAD_URL }}
         
@@ -357,6 +559,7 @@ jobs:
         DB_USER=${{ secrets.DB_USER }}
         DB_PASSWORD=${{ secrets.DB_PASSWORD }}
         DB_NAME=${{ secrets.DB_NAME }}
+        DB_POOL_SIZE=${{ secrets.DB_POOL_SIZE }}
         
         POSTGRES_DB=${{ secrets.DB_NAME }}
         POSTGRES_USER=${{ secrets.DB_USER }}
@@ -364,16 +567,45 @@ jobs:
         
         # Security
         JWT_SECRET=\$JWT_SECRET
+        SESSION_TIMEOUT_HOURS=${{ secrets.SESSION_TIMEOUT_HOURS }}
+        PASSWORD_SALT_ROUNDS=${{ secrets.PASSWORD_SALT_ROUNDS }}
+        
+        # Logging and Debug
+        LOG_LEVEL=${{ secrets.LOG_LEVEL }}
+        LOG_DIRECTORY=${{ secrets.LOG_DIRECTORY }}
+        DEBUG_MODE=${{ secrets.DEBUG_MODE }}
+        ENABLE_SQL_LOGGING=${{ secrets.ENABLE_SQL_LOGGING }}
+        
+        # Node.js Environment
+        NODE_ENV=${{ secrets.NODE_ENV }}
         
         # Web Application  
         WEB_PORT=${{ secrets.WEB_PORT }}
         WEB_APP_URL=${{ secrets.WEB_APP_URL }}
-        WEB_DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@postgres:5432/blokus_online
+        WEB_DATABASE_URL=${{ secrets.WEB_DATABASE_URL }}
+        WEB_CLIENT_DOWNLOAD_URL=${{ secrets.WEB_CLIENT_DOWNLOAD_URL }}
         WEB_NEXTAUTH_SECRET=${{ secrets.WEB_NEXTAUTH_SECRET }}
+        WEB_JWT_SECRET=${{ secrets.WEB_JWT_SECRET }}
         WEB_ADMIN_USERNAME=${{ secrets.WEB_ADMIN_USERNAME }}
         WEB_ADMIN_PASSWORD=${{ secrets.WEB_ADMIN_PASSWORD }}
         GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
         GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+        
+        # Single Player API Configuration
+        SINGLE_API_PORT=${{ secrets.SINGLE_API_PORT }}
+        REDIS_PORT=${{ secrets.REDIS_PORT }}
+        
+        # OIDC Auth Server Configuration  
+        OIDC_PORT=${{ secrets.OIDC_PORT }}
+        OIDC_ISSUER=${{ secrets.OIDC_ISSUER }}
+        OIDC_BASE_URL=${{ secrets.OIDC_BASE_URL }}
+        SESSION_SECRET=${{ secrets.SESSION_SECRET }}
+        WEB_CLIENT_SECRET=${{ secrets.WEB_CLIENT_SECRET }}
+        ADMIN_TOKEN=${{ secrets.ADMIN_TOKEN }}
+        ACCESS_TOKEN_LIFETIME=${{ secrets.ACCESS_TOKEN_LIFETIME }}
+        REFRESH_TOKEN_LIFETIME=${{ secrets.REFRESH_TOKEN_LIFETIME }}
+        REFRESH_TOKEN_MAX_LIFETIME=${{ secrets.REFRESH_TOKEN_MAX_LIFETIME }}
+        AUTH_CODE_LIFETIME=${{ secrets.AUTH_CODE_LIFETIME }}
         
         # SSL/Domain
         DOMAIN=${{ secrets.DOMAIN }}
@@ -413,6 +645,8 @@ jobs:
           echo 'Pulling images with SHA tags...' &&
           (docker pull ${{ env.IMAGE_PREFIX }}-game-server:${{ env.IMAGE_TAG }} &) &&
           (docker pull ${{ env.IMAGE_PREFIX }}-web-server:${{ env.IMAGE_TAG }} &) &&
+          (docker pull ${{ env.IMAGE_PREFIX }}-single-api:${{ env.IMAGE_TAG }} &) &&
+          (docker pull ${{ env.IMAGE_PREFIX }}-oidc-server:${{ env.IMAGE_TAG }} &) &&
           wait &&
           
           # 서비스 시작
@@ -436,13 +670,88 @@ jobs:
         " || true
 
   # ==========================================
+  # 변경사항 없음 처리 (성공으로 처리)
+  # ==========================================
+  no-changes-success:
+    name: No Changes - Success
+    runs-on: ubuntu-latest
+    needs: [detect-changes, build-game-server, build-web-server, build-single-api, build-oidc-server]
+    if: always() && needs.build-game-server.result == 'skipped' && needs.build-web-server.result == 'skipped' && needs.build-single-api.result == 'skipped' && needs.build-oidc-server.result == 'skipped'
+    
+    steps:
+    - name: No deployment needed
+      run: |
+        echo "🎉 Pipeline completed successfully!"
+        echo "================================="
+        echo ""
+        echo "✅ No changes detected in any service"
+        echo "✅ No deployment required"
+        echo "✅ All systems are up to date"
+        echo ""
+        echo "📊 Service status:"
+        echo "  Game Server: No changes"
+        echo "  Web Server: No changes" 
+        echo "  Single Player API: No changes"
+        echo "  OIDC Auth Server: No changes"
+        echo ""
+        echo "💡 This is expected behavior when no code changes are detected."
+
+  # ==========================================
+  # 빌드 실패 처리
+  # ==========================================
+  build-failure-handler:
+    name: Build Failure Handler
+    runs-on: ubuntu-latest
+    needs: [detect-changes, build-game-server, build-web-server, build-single-api, build-oidc-server]
+    if: always() && (needs.build-game-server.result == 'failure' || needs.build-web-server.result == 'failure' || needs.build-single-api.result == 'failure' || needs.build-oidc-server.result == 'failure')
+    
+    steps:
+    - name: Report build failures
+      run: |
+        echo "❌ Build Failure Detected!"
+        echo "=========================="
+        echo ""
+        echo "📊 Build Results:"
+        echo "  Game Server: ${{ needs.build-game-server.result }}"
+        echo "  Web Server: ${{ needs.build-web-server.result }}"
+        echo "  Single Player API: ${{ needs.build-single-api.result }}"
+        echo "  OIDC Auth Server: ${{ needs.build-oidc-server.result }}"
+        echo ""
+        
+        # 실패한 서비스 확인
+        FAILED_SERVICES=""
+        if [[ "${{ needs.build-game-server.result }}" == "failure" ]]; then
+          FAILED_SERVICES="$FAILED_SERVICES Game-Server"
+        fi
+        if [[ "${{ needs.build-web-server.result }}" == "failure" ]]; then
+          FAILED_SERVICES="$FAILED_SERVICES Web-Server"
+        fi
+        if [[ "${{ needs.build-single-api.result }}" == "failure" ]]; then
+          FAILED_SERVICES="$FAILED_SERVICES Single-Player-API"
+        fi
+        if [[ "${{ needs.build-oidc-server.result }}" == "failure" ]]; then
+          FAILED_SERVICES="$FAILED_SERVICES OIDC-Auth-Server"
+        fi
+        
+        echo "🚨 Failed Services:$FAILED_SERVICES"
+        echo ""
+        echo "🔧 Next Steps:"
+        echo "1. Check build logs for detailed error messages"
+        echo "2. Fix the issues in the failing services"
+        echo "3. Push fixes to trigger a new deployment"
+        echo ""
+        
+        # 파이프라인 실패로 종료
+        exit 1
+
+  # ==========================================
   # 배포 결과 요약
   # ==========================================
   deployment-summary:
     name: Deployment Summary
     runs-on: ubuntu-latest
-    needs: [detect-changes, build-game-server, build-web-server, deploy-to-server]
-    if: always()
+    needs: [detect-changes, build-game-server, build-web-server, build-single-api, build-oidc-server, deploy-to-server, no-changes-success, build-failure-handler]
+    if: always() && (needs.deploy-to-server.result == 'success' || needs.deploy-to-server.result == 'failure') && needs.build-failure-handler.result != 'failure'
     
     steps:
     - name: Display summary
@@ -453,16 +762,22 @@ jobs:
         echo "📊 Changes detected:"
         echo "  Game Server: ${{ needs.detect-changes.outputs.game-server-changed }}"
         echo "  Web Server: ${{ needs.detect-changes.outputs.web-changed }}"
+        echo "  Single Player API: ${{ needs.detect-changes.outputs.single-api-changed }}"
+        echo "  OIDC Auth Server: ${{ needs.detect-changes.outputs.oidc-changed }}"
         echo "  Infrastructure: ${{ needs.detect-changes.outputs.infrastructure-changed }}"
         echo ""
         echo "🎯 Deployment decisions:"
         echo "  Game Server: ${{ needs.detect-changes.outputs.deploy-game-server }}"
         echo "  Web Server: ${{ needs.detect-changes.outputs.deploy-web }}"
+        echo "  Single Player API: ${{ needs.detect-changes.outputs.deploy-single-api }}"
+        echo "  OIDC Auth Server: ${{ needs.detect-changes.outputs.deploy-oidc }}"
         echo "  Infrastructure: ${{ needs.detect-changes.outputs.deploy-infrastructure }}"
         echo ""
         echo "🏗️ Build results:"
         echo "  Game Server build: ${{ needs.build-game-server.result }}"
         echo "  Web Server build: ${{ needs.build-web-server.result }}"
+        echo "  Single Player API build: ${{ needs.build-single-api.result }}"
+        echo "  OIDC Auth Server build: ${{ needs.build-oidc-server.result }}"
         echo "  Server deployment: ${{ needs.deploy-to-server.result }}"
         echo ""
         

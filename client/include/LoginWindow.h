@@ -19,6 +19,7 @@
 #include <QDesktopServices>
 #include <QUrl>
 #include "ResponsiveUI.h"
+#include "OidcAuthenticator.h"
 
 namespace Blokus {
 
@@ -36,11 +37,13 @@ namespace Blokus {
     signals:
         // �α��� ���� �ñ׳�
         void loginRequested(const QString& username, const QString& password);
+        void jwtLoginRequested(const QString& jwtToken);
         void loginSuccessful(const QString& username);
 
     private slots:
         // UI �̺�Ʈ �ڵ鷯
         void onLoginClicked();
+        void onOidcLoginClicked();
         void onShowRegisterForm();
         void onShowPasswordResetForm();
 
@@ -48,6 +51,11 @@ namespace Blokus {
         void onUsernameTextChanged();
         void onPasswordTextChanged();
         void onEmailTextChanged();
+
+        // OIDC �̺�Ʈ �ڵ鷯
+        void onOidcAuthenticationSucceeded(const QString& accessToken, const OidcTokens& tokens);
+        void onOidcAuthenticationFailed(const QString& error);
+        void onOidcTokensRefreshed(const QString& accessToken);
 
         // �ε� �ִϸ��̼�
         void updateLoadingAnimation();
@@ -99,6 +107,7 @@ namespace Blokus {
         QLineEdit* m_usernameEdit;
         QLineEdit* m_passwordEdit;
         QPushButton* m_loginButton;
+        QPushButton* m_oidcLoginButton;
         QPushButton* m_showRegisterButton;
         QPushButton* m_showPasswordResetButton;
 
@@ -110,6 +119,9 @@ namespace Blokus {
 
         // ����
         bool m_isLoading;
+
+        // OIDC ����
+        OidcAuthenticator* m_oidcAuthenticator;
 
         // Ÿ�̸�
         QTimer* m_animationTimer;

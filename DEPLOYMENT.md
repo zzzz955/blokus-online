@@ -1,49 +1,124 @@
-# Blokus Online 배포 가이드
+# Blokus Online - Production Deployment Guide
 
-## 개요
-이 문서는 Blokus Online 프로젝트의 서버 배포 및 운영 가이드입니다.
+## 🏗️ Architecture Overview
 
-## 시스템 구성도
 ```
-[인터넷] 
-    ↓
-[Nginx Reverse Proxy] (포트 80, 443, 9999)
-    ↓
-┌─────────────────┬─────────────────┐
-│   웹사이트      │   게임 서버     │
-│ (Next.js:3000)  │ (C++:9999)      │
-└─────────────────┴─────────────────┘
-    ↓
-[PostgreSQL Database] (포트 5432)
+Host Machine
+├── 📁 /opt/blokus/thumbnails (host volume)
+│
+├── 🐳 Web Container (port 3000)
+│   ├── Next.js Admin Panel
+│   ├── Stage creation/editing
+│   ├── SVG thumbnail generation
+│   └── 📡 /api/thumbnails/* serving
+│
+├── 🐳 Single-Player-API Container (port 8080)
+│   ├── Node.js REST API
+│   ├── Compact format DB queries
+│   └── 🔗 Thumbnail URLs → Web Container
+│
+├── 🐳 Multiplayer Server Container (port 9999)
+│   └── C++ TCP Game Server
+│
+└── 🐳 PostgreSQL Container (port 5432)
+    └── Database with compact board states
 ```
 
-## 필요한 환경변수
+## 🚀 Quick Start
 
-### GitHub Repository Secrets
-다음 환경변수들을 GitHub Repository Secrets에 등록해야 합니다:
+### 1. Environment Setup
+```bash
+# Copy environment template
+cp .env.example .env
 
-#### SSH 연결 정보
-- `SSH_HOST`: 서버 IP 주소
-- `SSH_USER`: 서버 사용자명
-- `SSH_KEY`: SSH 개인키 (전체 내용)
-- `SSH_PORT`: SSH 포트 (기본값: 22)
+# Edit configuration
+nano .env
+```
 
-#### 게임 서버 설정
-- `SERVER_PORT`: 게임 서버 포트 (9999)
-- `DB_USER`: PostgreSQL 사용자명
-- `DB_PASSWORD`: PostgreSQL 비밀번호
-- `DB_NAME`: 게임 데이터베이스명
-- `DB_PORT`: PostgreSQL 포트 (5432)
+### 2. Create Host Directory
+```bash
+# Create thumbnails directory on host
+sudo mkdir -p /opt/blokus/thumbnails
+sudo chown -R 1000:1000 /opt/blokus/thumbnails
+sudo chmod 755 /opt/blokus/thumbnails
 
-#### 웹 애플리케이션 설정
-- `WEB_DATABASE_URL`: 웹 데이터베이스 연결 문자열
-- `WEB_APP_URL`: 웹사이트 도메인 (예: blokus-online.mooo.com)
-- `WEB_PORT`: 웹 애플리케이션 포트 (3000)
-- `WEB_CLIENT_DOWNLOAD_URL`: 클라이언트 다운로드 URL
-- `WEB_NEXTAUTH_SECRET`: NextAuth 시크릿 키
-- `WEB_JWT_SECRET`: JWT 시크릿 키
-- `WEB_ADMIN_USERNAME`: 웹 관리자 사용자명
-- `WEB_ADMIN_PASSWORD`: 웹 관리자 비밀번호
+# Update .env
+echo "THUMBNAIL_HOST_PATH=/opt/blokus/thumbnails" >> .env
+```
+
+### 3. Deploy Services
+```bash
+# Build and start all services
+docker-compose up -d
+
+# Check service status
+docker-compose ps
+
+# View logs
+docker-compose logs -f
+```
+
+## 📝 Configuration
+
+### Environment Variables
+
+**Required:**
+```env
+DB_PASSWORD=your-secure-password
+NEXTAUTH_SECRET=your-32-character-secret
+JWT_SECRET=your-jwt-secret
+THUMBNAIL_HOST_PATH=/opt/blokus/thumbnails
+```
+
+**Production URLs:**
+```env
+NEXTAUTH_URL=https://admin.yourdomain.com
+ALLOWED_ORIGINS=https://admin.yourdomain.com,https://api.yourdomain.com
+```
+
+## 🔧 Host Volume Configuration
+
+### Why Host Volumes?
+- **Cost Effective**: No cloud storage fees
+- **Performance**: Direct filesystem access
+- **Persistence**: Survives container restarts
+- **Backup**: Standard filesystem backup tools
+
+### Volume Mapping
+```yaml
+web:
+  volumes:
+    - ${THUMBNAIL_HOST_PATH}:/app/public/stage-thumbnails
+```
+
+### Permissions
+```bash
+# Ensure correct ownership
+sudo chown -R 1000:1000 /opt/blokus/thumbnails
+
+# Set appropriate permissions
+sudo chmod -R 755 /opt/blokus/thumbnails
+```
+
+## 🌐 Data Flow
+
+### Stage Creation Flow
+```
+1. Admin creates stage in Web UI
+2. Web generates SVG thumbnail → Host volume
+3. Web stores compact board state → Database
+4. API serves compact data → Client
+5. Client requests thumbnail → Web /api/thumbnails
+```
+
+### Network Efficiency
+```javascript
+// Database storage (compact):
+{obsIdx: [100, 101], pre: [[5,10,1]]}
+
+// Network transfer: Same compact format
+// Client parsing: obsIdx → coordinates
+```
 
 ## 배포 과정
 

@@ -3,6 +3,16 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
 
+// Environment variable validation for production (server-side only)
+if (typeof window === 'undefined' && process.env.NODE_ENV === 'production') {
+  const requiredVars = ['NEXTAUTH_SECRET', 'JWT_SECRET', 'DATABASE_URL'];
+  const missing = requiredVars.filter(varName => !process.env[varName]);
+  
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  }
+}
+
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {

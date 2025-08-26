@@ -41,11 +41,22 @@ namespace Blokus {
 
                 // 설정 로드
                 m_sessionDuration = std::chrono::hours(ConfigManager::sessionTimeoutHours);
-                m_minPasswordLength = 6; // 기본값 또는 설정에서 로드
+                m_minPasswordLength = 6; // 상수값: 보안 요구사항에 따른 최소 길이
 
                 // OpenSSL 초기화 확인
                 if (RAND_status() != 1) {
                     spdlog::warn("OpenSSL 랜덤 생성기 초기화 확인 필요");
+                }
+
+                // JWT 검증기 초기화
+                std::string jwksUrl = "http://localhost:9000/jwks.json";
+                std::string issuer = "http://localhost:9000";
+                std::vector<std::string> audiences = {"blokus-desktop-client"};
+                
+                m_jwtVerifier = std::make_unique<JwtVerifier>(jwksUrl, issuer, audiences);
+                if (!m_jwtVerifier->initialize()) {
+                    spdlog::error("JWT 검증기 초기화 실패");
+                    return false;
                 }
 
                 m_isInitialized.store(true);
@@ -64,6 +75,12 @@ namespace Blokus {
             }
 
             spdlog::info("AuthenticationService 종료 시작");
+
+            // JWT 검증기 정리
+            if (m_jwtVerifier) {
+                m_jwtVerifier->shutdown();
+                m_jwtVerifier.reset();
+            }
 
             // 활성 세션 정리
             {
@@ -206,6 +223,55 @@ namespace Blokus {
             }
             catch (const std::exception& e) {
                 spdlog::error("게스트 로그인 중 오류: {}", e.what());
+                return AuthResult(false, "서버 오류가 발생했습니다", "", "", "");
+            }
+        }
+
+        AuthResult AuthenticationService::loginWithJwt(const std::string& jwtToken) {
+            try {
+                if (jwtToken.empty()) {
+                    return AuthResult(false, "JWT 토큰이 비어있습니다", "", "", "");
+                }
+
+                if (!m_jwtVerifier) {
+                    spdlog::error("JWT 검증기가 초기화되지 않았습니다");
+                    return AuthResult(false, "서버 오류가 발생했습니다", "", "", "");
+                }
+
+                // JWT 토큰 검증
+                auto verifyResult = m_jwtVerifier->verifyToken(jwtToken);
+                if (!verifyResult.success) {
+                    spdlog::warn("JWT 토큰 검증 실패: {}", verifyResult.error);
+                    return AuthResult(false, "인증 토큰이 유효하지 않습니다", "", "", "");
+                }
+
+                if (!verifyResult.claims) {
+                    return AuthResult(false, "토큰 클레임 정보가 없습니다", "", "", "");
+                }
+
+                auto& claims = *verifyResult.claims;
+                
+                // 사용자 정보 추출
+                std::string userId = claims.sub;
+                std::string username = claims.preferred_username.empty() ? claims.sub : claims.preferred_username;
+
+                if (userId.empty()) {
+                    return AuthResult(false, "토큰에서 사용자 ID를 찾을 수 없습니다", "", "", "");
+                }
+
+                // 게임 서버용 세션 토큰 생성 (JWT와 별도)
+                std::string sessionToken = generateSessionToken();
+
+                // 세션 저장
+                if (!storeSession(sessionToken, userId, username)) {
+                    return AuthResult(false, "세션 생성에 실패했습니다", "", "", "");
+                }
+
+                spdlog::info("JWT 로그인 성공: {} (ID: {})", username, userId);
+                return AuthResult(true, "JWT 인증으로 로그인되었습니다", userId, sessionToken, username);
+            }
+            catch (const std::exception& e) {
+                spdlog::error("JWT 로그인 중 오류: {}", e.what());
                 return AuthResult(false, "서버 오류가 발생했습니다", "", "", "");
             }
         }

@@ -188,6 +188,18 @@ namespace Blokus {
         qDebug() << QString::fromUtf8("로그인 요청 전송: %1").arg(username);
     }
 
+    void NetworkClient::loginWithJwt(const QString& jwtToken)
+    {
+        if (!isConnected()) {
+            emit loginResult(false, QString::fromUtf8("서버에 연결되지 않았습니다."));
+            return;
+        }
+        
+        QString message = QString("auth:%1").arg(jwtToken);
+        sendMessage(message);
+        qDebug() << QString::fromUtf8("JWT 토큰 로그인 요청 전송: %1...").arg(jwtToken.left(20));
+    }
+
     void NetworkClient::registerUser(const QString& username, const QString& password)
     {
         if (!isConnected()) {
@@ -796,7 +808,8 @@ namespace Blokus {
         
         // 인증 관련 에러는 각각의 시그널로도 전달
         if (error.contains(QString::fromUtf8("사용자명")) || error.contains(QString::fromUtf8("비밀번호")) || 
-            error.contains(QString::fromUtf8("로그인"))) {
+            error.contains(QString::fromUtf8("로그인")) || error.contains(QString::fromUtf8("인증 토큰")) ||
+            error.contains(QString::fromUtf8("토큰이 유효하지 않습니다"))) {
             emit loginResult(false, error);
         }
         else if (error.contains(QString::fromUtf8("회원가입")) || error.contains(QString::fromUtf8("이미 사용 중")) ||

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { adminFetch } from '@/lib/client/admin-fetch';
 
 interface DashboardStats {
   announcements: {
@@ -43,7 +44,7 @@ export default function AdminDashboard() {
 
   const fetchDashboardStats = async () => {
     try {
-      const response = await fetch('/api/admin/dashboard');
+      const response = await adminFetch('/api/admin/dashboard');
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
@@ -254,6 +255,24 @@ export default function AdminDashboard() {
               >
                 <div className="text-orange-400 font-medium">게시글 관리</div>
                 <div className="text-orange-300 text-sm mt-1">숨김/삭제 관리</div>
+              </Link>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+              <Link 
+                href="/admin/stages?action=create"
+                className="bg-pink-500/10 hover:bg-pink-500/20 p-4 rounded-lg border border-pink-500/30 transition-colors"
+              >
+                <div className="text-pink-400 font-medium">새 스테이지</div>
+                <div className="text-pink-300 text-sm mt-1">퍼즐 스테이지 생성</div>
+              </Link>
+              
+              <Link 
+                href="/admin/stages"
+                className="bg-indigo-500/10 hover:bg-indigo-500/20 p-4 rounded-lg border border-indigo-500/30 transition-colors"
+              >
+                <div className="text-indigo-400 font-medium">스테이지 관리</div>
+                <div className="text-indigo-300 text-sm mt-1">스테이지 목록/편집</div>
               </Link>
             </div>
           </div>

@@ -30,6 +30,7 @@ set(CLIENT_SOURCES
     "src/ClientConfigManager.cpp"
     "src/SoundManager.cpp"
     "src/BGMManager.cpp"
+    "src/OidcAuthenticator.cpp"
     "resource.qrc"
     "app_icon.rc"
 )
@@ -48,6 +49,7 @@ set(CLIENT_HEADERS
     "include/ClientBlock.h"
     "include/ClientLogic.h"
     "include/ResponsiveUI.h"
+    "include/OidcAuthenticator.h"
     "include/NetworkClient.h"
     "include/ClientConfigManager.h"
     "include/SoundManager.h"
@@ -92,6 +94,12 @@ if(WIN32)
     # Debug 매크로 정의
     target_compile_definitions(BlokusClient PRIVATE
         $<$<CONFIG:Debug>:DEBUG _DEBUG>
+    )
+    
+    # Windows Credential Manager 라이브러리 링크
+    target_link_libraries(BlokusClient PRIVATE
+        credui.lib
+        crypt32.lib
     )
     
     # Qt5::WinMain 링크 제거 - 직접 WinMain 구현

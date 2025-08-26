@@ -52,7 +52,7 @@ namespace Blokus {
                 passwordSaltRounds = getEnvInt("PASSWORD_SALT_ROUNDS", 12);
 
                 // 로깅 설정
-                logLevel = getEnvString("LOG_LEVEL", "info");
+                logLevel = getEnvString("LOG_LEVEL", "warn");
                 logDirectory = getEnvString("LOG_DIRECTORY", "logs");
 
                 // 개발 설정
@@ -60,7 +60,7 @@ namespace Blokus {
                 enableSqlLogging = getEnvBool("ENABLE_SQL_LOGGING", false);
 
                 // 버전 관리 설정
-                serverVersion = getEnvString("BLOKUS_SERVER_VERSION", "1.4.0");
+                serverVersion = getEnvString("BLOKUS_SERVER_VERSION", "1.5.0");
                 buildDate = getEnvString("BLOKUS_BUILD_DATE", __DATE__ " " __TIME__);
                 gitCommit = getEnvString("BLOKUS_GIT_COMMIT", "unknown");
                 gitBranch = getEnvString("BLOKUS_GIT_BRANCH", "main");
