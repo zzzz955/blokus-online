@@ -622,3 +622,4 @@ CLAUDE.md
 # ETC
 prompt.txt
 last_log.txt
+*.keystore

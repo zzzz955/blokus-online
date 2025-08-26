@@ -499,10 +499,9 @@ namespace App.Security
                     cipher.Call("init", 1, secretKey); // ENCRYPT_MODE = 1
                     
                     byte[] plaintextBytes = System.Text.Encoding.UTF8.GetBytes(plaintext);
-                    AndroidJavaObject plaintextByteArray = AndroidJavaObject.CallStatic<AndroidJavaObject>("java.util.Arrays", "copyOf", 
-                        AndroidJavaObject.CallStatic<AndroidJavaObject>("java.nio.ByteBuffer", "wrap", plaintextBytes).Call<AndroidJavaObject>("array"), plaintextBytes.Length);
                     
-                    AndroidJavaObject encryptedBytes = cipher.Call<AndroidJavaObject>("doFinal", plaintextByteArray);
+                    // byte[] → AndroidJavaObject 변환을 위해 직접 doFinal에 전달
+                    AndroidJavaObject encryptedBytes = cipher.Call<AndroidJavaObject>("doFinal", plaintextBytes);
                     AndroidJavaObject iv = cipher.Call<AndroidJavaObject>("getIV");
                     
                     // IV + 암호화된 데이터를 Base64로 인코딩
