@@ -47,6 +47,8 @@ RUN echo "=== Installing build dependencies ===" && \
     # PostgreSQL 빌드 의존성 (libpq 빌드용)
     libpq-dev \
     postgresql-server-dev-all \
+    # UUID 빌드 의존성 (libuuid vcpkg 패키지용)
+    uuid-dev \
     # 추가 유틸리티 (컴파일 캐시)
     ccache \
     gnupg \
