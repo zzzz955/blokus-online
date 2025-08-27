@@ -61,12 +61,9 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
-      DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
       
       # 보안 설정
       JWT_SECRET: ${JWT_SECRET}
-      SESSION_TIMEOUT_HOURS: ${SESSION_TIMEOUT_HOURS:-24}
-      PASSWORD_SALT_ROUNDS: ${PASSWORD_SALT_ROUNDS:-12}
       
       # 로깅 설정
       LOG_LEVEL: ${LOG_LEVEL:-info}
@@ -74,7 +71,6 @@ services:
       
       # 개발 설정
       DEBUG_MODE: ${DEBUG_MODE:-false}
-      ENABLE_SQL_LOGGING: ${ENABLE_SQL_LOGGING:-false}
       
       # 시간대
       TZ: Asia/Seoul
@@ -125,8 +121,12 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
-      DB_POOL_MIN: 2
+      DB_POOL_MIN: 5
       DB_POOL_MAX: 10
+      
+      # Single Player API에서 사용하는 OIDC 환경변수들
+      OIDC_JWKS_URI: ${OIDC_JWKS_URI:-http://blokus-oidc-server:9000/jwks.json}
+      OIDC_BASE_URL: ${OIDC_BASE_URL:-http://blokus-oidc-server:9000}
       
       # JWT (게임 서버와 동일한 시크릿 사용)
       JWT_SECRET: ${JWT_SECRET}
@@ -135,7 +135,6 @@ services:
       # Server
       NODE_ENV: ${NODE_ENV:-production}
       PORT: 8080
-      API_PREFIX: /api
       
       # Unity 클라이언트용 - CORS 설정 (모든 Origin 허용)
       # Unity HTTP 요청은 Origin 헤더가 없으므로 개방적으로 설정
@@ -243,8 +242,9 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       
       # OIDC Issuer 설정
-      OIDC_ISSUER: ${OIDC_ISSUER:-https://blokus-online.mooo.com:9000}
-      OIDC_BASE_URL: ${OIDC_BASE_URL:-https://blokus-online.mooo.com:9000}
+      OIDC_ISSUER: ${OIDC_ISSUER:-http://blokus-oidc-server:9000}
+      OIDC_BASE_URL: ${OIDC_BASE_URL:-http://blokus-oidc-server:9000}
+      OIDC_JWKS_URI: ${OIDC_JWKS_URI:-http://blokus-oidc-server:9000/jwks.json}
       
       # Token 수명
       ACCESS_TOKEN_LIFETIME: ${ACCESS_TOKEN_LIFETIME:-10m}
@@ -269,10 +269,6 @@ services:
       SESSION_SECRET: ${SESSION_SECRET:-oidc-session-secret-change-in-production}
       WEB_CLIENT_SECRET: ${WEB_CLIENT_SECRET:-web-client-secret-change-in-production}
       ADMIN_TOKEN: ${ADMIN_TOKEN:-admin-token-change-in-production}
-      
-      # URLs
-      WEB_REGISTER_URL_PROD: https://${WEB_APP_URL:-blokus-online.mooo.com}/register
-      WEB_REGISTER_URL_DEV: http://localhost:3000/register
       
       # 시간대
       TZ: Asia/Seoul
@@ -322,25 +318,22 @@ services:
       
       # 웹 애플리케이션 설정
       APP_URL: https://${WEB_APP_URL}
-      CLIENT_DOWNLOAD_URL: ${WEB_CLIENT_DOWNLOAD_URL}
+      CLIENT_DOWNLOAD_URL: ${CLIENT_DOWNLOAD_URL}
       
       # 데이터베이스 연결 (웹 전용 DB)
-      DATABASE_URL: ${WEB_DATABASE_URL}
+      DATABASE_URL: ${DATABASE_URL}
       
       # 인증 설정
       NEXTAUTH_URL: https://${WEB_APP_URL}
-      NEXTAUTH_SECRET: ${WEB_NEXTAUTH_SECRET}
-      JWT_SECRET: ${WEB_JWT_SECRET}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      JWT_SECRET: ${JWT_SECRET}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       
       # 관리자 계정
-      ADMIN_USERNAME: ${WEB_ADMIN_USERNAME}
-      ADMIN_PASSWORD: ${WEB_ADMIN_PASSWORD}
+      ADMIN_USERNAME: ${ADMIN_USERNAME}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       
-      # 파일 업로드 설정
-      UPLOAD_DIR: "/app/public/uploads"
-      MAX_FILE_SIZE: "10485760" # 10MB
       
       # 시간대
       TZ: Asia/Seoul

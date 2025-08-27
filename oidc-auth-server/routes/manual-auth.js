@@ -7,6 +7,7 @@ const argon2 = require('argon2')
 const oidcConfig = require('../config/oidc')
 const dbService = require('../config/database')
 const logger = require('../config/logger')
+const { env } = require('../config/env')
 
 /**
  * Manual Authentication Routes
@@ -37,7 +38,7 @@ router.get('/',
   async (req, res) => {
     try {
       // 개발 환경에서만 접근 허용
-      if (process.env.NODE_ENV === 'production') {
+      if (env.NODE_ENV === 'production') {
         return res.status(404).json({
           error: 'not_found',
           error_description: 'Manual authentication not available in production'
@@ -135,7 +136,7 @@ router.post('/',
   async (req, res) => {
     try {
       // 개발 환경에서만 접근 허용
-      if (process.env.NODE_ENV === 'production') {
+      if (env.NODE_ENV === 'production') {
         return res.status(404).json({
           error: 'not_found',
           error_description: 'Manual authentication not available in production'

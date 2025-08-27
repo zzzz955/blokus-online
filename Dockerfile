@@ -85,11 +85,18 @@ RUN cd ${VCPKG_ROOT} && \
     export VCPKG_FEATURE_FLAGS=manifests,versions,binarycaching,compilertracking && \
     export VCPKG_BINARY_SOURCES="clear" && \
     # 의존성 설치 (빌드 시간 최적화) - 서버 전용 패키지만
-    timeout 600 ./vcpkg install --triplet=${VCPKG_DEFAULT_TRIPLET} \
+    echo "=== Starting vcpkg dependency installation ===" && \
+    timeout 900 ./vcpkg install --triplet=${VCPKG_DEFAULT_TRIPLET} \
         --x-buildtrees-root=/tmp/vcpkg-buildtrees \
         --x-install-root=/opt/vcpkg/installed \
         --x-packages-root=/tmp/vcpkg-packages \
-        --clean-after-build && \
+        --clean-after-build \
+        --debug || { \
+        echo "=== vcpkg install failed, checking jwt-cpp specifically ===" && \
+        ./vcpkg list | grep jwt || echo "jwt-cpp not found in list" && \
+        ./vcpkg install jwt-cpp --triplet=${VCPKG_DEFAULT_TRIPLET} --debug --x-install-root=/opt/vcpkg/installed && \
+        ./vcpkg list | grep jwt || exit 1; \
+    } && \
     # 임시 빌드 파일 정리로 이미지 크기 최적화
     rm -rf /tmp/vcpkg-buildtrees /tmp/vcpkg-packages /tmp/ccache && \
     # vcpkg 설치 검증
@@ -116,9 +123,12 @@ COPY server/ ./server/
 
 # vcpkg 설치 확인 (디버깅용)
 RUN echo "=== Checking vcpkg installations ===" && \
-    ls -la ${VCPKG_ROOT}/installed/x64-linux/share/ | grep -E "(libpq|openssl|spdlog)" && \
+    ls -la ${VCPKG_ROOT}/installed/x64-linux/share/ | grep -E "(libpq|openssl|spdlog|jwt-cpp)" && \
     echo "=== Available packages ===" && \
-    ${VCPKG_ROOT}/vcpkg list
+    ${VCPKG_ROOT}/vcpkg list && \
+    echo "=== Checking jwt-cpp specifically ===" && \
+    find ${VCPKG_ROOT}/installed/x64-linux -name "*jwt*" -type d && \
+    find ${VCPKG_ROOT}/installed/x64-linux -name "*jwt*" -type f
 
 # ==================================================
 # 프로젝트 빌드 (vcpkg toolchain + ccache 사용)
@@ -131,7 +141,13 @@ RUN export PATH="/usr/lib/ccache:$PATH" && \
     # CMake 경로 설정
     CMAKE_PATH=$(find ${VCPKG_ROOT}/downloads/tools -name cmake -type f | head -1) && \
     export PATH="$(dirname $CMAKE_PATH):$PATH" && \
-    # CMake 구성 (Release 빌드)
+    # CMake 구성 전 디버깅
+    echo "=== CMake Configuration Debug ===" && \
+    echo "VCPKG_ROOT: ${VCPKG_ROOT}" && \
+    echo "CMAKE_TOOLCHAIN_FILE: ${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" && \
+    echo "VCPKG_TARGET_TRIPLET: ${VCPKG_DEFAULT_TRIPLET}" && \
+    ls -la ${VCPKG_ROOT}/installed/${VCPKG_DEFAULT_TRIPLET}/share/jwt-cpp/ 2>/dev/null || echo "jwt-cpp cmake files not found" && \
+    # CMake 구성 (Release 빌드) with verbose output
     cmake -S . -B build \
         -GNinja \
         -DCMAKE_BUILD_TYPE=Release \
@@ -139,7 +155,8 @@ RUN export PATH="/usr/lib/ccache:$PATH" && \
         -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
         -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET} \
         -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-        -DCMAKE_CXX_COMPILER_LAUNCHER=ccache && \
+        -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+        --debug-find-pkg=jwt-cpp && \
     # 병렬 빌드 (CPU 코어 수 활용)
     ninja -C build -j$(nproc) -v && \
     # 빌드 결과 설치 디렉토리에 복사

@@ -8,6 +8,7 @@ const argon2 = require('argon2')
 const oidcConfig = require('../config/oidc')
 const dbService = require('../config/database')
 const logger = require('../config/logger')
+const { env } = require('../config/env')
 
 /**
  * GET /authorize
@@ -117,10 +118,10 @@ router.get('/',
       }
 
       // Google OAuth 클라이언트 설정 확인
-      const hasGoogleOAuth = process.env.GOOGLE_CLIENT_ID && 
-                            process.env.GOOGLE_CLIENT_SECRET &&
-                            process.env.GOOGLE_CLIENT_ID !== 'your-google-client-id.apps.googleusercontent.com' &&
-                            process.env.GOOGLE_CLIENT_SECRET !== 'your-google-client-secret'
+      const hasGoogleOAuth = env.GOOGLE_CLIENT_ID && 
+                            env.GOOGLE_CLIENT_SECRET &&
+                            env.GOOGLE_CLIENT_ID !== 'your-google-client-id.apps.googleusercontent.com' &&
+                            env.GOOGLE_CLIENT_SECRET !== 'your-google-client-secret'
 
       // 로그인 선택 페이지 생성
       const loginSelectionForm = generateLoginSelectionForm(authParams, hasGoogleOAuth)
@@ -197,7 +198,7 @@ router.post('/',
       let user = null
       
       // 개발 환경에서 테스트 계정 체크
-      if (process.env.NODE_ENV !== 'production' && testAccounts[username]) {
+      if (env.NODE_ENV !== 'production' && testAccounts[username]) {
         if (password === testAccounts[username]) {
           // 모의 사용자 객체 생성
           user = {
@@ -245,7 +246,7 @@ router.post('/',
           })
           
           // 데이터베이스 오류 시에도 테스트 계정 허용 (개발 환경)
-          if (process.env.NODE_ENV !== 'production' && testAccounts[username] && password === testAccounts[username]) {
+          if (env.NODE_ENV !== 'production' && testAccounts[username] && password === testAccounts[username]) {
             user = {
               user_id: username === 'zzzz955' ? 1 : 999,
               username: username,

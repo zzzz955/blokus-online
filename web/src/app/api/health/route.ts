@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { env } from '@/lib/env';
 
 export async function GET() {
   try {
@@ -7,8 +8,8 @@ export async function GET() {
       status: 'ok',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
-      environment: process.env.NODE_ENV,
-      version: process.env.npm_package_version || '1.0.0',
+      environment: env.NODE_ENV,
+      version: env.NPM_PACKAGE_VERSION,
     };
 
     return NextResponse.json(healthCheck, { status: 200 });

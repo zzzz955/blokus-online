@@ -1,4 +1,5 @@
 // GitHub Release API 공통 유틸리티
+import { env } from './env';
 export interface GitHubRelease {
   tag_name: string;
   name: string;
@@ -135,11 +136,11 @@ export async function getVersionInfo(): Promise<ClientVersion> {
       return transformToClientVersion(release);
     } else {
       console.warn('GitHub Releases API 오류, 기본 버전 사용');
-      return getDefaultVersion(process.env.CLIENT_VERSION);
+      return getDefaultVersion(env.CLIENT_VERSION);
     }
   } catch (error) {
     console.error('GitHub 릴리즈 정보 조회 실패:', error);
-    return getDefaultVersion(process.env.CLIENT_VERSION);
+    return getDefaultVersion(env.CLIENT_VERSION);
   }
 }
 
@@ -238,11 +239,11 @@ export async function getMultiPlatformReleaseInfo(): Promise<MultiPlatformReleas
       return transformToMultiPlatformRelease(release);
     } else {
       console.warn('GitHub Releases API 오류, 기본 다중 플랫폼 버전 사용');
-      return getDefaultMultiPlatformVersion(process.env.CLIENT_VERSION);
+      return getDefaultMultiPlatformVersion(env.CLIENT_VERSION);
     }
   } catch (error) {
     console.error('GitHub 다중 플랫폼 릴리즈 정보 조회 실패:', error);
-    return getDefaultMultiPlatformVersion(process.env.CLIENT_VERSION);
+    return getDefaultMultiPlatformVersion(env.CLIENT_VERSION);
   }
 }
 

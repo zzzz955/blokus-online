@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { env } from '@/lib/env';
 
 interface DownloadStats {
   totalDownloads: number;
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
     
     // API 키 검증 (내부 호출용)
     const apiKey = request.headers.get('x-internal-api-key');
-    if (apiKey !== process.env.INTERNAL_API_KEY && apiKey !== 'internal-stats-update') {
+    if (apiKey !== env.INTERNAL_API_KEY && apiKey !== 'internal-stats-update') {
       return NextResponse.json(
         { error: '권한이 없습니다.' },
         { status: 401 }

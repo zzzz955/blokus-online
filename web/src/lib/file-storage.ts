@@ -1,6 +1,7 @@
 // src/lib/file-storage.ts
 import fs from 'fs/promises';
 import path from 'path';
+import { env } from './env';
 
 // ✅ MIME → 확장자 매핑 (실제 저장은 항상 png로 통일하지만, 참고용)
 const MIME_TO_EXT: Record<string, string> = {
@@ -16,9 +17,9 @@ type StorageConfig = {
 };
 
 const DEFAULT_CONFIG: StorageConfig = {
-  baseDir: process.env.APP_ROOT_DIR || process.cwd(),
+  baseDir: env.APP_ROOT_DIR,
   thumbnailDir: 'public/stage-thumbnails',
-  publicPath: process.env.THUMBNAIL_PUBLIC_PATH || '/stage-thumbnails'
+  publicPath: env.THUMBNAIL_PUBLIC_PATH
 };
 
 async function ensureDir(baseDir: string, subDir: string) {

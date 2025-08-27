@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyRefreshToken, generateNewAccessToken } from '@/lib/server/admin-auth';
+import { env } from '@/lib/env';
 
 /**
  * Token Refresh API
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
       // 4. 새로운 access token을 쿠키에 저장
       res.cookies.set('admin-token', result.token!, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: env.NODE_ENV === 'production',
         sameSite: 'strict',
         maxAge: 15 * 60, // 15 minutes
       });

@@ -7,6 +7,7 @@ const oidcConfig = require('../config/oidc')
 const keyManager = require('../config/keys')
 const dbService = require('../config/database')
 const logger = require('../config/logger')
+const { env } = require('../config/env')
 
 /**
  * POST /revocation
@@ -204,7 +205,7 @@ router.post('/user/:userId',
 
       // TODO: admin_token 검증 구현 필요
       // 현재는 간단한 체크만 수행
-      if (admin_token !== process.env.ADMIN_TOKEN) {
+      if (admin_token !== env.ADMIN_TOKEN) {
         return res.status(403).json({
           error: 'access_denied',
           error_description: 'Invalid admin token'

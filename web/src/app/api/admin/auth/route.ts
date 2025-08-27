@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateAdmin, createAdminUser, verifyRefreshToken, generateNewAccessToken, type AdminLoginRequest } from '@/lib/server/admin-auth';
+import { env } from '@/lib/env';
 
 /**
  * 관리자 로그인 API
@@ -33,14 +34,14 @@ export async function POST(request: NextRequest) {
       
       res.cookies.set('admin-token', result.token!, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: env.NODE_ENV === 'production',
         sameSite: 'strict',
         maxAge: 15 * 60, // 15 minutes
       });
 
       res.cookies.set('admin-refresh-token', result.refreshToken!, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: env.NODE_ENV === 'production',
         sameSite: 'strict',
         maxAge: 7 * 24 * 60 * 60, // 7 days
       });
@@ -90,7 +91,7 @@ export async function DELETE() {
 export async function PUT(request: NextRequest) {
   try {
     // 환경 변수로 초기 설정 모드 체크
-    if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_ADMIN_CREATION) {
+    if (env.NODE_ENV === 'production' && env.ALLOW_ADMIN_CREATION !== 'true') {
       return NextResponse.json({
         success: false,
         error: '운영 환경에서는 관리자 계정 생성이 제한됩니다.'
@@ -100,7 +101,7 @@ export async function PUT(request: NextRequest) {
     const { username, password, role, setupKey } = await request.json();
 
     // 설정 키 검증 (보안 강화)
-    const expectedSetupKey = process.env.ADMIN_SETUP_KEY || 'setup-admin-2024';
+    const expectedSetupKey = env.ADMIN_SETUP_KEY;
     if (setupKey !== expectedSetupKey) {
       return NextResponse.json({
         success: false,

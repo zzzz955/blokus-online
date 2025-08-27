@@ -427,24 +427,9 @@ router.post('/register', async (req, res) => {
       userAgent: req.get('User-Agent')
     })
 
-    // 환경별 웹 등록 URL 결정
-    const isProduction = process.env.NODE_ENV === 'production'
-    const webRegisterUrl = isProduction
-      ? (process.env.WEB_REGISTER_URL_PROD || 'https://blokus-online.mooo.com/register')
-      : (process.env.WEB_REGISTER_URL_DEV || 'http://localhost:3000/register')
-
-    // 선택적 파라미터 처리 (앱에서 전달한 정보가 있다면)
-    const { app_callback, user_agent, device_id } = req.body
-
-    // URL 파라미터 구성
-    const urlParams = new URLSearchParams()
-    if (app_callback) urlParams.append('callback', app_callback)
-    if (user_agent) urlParams.append('source', 'mobile_app')
-    if (device_id) urlParams.append('device_id', device_id)
-
-    const finalUrl = urlParams.toString()
-      ? `${webRegisterUrl}?${urlParams.toString()}`
-      : webRegisterUrl
+    // TODO: 실제 등록 페이지 구현 후 적절한 URL로 변경 필요
+    // 현재 /register 라우트가 존재하지 않음
+    const finalUrl = '/auth/complete-registration'
 
     // 모바일 앱에서는 이 응답을 받아서 브라우저나 WebView로 URL을 열어야 함
     res.json({

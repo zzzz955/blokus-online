@@ -4,23 +4,16 @@ import { NextRequest } from 'next/server';
 import jwt from 'jsonwebtoken';
 import * as argon2 from 'argon2';
 import { prisma } from '@/lib/prisma';
+import { env } from '@/lib/env';
 
 // Helper function to get JWT secret with validation
 function getJwtSecret(): string {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    throw new Error('JWT_SECRET environment variable is required');
-  }
-  return secret;
+  return env.JWT_SECRET;
 }
 
 // Helper function to get refresh secret with validation
 function getRefreshSecret(): string {
-  const secret = process.env.JWT_REFRESH_SECRET;
-  if (!secret) {
-    throw new Error('JWT_REFRESH_SECRET environment variable is required');
-  }
-  return secret;
+  return env.JWT_REFRESH_SECRET;
 }
 
 export interface AdminSession {

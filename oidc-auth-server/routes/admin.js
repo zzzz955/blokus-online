@@ -6,6 +6,7 @@ const oidcConfig = require('../config/oidc')
 const keyManager = require('../config/keys')
 const dbService = require('../config/database')
 const logger = require('../config/logger')
+const { env } = require('../config/env')
 
 /**
  * 간단한 Admin Token 검증 미들웨어
@@ -13,7 +14,7 @@ const logger = require('../config/logger')
 function requireAdminAuth(req, res, next) {
   const adminToken = req.headers.authorization?.replace('Bearer ', '') || req.body.admin_token
 
-  if (!adminToken || adminToken !== process.env.ADMIN_TOKEN) {
+  if (!adminToken || adminToken !== env.ADMIN_TOKEN) {
     logger.warn('Unauthorized admin access attempt', {
       ip: req.ip,
       userAgent: req.get('User-Agent'),
@@ -62,7 +63,7 @@ router.get('/status', requireAdminAuth, async (req, res) => {
       version: process.env.npm_package_version || '1.0.0',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
-      environment: process.env.NODE_ENV || 'development',
+      environment: env.NODE_ENV,
       
       database: {
         status: dbHealthy ? 'healthy' : 'unhealthy',

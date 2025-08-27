@@ -8,14 +8,15 @@
 require('dotenv').config()
 const argon2 = require('argon2')
 const { Client } = require('pg')
+const { env } = require('../config/env')
 
 async function createTestUser() {
   const client = new Client({
-    host: process.env.DB_HOST || 'localhost',
-    port: process.env.DB_PORT || 5432,
-    database: process.env.DB_NAME || 'blokus_game',
-    user: process.env.DB_USER || 'blokus',
-    password: process.env.DB_PASSWORD || 'blokus123'
+    host: env.DB_HOST,
+    port: env.DB_PORT,
+    database: env.DB_NAME,
+    user: env.DB_USER,
+    password: env.DB_PASSWORD
   })
 
   try {

@@ -122,9 +122,12 @@ namespace App.Config
 #if UNITY_EDITOR
                 return "http://localhost:8080/api";
 #else
-                // WEB_APP_URL 기반으로 API URL 생성
-                string webUrl = GetEnvVariable("WEB_APP_URL", "https://blokus-online.mooo.com");
-                return $"{webUrl}:8080/api";
+                // WEB_APP_URL에서 도메인 추출 후 HTTP로 API URL 생성
+                string webUrl = GetEnvVariable("WEB_APP_URL", "blokus-online.mooo.com");
+                string domain = webUrl;
+                if (domain.StartsWith("http://")) domain = domain.Substring(7);
+                if (domain.StartsWith("https://")) domain = domain.Substring(8);
+                return $"http://{domain}:8080/api";
 #endif
             }
         }
@@ -139,9 +142,9 @@ namespace App.Config
 #if UNITY_EDITOR
                 return "http://localhost:9000";
 #else
-                // WEB_APP_URL 기반으로 OIDC URL 생성  
+                // 프로덕션에서는 Nginx 서브패스 사용
                 string webUrl = GetEnvVariable("WEB_APP_URL", "https://blokus-online.mooo.com");
-                return $"{webUrl}:9000";
+                return $"{webUrl}/oidc";
 #endif
             }
         }

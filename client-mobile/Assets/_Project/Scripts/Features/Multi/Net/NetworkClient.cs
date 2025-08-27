@@ -101,28 +101,16 @@
 //         // 환경 설정
 //         // ========================================
         
-//         /// <summary>
-//         /// 환경변수에서 서버 정보 로드
-//         /// </summary>
-//         private void InitializeFromEnvironment()
-//         {
-//             string envHost = Environment.GetEnvironmentVariable("BLOKUS_SERVER_HOST");
-//             string envPort = Environment.GetEnvironmentVariable("BLOKUS_SERVER_PORT");
+        /// <summary>
+        /// EnvironmentConfig에서 서버 정보 로드
+        /// </summary>
+        // private void InitializeFromEnvironment()
+        // {
+        //     serverHost = App.Config.EnvironmentConfig.TcpServerHost;
+        //     serverPort = App.Config.EnvironmentConfig.TcpServerPort;
             
-//             if (!string.IsNullOrEmpty(envHost))
-//             {
-//                 serverHost = envHost;
-//                 Debug.Log($"환경변수에서 서버 호스트 설정: {serverHost}");
-//             }
-            
-//             if (!string.IsNullOrEmpty(envPort) && int.TryParse(envPort, out int port))
-//             {
-//                 serverPort = port;
-//                 Debug.Log($"환경변수에서 서버 포트 설정: {serverPort}");
-//             }
-            
-//             Debug.Log($"서버 연결 정보: {serverHost}:{serverPort}");
-//         }
+        //     Debug.Log($"TCP 서버 연결 정보: {serverHost}:{serverPort}");
+        // }
         
 //         /// <summary>
 //         /// 서버 연결 정보 설정

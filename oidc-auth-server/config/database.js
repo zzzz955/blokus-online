@@ -1,5 +1,6 @@
 const { Pool } = require('pg')
 const logger = require('./logger')
+const { env } = require('./env')
 
 class DatabaseService {
   constructor() {
@@ -10,13 +11,13 @@ class DatabaseService {
     try {
       // PostgreSQL 연결 풀 생성
       this.pool = new Pool({
-        host: process.env.DB_HOST || 'localhost',
-        port: parseInt(process.env.DB_PORT, 10) || 5432,
-        database: process.env.DB_NAME || 'blokus_online',
-        user: process.env.DB_USER || 'admin',
-        password: process.env.DB_PASSWORD || 'admin',
-        min: parseInt(process.env.DB_POOL_MIN, 10) || 2,
-        max: parseInt(process.env.DB_POOL_MAX, 10) || 10,
+        host: env.DB_HOST,
+        port: env.DB_PORT,
+        database: env.DB_NAME,
+        user: env.DB_USER,
+        password: env.DB_PASSWORD,
+        min: env.DB_POOL_MIN,
+        max: env.DB_POOL_MAX,
         idleTimeoutMillis: 30000,
         connectionTimeoutMillis: 2000
       })
@@ -28,8 +29,8 @@ class DatabaseService {
 
       logger.info('Database connected successfully', {
         timestamp: result.rows[0].now,
-        host: process.env.DB_HOST,
-        database: process.env.DB_NAME
+        host: env.DB_HOST,
+        database: env.DB_NAME
       })
 
       return true

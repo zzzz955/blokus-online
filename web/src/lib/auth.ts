@@ -3,14 +3,11 @@ import jwt from 'jsonwebtoken';
 import { NextAuthOptions } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import { prisma } from './prisma';
+import { env } from './env';
 
 // Helper function to get JWT secret with validation
 function getJwtSecret(): string {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    throw new Error('JWT_SECRET environment variable is required');
-  }
-  return secret;
+  return env.JWT_SECRET;
 }
 
 export interface JWTPayload {
@@ -130,8 +127,8 @@ export async function createAdminUser(username: string, password: string, role: 
 export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId: env.GOOGLE_CLIENT_ID,
+      clientSecret: env.GOOGLE_CLIENT_SECRET,
     }),
     // 추후 Kakao, Naver 등 추가 가능
   ],
@@ -244,7 +241,7 @@ export const authOptions: NextAuthOptions = {
     maxAge: 24 * 60 * 60, // 24시간
   },
   
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: env.NEXTAUTH_SECRET,
 }
 
 // ========================================

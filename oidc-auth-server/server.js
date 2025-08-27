@@ -8,6 +8,7 @@ const passport = require('./config/passport')
 const logger = require('./config/logger')
 const dbService = require('./config/database')
 const keyManager = require('./config/keys')
+const { env } = require('./config/env')
 
 // Import routes
 const wellKnownRoutes = require('./routes/well-known')
@@ -21,7 +22,7 @@ const oauthRoutes = require('./routes/oauth')
 const manualAuthRoutes = require('./routes/manual-auth')
 
 const app = express()
-const PORT = process.env.PORT || 9000
+const PORT = env.PORT
 
 // Security middleware
 app.use(helmet({
@@ -37,7 +38,7 @@ app.use(helmet({
 }))
 
 // CORS configuration
-const isDevelopment = process.env.NODE_ENV !== 'production'
+const isDevelopment = env.NODE_ENV !== 'production'
 
 const corsOptions = {
   origin: isDevelopment ? true : function (origin, callback) {
@@ -73,11 +74,11 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
 // Session configuration for OAuth flows
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'fallback-secret-change-in-production',
+  secret: env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === 'production', // HTTPS in production
+    secure: env.NODE_ENV === 'production', // HTTPS in production
     httpOnly: true,
     maxAge: 10 * 60 * 1000 // 10 minutes for OAuth flow
   }
@@ -189,7 +190,7 @@ async function startServer() {
     // Start the server
     app.listen(PORT, () => {
       logger.info(`OIDC Auth Server started on port ${PORT}`, {
-        environment: process.env.NODE_ENV || 'development',
+        environment: env.NODE_ENV,
         port: PORT,
         timestamp: new Date().toISOString()
       })

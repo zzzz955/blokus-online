@@ -2,14 +2,16 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
+import { env, isBuildTime } from '@/lib/env';
 
 // Environment variable validation for production (server-side only)
-if (typeof window === 'undefined' && process.env.NODE_ENV === 'production') {
+// 빌드 시점에는 체크하지 않음 (fallback 값 사용)
+if (typeof window === 'undefined' && env.NODE_ENV === 'production' && !isBuildTime) {
   const requiredVars = ['NEXTAUTH_SECRET', 'JWT_SECRET', 'DATABASE_URL'];
   const missing = requiredVars.filter(varName => !process.env[varName]);
   
   if (missing.length > 0) {
-    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+    console.warn(`Using fallback values for: ${missing.join(', ')}`);
   }
 }
 

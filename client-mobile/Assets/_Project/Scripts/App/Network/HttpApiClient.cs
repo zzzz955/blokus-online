@@ -124,14 +124,6 @@ namespace App.Network{
 
         private void InitializeFromEnvironment()
         {
-            string envApiUrl = Environment.GetEnvironmentVariable("BLOKUS_API_URL");
-            if (!string.IsNullOrEmpty(envApiUrl))
-            {
-                // 환경변수가 있으면 개발 URL 오버라이드
-                // developmentApiUrl = envApiUrl;
-                Debug.Log($"API URL 환경변수 설정: {envApiUrl}");
-            }
-            
             Debug.Log($"[HttpApiClient] 현재 환경: {(Application.isEditor ? "에디터" : Application.isMobilePlatform ? "모바일" : "데스크톱")}");
             Debug.Log($"[HttpApiClient] 사용할 API URL: {ApiBaseUrl}");
         }

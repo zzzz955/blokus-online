@@ -543,13 +543,9 @@ jobs:
         IMAGE_TAG=${{ env.IMAGE_TAG }}
         GAME_SERVER_IMAGE=${{ env.IMAGE_PREFIX }}-game-server:${{ env.IMAGE_TAG }}
         WEB_SERVER_IMAGE=${{ env.IMAGE_PREFIX }}-web-server:${{ env.IMAGE_TAG }}
-        SINGLE_API_IMAGE=${{ env.IMAGE_PREFIX }}-single-api:${{ env.IMAGE_TAG }}
-        OIDC_SERVER_IMAGE=${{ env.IMAGE_PREFIX }}-oidc-server:${{ env.IMAGE_TAG }}
         
         # Game Server Configuration
         SERVER_PORT=${{ secrets.SERVER_PORT }}
-        SERVER_MAX_CLIENTS=${{ secrets.SERVER_MAX_CLIENTS }}
-        SERVER_THREAD_POOL_SIZE=${{ secrets.SERVER_THREAD_POOL_SIZE }}
         BLOKUS_SERVER_VERSION=${{ secrets.BLOKUS_SERVER_VERSION }}
         BLOKUS_DOWNLOAD_URL=${{ secrets.BLOKUS_DOWNLOAD_URL }}
         
@@ -559,7 +555,6 @@ jobs:
         DB_USER=${{ secrets.DB_USER }}
         DB_PASSWORD=${{ secrets.DB_PASSWORD }}
         DB_NAME=${{ secrets.DB_NAME }}
-        DB_POOL_SIZE=${{ secrets.DB_POOL_SIZE }}
         
         POSTGRES_DB=${{ secrets.DB_NAME }}
         POSTGRES_USER=${{ secrets.DB_USER }}
@@ -567,14 +562,11 @@ jobs:
         
         # Security
         JWT_SECRET=\$JWT_SECRET
-        SESSION_TIMEOUT_HOURS=${{ secrets.SESSION_TIMEOUT_HOURS }}
-        PASSWORD_SALT_ROUNDS=${{ secrets.PASSWORD_SALT_ROUNDS }}
         
         # Logging and Debug
         LOG_LEVEL=${{ secrets.LOG_LEVEL }}
         LOG_DIRECTORY=${{ secrets.LOG_DIRECTORY }}
         DEBUG_MODE=${{ secrets.DEBUG_MODE }}
-        ENABLE_SQL_LOGGING=${{ secrets.ENABLE_SQL_LOGGING }}
         
         # Node.js Environment
         NODE_ENV=${{ secrets.NODE_ENV }}
@@ -582,12 +574,11 @@ jobs:
         # Web Application  
         WEB_PORT=${{ secrets.WEB_PORT }}
         WEB_APP_URL=${{ secrets.WEB_APP_URL }}
-        WEB_DATABASE_URL=${{ secrets.WEB_DATABASE_URL }}
-        WEB_CLIENT_DOWNLOAD_URL=${{ secrets.WEB_CLIENT_DOWNLOAD_URL }}
-        WEB_NEXTAUTH_SECRET=${{ secrets.WEB_NEXTAUTH_SECRET }}
-        WEB_JWT_SECRET=${{ secrets.WEB_JWT_SECRET }}
-        WEB_ADMIN_USERNAME=${{ secrets.WEB_ADMIN_USERNAME }}
-        WEB_ADMIN_PASSWORD=${{ secrets.WEB_ADMIN_PASSWORD }}
+        DATABASE_URL=${{ secrets.DATABASE_URL }}
+        CLIENT_DOWNLOAD_URL=${{ secrets.CLIENT_DOWNLOAD_URL }}
+        NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
+        ADMIN_USERNAME=${{ secrets.ADMIN_USERNAME }}
+        ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
         GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
         GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
         
@@ -599,6 +590,9 @@ jobs:
         OIDC_PORT=${{ secrets.OIDC_PORT }}
         OIDC_ISSUER=${{ secrets.OIDC_ISSUER }}
         OIDC_BASE_URL=${{ secrets.OIDC_BASE_URL }}
+        OIDC_ISSUER_PROD=${{ secrets.OIDC_ISSUER_PROD }}
+        OIDC_BASE_URL_PROD=${{ secrets.OIDC_BASE_URL_PROD }}
+        OIDC_JWKS_URI=${{ secrets.OIDC_JWKS_URI }}
         SESSION_SECRET=${{ secrets.SESSION_SECRET }}
         WEB_CLIENT_SECRET=${{ secrets.WEB_CLIENT_SECRET }}
         ADMIN_TOKEN=${{ secrets.ADMIN_TOKEN }}
@@ -641,12 +635,10 @@ jobs:
           # 기존 서비스 중지
           docker compose down || true &&
           
-          # 최신 이미지 Pull (SHA 기반 태그 사용)
-          echo 'Pulling images with SHA tags...' &&
+          # 최신 이미지 Pull (Docker Compose 구조에 맞게)
+          echo 'Pulling pre-built images...' &&
           (docker pull ${{ env.IMAGE_PREFIX }}-game-server:${{ env.IMAGE_TAG }} &) &&
           (docker pull ${{ env.IMAGE_PREFIX }}-web-server:${{ env.IMAGE_TAG }} &) &&
-          (docker pull ${{ env.IMAGE_PREFIX }}-single-api:${{ env.IMAGE_TAG }} &) &&
-          (docker pull ${{ env.IMAGE_PREFIX }}-oidc-server:${{ env.IMAGE_TAG }} &) &&
           wait &&
           
           # 서비스 시작

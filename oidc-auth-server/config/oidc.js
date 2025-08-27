@@ -1,16 +1,17 @@
 const logger = require('./logger')
+const { env } = require('./env')
 
 class OIDCConfig {
   constructor() {
-    this.issuer = process.env.OIDC_ISSUER || 'http://localhost:9000'
-    this.baseUrl = process.env.OIDC_BASE_URL || 'http://localhost:9000'
+    this.issuer = env.OIDC_ISSUER
+    this.baseUrl = env.OIDC_BASE_URL
     
     // 토큰 수명 (슬라이딩 윈도우: 30일 + 최대 90일)
     this.tokenLifetimes = {
-      accessToken: process.env.ACCESS_TOKEN_LIFETIME || '10m',  // 10 minutes
-      refreshToken: process.env.REFRESH_TOKEN_LIFETIME || '30d', // 30 days (sliding window)
-      refreshTokenMaxLifetime: process.env.REFRESH_TOKEN_MAX_LIFETIME || '90d', // 90 days maximum
-      authorizationCode: process.env.AUTH_CODE_LIFETIME || '10m' // 10 minutes
+      accessToken: env.ACCESS_TOKEN_LIFETIME,  // 10 minutes
+      refreshToken: env.REFRESH_TOKEN_LIFETIME, // 30 days (sliding window)
+      refreshTokenMaxLifetime: env.REFRESH_TOKEN_MAX_LIFETIME, // 90 days maximum
+      authorizationCode: env.AUTH_CODE_LIFETIME // 10 minutes
     }
 
     // 지원하는 클라이언트들
@@ -44,7 +45,7 @@ class OIDCConfig {
       },
       'nextjs-web-client': {
         client_id: 'nextjs-web-client',
-        client_secret: process.env.WEB_CLIENT_SECRET || 'web-client-secret-change-in-production',
+        client_secret: env.WEB_CLIENT_SECRET,
         redirect_uris: [
           'http://localhost:3000/api/auth/callback/blokus-oidc',
           'https://blokus-online.mooo.com/api/auth/callback/blokus-oidc'
@@ -256,40 +257,12 @@ class OIDCConfig {
     return true
   }
 
-  // 환경별 설정 오버라이드
-  applyEnvironmentOverrides() {
-    if (process.env.NODE_ENV === 'production') {
-      // 프로덕션 환경 설정 - Nginx 서브패스 프록시 사용
-      this.issuer = process.env.OIDC_ISSUER_PROD || 'https://blokus-online.mooo.com/oidc'
-      this.baseUrl = process.env.OIDC_BASE_URL_PROD || 'https://blokus-online.mooo.com/oidc'
-
-      // 프로덕션에서는 localhost redirect URI 제거 (단, Qt 클라이언트는 예외)
-      Object.entries(this.clients).forEach(([clientId, client]) => {
-        if (clientId !== 'blokus-desktop-client') {
-          client.redirect_uris = client.redirect_uris.filter(uri => 
-            !uri.includes('localhost') && !uri.includes('127.0.0.1')
-          )
-        }
-      })
-      
-      // Next.js 클라이언트는 포트 443 (Nginx를 통해 3000으로 프록시)
-      this.clients['nextjs-web-client'].redirect_uris = [
-        'https://blokus-online.mooo.com/api/auth/callback/blokus-oidc'
-      ]
-    }
-
-    logger.info('Applied environment-specific OIDC configuration', {
-      environment: process.env.NODE_ENV || 'development',
-      issuer: this.issuer
-    })
-  }
 }
 
 // 싱글톤 인스턴스
 const oidcConfig = new OIDCConfig()
 
-// 환경별 설정 적용 및 검증
-oidcConfig.applyEnvironmentOverrides()
+// 설정 검증
 oidcConfig.validate()
 
 module.exports = oidcConfig

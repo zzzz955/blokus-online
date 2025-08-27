@@ -623,3 +623,4 @@ CLAUDE.md
 prompt.txt
 last_log.txt
 *.keystore
+.history/

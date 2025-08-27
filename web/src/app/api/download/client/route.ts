@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { env } from '@/lib/env';
 import { 
   fetchGitHubRelease, 
   getVersionInfo, 
@@ -36,7 +37,7 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5분
 
 // 환경변수에서 클라이언트 버전 가져오기
 function getClientVersion(): string {
-  return process.env.CLIENT_VERSION || 'v1.0.0';
+  return env.CLIENT_VERSION;
 }
 
 // 캐시된 다중 플랫폼 릴리즈 정보 확인
@@ -204,7 +205,7 @@ export async function GET(request: NextRequest) {
     console.log(`[DOWNLOAD] ${platform} client download - Version: v${platformRelease.version}, IP: ${ip}, User-Agent: ${userAgent}`);
     
     // 비동기적으로 통계 업데이트
-    fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/download/stats`, {
+    fetch(`${env.NEXTAUTH_URL}/api/download/stats`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
