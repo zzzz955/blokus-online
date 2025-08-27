@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <mutex>
 #include <future>
+#include <vector>
 
 namespace Blokus {
     namespace Server {

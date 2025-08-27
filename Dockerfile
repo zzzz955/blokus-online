@@ -49,6 +49,7 @@ RUN echo "=== Installing build dependencies ===" && \
     postgresql-server-dev-all \
     # UUID 빌드 의존성 (libuuid vcpkg 패키지용)
     uuid-dev \
+    libuuid1 \
     # 추가 유틸리티 (컴파일 캐시)
     ccache \
     gnupg \
@@ -136,6 +137,24 @@ RUN echo "=== Checking vcpkg installations ===" && \
     find ${VCPKG_ROOT}/installed/x64-linux -name "*jwt*" -type d && \
     find ${VCPKG_ROOT}/installed/x64-linux -name "*jwt*" -type f
 
+# === Quick fix & audit BEFORE cmake ===
+# 1) 호환 심볼릭 링크(없던 '/opt/vcpkg/include'를 올바른 위치로 연결)
+RUN mkdir -p /opt/vcpkg && \
+    ln -sfn /opt/vcpkg/installed/${VCPKG_DEFAULT_TRIPLET}/include /opt/vcpkg/include && \
+    ln -sfn /opt/vcpkg/installed/${VCPKG_DEFAULT_TRIPLET}/lib     /opt/vcpkg/lib || true
+
+# 2) 환경변수 오염 차단(있다면)
+RUN unset CPATH CPLUS_INCLUDE_PATH || true
+
+# 3) 감사 출력: 소스/CMake만 스캔(빌드폴더·VCS 제외)
+RUN echo "=== Audit hard-coded vcpkg paths ===" && \
+    (grep -R -n -E '/opt/vcpkg|VCPKG_ROOT.*/include' /app \
+      --include='CMakeLists.txt' --include='*.cmake' \
+      --include='*.cpp' --include='*.cc' --include='*.c' \
+      --include='*.hpp' --include='*.hh' --include='*.h' \
+      --exclude-dir=build --exclude-dir=.git || true) && \
+    (env | grep -E '^(CPATH|CPLUS_INCLUDE_PATH)=' || true)
+
 # ==================================================
 # 프로젝트 빌드 (vcpkg toolchain + ccache 사용)
 # ==================================================
@@ -162,9 +181,12 @@ RUN export PATH="/usr/lib/ccache:$PATH" && \
           -DCMAKE_CXX_STANDARD=20 \
           -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
           -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET} \
+          -DVCPKG_MANIFEST_MODE=OFF \
+          -DVCPKG_INSTALLED_DIR=/opt/vcpkg/installed \
+          -DCMAKE_FIND_PACKAGE_PREFER_CONFIG=ON \
+          -DOPENSSL_ROOT_DIR=/opt/vcpkg/installed/x64-linux \
           -DCMAKE_C_COMPILER_LAUNCHER=ccache \
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-          -DCMAKE_FIND_DEBUG_MODE=ON \
      || (echo "=== CMake Configuration Failed ==="; \
          echo "Build directory contents:"; ls -la build/ 2>/dev/null || echo "No build directory"; \
          echo "CMake Files:"; find build/ -name "*.log" 2>/dev/null || echo "No log files found"; \

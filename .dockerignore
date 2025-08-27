@@ -1,168 +1,110 @@
 # ==================================================
-# .dockerignore - Blokus Online 빌드 최적화
-# 불필요한 파일들을 제외하여 빌드 컨텍스트 최소화
+# .dockerignore - Blokus Online Server Build (Whitelist)
+# 화이트리스트 방식으로 빌드 컨텍스트 최소화 (gamer-server 전용)
 # ==================================================
 
-# ========== Version Control ==========
+# ========== 기본적으로 모든 파일 제외 ==========
+*
+
+# ========== 서버 빌드 필수 파일들만 포함 ==========
+# 루트 레벨 빌드 설정
+!CMakeLists.txt
+!vcpkg-server.json
+
+# ========== C++ 서버 코드 ==========
+# 서버 디렉토리 (gamer-server 핵심)
+!server/
+!server/**
+
+# 공통 라이브러리 코드
+!common/
+!common/**
+
+# ========== 빌드 도구 의존성 ==========
+# vcpkg 매니페스트 및 설정 파일들 (서버 전용)
+!vcpkg-server.json
+
+# ========== 제외할 디렉토리들 ==========
+# 클라이언트 관련 (빌드에 불필요)
+client/
+client-mobile/
+
+# 웹 애플리케이션 (빌드에 불필요)
+web/
+
+# 다른 서비스들 (빌드에 불필요)
+oidc-auth-server/
+single-player-api/
+
+# vcpkg 캐시 및 빌드 산출물 (컨테이너에서 재생성)
+vcpkg/buildtrees/
+vcpkg/downloads/
+vcpkg/packages/
+vcpkg_installed/
+build/
+
+# IDE 및 편집기 파일
+.vscode/
+.vs/
+.idea/
+
+# 문서 및 미디어
+docs/
+screenshots/
+images/
+data/
+
+# 로그 및 임시 파일
+logs/
+*.log
+*.tmp
+*.temp
+
+# 인증서 및 키 (보안)
+*.pem
+*.key
+*.crt
+*.p12
+
+# OS 생성 파일
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# 릴리즈 및 배포 파일
+releases/
+append/
+
+# 스크립트 및 배치 파일 (런타임에 불필요)
+*.bat
+*.ps1
+*.sh
+deploy.sh
+scripts/
+
+# 환경 설정 (컨테이너 내부에서 설정)
+.env
+.env.*
+!.env.example
+
+# Git 관련
 .git/
 .gitignore
 .gitattributes
 .github/
 
-# ========== CI/CD 관련 ==========
-.deployment_status.json
-.deployment_status.lock
-
-# ========== Documentation ==========
-*.md
-README*
-CHANGELOG*
-LICENSE*
-docs/
-examples/
-screenshots/
-images/
-
-# ========== IDE and Editor ==========
-.vscode/
-.vs/
-.idea/
-*.vcxproj
-*.vcxproj.filters
-*.vcxproj.user
-*.sln
-CMakeSettings.json
-CMakePresets.json
-*.swp
-*.swo
-*~
-
-# ========== Build Artifacts ==========
-build/
-cmake-build-*/
-CMakeFiles/
-CMakeCache.txt
-cmake_install.cmake
-Makefile
-dist/
-target/
-out/
-
-# ========== vcpkg 빌드 캐시 (컨테이너에서 재빌드) ==========
-vcpkg/buildtrees/
-vcpkg/downloads/
-vcpkg/packages/
-vcpkg_installed/
-# vcpkg.json과 vcpkg-configuration.json은 포함 (의존성 정보 필요)
-
-# ========== 클라이언트 코드 (서버 빌드시 불필요) ==========
-client/
-
-# ========== 웹 애플리케이션 관련 ==========
-web/node_modules/
-web/.next/
-web/coverage/
-web/.nyc_output/
-web/dist/
-# web/package*.json은 포함 (의존성 정보 필요)
-
-# ========== 테스트 파일 ==========
+# 테스트 파일
 test/
 tests/
-__tests__/
 *_test.cpp
-test_*.cpp
 *.test.*
-*.spec.*
-run_session_test.bat
-test_session_cleanup.cpp
-coverage/
 
-# ========== 로그 및 런타임 파일 ==========
-logs/
-*.log
-*.pid
-*.seed
-*.pid.lock
-log/
+# Node.js 관련 (웹 제외하므로 불필요)
+node_modules/
+.npm/
+package-lock.json
 
-# ========== 환경 설정 파일 ==========
-.env
-.env.local
-.env.*.local
-.env.test
-.env.production
-!.env.example
-
-# ========== OS 생성 파일 ==========
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-Thumbs.db
-ehthumbs.db
-
-# ========== 컴파일 결과물 ==========
-*.o
-*.obj
-*.exe
-*.dll
-*.so
-*.dylib
-*.a
-*.lib
-
-# ========== Protocol Buffers 생성 파일 ==========
-proto/*.pb.h
-proto/*.pb.cc
-
-# ========== 임시 파일 ==========
-tmp/
-temp/
-*.tmp
-*.temp
-*.bak
-*.backup
-*.orig
-
-# ========== 패키지 매니저 캐시 ==========
-.npm
-.yarn-integrity
-*.tgz
-
-# ========== Next.js 관련 ==========
-.next/
-.nuxt
-
-# ========== 캐시 파일들 ==========
-.cache
-.parcel-cache
-.eslintcache
-.stylelintcache
-.rpt2_cache/
-.rts2_cache_cjs/
-.rts2_cache_es/
-.rts2_cache_umd/
-
-# ========== 인증서 (보안상 제외) ==========
-*.pem
-*.key
-*.crt
-*.p12
-certbot/
-
-# ========== 데이터베이스 파일 ==========
-*.db
-*.sqlite
-*.sqlite3
-
-# ========== 업로드 파일 ==========
-web/uploads/
-uploads/
-downloads/
-
-# ========== 개발 도구 스크립트 ==========
-pkg_init.ps1
-*.bat
-*.ps1
+# ========== 빌드 최적화 확인 ==========
+# 이 .dockerignore로 컨텍스트가 ~100MB 이하로 줄어들어야 함
+# 이전 전체 컨텍스트: ~2GB+ → 최적화 후: ~50-100MB

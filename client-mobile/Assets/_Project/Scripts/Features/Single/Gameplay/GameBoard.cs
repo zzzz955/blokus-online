@@ -40,6 +40,7 @@ namespace Features.Single.Gameplay
         [SerializeField] private UnityEngine.UI.Button rotateButton;
         [SerializeField] private UnityEngine.UI.Button flipButton;
         [SerializeField] private UnityEngine.UI.Button placeButton;
+        [SerializeField] private UnityEngine.UI.Image placeImage;
         [SerializeField] private Sprite uiFallbackSprite;
 
         [Header("Action Button Sprites")]
@@ -648,7 +649,7 @@ namespace Features.Single.Gameplay
             if (placeButton != null)
             {
                 placeButton.interactable = canPlace;
-                var img = placeButton.GetComponent<UnityEngine.UI.Image>();
+                var img = placeImage.GetComponent<UnityEngine.UI.Image>();
                 if (img != null)
                 {
                     // sprite 기반 상태 변경 (색상 변경 대신)

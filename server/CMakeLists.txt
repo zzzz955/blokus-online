@@ -7,6 +7,8 @@ if(MSVC)
     add_compile_definitions(SPDLOG_WCHAR_TO_UTF8_SUPPORT)
 endif()
 
+set(CMAKE_FIND_PACKAGE_PREFER_CONFIG ON)
+
 # ���� �ҽ� ���ϵ�
 set(SERVER_SOURCES
     main.cpp
