@@ -28,7 +28,6 @@ RUN echo "=== Installing build dependencies ===" && \
     build-essential \
     ninja-build \
     pkg-config \
-    cmake \
     # 버전 관리 및 다운로드
     git \
     wget \
@@ -50,7 +49,18 @@ RUN echo "=== Installing build dependencies ===" && \
     postgresql-server-dev-all \
     # 추가 유틸리티 (컴파일 캐시)
     ccache \
+    gnupg \
     && rm -rf /var/lib/apt/lists/*
+
+# Kitware APT 추가 + CMake 설치 블록 보강
+RUN mkdir -p /etc/apt/keyrings \
+    && . /etc/os-release \
+    && wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc \
+    | gpg --dearmor -o /etc/apt/keyrings/kitware.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/kitware.gpg] https://apt.kitware.com/ubuntu/ ${UBUNTU_CODENAME} main" \
+    > /etc/apt/sources.list.d/kitware.list \
+    && apt-get update && apt-get install -y cmake \
+    && cmake --version
 
 # ==================================================
 # vcpkg 설치 및 부트스트랩 (캐시 가능한 레이어)
@@ -83,20 +93,20 @@ RUN cd ${VCPKG_ROOT} \
     && export VCPKG_FEATURE_FLAGS=manifests,versions,binarycaching,compilertracking \
     && echo "=== Starting vcpkg dependency installation ===" \
     && ./vcpkg install --triplet=${VCPKG_DEFAULT_TRIPLET} \
-        --x-buildtrees-root=/tmp/vcpkg-buildtrees \
-        --x-install-root=/opt/vcpkg/installed \
-        --x-packages-root=/tmp/vcpkg-packages \
-        --clean-after-build \
+    --x-buildtrees-root=/tmp/vcpkg-buildtrees \
+    --x-install-root=/opt/vcpkg/installed \
+    --x-packages-root=/tmp/vcpkg-packages \
+    --clean-after-build \
     && echo "=== Verifying jwt-cpp installation ===" \
     && ./vcpkg list | sed -n '/jwt/p' \
     && ( \
-         test -f "/opt/vcpkg/installed/${VCPKG_DEFAULT_TRIPLET}/share/jwt-cpp/jwt-cpp-config.cmake" \
-      || test -f "/opt/vcpkg/installed/${VCPKG_DEFAULT_TRIPLET}/share/jwt-cpp/jwt-cppConfig.cmake" \
-      || test -f "/opt/vcpkg/installed/${VCPKG_DEFAULT_TRIPLET}/lib/cmake/jwt-cpp/jwt-cpp-config.cmake" \
-      || (echo "jwt-cpp CMake config not found; dumping tree:" \
-          && find "/opt/vcpkg/installed/${VCPKG_DEFAULT_TRIPLET}" -maxdepth 4 -type f -iname "*jwt*config*.cmake" -print \
-          && exit 1) \
-       ) \
+    test -f "/opt/vcpkg/installed/${VCPKG_DEFAULT_TRIPLET}/share/jwt-cpp/jwt-cpp-config.cmake" \
+    || test -f "/opt/vcpkg/installed/${VCPKG_DEFAULT_TRIPLET}/share/jwt-cpp/jwt-cppConfig.cmake" \
+    || test -f "/opt/vcpkg/installed/${VCPKG_DEFAULT_TRIPLET}/lib/cmake/jwt-cpp/jwt-cpp-config.cmake" \
+    || (echo "jwt-cpp CMake config not found; dumping tree:" \
+    && find "/opt/vcpkg/installed/${VCPKG_DEFAULT_TRIPLET}" -maxdepth 4 -type f -iname "*jwt*config*.cmake" -print \
+    && exit 1) \
+    ) \
     && rm -rf /tmp/vcpkg-buildtrees /tmp/vcpkg-packages /tmp/ccache \
     && ./vcpkg list \
     && echo "=== Server-only vcpkg dependencies installation completed ==="
@@ -146,14 +156,14 @@ RUN export PATH="/usr/lib/ccache:$PATH" && \
     find ${VCPKG_ROOT}/installed/${VCPKG_DEFAULT_TRIPLET} -maxdepth 4 -type f -iname "*jwt*config*.cmake" -print || true && \
     # CMake 구성 (Release 빌드) with verbose output
     cmake -S . -B build \
-        -GNinja \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_CXX_STANDARD=20 \
-        -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
-        -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET} \
-        -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-        -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-        -DCMAKE_FIND_DEBUG_MODE=ON && \
+    -GNinja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_CXX_STANDARD=20 \
+    -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
+    -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET} \
+    -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+    -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+    -DCMAKE_FIND_DEBUG_MODE=ON && \
     # 병렬 빌드 (CPU 코어 수 활용)
     ninja -C build -j$(nproc) -v && \
     # 빌드 결과 설치 디렉토리에 복사

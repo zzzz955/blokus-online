@@ -624,3 +624,9 @@ prompt.txt
 last_log.txt
 *.keystore
 .history/
+
+# Android Build Files
+*.apk
+*.aab
+*_mapping.txt
+proguard/
