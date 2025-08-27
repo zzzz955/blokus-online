@@ -294,8 +294,8 @@ MonoBehaviour:
   - {fileID: 4530484368012543746}
   - {fileID: 3663710670478579506}
   - {fileID: 353684272470368975}
-  activeStar: {fileID: 21300000, guid: 89c2601013eb25145a4de556def22d2f, type: 3}
-  inactiveStar: {fileID: 21300000, guid: ce0759a83281ec14c8d46f6204875622, type: 3}
+  activeStar: {fileID: 21300000, guid: f53c29c0f1dc96c429f7074b4f131e22, type: 3}
+  inactiveStar: {fileID: 21300000, guid: d58ac30aef1868a4ebaa71c47ac6dd17, type: 3}
   activeStarColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   inactiveStarColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   unlockedSprite: {fileID: 21300000, guid: 6615bcc022c8dce488a859b02e3e365c, type: 3}

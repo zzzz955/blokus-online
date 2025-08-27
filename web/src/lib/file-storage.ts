@@ -14,12 +14,14 @@ type StorageConfig = {
   baseDir: string;
   thumbnailDir: string;
   publicPath: string;
+  isProduction: boolean;
 };
 
 const DEFAULT_CONFIG: StorageConfig = {
   baseDir: env.APP_ROOT_DIR,
-  thumbnailDir: 'public/stage-thumbnails',
-  publicPath: env.THUMBNAIL_PUBLIC_PATH
+  thumbnailDir: env.THUMBNAIL_STORAGE_DIR || 'public/stage-thumbnails',
+  publicPath: env.THUMBNAIL_PUBLIC_PATH,
+  isProduction: env.NODE_ENV === 'production'
 };
 
 async function ensureDir(baseDir: string, subDir: string) {
@@ -54,7 +56,18 @@ class FileStorage {
   }
 
   async ensureThumbnailDir() {
-    return ensureDir(this.config.baseDir, this.config.thumbnailDir);
+    // 환경별 디렉토리 경로 처리
+    if (this.config.isProduction) {
+      // 배포환경: 절대 경로 또는 컨테이너 내 경로 사용
+      const thumbnailPath = path.isAbsolute(this.config.thumbnailDir) 
+        ? this.config.thumbnailDir 
+        : path.join(this.config.baseDir, this.config.thumbnailDir);
+      await fs.mkdir(thumbnailPath, { recursive: true });
+      return thumbnailPath;
+    } else {
+      // 개발환경: 기존 로직 유지
+      return ensureDir(this.config.baseDir, this.config.thumbnailDir);
+    }
   }
 
   generateThumbnailFilename(stageNumber: number): string {

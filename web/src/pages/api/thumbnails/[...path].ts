@@ -7,7 +7,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs';
 import path from 'path';
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', ['GET']);
     return res.status(405).json({ error: 'Method not allowed' });
@@ -28,12 +28,15 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(404).json({ error: 'File not found' });
     }
 
-    // Construct absolute file path
-    const publicDir = path.join(process.cwd(), 'public', 'stage-thumbnails');
-    const absolutePath = path.join(publicDir, fileName);
+    // Construct absolute file path using environment variable
+    const { env } = await import('@/lib/env');
+    const storageDir = path.isAbsolute(env.THUMBNAIL_STORAGE_DIR) 
+      ? env.THUMBNAIL_STORAGE_DIR 
+      : path.join(process.cwd(), env.THUMBNAIL_STORAGE_DIR);
+    const absolutePath = path.join(storageDir, fileName);
 
     // Security: Prevent directory traversal
-    if (!absolutePath.startsWith(publicDir)) {
+    if (!absolutePath.startsWith(storageDir)) {
       return res.status(404).json({ error: 'File not found' });
     }
 

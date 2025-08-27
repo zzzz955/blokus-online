@@ -334,6 +334,8 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       
+      # 파일 저장소 설정
+      THUMBNAIL_STORAGE_DIR: /var/lib/blokus/stage-thumbnails
       
       # 시간대
       TZ: Asia/Seoul
@@ -341,6 +343,8 @@ services:
     volumes:
       # 업로드된 파일 영속성
       - ./web/uploads:/app/public/uploads
+      # 스테이지 썸네일 영속성 (레포지토리 외부)
+      - ${THUMBNAIL_HOST_DIR:-/var/lib/blokus/stage-thumbnails}:/var/lib/blokus/stage-thumbnails
     
     # 포트는 nginx를 통해서만 접근하므로 외부 노출 불필요
     # ports:

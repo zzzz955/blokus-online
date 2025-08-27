@@ -228,6 +228,11 @@ web/prisma/migrations/
 # Uploads
 web/public/uploads/
 
+# Stage thumbnails (레포지토리 외부 저장하지만 혹시 모를 상황 대비)
+web/stage-thumbnails/
+data/stage-thumbnails/
+**/stage-thumbnails/
+
 # Static generation
 web/.vercel
 
