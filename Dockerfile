@@ -153,7 +153,7 @@ RUN export PATH="/usr/lib/ccache:$PATH" && \
         -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET} \
         -DCMAKE_C_COMPILER_LAUNCHER=ccache \
         -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-        --debug-find-pkg=jwt-cpp && \
+        -DCMAKE_FIND_DEBUG_MODE=ON && \
     # 병렬 빌드 (CPU 코어 수 활용)
     ninja -C build -j$(nproc) -v && \
     # 빌드 결과 설치 디렉토리에 복사
