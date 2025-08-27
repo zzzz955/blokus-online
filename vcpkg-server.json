@@ -2,6 +2,7 @@
   "name": "blokus-online-server",
   "version": "1.0.0",
   "description": "Blokus Online Server Dependencies (No Qt)",
+  "builtin-baseline": "f176b58f35a75f9f8f54099cd9df97d2e2793a2e",
   "dependencies": [
     "spdlog",
     "boost-asio",

@@ -28,6 +28,7 @@ RUN echo "=== Installing build dependencies ===" && \
     build-essential \
     ninja-build \
     pkg-config \
+    cmake \
     # 버전 관리 및 다운로드
     git \
     wget \
@@ -57,8 +58,8 @@ RUN echo "=== Installing build dependencies ===" && \
 RUN echo "=== Installing vcpkg ===" && \
     git clone https://github.com/Microsoft/vcpkg.git ${VCPKG_ROOT} && \
     cd ${VCPKG_ROOT} && \
-    # 안정적인 릴리즈 태그로 체크아웃 (2024.08.23)
-    git checkout 2024.08.23 && \
+    # 안정적인 릴리즈 태그로 체크아웃 (2024.09.23)
+    git checkout 2024.09.23 && \
     # vcpkg 부트스트랩
     ./bootstrap-vcpkg.sh && \
     # vcpkg 실행 가능성 확인
@@ -74,34 +75,22 @@ COPY vcpkg-server.json ${VCPKG_ROOT}/vcpkg.json
 # ==================================================
 # vcpkg 의존성 설치 (병렬 빌드 + 캐시 최적화)
 # ==================================================
-RUN cd ${VCPKG_ROOT} && \
-    # 병렬 빌드 최적화를 위한 환경변수 설정
-    export VCPKG_MAX_CONCURRENCY=$(nproc) && \
-    export VCPKG_KEEP_ENV_VARS=VCPKG_MAX_CONCURRENCY && \
-    # ccache 설정 (컴파일 캐시)
-    export PATH="/usr/lib/ccache:$PATH" && \
-    export CCACHE_DIR=/tmp/ccache && \
-    # 빌드 최적화 플래그 추가
-    export VCPKG_FEATURE_FLAGS=manifests,versions,binarycaching,compilertracking && \
-    export VCPKG_BINARY_SOURCES="clear" && \
-    # 의존성 설치 (빌드 시간 최적화) - 서버 전용 패키지만
-    echo "=== Starting vcpkg dependency installation ===" && \
-    timeout 900 ./vcpkg install --triplet=${VCPKG_DEFAULT_TRIPLET} \
+RUN cd ${VCPKG_ROOT} \
+    && export VCPKG_MAX_CONCURRENCY=$(nproc) \
+    && export VCPKG_KEEP_ENV_VARS=VCPKG_MAX_CONCURRENCY \
+    && export PATH="/usr/lib/ccache:$PATH" \
+    && export CCACHE_DIR=/tmp/ccache \
+    && export VCPKG_FEATURE_FLAGS=manifests,versions,binarycaching,compilertracking \
+    && echo "=== Starting vcpkg dependency installation ===" \
+    && ./vcpkg install --triplet=${VCPKG_DEFAULT_TRIPLET} \
         --x-buildtrees-root=/tmp/vcpkg-buildtrees \
         --x-install-root=/opt/vcpkg/installed \
         --x-packages-root=/tmp/vcpkg-packages \
         --clean-after-build \
-        --debug || { \
-        echo "=== vcpkg install failed, checking jwt-cpp specifically ===" && \
-        ./vcpkg list | grep jwt || echo "jwt-cpp not found in list" && \
-        ./vcpkg install jwt-cpp --triplet=${VCPKG_DEFAULT_TRIPLET} --debug --x-install-root=/opt/vcpkg/installed && \
-        ./vcpkg list | grep jwt || exit 1; \
-    } && \
-    # 임시 빌드 파일 정리로 이미지 크기 최적화
-    rm -rf /tmp/vcpkg-buildtrees /tmp/vcpkg-packages /tmp/ccache && \
-    # vcpkg 설치 검증
-    ./vcpkg list && \
-    echo "=== Server-only vcpkg dependencies installation completed ==="
+    && test -f /opt/vcpkg/installed/${VCPKG_DEFAULT_TRIPLET}/share/jwt-cpp/jwt-cppConfig.cmake \
+    && rm -rf /tmp/vcpkg-buildtrees /tmp/vcpkg-packages /tmp/ccache \
+    && ./vcpkg list \
+    && echo "=== Server-only vcpkg dependencies installation completed ==="
 
 # vcpkg 의존성 설치 완료 (소스코드와 독립적으로 캐시됨)
 
@@ -138,9 +127,6 @@ RUN export PATH="/usr/lib/ccache:$PATH" && \
     export CCACHE_DIR=/tmp/ccache && \
     export CMAKE_C_COMPILER_LAUNCHER=ccache && \
     export CMAKE_CXX_COMPILER_LAUNCHER=ccache && \
-    # CMake 경로 설정
-    CMAKE_PATH=$(find ${VCPKG_ROOT}/downloads/tools -name cmake -type f | head -1) && \
-    export PATH="$(dirname $CMAKE_PATH):$PATH" && \
     # CMake 구성 전 디버깅
     echo "=== CMake Configuration Debug ===" && \
     echo "VCPKG_ROOT: ${VCPKG_ROOT}" && \
