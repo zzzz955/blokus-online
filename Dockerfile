@@ -150,10 +150,11 @@ RUN export PATH="/usr/lib/ccache:$PATH" && \
     ls -la ${VCPKG_ROOT}/installed/${VCPKG_DEFAULT_TRIPLET}/share/jwt-cpp/ 2>/dev/null || echo "jwt-cpp share directory not found" && \
     echo "=== Searching for jwt-cpp CMake config files ===" && \
     find ${VCPKG_ROOT}/installed/${VCPKG_DEFAULT_TRIPLET} -maxdepth 4 -type f -iname "*jwt*config*.cmake" -print || true && \
-    # CMake 구성 with --fresh flag for cache cleanup
+    # CMake 구성 with cache cleanup and robust error handling
     echo "=== Using CMake ===" && cmake --version \
     && echo "=== Toolchain === ${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
-    && cmake --fresh -S . -B build \
+    && rm -rf build \
+    && cmake -S . -B build \
           -GNinja \
           -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_CXX_STANDARD=20 \
@@ -162,9 +163,12 @@ RUN export PATH="/usr/lib/ccache:$PATH" && \
           -DCMAKE_C_COMPILER_LAUNCHER=ccache \
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
           -DCMAKE_FIND_DEBUG_MODE=ON \
-     || (echo "=== CMake logs ==="; ls -R build || true; \
-         (cat build/CMakeFiles/CMakeError.log || true); \
-         (cat build/CMakeFiles/CMakeOutput.log || true); exit 1) \
+     || (echo "=== CMake Configuration Failed ==="; \
+         echo "Build directory contents:"; ls -la build/ 2>/dev/null || echo "No build directory"; \
+         echo "CMake Files:"; find build/ -name "*.log" 2>/dev/null || echo "No log files found"; \
+         if [ -f "build/CMakeFiles/CMakeError.log" ]; then echo "=== CMakeError.log ==="; cat build/CMakeFiles/CMakeError.log; fi; \
+         if [ -f "build/CMakeFiles/CMakeOutput.log" ]; then echo "=== CMakeOutput.log ==="; cat build/CMakeFiles/CMakeOutput.log; fi; \
+         exit 1) \
     && \
     # 병렬 빌드 (CPU 코어 수 활용)
     ninja -C build -j$(nproc) -v && \
