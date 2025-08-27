@@ -87,7 +87,16 @@ RUN cd ${VCPKG_ROOT} \
         --x-install-root=/opt/vcpkg/installed \
         --x-packages-root=/tmp/vcpkg-packages \
         --clean-after-build \
-    && test -f /opt/vcpkg/installed/${VCPKG_DEFAULT_TRIPLET}/share/jwt-cpp/jwt-cppConfig.cmake \
+    && echo "=== Verifying jwt-cpp installation ===" \
+    && ./vcpkg list | sed -n '/jwt/p' \
+    && ( \
+         test -f "/opt/vcpkg/installed/${VCPKG_DEFAULT_TRIPLET}/share/jwt-cpp/jwt-cpp-config.cmake" \
+      || test -f "/opt/vcpkg/installed/${VCPKG_DEFAULT_TRIPLET}/share/jwt-cpp/jwt-cppConfig.cmake" \
+      || test -f "/opt/vcpkg/installed/${VCPKG_DEFAULT_TRIPLET}/lib/cmake/jwt-cpp/jwt-cpp-config.cmake" \
+      || (echo "jwt-cpp CMake config not found; dumping tree:" \
+          && find "/opt/vcpkg/installed/${VCPKG_DEFAULT_TRIPLET}" -maxdepth 4 -type f -iname "*jwt*config*.cmake" -print \
+          && exit 1) \
+       ) \
     && rm -rf /tmp/vcpkg-buildtrees /tmp/vcpkg-packages /tmp/ccache \
     && ./vcpkg list \
     && echo "=== Server-only vcpkg dependencies installation completed ==="
@@ -132,7 +141,9 @@ RUN export PATH="/usr/lib/ccache:$PATH" && \
     echo "VCPKG_ROOT: ${VCPKG_ROOT}" && \
     echo "CMAKE_TOOLCHAIN_FILE: ${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" && \
     echo "VCPKG_TARGET_TRIPLET: ${VCPKG_DEFAULT_TRIPLET}" && \
-    ls -la ${VCPKG_ROOT}/installed/${VCPKG_DEFAULT_TRIPLET}/share/jwt-cpp/ 2>/dev/null || echo "jwt-cpp cmake files not found" && \
+    ls -la ${VCPKG_ROOT}/installed/${VCPKG_DEFAULT_TRIPLET}/share/jwt-cpp/ 2>/dev/null || echo "jwt-cpp share directory not found" && \
+    echo "=== Searching for jwt-cpp CMake config files ===" && \
+    find ${VCPKG_ROOT}/installed/${VCPKG_DEFAULT_TRIPLET} -maxdepth 4 -type f -iname "*jwt*config*.cmake" -print || true && \
     # CMake 구성 (Release 빌드) with verbose output
     cmake -S . -B build \
         -GNinja \
