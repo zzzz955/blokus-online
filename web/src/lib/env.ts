@@ -16,7 +16,8 @@ const DEV_FALLBACKS = {
   INTERNAL_API_KEY: 'dev-internal-api-key',
   ADMIN_SETUP_KEY: 'setup-admin-2024',
   APP_ROOT_DIR: '',
-  THUMBNAIL_PUBLIC_PATH: '/stage-thumbnails',
+  THUMBNAIL_PUBLIC_PATH: '/api/thumbnails',
+  THUMBNAIL_STORAGE_DIR: '../data/stage-thumbnails',
   ALLOW_ADMIN_CREATION: 'false'
 } as const;
 
@@ -62,6 +63,7 @@ export const env = {
   // 파일 저장 설정
   APP_ROOT_DIR: getEnvWithFallback('APP_ROOT_DIR', false) || process.cwd(),
   THUMBNAIL_PUBLIC_PATH: getEnvWithFallback('THUMBNAIL_PUBLIC_PATH', false),
+  THUMBNAIL_STORAGE_DIR: getEnvWithFallback('THUMBNAIL_STORAGE_DIR', false),
   
   // 환경 타입
   NODE_ENV: process.env.NODE_ENV || 'development',

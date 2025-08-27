@@ -122,12 +122,8 @@ FROM vcpkg-builder AS app-builder
 # 작업 디렉토리 설정
 WORKDIR /app
 
-# CMake 프로젝트 파일 먼저 복사 (캐시 최적화)
-COPY CMakeLists.txt ./
-
-# 소스코드를 마지막에 복사 (가장 자주 변경되는 부분)
-COPY common/ ./common/
-COPY server/ ./server/
+# 루트 전체 복사 (.dockerignore로 제외 관리)
+COPY . .
 
 # vcpkg 설치 확인 (디버깅용)
 RUN echo "=== Checking vcpkg installations ===" && \
@@ -154,16 +150,22 @@ RUN export PATH="/usr/lib/ccache:$PATH" && \
     ls -la ${VCPKG_ROOT}/installed/${VCPKG_DEFAULT_TRIPLET}/share/jwt-cpp/ 2>/dev/null || echo "jwt-cpp share directory not found" && \
     echo "=== Searching for jwt-cpp CMake config files ===" && \
     find ${VCPKG_ROOT}/installed/${VCPKG_DEFAULT_TRIPLET} -maxdepth 4 -type f -iname "*jwt*config*.cmake" -print || true && \
-    # CMake 구성 (Release 빌드) with verbose output
-    cmake -S . -B build \
-    -GNinja \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_CXX_STANDARD=20 \
-    -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
-    -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET} \
-    -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-    -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-    -DCMAKE_FIND_DEBUG_MODE=ON && \
+    # CMake 구성 with --fresh flag for cache cleanup
+    echo "=== Using CMake ===" && cmake --version \
+    && echo "=== Toolchain === ${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
+    && cmake --fresh -S . -B build \
+          -GNinja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_CXX_STANDARD=20 \
+          -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
+          -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET} \
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+          -DCMAKE_FIND_DEBUG_MODE=ON \
+     || (echo "=== CMake logs ==="; ls -R build || true; \
+         (cat build/CMakeFiles/CMakeError.log || true); \
+         (cat build/CMakeFiles/CMakeOutput.log || true); exit 1) \
+    && \
     # 병렬 빌드 (CPU 코어 수 활용)
     ninja -C build -j$(nproc) -v && \
     # 빌드 결과 설치 디렉토리에 복사
