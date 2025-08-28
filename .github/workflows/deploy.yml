@@ -91,7 +91,7 @@ jobs:
         fi
 
         INFRA_CHANGED=false
-        if echo "$CHANGED_FILES" | grep -qE '^(docker-compose\.yml|\.github/|\.env\.example)'; then
+        if echo "$CHANGED_FILES" | grep -qE '^(docker-compose\.yml|\.github/|\.env\.example|nginx/)'; then
           INFRA_CHANGED=true
         fi
 

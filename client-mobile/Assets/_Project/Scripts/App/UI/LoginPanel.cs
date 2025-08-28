@@ -55,6 +55,9 @@ namespace App.UI
         {
             base.Start();
             
+            // 🔥 릴리즈 빌드 디버깅을 위한 토스트 메시지
+            ShowSystemDiagnostics();
+            
             // 버튼 이벤트 설정
             SetupButtons();
             
@@ -190,7 +193,7 @@ namespace App.UI
                 yield break;
             }
 
-            SetStatusText("자동 로그인 시도 중...", MessagePriority.Info);
+            SetStatusText("자동 로그인 시도 중...", Shared.UI.MessagePriority.Info);
             SetLoadingState(true);
             isAuthenticating = true;
 
@@ -211,7 +214,7 @@ namespace App.UI
             if (isAuthenticating)
             {
                 Debug.Log("자동 로그인 실패 - 수동 로그인 필요");
-                SetStatusText("로그인이 필요합니다", MessagePriority.Warning);
+                SetStatusText("로그인이 필요합니다", Shared.UI.MessagePriority.Warning);
                 SetLoadingState(false);
                 isAuthenticating = false;
                 
@@ -230,7 +233,11 @@ namespace App.UI
 
         public void OnLoginButtonClicked()
         {
-            if (isAuthenticating) return;
+            if (isAuthenticating)
+            {
+                SystemMessageManager.ShowToast("이미 인증 진행 중입니다", Shared.UI.MessagePriority.Warning);
+                return;
+            }
 
             string username = usernameInput?.text?.Trim();
             string password = passwordInput?.text;
@@ -238,13 +245,15 @@ namespace App.UI
             // 입력 검증
             if (string.IsNullOrEmpty(username))
             {
-                SetStatusText("사용자명을 입력해주세요", MessagePriority.Warning);
+                SetStatusText("사용자명을 입력해주세요",Shared.UI.MessagePriority.Warning);
+                SystemMessageManager.ShowToast("사용자명을 입력해주세요", Shared.UI.MessagePriority.Warning);
                 return;
             }
 
             if (string.IsNullOrEmpty(password))
             {
-                SetStatusText("비밀번호를 입력해주세요", MessagePriority.Warning);
+                SetStatusText("비밀번호를 입력해주세요", Shared.UI.MessagePriority.Warning);
+                SystemMessageManager.ShowToast("비밀번호를 입력해주세요", Shared.UI.MessagePriority.Warning);
                 return;
             }
 
@@ -255,7 +264,11 @@ namespace App.UI
 
         public void OnSocialLoginButtonClicked(int buttonIndex)
         {
-            if (isAuthenticating) return;
+            if (isAuthenticating)
+            {
+                SystemMessageManager.ShowToast("이미 인증 진행 중입니다", Shared.UI.MessagePriority.Warning);
+                return;
+            }
 
             // 버튼 인덱스에 따른 소셜 로그인
             string provider = "unknown";
@@ -265,7 +278,8 @@ namespace App.UI
                 case 1: provider = "facebook"; break;
                 // 추가 소셜 로그인 제공자들...
                 default: 
-                    SetStatusText("지원하지 않는 로그인 방식입니다", MessagePriority.Warning);
+                    SetStatusText("지원하지 않는 로그인 방식입니다", Shared.UI.MessagePriority.Warning);
+                    SystemMessageManager.ShowToast("지원하지 않는 로그인 방식입니다", Shared.UI.MessagePriority.Warning);
                     return;
             }
 
@@ -275,8 +289,9 @@ namespace App.UI
         public void OnRegisterButtonClicked()
         {
             // 웹 애플리케이션으로 리다이렉트
-            SetStatusText("웹 브라우저에서 회원가입을 진행해주세요", MessagePriority.Info);
+            SetStatusText("웹 브라우저에서 회원가입을 진행해주세요", Shared.UI.MessagePriority.Info);
             var registerUrl = $"{EnvironmentConfig.WebServerUrl}/register";
+            
             Application.OpenURL(registerUrl);
             Debug.Log($"회원가입 페이지 열기: {registerUrl}");
         }
@@ -288,7 +303,7 @@ namespace App.UI
         private void PerformHttpLogin(string username, string password)
         {
             isAuthenticating = true;
-            SetStatusText($"로그인 중: {username}", MessagePriority.Info);
+            SetStatusText($"로그인 중: {username}", Shared.UI.MessagePriority.Info);
             SetLoadingState(true);
 
             if (HttpApiClient.Instance != null)
@@ -298,6 +313,7 @@ namespace App.UI
             }
             else
             {
+                SystemMessageManager.ShowToast("HttpApiClient 인스턴스가 없습니다!", Shared.UI.MessagePriority.Error);
                 Debug.LogError("HttpApiClient 인스턴스가 없습니다");
                 OnLoginFailed("네트워크 오류가 발생했습니다");
             }
@@ -307,12 +323,13 @@ namespace App.UI
         {
             if (oidcAuthenticator == null || !oidcAuthenticator.IsReady())
             {
-                SetStatusText("OAuth 설정을 확인하는 중입니다...", MessagePriority.Warning);
+                SetStatusText("OAuth 설정을 확인하는 중입니다...", Shared.UI.MessagePriority.Warning);
+                SystemMessageManager.ShowToast("OAuth 설정을 확인하는 중입니다...", Shared.UI.MessagePriority.Warning);
                 return;
             }
 
             isAuthenticating = true;
-            SetStatusText($"{provider.ToUpper()} 계정으로 로그인 중...", MessagePriority.Info);
+            SetStatusText($"{provider.ToUpper()} 계정으로 로그인 중...", Shared.UI.MessagePriority.Info);
             SetLoadingState(true);
 
             // OIDC Authorization Code Flow 시작
@@ -340,6 +357,13 @@ namespace App.UI
             isAuthenticating = false;
             SetLoadingState(false);
 
+            // 🔥 토스트로 서버 응답 확인 (에러일 때만)
+            if (!success)
+            {
+                SystemMessageManager.ShowToast($"서버 응답 실패: {message?.Substring(0, Math.Min(30, message?.Length ?? 0))}...", 
+                                            Shared.UI.MessagePriority.Error);
+            }
+
             if (success)
             {
                 // 토큰 저장
@@ -353,7 +377,8 @@ namespace App.UI
                 // OIDC_REDIRECT_REQUIRED인 경우 자동으로 OAuth 로그인으로 전환
                 if (message.Contains("OIDC_REDIRECT_REQUIRED") || message.Contains("OIDC flow"))
                 {
-                    SetStatusText("OAuth 인증이 필요합니다. Google 계정으로 로그인합니다...", MessagePriority.Info);
+                    SetStatusText("OAuth 인증이 필요합니다. Google 계정으로 로그인합니다...", Shared.UI.MessagePriority.Info);
+                    SystemMessageManager.ShowToast("OIDC 인증 요구됨 - Google OAuth 자동 전환", Shared.UI.MessagePriority.Warning);
                     Debug.Log("서버에서 OIDC 인증 요구 - Google OAuth로 자동 전환");
                     
                     // 1초 후 자동으로 Google OAuth 시작
@@ -377,7 +402,7 @@ namespace App.UI
             }
             else
             {
-                SetStatusText("Google 로그인 버튼이 설정되지 않았습니다", MessagePriority.Error);
+                SetStatusText("Google 로그인 버튼이 설정되지 않았습니다", Shared.UI.MessagePriority.Error);
             }
         }
 
@@ -409,7 +434,7 @@ namespace App.UI
 
         private void OnLoginSuccess(string message, string token)
         {
-            SetStatusText("로그인 성공!", MessagePriority.Success);
+            SetStatusText("로그인 성공!", Shared.UI.MessagePriority.Success);
             
             Debug.Log($"로그인 성공 - {message}");
 
@@ -424,7 +449,7 @@ namespace App.UI
             PlayerPrefs.SetString("refresh_token", refreshToken);
             PlayerPrefs.Save();
 
-            SetStatusText("OAuth 로그인 성공!", MessagePriority.Success);
+            SetStatusText("OAuth 로그인 성공!", Shared.UI.MessagePriority.Success);
             Debug.Log("OAuth 로그인 성공 - 토큰 저장 완료");
 
             // HttpApiClient에 토큰 설정 (userId는 임시로 0 사용)
@@ -440,7 +465,8 @@ namespace App.UI
 
         private void OnLoginFailed(string errorMessage)
         {
-            SetStatusText($"로그인 실패: {errorMessage}", MessagePriority.Error);
+            SetStatusText($"로그인 실패: {errorMessage}", Shared.UI.MessagePriority.Error);
+            SystemMessageManager.ShowToast($"로그인 실패: {errorMessage}", Shared.UI.MessagePriority.Error);
             Debug.LogWarning($"로그인 실패: {errorMessage}");
 
             // 유효하지 않은 refresh token 삭제
@@ -449,6 +475,7 @@ namespace App.UI
                 PlayerPrefs.DeleteKey("refresh_token");
                 PlayerPrefs.DeleteKey("access_token");
                 PlayerPrefs.Save();
+                SystemMessageManager.ShowToast("유효하지 않은 토큰 삭제됨", Shared.UI.MessagePriority.Warning);
                 Debug.Log("유효하지 않은 토큰 삭제 완료");
             }
         }
@@ -485,10 +512,10 @@ namespace App.UI
             }
 
             SetLoadingState(false);
-            SetStatusText("로그인 정보를 입력하세요", MessagePriority.Info);
+            SetStatusText("로그인 정보를 입력하세요", Shared.UI.MessagePriority.Info);
         }
 
-        private void SetStatusText(string message, MessagePriority priority)
+        private void SetStatusText(string message, Shared.UI.MessagePriority priority)
         {
             if (statusText != null)
             {
@@ -497,13 +524,13 @@ namespace App.UI
                 // 우선순위에 따른 색상 변경
                 switch (priority)
                 {
-                    case MessagePriority.Success:
+                    case Shared.UI.MessagePriority.Success:
                         statusText.color = Color.green;
                         break;
-                    case MessagePriority.Warning:
+                    case Shared.UI.MessagePriority.Warning:
                         statusText.color = Color.yellow;
                         break;
-                    case MessagePriority.Error:
+                    case Shared.UI.MessagePriority.Error:
                         statusText.color = Color.red;
                         break;
                     default:
@@ -536,16 +563,53 @@ namespace App.UI
         }
 
         // ==========================================
+        // 🔥 디버깅 및 진단
+        // ==========================================
+        
+        /// <summary>
+        /// 릴리즈 빌드에서 시스템 상태를 토스트로 표시하여 디버깅 (Warning 이상만)
+        /// </summary>
+        private void ShowSystemDiagnostics()
+        {
+            try
+            {
+                // HttpApiClient 상태 확인 (없으면 에러)
+                bool hasHttpClient = HttpApiClient.Instance != null;
+                if (!hasHttpClient)
+                {
+                    SystemMessageManager.ShowToast("HttpApiClient 없음!", Shared.UI.MessagePriority.Error);
+                }
+                
+                // 버튼 상태 확인 (문제가 있으면 경고)
+                bool loginBtnOk = loginButton != null && loginButton.interactable;
+                bool socialBtnOk = socialLoginButtons != null && socialLoginButtons.Length > 0 && socialLoginButtons[0] != null && socialLoginButtons[0].interactable;
+                bool registerBtnOk = registerButton != null && registerButton.interactable;
+                
+                if (!loginBtnOk || !socialBtnOk || !registerBtnOk)
+                {
+                    SystemMessageManager.ShowToast($"버튼상태 문제 - Login:{loginBtnOk}, Social:{socialBtnOk}, Register:{registerBtnOk}", 
+                        Shared.UI.MessagePriority.Warning);
+                }
+                    
+                // Canvas/UI 시스템 상태 (문제가 있으면 에러)
+                var eventSystem = FindObjectOfType<UnityEngine.EventSystems.EventSystem>();
+                var canvas = GetComponentInParent<Canvas>();
+                var raycaster = GetComponentInParent<GraphicRaycaster>();
+                
+                if (eventSystem == null || canvas == null || raycaster == null)
+                {
+                    SystemMessageManager.ShowToast($"UI시스템 문제 - EventSystem:{eventSystem != null}, Canvas:{canvas != null}, Raycaster:{raycaster != null}", 
+                        Shared.UI.MessagePriority.Error);
+                }
+            }
+            catch (System.Exception ex)
+            {
+                SystemMessageManager.ShowToast($"진단 오류: {ex.Message}", Shared.UI.MessagePriority.Error);
+            }
+        }
+
+        // ==========================================
         // 유틸리티
         // ==========================================
-
-        public enum MessagePriority
-        {
-            Info,
-            Success,
-            Warning,
-            Error,
-            Debug
-        }
     }
 }
