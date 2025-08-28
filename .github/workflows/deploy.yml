@@ -577,7 +577,7 @@ jobs:
           
           echo '📝 .env 파일 생성 중... JWT_SECRET 길이:' \${#JWT_SECRET}
           
-          cat > .env << 'EOF'
+          cat > .env << EOF
         # Image Configuration
         IMAGE_TAG=${{ env.IMAGE_TAG }}
         GAME_SERVER_IMAGE=${{ env.IMAGE_PREFIX }}-game-server:${{ env.IMAGE_TAG }}
@@ -602,12 +602,12 @@ jobs:
         POSTGRES_PASSWORD=${{ secrets.DB_PASSWORD }}
         
         # Security (모든 민감한 정보는 서버 변수 사용)
-        JWT_SECRET=\$JWT_SECRET
-        JWT_REFRESH_SECRET=\$JWT_REFRESH_SECRET
-        NEXTAUTH_SECRET=\$NEXTAUTH_SECRET
-        SESSION_SECRET=\$SESSION_SECRET
-        ADMIN_TOKEN=\$ADMIN_TOKEN
-        INTERNAL_API_KEY=\$INTERNAL_API_KEY
+        JWT_SECRET=$JWT_SECRET
+        JWT_REFRESH_SECRET=$JWT_REFRESH_SECRET
+        NEXTAUTH_SECRET=$NEXTAUTH_SECRET
+        SESSION_SECRET=$SESSION_SECRET
+        ADMIN_TOKEN=$ADMIN_TOKEN
+        INTERNAL_API_KEY=$INTERNAL_API_KEY
         
         # Logging and Debug
         LOG_LEVEL=${{ secrets.LOG_LEVEL }}
@@ -625,7 +625,7 @@ jobs:
         ADMIN_USERNAME=${{ secrets.ADMIN_USERNAME }}
         ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
         GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
-        GOOGLE_CLIENT_SECRET=\$GOOGLE_CLIENT_SECRET
+        GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET
         
         # Single Player API Configuration
         SINGLE_API_PORT=${{ secrets.SINGLE_API_PORT }}
