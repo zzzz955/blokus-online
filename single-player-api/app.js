@@ -165,6 +165,19 @@ app.get('/', (req, res) => {
   })
 })
 
+// Simple health check endpoint for Docker health check (no API prefix)
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'Service is healthy',
+    data: {
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime()
+    }
+  })
+})
+
 // API documentation endpoint
 app.get(`${apiPrefix}`, (req, res) => {
   res.json({
