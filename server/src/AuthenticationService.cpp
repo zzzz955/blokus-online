@@ -48,9 +48,13 @@ namespace Blokus {
                     spdlog::warn("OpenSSL 랜덤 생성기 초기화 확인 필요");
                 }
 
-                // JWT 검증기 초기화
-                std::string jwksUrl = "http://localhost:9000/jwks.json";
-                std::string issuer = "http://localhost:9000";
+                // JWT 검증기 초기화 (환경변수 우선, fallback으로 컨테이너 이름)
+                std::string jwksUrl = std::getenv("OIDC_JWKS_URI") 
+                    ? std::getenv("OIDC_JWKS_URI") 
+                    : "http://blokus-oidc-server:9000/jwks.json";
+                std::string issuer = std::getenv("OIDC_ISSUER")
+                    ? std::getenv("OIDC_ISSUER")
+                    : "http://blokus-oidc-server:9000";
                 std::vector<std::string> audiences = {"blokus-desktop-client"};
                 
                 m_jwtVerifier = std::make_unique<JwtVerifier>(jwksUrl, issuer, audiences);

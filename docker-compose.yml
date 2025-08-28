@@ -65,6 +65,10 @@ services:
       # 보안 설정
       JWT_SECRET: ${JWT_SECRET}
       
+      # OIDC 인증 연동
+      OIDC_JWKS_URI: ${OIDC_JWKS_URI:-http://blokus-oidc-server:9000/jwks.json}
+      OIDC_ISSUER: ${OIDC_ISSUER:-http://blokus-oidc-server:9000}
+      
       # 로깅 설정
       LOG_LEVEL: ${LOG_LEVEL:-info}
       LOG_DIRECTORY: ${LOG_DIRECTORY:-/app/logs}
@@ -89,6 +93,8 @@ services:
     
     depends_on:
       postgres:
+        condition: service_healthy
+      blokus-oidc-server:
         condition: service_healthy
     
     healthcheck:
@@ -275,9 +281,9 @@ services:
       # 시간대
       TZ: Asia/Seoul
     
-    ports:
-      # OIDC 서버는 9000 포트로 직접 노출 (Google OAuth 콜백용)
-      - "${OIDC_PORT:-9000}:9000"
+    # 포트 직접 노출 제거 - Nginx 프록시를 통해서만 접근
+    # ports:
+    #   - "${OIDC_PORT:-9000}:9000"
     
     volumes:
       # OIDC 로그
