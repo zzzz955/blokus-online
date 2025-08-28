@@ -63,8 +63,8 @@ services:
 
       JWT_SECRET: ${JWT_SECRET:?must_provide_JWT_SECRET}
 
-      OIDC_JWKS_URI: ${OIDC_JWKS_URI:-https://blokus-online.mooo.com/oidc/jwks.json}
-      OIDC_ISSUER:   ${OIDC_ISSUER:-https://blokus-online.mooo.com/oidc}
+      OIDC_JWKS_URI: http://blokus-oidc-server:9000/jwks.json
+      OIDC_ISSUER: http://blokus-oidc-server:9000
 
       LOG_LEVEL: ${LOG_LEVEL:-info}
       LOG_DIRECTORY: ${LOG_DIRECTORY:-/app/logs}
@@ -119,8 +119,8 @@ services:
       DB_POOL_MIN: 5
       DB_POOL_MAX: 10
 
-      OIDC_JWKS_URI: ${OIDC_JWKS_URI:-https://blokus-online.mooo.com/oidc/jwks.json}
-      OIDC_BASE_URL: ${OIDC_BASE_URL:-https://blokus-online.mooo.com/oidc}
+      OIDC_JWKS_URI: http://blokus-oidc-server:9000/jwks.json
+      OIDC_BASE_URL: http://blokus-oidc-server:9000
 
       JWT_EXPIRE_IN: 7d
 
@@ -327,11 +327,12 @@ services:
         condition: service_healthy
 
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "--ipv4", "http://127.0.0.1:3000/healthz"]
+      test: ["CMD-SHELL", "curl -fsS --ipv4 http://127.0.0.1:3000/healthz || curl -fsS --ipv4 http://$$(hostname -i):3000/healthz"]
       interval: 10s
       timeout: 5s
       retries: 30
       start_period: 60s
+    command: ["sh","-lc","exec npm run start -- -H 0.0.0.0 -p 3000"]
 
     logging:
       driver: "json-file"
