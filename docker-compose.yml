@@ -120,14 +120,12 @@ services:
     container_name: blokus-single-api
     restart: unless-stopped
     
+    env_file:
+      - .env
     environment:
-      # Database (postgres 컨테이너 연결)
+      # Database (postgres 컨테이너 연결) 
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_NAME: ${DB_NAME}
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
       DB_POOL_MIN: 5
       DB_POOL_MAX: 10
       
@@ -135,8 +133,7 @@ services:
       OIDC_JWKS_URI: ${OIDC_JWKS_URI:-http://blokus-oidc-server:9000/jwks.json}
       OIDC_BASE_URL: ${OIDC_BASE_URL:-http://blokus-oidc-server:9000}
       
-      # JWT (게임 서버와 동일한 시크릿 사용)
-      JWT_SECRET: ${JWT_SECRET}
+      # JWT 토큰 설정
       JWT_EXPIRE_IN: 7d
       
       # Server
@@ -300,10 +297,10 @@ services:
     
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:9000/.well-known/openid_configuration', (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
-      interval: 30s
-      timeout: 15s
-      retries: 5
-      start_period: 60s
+      interval: 45s
+      timeout: 20s
+      retries: 8
+      start_period: 120s
     
     # 로그 설정
     logging:
@@ -367,10 +364,10 @@ services:
     
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
-      interval: 30s
-      timeout: 15s
-      retries: 5
-      start_period: 60s
+      interval: 45s
+      timeout: 20s
+      retries: 8
+      start_period: 90s
     
     # 로그 설정
     logging:
