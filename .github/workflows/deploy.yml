@@ -50,13 +50,12 @@ jobs:
       build-cache-key-web: ${{ steps.cache-keys.outputs.web-cache-key }}
       build-cache-key-single-api: ${{ steps.cache-keys.outputs.single-api-cache-key }}
       build-cache-key-oidc: ${{ steps.cache-keys.outputs.oidc-cache-key }}
-    
     steps:
     - name: Checkout
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
-        
+
     - name: Detect file changes
       id: changes
       run: |
@@ -69,143 +68,104 @@ jobs:
         else
           CHANGED_FILES=""
         fi
-        
         echo "Changed files: $CHANGED_FILES"
-        
-        # 게임 서버 변경사항
+
         GAME_CHANGED=false
         if echo "$CHANGED_FILES" | grep -qE '^(server/|client/|common/|CMakeLists\.txt|vcpkg\.json|Dockerfile)'; then
           GAME_CHANGED=true
         fi
-        
-        # 웹 서버 변경사항  
+
         WEB_CHANGED=false
         if echo "$CHANGED_FILES" | grep -qE '^web/'; then
           WEB_CHANGED=true
         fi
-        
-        # Single Player API 변경사항
+
         SINGLE_API_CHANGED=false
         if echo "$CHANGED_FILES" | grep -qE '^single-player-api/'; then
           SINGLE_API_CHANGED=true
         fi
-        
-        # OIDC Auth Server 변경사항
+
         OIDC_CHANGED=false
         if echo "$CHANGED_FILES" | grep -qE '^oidc-auth-server/'; then
           OIDC_CHANGED=true
         fi
-        
-        # 인프라 변경사항
+
         INFRA_CHANGED=false
         if echo "$CHANGED_FILES" | grep -qE '^(docker-compose\.yml|\.github/|\.env\.example)'; then
           INFRA_CHANGED=true
         fi
-        
+
         echo "game-server=$GAME_CHANGED" >> $GITHUB_OUTPUT
         echo "web=$WEB_CHANGED" >> $GITHUB_OUTPUT
         echo "single-api=$SINGLE_API_CHANGED" >> $GITHUB_OUTPUT
         echo "oidc=$OIDC_CHANGED" >> $GITHUB_OUTPUT
         echo "infrastructure=$INFRA_CHANGED" >> $GITHUB_OUTPUT
-        
+
     - name: Generate cache keys
       id: cache-keys
       run: |
-        # 게임서버 캐시 키 (C++ 의존성 기반)
         GAME_DEPS_HASH=$(find . -name "vcpkg.json" -o -name "CMakeLists.txt" -o -name "*.cpp" -o -name "*.h" | head -20 | xargs cat | sha256sum | cut -d' ' -f1)
         GAME_CACHE_KEY="game-server-v2-$GAME_DEPS_HASH"
-        
-        # 웹서버 캐시 키 (Node.js 의존성 기반)
+
         WEB_DEPS_HASH=$(find web -name "package*.json" -o -name "*.ts" -o -name "*.tsx" | head -20 | xargs cat 2>/dev/null | sha256sum | cut -d' ' -f1 || echo "default")
         WEB_CACHE_KEY="web-server-v2-$WEB_DEPS_HASH"
-        
-        # Single Player API 캐시 키
+
         SINGLE_API_DEPS_HASH=$(find single-player-api -name "package*.json" -o -name "*.js" | head -10 | xargs cat 2>/dev/null | sha256sum | cut -d' ' -f1 || echo "default")
         SINGLE_API_CACHE_KEY="single-api-v2-$SINGLE_API_DEPS_HASH"
-        
-        # OIDC Auth Server 캐시 키
+
         OIDC_DEPS_HASH=$(find oidc-auth-server -name "package*.json" -o -name "*.js" | head -10 | xargs cat 2>/dev/null | sha256sum | cut -d' ' -f1 || echo "default")
         OIDC_CACHE_KEY="oidc-server-v2-$OIDC_DEPS_HASH"
-        
+
         echo "game-cache-key=$GAME_CACHE_KEY" >> $GITHUB_OUTPUT
         echo "web-cache-key=$WEB_CACHE_KEY" >> $GITHUB_OUTPUT
         echo "single-api-cache-key=$SINGLE_API_CACHE_KEY" >> $GITHUB_OUTPUT
         echo "oidc-cache-key=$OIDC_CACHE_KEY" >> $GITHUB_OUTPUT
-        
+
     - name: Setup SSH for deployment status check
       run: |
         mkdir -p ~/.ssh
         echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan -p ${{ env.SSH_PORT }} -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
-        
+
     - name: Check previous deployment status & make decisions
       id: deploy-decision
       run: |
-        # 강제 배포 플래그
         FORCE_GAME="${{ github.event.inputs.force_deploy_game_server }}"
         FORCE_WEB="${{ github.event.inputs.force_deploy_web }}"
         FORCE_INFRA="${{ github.event.inputs.force_deploy_full }}"
-        
-        # 변경사항 기반 초기 결정
+
         DEPLOY_GAME="${{ steps.changes.outputs.game-server }}"
         DEPLOY_WEB="${{ steps.changes.outputs.web }}"
         DEPLOY_SINGLE_API="${{ steps.changes.outputs.single-api }}"
         DEPLOY_OIDC="${{ steps.changes.outputs.oidc }}"
         DEPLOY_INFRA="${{ steps.changes.outputs.infrastructure }}"
-        
-        # 이전 배포 실패 확인
+
         LAST_STATUS=$(ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} \
           "cd ${{ env.DEPLOY_PATH }} && cat .deployment_status.json 2>/dev/null || echo '{}'" | jq -r 2>/dev/null || echo '{}')
-        
         echo "Previous deployment status: $LAST_STATUS"
-        
-        # 실패한 배포 재시도 로직
-        if echo "$LAST_STATUS" | jq -e '.game_server == "failed"' >/dev/null 2>&1; then
-          DEPLOY_GAME=true
-          echo "Game server needs retry due to previous failure"
-        fi
-        
-        if echo "$LAST_STATUS" | jq -e '.web == "failed"' >/dev/null 2>&1; then
-          DEPLOY_WEB=true
-          echo "Web server needs retry due to previous failure"
-        fi
-        
-        if echo "$LAST_STATUS" | jq -e '.single_api == "failed"' >/dev/null 2>&1; then
-          DEPLOY_SINGLE_API=true
-          echo "Single Player API needs retry due to previous failure"
-        fi
-        
-        if echo "$LAST_STATUS" | jq -e '.oidc == "failed"' >/dev/null 2>&1; then
-          DEPLOY_OIDC=true
-          echo "OIDC Auth Server needs retry due to previous failure"
-        fi
-        
-        # 강제 배포 적용
+
+        if echo "$LAST_STATUS" | jq -e '.game_server == "failed"' >/dev/null 2>&1; then DEPLOY_GAME=true; fi
+        if echo "$LAST_STATUS" | jq -e '.web == "failed"' >/dev/null 2>&1; then DEPLOY_WEB=true; fi
+        if echo "$LAST_STATUS" | jq -e '.single_api == "failed"' >/dev/null 2>&1; then DEPLOY_SINGLE_API=true; fi
+        if echo "$LAST_STATUS" | jq -e '.oidc == "failed"' >/dev/null 2>&1; then DEPLOY_OIDC=true; fi
+
         if [ "$FORCE_GAME" = "true" ]; then DEPLOY_GAME=true; fi
         if [ "$FORCE_WEB" = "true" ]; then DEPLOY_WEB=true; fi
         if [ "$FORCE_INFRA" = "true" ]; then
-          DEPLOY_GAME=true
-          DEPLOY_WEB=true
-          DEPLOY_SINGLE_API=true
-          DEPLOY_OIDC=true
-          DEPLOY_INFRA=true
+          DEPLOY_GAME=true; DEPLOY_WEB=true; DEPLOY_SINGLE_API=true; DEPLOY_OIDC=true; DEPLOY_INFRA=true
         fi
-        
-        # 인프라 변경시 전체 배포
+
         if [ "$DEPLOY_INFRA" = "true" ]; then
-          DEPLOY_GAME=true
-          DEPLOY_WEB=true
-          DEPLOY_SINGLE_API=true
-          DEPLOY_OIDC=true
+          DEPLOY_GAME=true; DEPLOY_WEB=true; DEPLOY_SINGLE_API=true; DEPLOY_OIDC=true
         fi
-        
+
         echo "deploy-game-server=$DEPLOY_GAME" >> $GITHUB_OUTPUT
         echo "deploy-web=$DEPLOY_WEB" >> $GITHUB_OUTPUT
         echo "deploy-single-api=$DEPLOY_SINGLE_API" >> $GITHUB_OUTPUT
         echo "deploy-oidc=$DEPLOY_OIDC" >> $GITHUB_OUTPUT
         echo "deploy-infrastructure=$DEPLOY_INFRA" >> $GITHUB_OUTPUT
-        
+
         echo "Final deployment decision:"
         echo "  Game Server: $DEPLOY_GAME"
         echo "  Web Server: $DEPLOY_WEB"
@@ -226,25 +186,24 @@ jobs:
       packages: write
     outputs:
       image-tag: ${{ steps.meta.outputs.tags }}
-      
     steps:
     - name: Checkout
       uses: actions/checkout@v4
-      
+
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
       with:
         driver: docker-container
         driver-opts: |
           network=host
-          
+
     - name: Log in to Container Registry
       uses: docker/login-action@v3
       with:
         registry: ${{ env.REGISTRY }}
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
-        
+
     - name: Extract metadata
       id: meta
       uses: docker/metadata-action@v5
@@ -254,7 +213,7 @@ jobs:
           type=sha,prefix={{branch}}-
           type=raw,value=${{ env.IMAGE_TAG }}
           type=raw,value=latest,enable={{is_default_branch}}
-          
+
     - name: Build and push Game Server
       uses: docker/build-push-action@v5
       with:
@@ -274,13 +233,11 @@ jobs:
           BUILDKIT_INLINE_CACHE=1
           BUILDKIT_MULTI_PLATFORM=false
         platforms: linux/amd64
-        
-    - name: Test Game Server build
-      run: |
-        # 빌드된 이미지로 간단한 동작 테스트
-        docker run --rm -t ${{ env.IMAGE_PREFIX }}-game-server:latest --version || echo "Version check completed"
 
-  # ==========================================  
+    - name: Test Game Server build
+      run: docker run --rm -t ${{ env.IMAGE_PREFIX }}-game-server:latest --version || echo "Version check completed"
+
+  # ==========================================
   # 병렬 빌드 - 웹 서버 (Node.js)
   # ==========================================
   build-web-server:
@@ -293,23 +250,22 @@ jobs:
       packages: write
     outputs:
       image-tag: ${{ steps.meta.outputs.tags }}
-      
     steps:
     - name: Checkout
       uses: actions/checkout@v4
-      
+
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
       with:
         driver: docker-container
-        
+
     - name: Log in to Container Registry
       uses: docker/login-action@v3
       with:
         registry: ${{ env.REGISTRY }}
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
-        
+
     - name: Extract metadata
       id: meta
       uses: docker/metadata-action@v5
@@ -319,7 +275,7 @@ jobs:
           type=sha,prefix={{branch}}-
           type=raw,value=${{ env.IMAGE_TAG }}
           type=raw,value=latest,enable={{is_default_branch}}
-          
+
     - name: Build and push Web Server
       uses: docker/build-push-action@v5
       with:
@@ -338,13 +294,11 @@ jobs:
           BUILDKIT_INLINE_CACHE=1
           NODE_ENV=production
         platforms: linux/amd64
-        
-    - name: Test Web Server build
-      run: |
-        # 빌드된 이미지 기본 동작 테스트
-        echo "Web server build completed successfully"
 
-  # ==========================================  
+    - name: Test Web Server build
+      run: echo "Web server build completed successfully"
+
+  # ==========================================
   # 병렬 빌드 - Single Player API (Node.js)
   # ==========================================
   build-single-api:
@@ -357,23 +311,22 @@ jobs:
       packages: write
     outputs:
       image-tag: ${{ steps.meta.outputs.tags }}
-      
     steps:
     - name: Checkout
       uses: actions/checkout@v4
-      
+
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
       with:
         driver: docker-container
-        
+
     - name: Log in to Container Registry
       uses: docker/login-action@v3
       with:
         registry: ${{ env.REGISTRY }}
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
-        
+
     - name: Extract metadata
       id: meta
       uses: docker/metadata-action@v5
@@ -383,7 +336,7 @@ jobs:
           type=sha,prefix={{branch}}-
           type=raw,value=${{ env.IMAGE_TAG }}
           type=raw,value=latest,enable={{is_default_branch}}
-          
+
     - name: Build and push Single Player API
       uses: docker/build-push-action@v5
       with:
@@ -402,13 +355,11 @@ jobs:
           BUILDKIT_INLINE_CACHE=1
           NODE_ENV=production
         platforms: linux/amd64
-        
-    - name: Test Single Player API build
-      run: |
-        # 빌드된 이미지 기본 동작 테스트
-        echo "Single Player API build completed successfully"
 
-  # ==========================================  
+    - name: Test Single Player API build
+      run: echo "Single Player API build completed successfully"
+
+  # ==========================================
   # 병렬 빌드 - OIDC Auth Server (Node.js)
   # ==========================================
   build-oidc-server:
@@ -421,23 +372,22 @@ jobs:
       packages: write
     outputs:
       image-tag: ${{ steps.meta.outputs.tags }}
-      
     steps:
     - name: Checkout
       uses: actions/checkout@v4
-      
+
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
       with:
         driver: docker-container
-        
+
     - name: Log in to Container Registry
       uses: docker/login-action@v3
       with:
         registry: ${{ env.REGISTRY }}
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
-        
+
     - name: Extract metadata
       id: meta
       uses: docker/metadata-action@v5
@@ -447,7 +397,7 @@ jobs:
           type=sha,prefix={{branch}}-
           type=raw,value=${{ env.IMAGE_TAG }}
           type=raw,value=latest,enable={{is_default_branch}}
-          
+
     - name: Build and push OIDC Auth Server
       uses: docker/build-push-action@v5
       with:
@@ -467,11 +417,9 @@ jobs:
           BUILDKIT_INLINE_CACHE=1
           NODE_ENV=production
         platforms: linux/amd64
-        
+
     - name: Test OIDC Auth Server build
-      run: |
-        # 빌드된 이미지 기본 동작 테스트
-        echo "OIDC Auth Server build completed successfully"
+      run: echo "OIDC Auth Server build completed successfully"
 
   # ==========================================
   # 통합 배포 - 서버에 이미지 배포
@@ -483,36 +431,44 @@ jobs:
     if: always() && (needs.build-game-server.result == 'success' || needs.build-web-server.result == 'success' || needs.build-single-api.result == 'success' || needs.build-oidc-server.result == 'success')
     outputs:
       deployment-performed: ${{ steps.deployment-check.outputs.deployment-performed }}
-    
     steps:
     - name: Check if deployment is needed
       id: deployment-check
       run: |
-        # 빌드 성공한 서비스가 있는지 확인
         GAME_SUCCESS="${{ needs.build-game-server.result }}"
         WEB_SUCCESS="${{ needs.build-web-server.result }}"
         SINGLE_SUCCESS="${{ needs.build-single-api.result }}"
         OIDC_SUCCESS="${{ needs.build-oidc-server.result }}"
-        
         if [[ "$GAME_SUCCESS" == "success" ]] || [[ "$WEB_SUCCESS" == "success" ]] || [[ "$SINGLE_SUCCESS" == "success" ]] || [[ "$OIDC_SUCCESS" == "success" ]]; then
           echo "deployment-performed=true" >> $GITHUB_OUTPUT
-          echo "Deployment will be performed - at least one service was built successfully"
         else
-          echo "deployment-performed=false" >> $GITHUB_OUTPUT  
-          echo "No deployment needed - no services were built"
-          exit 0  # 성공으로 종료
+          echo "deployment-performed=false" >> $GITHUB_OUTPUT
+          exit 0
         fi
-    
+
     - name: Checkout
       uses: actions/checkout@v4
-      
+
     - name: Setup SSH
       run: |
         mkdir -p ~/.ssh
         echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan -p ${{ env.SSH_PORT }} -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
-        
+
+    - name: Sanity check required secrets (runner-side)
+      run: |
+        set -e
+        req=( BLOKUS_SERVER_VERSION BLOKUS_DOWNLOAD_URL )
+        for k in "${req[@]}"; do
+          v="${{ secrets.BLOKUS_SERVER_VERSION }}"
+          [ "$k" = "BLOKUS_DOWNLOAD_URL" ] && v="${{ secrets.BLOKUS_DOWNLOAD_URL }}"
+          if [ -z "$v" ]; then
+            echo "❌ Required secret $k is missing or empty"; exit 1
+          fi
+        done
+        echo "✅ Required secrets present"
+
     - name: Sync source code and environment
       run: |
         ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
@@ -525,18 +481,17 @@ jobs:
             git reset --hard origin/main
           fi
         "
-        
+
     - name: Update environment file
       run: |
         ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} 'bash -se' <<'SSH_EOF'
         set -Eeuo pipefail
-
         cd "${{ env.DEPLOY_PATH }}"
 
-        # 0) 현재 .env 백업
+        # 0) backup
         [ -f .env ] && cp -f .env ".env.bak.$(date +%Y%m%d%H%M%S)" || true
 
-        # 1) 시크릿을 원격 셸 변수로 "값"만 받음 (비면 원격에서 생성)
+        # 1) read secrets (runner-injected values)
         JWT_SECRET="${{ secrets.JWT_SECRET }}"
         JWT_REFRESH_SECRET="${{ secrets.JWT_REFRESH_SECRET }}"
         NEXTAUTH_SECRET="${{ secrets.NEXTAUTH_SECRET }}"
@@ -544,8 +499,14 @@ jobs:
         ADMIN_TOKEN="${{ secrets.ADMIN_TOKEN }}"
         GOOGLE_CLIENT_SECRET="${{ secrets.GOOGLE_CLIENT_SECRET }}"
         INTERNAL_API_KEY="${{ secrets.INTERNAL_API_KEY }}"
+        BLOKUS_SERVER_VERSION="${{ secrets.BLOKUS_SERVER_VERSION }}"
+        BLOKUS_DOWNLOAD_URL="${{ secrets.BLOKUS_DOWNLOAD_URL }}"
 
-        # 2) 누락 시 원격에서 안전하게 생성
+        # 2) enforce required secrets (must not be empty)
+        if [ -z "$BLOKUS_SERVER_VERSION" ]; then echo "❌ BLOKUS_SERVER_VERSION is required"; exit 1; fi
+        if [ -z "$BLOKUS_DOWNLOAD_URL" ]; then echo "❌ BLOKUS_DOWNLOAD_URL is required"; exit 1; fi
+
+        # Optionally auto-generate others if empty
         [ -n "$JWT_SECRET" ] || { JWT_SECRET="$(openssl rand -hex 32)"; echo "⚠️ JWT_SECRET auto-generated"; }
         [ -n "$JWT_REFRESH_SECRET" ] || { JWT_REFRESH_SECRET="$(openssl rand -hex 32)"; echo "⚠️ JWT_REFRESH_SECRET auto-generated"; }
         [ -n "$NEXTAUTH_SECRET" ] || { NEXTAUTH_SECRET="$(openssl rand -hex 32)"; echo "⚠️ NEXTAUTH_SECRET auto-generated"; }
@@ -553,15 +514,12 @@ jobs:
         [ -n "$ADMIN_TOKEN" ] || { ADMIN_TOKEN="$(openssl rand -hex 16)"; echo "⚠️ ADMIN_TOKEN auto-generated"; }
         [ -n "$INTERNAL_API_KEY" ] || { INTERNAL_API_KEY="$(openssl rand -hex 16)"; echo "⚠️ INTERNAL_API_KEY auto-generated"; }
 
-        # 3) .env 새로 작성 (로컬 치환 없음, 모든 줄은 printf로 안전 기록)
+        # 3) write .env safely
         umask 077
         : > .env
+        put_kv(){ printf '%s=%s\n' "$1" "$2" >> .env; }
 
-        put_kv() { # KEY VALUE
-          printf '%s=%s\n' "$1" "$2" >> .env
-        }
-
-        # 이미지/태그
+        # images
         put_kv IMAGE_TAG             "${{ env.IMAGE_TAG }}"
         put_kv GAME_SERVER_IMAGE     "${{ env.IMAGE_PREFIX }}-game-server:${{ env.IMAGE_TAG }}"
         put_kv WEB_SERVER_IMAGE      "${{ env.IMAGE_PREFIX }}-web-server:${{ env.IMAGE_TAG }}"
@@ -578,7 +536,10 @@ jobs:
         put_kv POSTGRES_USER         "${{ secrets.DB_USER }}"
         put_kv POSTGRES_PASSWORD     "${{ secrets.DB_PASSWORD }}"
 
-        # 보안(필수)
+        # required app vars
+        put_kv BLOKUS_SERVER_VERSION "$BLOKUS_SERVER_VERSION"
+        put_kv BLOKUS_DOWNLOAD_URL   "$BLOKUS_DOWNLOAD_URL"
+
         put_kv JWT_SECRET            "$JWT_SECRET"
         put_kv JWT_REFRESH_SECRET    "$JWT_REFRESH_SECRET"
         put_kv NEXTAUTH_SECRET       "$NEXTAUTH_SECRET"
@@ -586,13 +547,13 @@ jobs:
         put_kv ADMIN_TOKEN           "$ADMIN_TOKEN"
         put_kv INTERNAL_API_KEY      "$INTERNAL_API_KEY"
 
-        # 기타
+        # misc
         put_kv LOG_LEVEL             "${{ secrets.LOG_LEVEL }}"
         put_kv LOG_DIRECTORY         "${{ secrets.LOG_DIRECTORY }}"
         put_kv DEBUG_MODE            "${{ secrets.DEBUG_MODE }}"
         put_kv NODE_ENV              "${{ secrets.NODE_ENV }}"
 
-        # Web
+        # web
         put_kv WEB_PORT              "${{ secrets.WEB_PORT }}"
         put_kv WEB_APP_URL           "${{ secrets.WEB_APP_URL }}"
         put_kv DATABASE_URL          "${{ secrets.DATABASE_URL }}"
@@ -602,11 +563,11 @@ jobs:
         put_kv GOOGLE_CLIENT_ID      "${{ secrets.GOOGLE_CLIENT_ID }}"
         put_kv GOOGLE_CLIENT_SECRET  "${{ secrets.GOOGLE_CLIENT_SECRET }}"
 
-        # Single API
+        # single api
         put_kv SINGLE_API_PORT       "${{ secrets.SINGLE_API_PORT }}"
         put_kv REDIS_PORT            "${{ secrets.REDIS_PORT }}"
 
-        # OIDC
+        # oidc
         put_kv OIDC_PORT             "${{ secrets.OIDC_PORT }}"
         put_kv OIDC_ISSUER           "${{ secrets.OIDC_ISSUER }}"
         put_kv OIDC_BASE_URL         "${{ secrets.OIDC_BASE_URL }}"
@@ -619,15 +580,15 @@ jobs:
         put_kv REFRESH_TOKEN_MAX_LIFETIME   "${{ secrets.REFRESH_TOKEN_MAX_LIFETIME }}"
         put_kv AUTH_CODE_LIFETIME    "${{ secrets.AUTH_CODE_LIFETIME }}"
 
-        # SSL / 도메인
+        # ssl/domain
         put_kv DOMAIN                "${{ secrets.DOMAIN }}"
         put_kv CERTBOT_EMAIL         "${{ secrets.CERTBOT_EMAIL }}"
 
-        echo '🔍 Validating .env (non-empty for required keys)...'
+        echo '🔍 Validating .env (required non-empty)...'
         awk -F= '
           /^[A-Za-z_][A-Za-z0-9_]*=/ {
             key=$1; val=$0; sub(/^[^=]*=/,"",val);
-            if (key ~ /^(JWT_SECRET|JWT_REFRESH_SECRET|NEXTAUTH_SECRET|SESSION_SECRET|ADMIN_TOKEN|INTERNAL_API_KEY)$/ && length(val)==0) {
+            if (key ~ /^(JWT_SECRET|JWT_REFRESH_SECRET|NEXTAUTH_SECRET|SESSION_SECRET|ADMIN_TOKEN|INTERNAL_API_KEY|BLOKUS_SERVER_VERSION|BLOKUS_DOWNLOAD_URL)$/ && length(val)==0) {
               printf("❌ %s is empty\n", key); bad=1
             }
           }
@@ -636,16 +597,16 @@ jobs:
         echo '✅ .env integrity OK'
         SSH_EOF
 
-        
     - name: Login to registry on server
       run: |
         ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
           echo '${{ secrets.GITHUB_TOKEN }}' | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
         "
-        
+
     - name: Deploy services (Fast deployment with pre-built images)
       run: |
-        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} 'bash -se' <<'SSH_EOF'
+        ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=8 \
+            -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} 'bash -se' <<'SSH_EOF'
         set -Eeuo pipefail
         cd "${{ env.DEPLOY_PATH }}"
 
@@ -668,83 +629,81 @@ jobs:
         fi
         echo "Using compose command: $COMPOSE_CMD"
 
-        # .env 필수
         [ -f .env ] || { echo 'Error: .env file not found'; update_status 'deployment' 'failed'; exit 1; }
 
-        # 내려두기
         $COMPOSE_CMD --env-file .env down || true
         docker container prune -f || true
 
-        # 사전 pull (선택)
         [ '${{ needs.build-game-server.result }}' = 'success' ] && docker pull "${{ env.IMAGE_PREFIX }}-game-server:${{ env.IMAGE_TAG }}" || true
         [ '${{ needs.build-web-server.result }}' = 'success' ] && docker pull "${{ env.IMAGE_PREFIX }}-web-server:${{ env.IMAGE_TAG }}" || true
         [ '${{ needs.build-single-api.result }}' = 'success' ] && docker pull "${{ env.IMAGE_PREFIX }}-single-api:${{ env.IMAGE_TAG }}" || true
         [ '${{ needs.build-oidc-server.result }}' = 'success' ] && docker pull "${{ env.IMAGE_PREFIX }}-oidc-server:${{ env.IMAGE_TAG }}" || true
 
-        # 기동
         echo 'Starting services with timeout...'
         timeout 300 $COMPOSE_CMD --env-file .env up -d --remove-orphans
 
         echo 'Checking container status...'
         $COMPOSE_CMD --env-file .env ps -a
 
-        if ! $COMPOSE_CMD --env-file .env ps --filter status=running | grep -q running; then
-          echo 'Some containers failed to start. Checking logs...'
-          $COMPOSE_CMD --env-file .env logs --tail=50
+        echo 'Waiting for services to be healthy...'
+        OK=0
+        for i in {1..36}; do
+          JSON=$($COMPOSE_CMD --env-file .env ps --format json || echo '[]')
+          TOTAL=$(echo "$JSON" | jq 'length')
+          RUNNING=$(echo "$JSON" | jq '[.[] | select(.State=="running")] | length')
+          UNHEALTHY=$(echo "$JSON" | jq '[.[] | select(.Health=="unhealthy")] | length')
+          EXITED=$(echo "$JSON" | jq '[.[] | select(.State=="exited")] | length')
+          CORE_OK=$(echo "$JSON" | jq -e \
+            '[.[] | select(.Service=="blokus-oidc-server" or .Service=="blokus-web" or .Service=="blokus-single-api") | select(.Health=="healthy")] | length == 3' >/dev/null; echo $?)
+          echo "tick $i: total=$TOTAL running=$RUNNING unhealthy=$UNHEALTHY exited=$EXITED"
+
+          if [ "$EXITED" -gt 0 ]; then
+            echo 'Detected exited container(s) – stopping wait early.'
+            break
+          fi
+          if [ $CORE_OK -eq 0 ]; then
+            OK=1
+            echo 'Core services healthy.'
+            break
+          fi
+          sleep 5
+        done
+
+        if [ "$OK" -ne 1 ]; then
+          echo 'Health check timeout or unhealthy services - dumping status/logs'
+          $COMPOSE_CMD --env-file .env ps -a
+          $COMPOSE_CMD --env-file .env logs --tail=120
           update_status 'deployment' 'failed'
           exit 1
         fi
 
-        echo 'Waiting for services to be healthy...'
-        for i in {1..24}; do
-          HEALTHY_COUNT=$($COMPOSE_CMD --env-file .env ps --filter health=healthy --format json | wc -l)
-          RUNNING_COUNT=$($COMPOSE_CMD --env-file .env ps --filter status=running --format json | wc -l)
-          echo "Health check $i/24: $HEALTHY_COUNT healthy containers, $RUNNING_COUNT running"
-          [ $HEALTHY_COUNT -gt 0 ] && [ $RUNNING_COUNT -gt 0 ] && break
-          [ $i -eq 24 ] && { $COMPOSE_CMD --env-file .env ps -a; $COMPOSE_CMD --env-file .env logs --tail=20; }
-          sleep 5
-        done
-
         echo 'Final deployment status:'
         $COMPOSE_CMD --env-file .env ps -a
         update_status 'deployment' 'success'
+        exit 0
         SSH_EOF
 
-            
-        - name: Deployment failure handling
-          if: failure()
-          run: |
-            ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
-              cd ${{ env.DEPLOY_PATH }} &&
-              echo '{}' | jq '. + {\"deployment\": \"failed\", \"deployment_timestamp\": \"$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")\"}' > .deployment_status.json
-            " || true
+    - name: Deployment failure handling
+      if: failure()
+      run: |
+        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
+          cd ${{ env.DEPLOY_PATH }} &&
+          echo '{}' | jq '. + {\"deployment\": \"failed\", \"deployment_timestamp\": \"$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")\"}' > .deployment_status.json
+        " || true
 
   # ==========================================
-  # 변경사항 없음 처리 (성공으로 처리)
+  # 변경사항 없음 처리
   # ==========================================
   no-changes-success:
     name: No Changes - Success
     runs-on: ubuntu-latest
     needs: [detect-changes, build-game-server, build-web-server, build-single-api, build-oidc-server]
     if: always() && needs.build-game-server.result == 'skipped' && needs.build-web-server.result == 'skipped' && needs.build-single-api.result == 'skipped' && needs.build-oidc-server.result == 'skipped'
-    
     steps:
     - name: No deployment needed
       run: |
         echo "🎉 Pipeline completed successfully!"
-        echo "================================="
-        echo ""
-        echo "✅ No changes detected in any service"
-        echo "✅ No deployment required"
-        echo "✅ All systems are up to date"
-        echo ""
-        echo "📊 Service status:"
-        echo "  Game Server: No changes"
-        echo "  Web Server: No changes" 
-        echo "  Single Player API: No changes"
-        echo "  OIDC Auth Server: No changes"
-        echo ""
-        echo "💡 This is expected behavior when no code changes are detected."
+        echo "No services changed; no deployment required."
 
   # ==========================================
   # 빌드 실패 처리
@@ -754,44 +713,14 @@ jobs:
     runs-on: ubuntu-latest
     needs: [detect-changes, build-game-server, build-web-server, build-single-api, build-oidc-server]
     if: always() && (needs.build-game-server.result == 'failure' || needs.build-web-server.result == 'failure' || needs.build-single-api.result == 'failure' || needs.build-oidc-server.result == 'failure')
-    
     steps:
     - name: Report build failures
       run: |
         echo "❌ Build Failure Detected!"
-        echo "=========================="
-        echo ""
-        echo "📊 Build Results:"
-        echo "  Game Server: ${{ needs.build-game-server.result }}"
-        echo "  Web Server: ${{ needs.build-web-server.result }}"
-        echo "  Single Player API: ${{ needs.build-single-api.result }}"
-        echo "  OIDC Auth Server: ${{ needs.build-oidc-server.result }}"
-        echo ""
-        
-        # 실패한 서비스 확인
-        FAILED_SERVICES=""
-        if [[ "${{ needs.build-game-server.result }}" == "failure" ]]; then
-          FAILED_SERVICES="$FAILED_SERVICES Game-Server"
-        fi
-        if [[ "${{ needs.build-web-server.result }}" == "failure" ]]; then
-          FAILED_SERVICES="$FAILED_SERVICES Web-Server"
-        fi
-        if [[ "${{ needs.build-single-api.result }}" == "failure" ]]; then
-          FAILED_SERVICES="$FAILED_SERVICES Single-Player-API"
-        fi
-        if [[ "${{ needs.build-oidc-server.result }}" == "failure" ]]; then
-          FAILED_SERVICES="$FAILED_SERVICES OIDC-Auth-Server"
-        fi
-        
-        echo "🚨 Failed Services:$FAILED_SERVICES"
-        echo ""
-        echo "🔧 Next Steps:"
-        echo "1. Check build logs for detailed error messages"
-        echo "2. Fix the issues in the failing services"
-        echo "3. Push fixes to trigger a new deployment"
-        echo ""
-        
-        # 파이프라인 실패로 종료
+        echo "Game Server: ${{ needs.build-game-server.result }}"
+        echo "Web Server: ${{ needs.build-web-server.result }}"
+        echo "Single Player API: ${{ needs.build-single-api.result }}"
+        echo "OIDC Auth Server: ${{ needs.build-oidc-server.result }}"
         exit 1
 
   # ==========================================
@@ -802,41 +731,24 @@ jobs:
     runs-on: ubuntu-latest
     needs: [detect-changes, build-game-server, build-web-server, build-single-api, build-oidc-server, deploy-to-server, no-changes-success, build-failure-handler]
     if: always() && (needs.deploy-to-server.result == 'success' || needs.deploy-to-server.result == 'failure') && needs.build-failure-handler.result != 'failure'
-    
     steps:
     - name: Display summary
       run: |
         echo "🚀 Optimized Deployment Summary"
-        echo "================================"
-        echo ""
-        echo "📊 Changes detected:"
+        echo "Changes:"
         echo "  Game Server: ${{ needs.detect-changes.outputs.game-server-changed }}"
         echo "  Web Server: ${{ needs.detect-changes.outputs.web-changed }}"
-        echo "  Single Player API: ${{ needs.detect-changes.outputs.single-api-changed }}"
-        echo "  OIDC Auth Server: ${{ needs.detect-changes.outputs.oidc-changed }}"
-        echo "  Infrastructure: ${{ needs.detect-changes.outputs.infrastructure-changed }}"
-        echo ""
-        echo "🎯 Deployment decisions:"
-        echo "  Game Server: ${{ needs.detect-changes.outputs.deploy-game-server }}"
-        echo "  Web Server: ${{ needs.detect-changes.outputs.deploy-web }}"
-        echo "  Single Player API: ${{ needs.detect-changes.outputs.deploy-single-api }}"
-        echo "  OIDC Auth Server: ${{ needs.detect-changes.outputs.deploy-oidc }}"
-        echo "  Infrastructure: ${{ needs.detect-changes.outputs.deploy-infrastructure }}"
-        echo ""
-        echo "🏗️ Build results:"
-        echo "  Game Server build: ${{ needs.build-game-server.result }}"
-        echo "  Web Server build: ${{ needs.build-web-server.result }}"
-        echo "  Single Player API build: ${{ needs.build-single-api.result }}"
-        echo "  OIDC Auth Server build: ${{ needs.build-oidc-server.result }}"
-        echo "  Server deployment: ${{ needs.deploy-to-server.result }}"
-        echo ""
-        
-        # 전체 성공 여부 확인
+        echo "  Single API: ${{ needs.detect-changes.outputs.single-api-changed }}"
+        echo "  OIDC: ${{ needs.detect-changes.outputs.oidc-changed }}"
+        echo "  Infra: ${{ needs.detect-changes.outputs.infrastructure-changed }}"
+        echo "Build results:"
+        echo "  Game: ${{ needs.build-game-server.result }}"
+        echo "  Web: ${{ needs.build-web-server.result }}"
+        echo "  Single: ${{ needs.build-single-api.result }}"
+        echo "  OIDC: ${{ needs.build-oidc-server.result }}"
+        echo "Deploy: ${{ needs.deploy-to-server.result }}"
         if [ "${{ needs.deploy-to-server.result }}" = "success" ]; then
-          echo "✅ Deployment completed successfully in under 3 minutes!"
-          echo "🌐 Services:"
-          echo "  Game Server: ${{ secrets.WEB_APP_URL }}:${{ secrets.SERVER_PORT }}"
-          echo "  Web Application: https://${{ secrets.WEB_APP_URL }}"
+          echo "✅ Deployment completed successfully!"
         else
           echo "❌ Deployment failed!"
           exit 1

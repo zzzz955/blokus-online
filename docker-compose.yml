@@ -55,8 +55,8 @@ services:
       SERVER_PORT: ${SERVER_PORT:-9999}
       SERVER_MAX_CLIENTS: ${SERVER_MAX_CLIENTS:-1000}
       SERVER_THREAD_POOL_SIZE: ${SERVER_THREAD_POOL_SIZE:-4}
-      BLOKUS_SERVER_VERSION: ${BLOKUS_SERVER_VERSION}
-      BLOKUS_DOWNLOAD_URL: ${BLOKUS_DOWNLOAD_URL}
+      BLOKUS_SERVER_VERSION: ${BLOKUS_SERVER_VERSION:?must_provide_BLOKUS_SERVER_VERSION}
+      BLOKUS_DOWNLOAD_URL:   ${BLOKUS_DOWNLOAD_URL:?must_provide_BLOKUS_DOWNLOAD_URL}
       
       # 데이터베이스 연결 (postgres 서비스명 사용)
       DB_HOST: postgres
@@ -325,14 +325,14 @@ services:
       NEXT_TELEMETRY_DISABLED: 1
       
       # 웹 애플리케이션 설정
-      APP_URL: https://${WEB_APP_URL}
+      APP_URL: ${WEB_APP_URL}
       CLIENT_DOWNLOAD_URL: ${CLIENT_DOWNLOAD_URL}
       
       # 데이터베이스 연결 (웹 전용 DB)
       DATABASE_URL: ${DATABASE_URL}
       
       # 인증 설정
-      NEXTAUTH_URL: https://${WEB_APP_URL}
+      NEXTAUTH_URL: ${WEB_APP_URL}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
       JWT_SECRET: ${JWT_SECRET:?must_provide_JWT_SECRET}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
