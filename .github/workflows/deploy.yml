@@ -531,7 +531,9 @@ jobs:
         ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
           cd ${{ env.DEPLOY_PATH }} &&
           
-          # 민감한 환경변수들 자동 생성
+          # 환경변수 설정 (GitHub Secrets 우선, 없으면 자동 생성)
+          echo '🔐 환경변수 설정 중...'
+          
           JWT_SECRET='${{ secrets.JWT_SECRET }}'
           JWT_REFRESH_SECRET='${{ secrets.JWT_REFRESH_SECRET }}'
           NEXTAUTH_SECRET='${{ secrets.NEXTAUTH_SECRET }}'
@@ -540,25 +542,40 @@ jobs:
           GOOGLE_CLIENT_SECRET='${{ secrets.GOOGLE_CLIENT_SECRET }}'
           INTERNAL_API_KEY='${{ secrets.INTERNAL_API_KEY }}'
           
-          # 누락된 시크릿들 자동 생성
+          # 누락된 시크릿들 자동 생성 및 디버그 출력
           if [ -z \"\$JWT_SECRET\" ]; then
             JWT_SECRET=\$(openssl rand -hex 32)
+            echo '⚠️ JWT_SECRET이 GitHub Secrets에 없어서 자동 생성했습니다'
+          else
+            echo \"✅ JWT_SECRET을 GitHub Secrets에서 로드했습니다 (길이: \${#JWT_SECRET})\"
           fi
+          
           if [ -z \"\$JWT_REFRESH_SECRET\" ]; then
             JWT_REFRESH_SECRET=\$(openssl rand -hex 32)
+            echo '⚠️ JWT_REFRESH_SECRET을 자동 생성했습니다'
           fi
+          
           if [ -z \"\$NEXTAUTH_SECRET\" ]; then
             NEXTAUTH_SECRET=\$(openssl rand -hex 32)
+            echo '⚠️ NEXTAUTH_SECRET을 자동 생성했습니다'
           fi
+          
           if [ -z \"\$SESSION_SECRET\" ]; then
             SESSION_SECRET=\$(openssl rand -hex 32)
+            echo '⚠️ SESSION_SECRET을 자동 생성했습니다'
           fi
+          
           if [ -z \"\$ADMIN_TOKEN\" ]; then
             ADMIN_TOKEN=\$(openssl rand -hex 16)
+            echo '⚠️ ADMIN_TOKEN을 자동 생성했습니다'
           fi
+          
           if [ -z \"\$INTERNAL_API_KEY\" ]; then
             INTERNAL_API_KEY=\$(openssl rand -hex 16)
+            echo '⚠️ INTERNAL_API_KEY을 자동 생성했습니다'
           fi
+          
+          echo '📝 .env 파일 생성 중... JWT_SECRET 길이:' \${#JWT_SECRET}
           
           cat > .env << 'EOF'
         # Image Configuration
@@ -631,6 +648,22 @@ jobs:
         DOMAIN=${{ secrets.DOMAIN }}
         CERTBOT_EMAIL=${{ secrets.CERTBOT_EMAIL }}
         EOF
+          
+          # .env 파일 생성 검증
+          echo '🔍 .env 파일 검증 중...'
+          if [ -f .env ]; then
+            echo '✅ .env 파일이 성공적으로 생성되었습니다'
+            echo \"📊 파일 크기: \$(wc -l < .env) lines\"
+            echo '🔍 중요 환경변수 확인:'
+            if grep -q 'JWT_SECRET=' .env; then
+              echo '✅ JWT_SECRET 설정됨'
+            else
+              echo '❌ JWT_SECRET 누락!'
+            fi
+          else
+            echo '❌ .env 파일 생성 실패!'
+            exit 1
+          fi
         "
         
     - name: Login to registry on server
