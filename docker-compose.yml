@@ -110,8 +110,9 @@ services:
     env_file:
       - .env
     environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
+      DATABASE_URL: ${DATABASE_URL}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
@@ -158,11 +159,11 @@ services:
         condition: service_healthy
 
     healthcheck:
-      test: ["CMD", "node", "-e", "const http=require('http');const P=['/api/health/live','/api/health','/'];let i=0;const go=()=>{if(i>=P.length)process.exit(1);http.get('http://localhost:8080'+P[i++],r=>{if(r.statusCode===200)process.exit(0);go();}).on('error',go)};go();"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 90s
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health >/dev/null 2>&1 || wget -qO- http://127.0.0.1:8080/ >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+      start_period: 60s
 
     logging:
       driver: "json-file"
@@ -326,13 +327,11 @@ services:
         condition: service_healthy
 
     healthcheck:
-      test: ["CMD", "node", "-e",
-        "require('http').get('http://localhost:3000/', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
-      ]
-      interval: 45s
-      timeout: 20s
-      retries: 3
-      start_period: 90s
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+      start_period: 60s
 
     logging:
       driver: "json-file"

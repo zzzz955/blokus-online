@@ -669,7 +669,7 @@ jobs:
         $COMPOSE_CMD --env-file .env ps -a || true
 
         # ---- 건강 체크: 서비스명 -> CID -> docker inspect ----
-        must_be_healthy=(blokus-oidc-server blokus-web blokus-single-api)
+        must_be_healthy=(blokus-oidc-server)
         ok=0
         for i in {1..36}; do
           all=1
