@@ -675,7 +675,7 @@ jobs:
         echo 'Waiting for core services (web/oidc/single-api) to be healthy...'
         OK=0
         for i in {1..36}; do
-          JSON=$($COMPOSE_CMD --env-file .env ps --format json || echo '[]')
+          JSON=$($COMPOSE_CMD --env-file .env ps --format '{{json .}}' 2>/dev/null | jq -s '.')
           TOTAL=$(echo "$JSON" | jq 'length')
           RUNNING=$(echo "$JSON" | jq '[.[] | select(.State=="running")] | length')
           UNHEALTHY=$(echo "$JSON" | jq '[.[] | select(.Health=="unhealthy")] | length')
