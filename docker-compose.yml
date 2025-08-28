@@ -1,3 +1,5 @@
+version: "3.9"
+
 # Removed obsolete version attribute for Docker Compose v2 compatibility
 
 services:
@@ -6,35 +8,33 @@ services:
     image: postgres:16-alpine
     container_name: blokus-postgres
     restart: unless-stopped
-    
+    pull_policy: always
+
+    env_file:
+      - .env
     environment:
-      # .env 파일에서 환경변수 로드
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
       TZ: Asia/Seoul
-    
+
     volumes:
-      # 데이터베이스 영속성
       - postgres_data:/var/lib/postgresql/data
-      # 초기 스키마 스크립트 (옵션)
-      - ./sql:/docker-entrypoint-initdb.d:ro
-    
+
     ports:
       - "${DB_PORT:-5432}:5432"
-    
+
     networks:
       - blokus-network
-    
+
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 10s
       timeout: 5s
       retries: 3
       start_period: 30s
-    
-    # 로그 설정
+
     logging:
       driver: "json-file"
       options:
@@ -46,221 +46,193 @@ services:
     image: ${GAME_SERVER_IMAGE:-ghcr.io/zzzz955/blokus-online/blokus-game-server:${IMAGE_TAG:-latest}}
     container_name: blokus-server
     restart: unless-stopped
+    pull_policy: always
 
     env_file:
       - .env
-    
     environment:
-      # 서버 설정
       SERVER_PORT: ${SERVER_PORT:-9999}
       SERVER_MAX_CLIENTS: ${SERVER_MAX_CLIENTS:-1000}
       SERVER_THREAD_POOL_SIZE: ${SERVER_THREAD_POOL_SIZE:-4}
       BLOKUS_SERVER_VERSION: ${BLOKUS_SERVER_VERSION:?must_provide_BLOKUS_SERVER_VERSION}
       BLOKUS_DOWNLOAD_URL:   ${BLOKUS_DOWNLOAD_URL:?must_provide_BLOKUS_DOWNLOAD_URL}
-      
-      # 데이터베이스 연결 (postgres 서비스명 사용)
+
       DB_HOST: postgres
       DB_PORT: ${DB_PORT:-5432}
       DB_USER: ${DB_USER:?must_provide_DB_USER}
       DB_PASSWORD: ${DB_PASSWORD:?must_provide_DB_PASSWORD}
       DB_NAME: ${DB_NAME:?must_provide_DB_NAME}
-      
-      # 보안 설정
+
       JWT_SECRET: ${JWT_SECRET:?must_provide_JWT_SECRET}
-      
-      # OIDC 인증 연동
+
       OIDC_JWKS_URI: ${OIDC_JWKS_URI:-http://blokus-oidc-server:9000/jwks.json}
-      OIDC_ISSUER: ${OIDC_ISSUER:-http://blokus-oidc-server:9000}
-      
-      # 로깅 설정
+      OIDC_ISSUER:   ${OIDC_ISSUER:-http://blokus-oidc-server:9000}
+
       LOG_LEVEL: ${LOG_LEVEL:-info}
       LOG_DIRECTORY: ${LOG_DIRECTORY:-/app/logs}
-      
-      # 개발 설정
       DEBUG_MODE: ${DEBUG_MODE:-false}
-      
-      # 시간대
       TZ: Asia/Seoul
-    
+
     volumes:
-      # 로그 디렉토리 마운트
       - ./logs:/app/logs
-      # 설정 파일 (옵션)
       - ./config:/app/config:ro
-    
+
     ports:
       - "${SERVER_PORT:-9999}:${SERVER_PORT:-9999}"
-    
+
     networks:
       - blokus-network
-    
+
     depends_on:
       postgres:
         condition: service_healthy
       blokus-oidc-server:
         condition: service_healthy
-    
+
     healthcheck:
       test: ["CMD", "netcat", "-z", "localhost", "9999"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
-    
-    # 로그 설정
+
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "5"
 
-  # ========== Single Player API Server (NEW) ==========
+  # ========== Single Player API Server ==========
   blokus-single-api:
     image: ${SINGLE_API_IMAGE:-ghcr.io/zzzz955/blokus-online/blokus-single-api:${IMAGE_TAG:-latest}}
-    build:
-      context: ./single-player-api
-      dockerfile: Dockerfile
     container_name: blokus-single-api
     restart: unless-stopped
-    
+    pull_policy: always
+
     env_file:
       - .env
     environment:
-      # Database (postgres 컨테이너 연결) 
       DB_HOST: postgres
       DB_PORT: 5432
       DB_POOL_MIN: 5
       DB_POOL_MAX: 10
-      
-      # Single Player API에서 사용하는 OIDC 환경변수들
+
       OIDC_JWKS_URI: ${OIDC_JWKS_URI:-http://blokus-oidc-server:9000/jwks.json}
       OIDC_BASE_URL: ${OIDC_BASE_URL:-http://blokus-oidc-server:9000}
-      
-      # JWT 토큰 설정
+
       JWT_EXPIRE_IN: 7d
-      
-      # Server
+
       NODE_ENV: ${NODE_ENV:-production}
       PORT: 8080
-      
-      # Unity 클라이언트용 - CORS 설정 (모든 Origin 허용)
-      # Unity HTTP 요청은 Origin 헤더가 없으므로 개방적으로 설정
+
       ALLOWED_ORIGINS: "*"
-      
-      # Rate Limiting
-      RATE_LIMIT_WINDOW_MS: 900000  # 15분
-      RATE_LIMIT_MAX_REQUESTS: 200  # Unity 앱용으로 조금 더 여유롭게
-      
-      # Logging
+
+      RATE_LIMIT_WINDOW_MS: 900000
+      RATE_LIMIT_MAX_REQUESTS: 200
+
       LOG_LEVEL: ${LOG_LEVEL:-info}
-      
-      # Redis 캐시 (선택사항)
+
       REDIS_URL: redis://redis:6379
-      CACHE_TTL_STAGE: 3600     # 1시간
-      CACHE_TTL_PROGRESS: 300   # 5분
-      
-      # Performance
+      CACHE_TTL_STAGE: 3600
+      CACHE_TTL_PROGRESS: 300
+
       COMPRESSION_LEVEL: 6
       TRUST_PROXY: true
-      
-      # 시간대
       TZ: Asia/Seoul
-    
-    ports:
-      - "${SINGLE_API_PORT:-8080}:8080"
-    
+
+    # 포트 외부 노출은 nginx로 라우팅(권장). 필요시 주석 해제.
+    # ports:
+    #   - "${SINGLE_API_PORT:-8080}:8080"
+
     volumes:
       - ./single-player-api/logs:/app/logs
-    
+
     networks:
       - blokus-network
-    
+
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    
+
     healthcheck:
       test: ["CMD", "node", "-e", "const http=require('http');const P=['/api/health/live','/api/health','/'];let i=0;const go=()=>{if(i>=P.length)process.exit(1);http.get('http://localhost:8080'+P[i++],r=>{if(r.statusCode===200)process.exit(0);go();}).on('error',go)};go();"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
-    
-    # 로그 설정
+
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
 
-  # ========== Redis Cache (NEW) ==========
+  # ========== Redis Cache ==========
   redis:
     image: redis:7-alpine
     container_name: blokus-redis
     restart: unless-stopped
-    
+    pull_policy: always
+
+    env_file:
+      - .env
     environment:
       TZ: Asia/Seoul
-    
+
     command: |
       redis-server
       --appendonly yes
       --maxmemory 256mb
       --maxmemory-policy allkeys-lru
-    
+
     volumes:
       - redis_data:/data
       - ./single-player-api/logs:/var/log/redis
-    
+
     ports:
       - "${REDIS_PORT:-6379}:6379"
-    
+
     networks:
       - blokus-network
-    
+
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
-    
-    # 로그 설정
+
     logging:
       driver: "json-file"
       options:
         max-size: "5m"
         max-file: "3"
 
-  # ========== OIDC Authentication Server (NEW) ==========
+  # ========== OIDC Authentication Server ==========
   blokus-oidc-server:
     image: ${OIDC_SERVER_IMAGE:-ghcr.io/zzzz955/blokus-online/blokus-oidc-server:${IMAGE_TAG:-latest}}
-    build:
-      context: ./oidc-auth-server
-      dockerfile: Dockerfile
     container_name: blokus-oidc-server
     restart: unless-stopped
-    
+    pull_policy: always
+
+    env_file:
+      - .env
     environment:
-      # OIDC Server 설정
       NODE_ENV: ${NODE_ENV:-production}
       PORT: 9000
       LOG_LEVEL: ${LOG_LEVEL:-info}
-      
-      # OIDC Issuer 설정
+
       OIDC_ISSUER: ${OIDC_ISSUER:-http://blokus-oidc-server:9000}
       OIDC_BASE_URL: ${OIDC_BASE_URL:-http://blokus-oidc-server:9000}
       OIDC_JWKS_URI: ${OIDC_JWKS_URI:-http://blokus-oidc-server:9000/jwks.json}
-      
-      # Token 수명
+
       ACCESS_TOKEN_LIFETIME: ${ACCESS_TOKEN_LIFETIME:-10m}
       REFRESH_TOKEN_LIFETIME: ${REFRESH_TOKEN_LIFETIME:-30d}
       REFRESH_TOKEN_MAX_LIFETIME: ${REFRESH_TOKEN_MAX_LIFETIME:-90d}
       AUTH_CODE_LIFETIME: ${AUTH_CODE_LIFETIME:-10m}
-      
-      # Database (postgres 컨테이너 연결)
+
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: ${DB_NAME}
@@ -268,44 +240,38 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       DB_POOL_MIN: 2
       DB_POOL_MAX: 10
-      
-      # Google OAuth
+
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-      
-      # Session & Security
+
       SESSION_SECRET: ${SESSION_SECRET:-oidc-session-secret-change-in-production}
       WEB_CLIENT_SECRET: ${WEB_CLIENT_SECRET:-web-client-secret-change-in-production}
       ADMIN_TOKEN: ${ADMIN_TOKEN:-admin-token-change-in-production}
-      
-      # 시간대
+
       TZ: Asia/Seoul
-    
-    # 포트 직접 노출 제거 - Nginx 프록시를 통해서만 접근
+
+    # 외부 포트 노출 제거 (nginx 통해 접근)
     # ports:
     #   - "${OIDC_PORT:-9000}:9000"
-    
+
     volumes:
-      # OIDC 로그
       - ./oidc-auth-server/logs:/app/logs
-      # JWT 키 저장
       - ./oidc-auth-server/keys:/app/keys
-    
+
     networks:
       - blokus-network
-    
+
     depends_on:
       postgres:
         condition: service_healthy
-    
+
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:9000/.well-known/openid-configuration', (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
       interval: 45s
       timeout: 20s
       retries: 3
       start_period: 120s
-    
-    # 로그 설정
+
     logging:
       driver: "json-file"
       options:
@@ -317,62 +283,54 @@ services:
     image: ${WEB_SERVER_IMAGE:-ghcr.io/zzzz955/blokus-online/blokus-web-server:${IMAGE_TAG:-latest}}
     container_name: blokus-web
     restart: unless-stopped
-    
+    pull_policy: always
+
+    env_file:
+      - .env
     environment:
-      # Next.js 설정
       NODE_ENV: production
       PORT: ${WEB_PORT:-3000}
       NEXT_TELEMETRY_DISABLED: 1
-      
-      # 웹 애플리케이션 설정
+
       APP_URL: ${WEB_APP_URL}
       CLIENT_DOWNLOAD_URL: ${CLIENT_DOWNLOAD_URL}
-      
-      # 데이터베이스 연결 (웹 전용 DB)
+
       DATABASE_URL: ${DATABASE_URL}
-      
-      # 인증 설정
+
       NEXTAUTH_URL: ${WEB_APP_URL}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
       JWT_SECRET: ${JWT_SECRET:?must_provide_JWT_SECRET}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-      
-      # 관리자 계정
+
       ADMIN_USERNAME: ${ADMIN_USERNAME}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
-      
-      # 파일 저장소 설정
+
       THUMBNAIL_STORAGE_DIR: /var/lib/blokus/stage-thumbnails
-      
-      # 시간대
       TZ: Asia/Seoul
-    
+
     volumes:
-      # 업로드된 파일 영속성
       - ./web/uploads:/app/public/uploads
-      # 스테이지 썸네일 영속성 (레포지토리 외부)
       - ${THUMBNAIL_HOST_DIR:-/var/lib/blokus/stage-thumbnails}:/var/lib/blokus/stage-thumbnails
-    
-    # 포트는 nginx를 통해서만 접근하므로 외부 노출 불필요
+
+    # 외부 노출 불필요 (nginx 경유)
     # ports:
     #   - "${WEB_PORT:-3000}:3000"
-    
+
     networks:
       - blokus-network
-    
+
     depends_on:
       postgres:
         condition: service_healthy
-    
+
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
       interval: 45s
       timeout: 20s
       retries: 3
       start_period: 90s
-    
-    # 로그 설정
+
     logging:
       driver: "json-file"
       options:
@@ -384,41 +342,38 @@ services:
     image: nginx:alpine
     container_name: blokus-nginx
     restart: unless-stopped
-    
+    pull_policy: always
+
+    # 외부 포트 노출 지점
     ports:
       - "80:80"
       - "443:443"
       - "9000:9000"  # OIDC 서버 (Google OAuth 콜백용)
-      # Single Player API도 Nginx를 통해 라우팅 (선택사항)
-      # - "8080:8080"  # 직접 접근도 허용
-    
+      # Single API도 Nginx를 통해 라우팅하려면 server 블록 구성 후 선택 노출
+      # - "8080:8080"
+
     volumes:
-      # Nginx 설정
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      # SSL 인증서 (Let's Encrypt)
       - ./certbot/conf:/etc/letsencrypt:ro
       - ./certbot/www:/var/www/certbot:ro
-      # 클라이언트 다운로드 파일
       - ./downloads:/var/www/downloads:ro
-      # 로그
       - ./logs/nginx:/var/log/nginx
-    
+
     networks:
       - blokus-network
-    
+
     depends_on:
       - blokus-web
       - blokus-server
       - blokus-single-api
-      - blokus-oidc-server  # OIDC 서버 추가
-    
+      - blokus-oidc-server
+
     healthcheck:
       test: ["CMD", "nginx", "-t"]
       interval: 30s
       timeout: 10s
       retries: 3
-    
-    # 로그 설정
+
     logging:
       driver: "json-file"
       options:
@@ -426,27 +381,26 @@ services:
         max-file: "3"
 
   # ========== Let's Encrypt Certbot ==========
-  # certbot은 docker-compose run으로 수동 실행하는 것을 권장
-  # 초기 인증서 발급: docker-compose run --rm certbot certonly --webroot -w /var/www/certbot --email ${CERTBOT_EMAIL} -d ${DOMAIN} --agree-tos --non-interactive
-  # 인증서 갱신: docker-compose run --rm certbot renew --quiet
   certbot:
     image: certbot/certbot
     container_name: blokus-certbot
     profiles: ["manual"]  # 기본 up에서 제외, 수동 실행용
-    
+    pull_policy: always
+
+    env_file:
+      - .env
     volumes:
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
       - ./logs/certbot:/var/log/letsencrypt
-    
+
     networks:
       - blokus-network
-    
+
     environment:
       - DOMAIN=${DOMAIN}
       - EMAIL=${CERTBOT_EMAIL}
-    
-    # 로그 설정
+
     logging:
       driver: "json-file"
       options:
