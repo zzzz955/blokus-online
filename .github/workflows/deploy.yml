@@ -611,21 +611,39 @@ jobs:
 
         SSH_EOF
 
-    - name: Login to registry on server
+    - name: Login to registry on server (use PAT; fallback to GITHUB_TOKEN)
+      env:
+        GHCR_PAT: ${{ secrets.GHCR_PAT }}
+        GHCR_USER: ${{ github.repository_owner }}
+        RUNTIME_ACTOR: ${{ github.actor }}
+        RUNTIME_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
-          docker logout ${{ env.REGISTRY }} || true
-          echo '${{ secrets.GITHUB_TOKEN }}' | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
-        "
+        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} 'bash -se' <<SSH_EOF
+        set -Eeuo pipefail
 
-    - name: Pull images & deploy without build (with DB backup)
+        # 값 주입 (러너에서 치환되어 원격 셸 변수로 설정됨)
+        GHCR_PAT="${GHCR_PAT}"
+        GHCR_USER="${GHCR_USER}"
+        RUNTIME_ACTOR="${RUNTIME_ACTOR}"
+        RUNTIME_TOKEN="${RUNTIME_TOKEN}"
+
+        docker logout ghcr.io >/dev/null 2>&1 || true
+
+        if [ -n "${GHCR_PAT:-}" ]; then
+          printf '%s' "$GHCR_PAT" | docker login ghcr.io -u "${GHCR_USER:-$RUNTIME_ACTOR}" --password-stdin
+        else
+          printf '%s' "$RUNTIME_TOKEN" | docker login ghcr.io -u "$RUNTIME_ACTOR" --password-stdin
+        fi
+        SSH_EOF
+
+    - name: Pull images & deploy (no local build, no DB backup)
       run: |
         ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=8 \
             -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} 'bash -se' <<'SSH_EOF'
         set -Eeuo pipefail
         cd "${{ env.DEPLOY_PATH }}"
 
-        # Compose command detection
+        # compose 명령 확인
         if command -v docker-compose &>/dev/null; then
           COMPOSE_CMD='docker-compose'
         elif docker compose version &>/dev/null; then
@@ -637,76 +655,46 @@ jobs:
         echo "Using compose command: $COMPOSE_CMD"
         [ -f .env ] || { echo 'Error: .env file not found'; exit 1; }
 
-        # Preview effective config (debug)
-        $COMPOSE_CMD --env-file .env config >/tmp/compose_resolved.yml || true
-        echo '--- compose (resolved) preview ---'
-        head -n 200 /tmp/compose_resolved.yml || true
-        echo '---------------------------------'
+        # 네트워크/레지스트리 느릴 때 대비 타임아웃 여유
+        export DOCKER_CLIENT_TIMEOUT=600
+        export COMPOSE_HTTP_TIMEOUT=600
 
-        update_status() {
-          local service=$1 status=$2 ts
-          ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          echo '{}' | jq --arg s "$service" --arg st "$status" --arg t "$ts" \
-            '. + {($s): $st, ($s+"_timestamp"): $t}' > .deployment_status.json
-        }
-
-        echo 'Starting deployment (no local build)...'
-        update_status 'deployment' 'starting'
-
-        # --- Make sure we use registry images only ---
-        $COMPOSE_CMD --env-file .env down || true
-        docker container prune -f || true
-
-        # Only pull images that were built in this run (best-effort)
-        [ '${{ needs.build-game-server.result }}' = 'success' ] && docker pull "${{ env.IMAGE_PREFIX }}-game-server:${{ env.IMAGE_TAG }}" || true
-        [ '${{ needs.build-web-server.result }}' = 'success' ] && docker pull "${{ env.IMAGE_PREFIX }}-web-server:${{ env.IMAGE_TAG }}" || true
-        [ '${{ needs.build-single-api.result }}' = 'success' ] && docker pull "${{ env.IMAGE_PREFIX }}-single-api:${{ env.IMAGE_TAG }}" || true
-        [ '${{ needs.build-oidc-server.result }}' = 'success' ] && docker pull "${{ env.IMAGE_PREFIX }}-oidc-server:${{ env.IMAGE_TAG }}" || true
-
-        # Compose-level pull (in case pull_policy not supported)
+        # 미리 풀(안전)
         $COMPOSE_CMD --env-file .env pull || true
 
         echo 'Starting services with timeout...'
-        timeout 300 $COMPOSE_CMD --env-file .env up -d --no-build --remove-orphans
+        timeout 600 $COMPOSE_CMD --env-file .env up -d --no-build --remove-orphans --pull always
 
         echo 'Checking container status...'
-        $COMPOSE_CMD --env-file .env ps -a
+        $COMPOSE_CMD --env-file .env ps -a || true
 
-        echo 'Waiting for core services (web/oidc/single-api) to be healthy...'
-        OK=0
+        # ---- 건강 체크: 서비스명 -> CID -> docker inspect ----
+        must_be_healthy=(blokus-oidc-server blokus-web blokus-single-api)
+        ok=0
         for i in {1..36}; do
-          JSON=$($COMPOSE_CMD --env-file .env ps --format '{{json .}}' 2>/dev/null | jq -s '.')
-          TOTAL=$(echo "$JSON" | jq 'length')
-          RUNNING=$(echo "$JSON" | jq '[.[] | select(.State=="running")] | length')
-          UNHEALTHY=$(echo "$JSON" | jq '[.[] | select(.Health=="unhealthy")] | length')
-          EXITED=$(echo "$JSON" | jq '[.[] | select(.State=="exited")] | length')
-          CORE_OK=$(echo "$JSON" | jq -e \
-            '[.[] | select(.Service=="blokus-oidc-server" or .Service=="blokus-web" or .Service=="blokus-single-api") | select(.Health=="healthy")] | length == 3' >/dev/null; echo $?)
-          echo "tick $i: total=$TOTAL running=$RUNNING unhealthy=$UNHEALTHY exited=$EXITED"
-          if [ "$EXITED" -gt 0 ]; then
-            echo 'Detected exited container(s) – stopping wait early.'
-            break
-          fi
-          if [ $CORE_OK -eq 0 ]; then
-            OK=1
-            echo 'Core services healthy.'
-            break
-          fi
+          all=1
+          for s in "${must_be_healthy[@]}"; do
+            cid=$($COMPOSE_CMD --env-file .env ps -q "$s" 2>/dev/null || true)
+            if [ -z "$cid" ]; then
+              st="missing"
+            else
+              st=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}unknown{{end}}' "$cid" 2>/dev/null || echo "missing")
+            fi
+            echo "tick $i: service=$s cid=${cid:-none} health=$st"
+            [ "$st" = "healthy" ] || all=0
+          done
+          if [ $all -eq 1 ]; then ok=1; break; fi
           sleep 5
         done
 
-        if [ "$OK" -ne 1 ]; then
+        if [ "$ok" -ne 1 ]; then
           echo 'Health check timeout or unhealthy services - dumping status/logs'
-          $COMPOSE_CMD --env-file .env ps -a
-          $COMPOSE_CMD --env-file .env logs --tail=120
-          update_status 'deployment' 'failed'
+          $COMPOSE_CMD --env-file .env ps -a || true
+          $COMPOSE_CMD --env-file .env logs --no-color --tail=200 || true
           exit 1
         fi
 
-        echo 'Final deployment status:'
-        $COMPOSE_CMD --env-file .env ps -a
-        update_status 'deployment' 'success'
-        exit 0
+        echo 'Deployment success.'
         SSH_EOF
 
     - name: Deployment failure handling
