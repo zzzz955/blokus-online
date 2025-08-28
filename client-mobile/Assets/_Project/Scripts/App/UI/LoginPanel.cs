@@ -290,7 +290,7 @@ namespace App.UI
         {
             // 웹 애플리케이션으로 리다이렉트
             SetStatusText("웹 브라우저에서 회원가입을 진행해주세요", Shared.UI.MessagePriority.Info);
-            var registerUrl = $"{EnvironmentConfig.WebServerUrl}/register";
+            var registerUrl = $"{EnvironmentConfig.WebServerUrl}/auth/signin";
             
             Application.OpenURL(registerUrl);
             Debug.Log($"회원가입 페이지 열기: {registerUrl}");

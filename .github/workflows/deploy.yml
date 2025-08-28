@@ -437,7 +437,14 @@ jobs:
     permissions:
       contents: read
       packages: read
-    if: always() && (needs.build-game-server.result == 'success' || needs.build-web-server.result == 'success' || needs.build-single-api.result == 'success' || needs.build-oidc-server.result == 'success')
+    if: |
+      always() && (
+        needs.detect-changes.outputs.deploy-infrastructure == 'true' ||
+        needs.build-game-server.result == 'success' ||
+        needs.build-web-server.result == 'success' ||
+       needs.build-single-api.result == 'success' ||
+        needs.build-oidc-server.result == 'success'
+      )
     outputs:
       deployment-performed: ${{ steps.deployment-check.outputs.deployment-performed }}
     steps:
@@ -665,6 +672,12 @@ jobs:
         echo 'Starting services with timeout...'
         timeout 600 $COMPOSE_CMD --env-file .env up -d --no-build --remove-orphans --pull always
 
+        # infra(nginx/**, docker-compose.yml)만 변경된 경우에도 nginx는 반드시 갱신
+        if grep -q '"true"' <<< "${{ needs.detect-changes.outputs.deploy-infrastructure }}"; then
+          $COMPOSE_CMD --env-file .env up -d --force-recreate nginx
+          $COMPOSE_CMD --env-file .env exec -T nginx nginx -s reload || true
+        fi
+
         echo 'Checking container status...'
         $COMPOSE_CMD --env-file .env ps -a || true
 
@@ -695,7 +708,13 @@ jobs:
         fi
 
         echo 'Deployment success.'
-        SSH_EOF
+        # --- DB ready 대기 ---
+        until $COMPOSE_CMD --env-file .env exec -T postgres pg_isready -U "${DB_USER:-sang}" -d "${DB_NAME:-blokus_online}"; do sleep 2; done
+        # --- Prisma migrate ---
+        $COMPOSE_CMD --env-file .env exec -T blokus-web npx prisma migrate deploy || true
+        $COMPOSE_CMD --env-file .env exec -T blokus-oidc-server npx prisma migrate deploy || true
+        $COMPOSE_CMD --env-file .env exec -T blokus-single-api npx prisma migrate deploy || true
+        echo 'Deployment success.'
 
     - name: Deployment failure handling
       if: failure()
@@ -770,6 +789,11 @@ jobs:
         echo "Deploy: ${{ needs.deploy-to-server.result }}"
         if [ "${{ needs.deploy-to-server.result }}" = "success" ]; then
           echo "✅ Deployment completed successfully!"
+          # --- Smoke tests (200 응답 기대) ---
+          curl -fsS https://blokus-online.mooo.com/healthz
+          curl -fsS https://blokus-online.mooo.com/.well-known/openid-configuration || true   # /oidc/ 경로로 두었으면 경로 맞춰 수정
+          curl -fsS https://blokus-online.mooo.com/ | head -c 0
+          echo 'Deployment success.'
         else
           echo "❌ Deployment failed!"
           exit 1
