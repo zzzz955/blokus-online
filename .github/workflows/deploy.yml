@@ -653,17 +653,6 @@ jobs:
         echo 'Starting deployment (no local build)...'
         update_status 'deployment' 'starting'
 
-        # --- Safe DB backup before changing stack ---
-        mkdir -p backups
-        # load DB vars from .env
-        set -a; . ./.env; set +a
-        if docker ps --format '{{.Names}}' | grep -q '^blokus-postgres$'; then
-          echo "Creating DB backup from running container..."
-          docker exec -i blokus-postgres pg_dump -U "$DB_USER" -d "$DB_NAME" -Fc > "backups/backup_$(date +%Y%m%d_%H%M%S).dump" || echo "⚠️ DB backup warning (continuing)"
-        else
-          echo "⚠️ postgres container not running, skipping backup"
-        fi
-
         # --- Make sure we use registry images only ---
         $COMPOSE_CMD --env-file .env down || true
         docker container prune -f || true
