@@ -472,14 +472,9 @@ jobs:
         check ADMIN_TOKEN           "${{ secrets.ADMIN_TOKEN }}"
         check GOOGLE_CLIENT_ID      "${{ secrets.GOOGLE_CLIENT_ID }}"
         check GOOGLE_CLIENT_SECRET  "${{ secrets.GOOGLE_CLIENT_SECRET }}"
-        check WEB_PORT              "${{ secrets.WEB_PORT }}"
         check WEB_APP_URL           "${{ secrets.WEB_APP_URL }}"
         check DATABASE_URL          "${{ secrets.DATABASE_URL }}"
         check CLIENT_DOWNLOAD_URL   "${{ secrets.CLIENT_DOWNLOAD_URL }}"
-        check OIDC_PORT             "${{ secrets.OIDC_PORT }}"
-        check OIDC_ISSUER           "${{ secrets.OIDC_ISSUER }}"
-        check OIDC_BASE_URL         "${{ secrets.OIDC_BASE_URL }}"
-        check OIDC_JWKS_URI         "${{ secrets.OIDC_JWKS_URI }}"
         check WEB_CLIENT_SECRET     "${{ secrets.WEB_CLIENT_SECRET }}"
         check ACCESS_TOKEN_LIFETIME "${{ secrets.ACCESS_TOKEN_LIFETIME }}"
         check REFRESH_TOKEN_LIFETIME "${{ secrets.REFRESH_TOKEN_LIFETIME }}"
@@ -567,12 +562,10 @@ jobs:
 
         # misc
         put_kv LOG_LEVEL             "${{ secrets.LOG_LEVEL }}"
-        put_kv LOG_DIRECTORY         "${{ secrets.LOG_DIRECTORY }}"
         put_kv DEBUG_MODE            "${{ secrets.DEBUG_MODE }}"
         put_kv NODE_ENV              "${{ secrets.NODE_ENV }}"
 
         # web
-        put_kv WEB_PORT              "${{ secrets.WEB_PORT }}"
         put_kv WEB_APP_URL           "${{ secrets.WEB_APP_URL }}"
         put_kv DATABASE_URL          "${{ secrets.DATABASE_URL }}"
         put_kv CLIENT_DOWNLOAD_URL   "${{ secrets.CLIENT_DOWNLOAD_URL }}"
@@ -581,17 +574,7 @@ jobs:
         put_kv GOOGLE_CLIENT_ID      "${{ secrets.GOOGLE_CLIENT_ID }}"
         put_kv GOOGLE_CLIENT_SECRET  "${{ secrets.GOOGLE_CLIENT_SECRET }}"
 
-        # single api
-        put_kv SINGLE_API_PORT       "${{ secrets.SINGLE_API_PORT }}"
-        put_kv REDIS_PORT            "${{ secrets.REDIS_PORT }}"
-
         # oidc
-        put_kv OIDC_PORT             "${{ secrets.OIDC_PORT }}"
-        put_kv OIDC_ISSUER           "${{ secrets.OIDC_ISSUER }}"
-        put_kv OIDC_BASE_URL         "${{ secrets.OIDC_BASE_URL }}"
-        put_kv OIDC_ISSUER_PROD      "${{ secrets.OIDC_ISSUER_PROD }}"
-        put_kv OIDC_BASE_URL_PROD    "${{ secrets.OIDC_BASE_URL_PROD }}"
-        put_kv OIDC_JWKS_URI         "${{ secrets.OIDC_JWKS_URI }}"
         put_kv WEB_CLIENT_SECRET     "${{ secrets.WEB_CLIENT_SECRET }}"
         put_kv ACCESS_TOKEN_LIFETIME "${{ secrets.ACCESS_TOKEN_LIFETIME }}"
         put_kv REFRESH_TOKEN_LIFETIME       "${{ secrets.REFRESH_TOKEN_LIFETIME }}"

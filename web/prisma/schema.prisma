@@ -19,34 +19,37 @@ model User {
   
   // 필수 로그인 정보 (모든 사용자)
   username     String   @unique @db.VarChar(20)
-  password_hash String  @map("password_hash") @db.VarChar(255)
+  password_hash String  @map("password_hash")
   
   // OAuth 연동 정보 (선택사항, 계정 복구용)
-  email        String?  @unique @db.VarChar(100)
-  oauth_provider String? @map("oauth_provider") @db.VarChar(20)
-  oauth_id     String?  @map("oauth_id") @db.VarChar(100)
-  
-  // 사용자 프로필
-  display_name String?  @map("display_name") @db.VarChar(30)
-  avatar_url   String?  @map("avatar_url")
-  
-  // 계정 상태
-  is_active    Boolean  @default(true) @map("is_active")
+  email        String?  @unique
+  oauth_provider String? @map("oauth_provider")
+  oauth_id     String?  @map("oauth_id")
   
   // 시간 정보
-  created_at   DateTime @default(now()) @map("created_at")
   last_login_at DateTime? @map("last_login_at")
   updated_at   DateTime @updatedAt @map("updated_at")
+  
+  // 진행상황 동기화 정보
+  progress_version Int @default(1) @map("progress_version")
+  progress_updated_at DateTime @default(now()) @map("progress_updated_at")
+  last_sync_at DateTime @default(now()) @map("last_sync_at")
+  last_metadata_check_at DateTime @default(now()) @map("last_metadata_check_at")
   
   // 관계
   user_stats     UserStats?
   user_settings  UserSettings?
+  user_stage_progress UserStageProgress[]
   testimonials   Testimonial[]
   support_tickets SupportTicket[]
   posts          Post[]
   comments       Comment[]
   replies        Reply[]
+  authorization_codes AuthorizationCode[]
+  refresh_token_families RefreshTokenFamily[]
   
+  @@index([email], name: "idx_users_email")
+  @@index([oauth_provider, oauth_id], name: "idx_users_oauth")
   @@map("users")
 }
 
@@ -69,6 +72,12 @@ model UserStats {
   
   last_played    DateTime? @map("last_played")
   updated_at     DateTime @updatedAt @map("updated_at")
+  
+  // 싱글플레이어 전용 통계
+  single_player_level Int @default(1) @map("single_player_level")
+  max_stage_completed Int @default(0) @map("max_stage_completed")
+  total_single_games Int @default(0) @map("total_single_games")
+  single_player_score BigInt @default(0) @map("single_player_score")
   
   // 관계
   user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
@@ -115,6 +124,64 @@ model UserFriend {
   
   @@unique([requester_user_id, addressee_user_id])
   @@map("user_friends")
+}
+
+// ========================================
+// 게임 스테이지 관련 테이블들
+// ========================================
+
+model Stage {
+  stage_id             Int    @id @default(autoincrement()) @map("stage_id")
+  stage_number         Int    @unique @map("stage_number")
+  difficulty           Int
+  available_blocks     Int[]  @map("available_blocks")
+  optimal_score        Int    @map("optimal_score")
+  time_limit           Int?   @map("time_limit")
+  max_undo_count       Int    @default(3) @map("max_undo_count")
+  stage_description    String? @map("stage_description")
+  stage_hints          String? @map("stage_hints")
+  is_active            Boolean @default(true) @map("is_active")
+  is_featured          Boolean @default(false) @map("is_featured")
+  created_at           DateTime @default(now()) @map("created_at")
+  updated_at           DateTime @default(now()) @updatedAt @map("updated_at")
+  thumbnail_url        String? @map("thumbnail_url")
+  initial_board_state  Int[]? @map("initial_board_state")
+  
+  // 관계
+  user_stage_progress  UserStageProgress[]
+  
+  @@index([stage_number], name: "idx_stages_number")
+  @@index([is_active], name: "idx_stages_active")
+  @@index([difficulty], name: "idx_stages_difficulty")
+  @@index([is_featured], name: "idx_stages_featured")
+  @@index([initial_board_state], name: "idx_stages_initial_board_state")
+  @@map("stages")
+}
+
+model UserStageProgress {
+  user_id               Int      @map("user_id")
+  stage_id              Int      @map("stage_id")
+  is_completed          Boolean  @default(false) @map("is_completed")
+  stars_earned          Int      @default(0) @map("stars_earned")
+  best_score            Int      @default(0) @map("best_score")
+  best_completion_time  Int?     @map("best_completion_time")
+  total_attempts        Int      @default(0) @map("total_attempts")
+  successful_attempts   Int      @default(0) @map("successful_attempts")
+  first_played_at       DateTime @default(now()) @map("first_played_at")
+  first_completed_at    DateTime? @map("first_completed_at")
+  last_played_at        DateTime @default(now()) @map("last_played_at")
+  updated_at            DateTime @default(now()) @updatedAt @map("updated_at")
+  
+  // 관계
+  user  User  @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  stage Stage @relation(fields: [stage_id], references: [stage_id], onDelete: Cascade)
+  
+  @@id([user_id, stage_id])
+  @@index([user_id], name: "idx_user_stage_progress_user_id")
+  @@index([stage_id], name: "idx_user_stage_progress_stage_id")
+  @@index([is_completed], name: "idx_user_stage_progress_completed")
+  @@index([stars_earned], name: "idx_user_stage_progress_stars")
+  @@map("user_stage_progress")
 }
 
 // ========================================
@@ -297,4 +364,71 @@ model Reply {
   updated_at   DateTime @updatedAt @map("updated_at")
   
   @@map("replies")
+}
+
+// ========================================
+// OIDC/OAuth 2.1 Authentication Tables
+// ========================================
+
+model AuthorizationCode {
+  code_id                  Int      @id @default(autoincrement()) @map("code_id")
+  code                     String   @unique @db.VarChar(255)
+  client_id                String   @db.VarChar(255) @map("client_id")
+  user_id                  Int      @map("user_id")
+  redirect_uri             String
+  scope                    String
+  code_challenge           String?  @db.VarChar(255) @map("code_challenge")
+  code_challenge_method    String?  @db.VarChar(10) @map("code_challenge_method")
+  expires_at               DateTime @map("expires_at")
+  created_at               DateTime @default(now()) @map("created_at")
+  
+  // 관계
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  
+  @@index([code], name: "idx_authorization_codes_code")
+  @@index([expires_at], name: "idx_authorization_codes_expires")
+  @@index([user_id], name: "idx_authorization_codes_user")
+  @@map("authorization_codes")
+}
+
+model RefreshTokenFamily {
+  family_id           Int      @id @default(autoincrement()) @map("family_id")
+  user_id             Int      @map("user_id")
+  client_id           String   @db.VarChar(255) @map("client_id")
+  device_fingerprint  String?  @db.VarChar(255) @map("device_fingerprint")
+  status              String   @default("active") @db.VarChar(20)
+  created_at          DateTime @default(now()) @map("created_at")
+  last_used_at        DateTime @default(now()) @map("last_used_at")
+  max_expires_at      DateTime @map("max_expires_at")
+  
+  // 관계
+  user           User           @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  refresh_tokens RefreshToken[]
+  
+  @@index([user_id], name: "idx_refresh_token_families_user")
+  @@index([client_id], name: "idx_refresh_token_families_client")
+  @@index([status], name: "idx_refresh_token_families_status")
+  @@index([max_expires_at], name: "idx_refresh_token_families_max_expires")
+  @@map("refresh_token_families")
+}
+
+model RefreshToken {
+  token_id      Int      @id @default(autoincrement()) @map("token_id")
+  family_id     Int      @map("family_id")
+  jti           String   @unique @db.VarChar(255)
+  prev_jti      String?  @db.VarChar(255) @map("prev_jti")
+  status        String   @default("active") @db.VarChar(20)
+  expires_at    DateTime @map("expires_at")
+  created_at    DateTime @default(now()) @map("created_at")
+  last_used_at  DateTime @default(now()) @map("last_used_at")
+  
+  // 관계
+  family RefreshTokenFamily @relation(fields: [family_id], references: [family_id], onDelete: Cascade)
+  
+  @@index([jti], name: "idx_refresh_tokens_jti")
+  @@index([family_id], name: "idx_refresh_tokens_family")
+  @@index([status], name: "idx_refresh_tokens_status")
+  @@index([expires_at], name: "idx_refresh_tokens_expires")
+  @@index([prev_jti], name: "idx_refresh_tokens_prev_jti")
+  @@map("refresh_tokens")
 }

@@ -9,10 +9,7 @@ if [ -z "$DATABASE_URL" ]; then
     exit 1
 fi
 
-echo "📊 Running Prisma database migration..."
-npx prisma db push --accept-data-loss
-
-echo "✅ Database migration completed"
+echo "📊 Database connection verified"
 
 echo "👤 Initializing admin user..."
 node scripts/init-admin.js
