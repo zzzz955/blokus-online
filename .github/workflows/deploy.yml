@@ -528,143 +528,114 @@ jobs:
         
     - name: Update environment file
       run: |
-        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
-          cd ${{ env.DEPLOY_PATH }} &&
-          
-          # 환경변수 설정 (GitHub Secrets 우선, 없으면 자동 생성)
-          echo '🔐 환경변수 설정 중...'
-          
-          JWT_SECRET='${{ secrets.JWT_SECRET }}'
-          JWT_REFRESH_SECRET='${{ secrets.JWT_REFRESH_SECRET }}'
-          NEXTAUTH_SECRET='${{ secrets.NEXTAUTH_SECRET }}'
-          SESSION_SECRET='${{ secrets.SESSION_SECRET }}'
-          ADMIN_TOKEN='${{ secrets.ADMIN_TOKEN }}'
-          GOOGLE_CLIENT_SECRET='${{ secrets.GOOGLE_CLIENT_SECRET }}'
-          INTERNAL_API_KEY='${{ secrets.INTERNAL_API_KEY }}'
-          
-          # 누락된 시크릿들 자동 생성 및 디버그 출력
-          if [ -z \"\$JWT_SECRET\" ]; then
-            JWT_SECRET=\$(openssl rand -hex 32)
-            echo '⚠️ JWT_SECRET이 GitHub Secrets에 없어서 자동 생성했습니다'
-          else
-            echo \"✅ JWT_SECRET을 GitHub Secrets에서 로드했습니다 (길이: \${#JWT_SECRET})\"
-          fi
-          
-          if [ -z \"\$JWT_REFRESH_SECRET\" ]; then
-            JWT_REFRESH_SECRET=\$(openssl rand -hex 32)
-            echo '⚠️ JWT_REFRESH_SECRET을 자동 생성했습니다'
-          fi
-          
-          if [ -z \"\$NEXTAUTH_SECRET\" ]; then
-            NEXTAUTH_SECRET=\$(openssl rand -hex 32)
-            echo '⚠️ NEXTAUTH_SECRET을 자동 생성했습니다'
-          fi
-          
-          if [ -z \"\$SESSION_SECRET\" ]; then
-            SESSION_SECRET=\$(openssl rand -hex 32)
-            echo '⚠️ SESSION_SECRET을 자동 생성했습니다'
-          fi
-          
-          if [ -z \"\$ADMIN_TOKEN\" ]; then
-            ADMIN_TOKEN=\$(openssl rand -hex 16)
-            echo '⚠️ ADMIN_TOKEN을 자동 생성했습니다'
-          fi
-          
-          if [ -z \"\$INTERNAL_API_KEY\" ]; then
-            INTERNAL_API_KEY=\$(openssl rand -hex 16)
-            echo '⚠️ INTERNAL_API_KEY을 자동 생성했습니다'
-          fi
-          
-          echo '📝 .env 파일 생성 중... JWT_SECRET 길이:' \${#JWT_SECRET}
-          
-          cat > .env << 'EOF'
-        # Image Configuration
-        IMAGE_TAG=${{ env.IMAGE_TAG }}
-        GAME_SERVER_IMAGE=${{ env.IMAGE_PREFIX }}-game-server:${{ env.IMAGE_TAG }}
-        WEB_SERVER_IMAGE=${{ env.IMAGE_PREFIX }}-web-server:${{ env.IMAGE_TAG }}
-        SINGLE_API_IMAGE=${{ env.IMAGE_PREFIX }}-single-api:${{ env.IMAGE_TAG }}
-        OIDC_SERVER_IMAGE=${{ env.IMAGE_PREFIX }}-oidc-server:${{ env.IMAGE_TAG }}
-        
-        # Game Server Configuration
-        SERVER_PORT=${{ secrets.SERVER_PORT }}
-        BLOKUS_SERVER_VERSION=${{ secrets.BLOKUS_SERVER_VERSION }}
-        BLOKUS_DOWNLOAD_URL=${{ secrets.BLOKUS_DOWNLOAD_URL }}
-        
-        # Database Configuration
-        DB_HOST=postgres
-        DB_PORT=${{ secrets.DB_PORT }}
-        DB_USER=${{ secrets.DB_USER }}
-        DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-        DB_NAME=${{ secrets.DB_NAME }}
-        
-        POSTGRES_DB=${{ secrets.DB_NAME }}
-        POSTGRES_USER=${{ secrets.DB_USER }}
-        POSTGRES_PASSWORD=${{ secrets.DB_PASSWORD }}
-        
-        # Logging and Debug
-        LOG_LEVEL=${{ secrets.LOG_LEVEL }}
-        LOG_DIRECTORY=${{ secrets.LOG_DIRECTORY }}
-        DEBUG_MODE=${{ secrets.DEBUG_MODE }}
-        
-        # Node.js Environment
-        NODE_ENV=${{ secrets.NODE_ENV }}
-        
-        # Web Application  
-        WEB_PORT=${{ secrets.WEB_PORT }}
-        WEB_APP_URL=${{ secrets.WEB_APP_URL }}
-        DATABASE_URL=${{ secrets.DATABASE_URL }}
-        CLIENT_DOWNLOAD_URL=${{ secrets.CLIENT_DOWNLOAD_URL }}
-        ADMIN_USERNAME=${{ secrets.ADMIN_USERNAME }}
-        ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
-        GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
-        GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
-        
-        # Single Player API Configuration
-        SINGLE_API_PORT=${{ secrets.SINGLE_API_PORT }}
-        REDIS_PORT=${{ secrets.REDIS_PORT }}
-        
-        # OIDC Auth Server Configuration  
-        OIDC_PORT=${{ secrets.OIDC_PORT }}
-        OIDC_ISSUER=${{ secrets.OIDC_ISSUER }}
-        OIDC_BASE_URL=${{ secrets.OIDC_BASE_URL }}
-        OIDC_ISSUER_PROD=${{ secrets.OIDC_ISSUER_PROD }}
-        OIDC_BASE_URL_PROD=${{ secrets.OIDC_BASE_URL_PROD }}
-        OIDC_JWKS_URI=${{ secrets.OIDC_JWKS_URI }}
-        WEB_CLIENT_SECRET=${{ secrets.WEB_CLIENT_SECRET }}
-        ACCESS_TOKEN_LIFETIME=${{ secrets.ACCESS_TOKEN_LIFETIME }}
-        REFRESH_TOKEN_LIFETIME=${{ secrets.REFRESH_TOKEN_LIFETIME }}
-        REFRESH_TOKEN_MAX_LIFETIME=${{ secrets.REFRESH_TOKEN_MAX_LIFETIME }}
-        AUTH_CODE_LIFETIME=${{ secrets.AUTH_CODE_LIFETIME }}
-        
-        # SSL/Domain
-        DOMAIN=${{ secrets.DOMAIN }}
-        CERTBOT_EMAIL=${{ secrets.CERTBOT_EMAIL }}
-        EOF
-          
-          # .env 파일 생성 검증 (키 존재 + 빈값 금지)
-          echo '🔍 .env 파일 검증 중...'
-          if [ ! -f .env ]; then
-            echo '❌ .env 파일 생성 실패!'; exit 1
-          fi
-          awk -F= '
-            /^[A-Za-z_][A-Za-z0-9_]*=/ {
-              key=$1; val=$0; sub(/^[^=]*=/,"",val);
-              if (key ~ /^(JWT_SECRET|JWT_REFRESH_SECRET|NEXTAUTH_SECRET|SESSION_SECRET|ADMIN_TOKEN|INTERNAL_API_KEY)$/ && length(val)==0) {
-                printf("❌ %s is empty\n", key); bad=1
-              }
-            }
-            END { exit bad }
-          ' .env
-          echo '✅ .env integrity OK'
-        "
+        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} 'bash -se' <<'SSH_EOF'
+        set -Eeuo pipefail
 
-        # 강제: 동적으로 생성(혹은 시크릿에서 로드)된 보안 변수들을 .env에 덮어쓰기
-        printf 'JWT_SECRET=%s\n' "\$JWT_SECRET" >> .env
-        printf 'JWT_REFRESH_SECRET=%s\n' "\$JWT_REFRESH_SECRET" >> .env
-        printf 'NEXTAUTH_SECRET=%s\n' "\$NEXTAUTH_SECRET" >> .env
-        printf 'SESSION_SECRET=%s\n' "\$SESSION_SECRET" >> .env
-        printf 'ADMIN_TOKEN=%s\n' "\$ADMIN_TOKEN" >> .env
-        printf 'INTERNAL_API_KEY=%s\n' "\$INTERNAL_API_KEY" >> .env
+        cd "${{ env.DEPLOY_PATH }}"
+
+        # 0) 현재 .env 백업
+        [ -f .env ] && cp -f .env ".env.bak.$(date +%Y%m%d%H%M%S)" || true
+
+        # 1) 시크릿을 원격 셸 변수로 "값"만 받음 (비면 원격에서 생성)
+        JWT_SECRET="${{ secrets.JWT_SECRET }}"
+        JWT_REFRESH_SECRET="${{ secrets.JWT_REFRESH_SECRET }}"
+        NEXTAUTH_SECRET="${{ secrets.NEXTAUTH_SECRET }}"
+        SESSION_SECRET="${{ secrets.SESSION_SECRET }}"
+        ADMIN_TOKEN="${{ secrets.ADMIN_TOKEN }}"
+        GOOGLE_CLIENT_SECRET="${{ secrets.GOOGLE_CLIENT_SECRET }}"
+        INTERNAL_API_KEY="${{ secrets.INTERNAL_API_KEY }}"
+
+        # 2) 누락 시 원격에서 안전하게 생성
+        [ -n "$JWT_SECRET" ] || { JWT_SECRET="$(openssl rand -hex 32)"; echo "⚠️ JWT_SECRET auto-generated"; }
+        [ -n "$JWT_REFRESH_SECRET" ] || { JWT_REFRESH_SECRET="$(openssl rand -hex 32)"; echo "⚠️ JWT_REFRESH_SECRET auto-generated"; }
+        [ -n "$NEXTAUTH_SECRET" ] || { NEXTAUTH_SECRET="$(openssl rand -hex 32)"; echo "⚠️ NEXTAUTH_SECRET auto-generated"; }
+        [ -n "$SESSION_SECRET" ] || { SESSION_SECRET="$(openssl rand -hex 32)"; echo "⚠️ SESSION_SECRET auto-generated"; }
+        [ -n "$ADMIN_TOKEN" ] || { ADMIN_TOKEN="$(openssl rand -hex 16)"; echo "⚠️ ADMIN_TOKEN auto-generated"; }
+        [ -n "$INTERNAL_API_KEY" ] || { INTERNAL_API_KEY="$(openssl rand -hex 16)"; echo "⚠️ INTERNAL_API_KEY auto-generated"; }
+
+        # 3) .env 새로 작성 (로컬 치환 없음, 모든 줄은 printf로 안전 기록)
+        umask 077
+        : > .env
+
+        put_kv() { # KEY VALUE
+          printf '%s=%s\n' "$1" "$2" >> .env
+        }
+
+        # 이미지/태그
+        put_kv IMAGE_TAG             "${{ env.IMAGE_TAG }}"
+        put_kv GAME_SERVER_IMAGE     "${{ env.IMAGE_PREFIX }}-game-server:${{ env.IMAGE_TAG }}"
+        put_kv WEB_SERVER_IMAGE      "${{ env.IMAGE_PREFIX }}-web-server:${{ env.IMAGE_TAG }}"
+        put_kv SINGLE_API_IMAGE      "${{ env.IMAGE_PREFIX }}-single-api:${{ env.IMAGE_TAG }}"
+        put_kv OIDC_SERVER_IMAGE     "${{ env.IMAGE_PREFIX }}-oidc-server:${{ env.IMAGE_TAG }}"
+
+        # DB
+        put_kv DB_HOST               "postgres"
+        put_kv DB_PORT               "${{ secrets.DB_PORT }}"
+        put_kv DB_USER               "${{ secrets.DB_USER }}"
+        put_kv DB_PASSWORD           "${{ secrets.DB_PASSWORD }}"
+        put_kv DB_NAME               "${{ secrets.DB_NAME }}"
+        put_kv POSTGRES_DB           "${{ secrets.DB_NAME }}"
+        put_kv POSTGRES_USER         "${{ secrets.DB_USER }}"
+        put_kv POSTGRES_PASSWORD     "${{ secrets.DB_PASSWORD }}"
+
+        # 보안(필수)
+        put_kv JWT_SECRET            "$JWT_SECRET"
+        put_kv JWT_REFRESH_SECRET    "$JWT_REFRESH_SECRET"
+        put_kv NEXTAUTH_SECRET       "$NEXTAUTH_SECRET"
+        put_kv SESSION_SECRET        "$SESSION_SECRET"
+        put_kv ADMIN_TOKEN           "$ADMIN_TOKEN"
+        put_kv INTERNAL_API_KEY      "$INTERNAL_API_KEY"
+
+        # 기타
+        put_kv LOG_LEVEL             "${{ secrets.LOG_LEVEL }}"
+        put_kv LOG_DIRECTORY         "${{ secrets.LOG_DIRECTORY }}"
+        put_kv DEBUG_MODE            "${{ secrets.DEBUG_MODE }}"
+        put_kv NODE_ENV              "${{ secrets.NODE_ENV }}"
+
+        # Web
+        put_kv WEB_PORT              "${{ secrets.WEB_PORT }}"
+        put_kv WEB_APP_URL           "${{ secrets.WEB_APP_URL }}"
+        put_kv DATABASE_URL          "${{ secrets.DATABASE_URL }}"
+        put_kv CLIENT_DOWNLOAD_URL   "${{ secrets.CLIENT_DOWNLOAD_URL }}"
+        put_kv ADMIN_USERNAME        "${{ secrets.ADMIN_USERNAME }}"
+        put_kv ADMIN_PASSWORD        "${{ secrets.ADMIN_PASSWORD }}"
+        put_kv GOOGLE_CLIENT_ID      "${{ secrets.GOOGLE_CLIENT_ID }}"
+        put_kv GOOGLE_CLIENT_SECRET  "${{ secrets.GOOGLE_CLIENT_SECRET }}"
+
+        # Single API
+        put_kv SINGLE_API_PORT       "${{ secrets.SINGLE_API_PORT }}"
+        put_kv REDIS_PORT            "${{ secrets.REDIS_PORT }}"
+
+        # OIDC
+        put_kv OIDC_PORT             "${{ secrets.OIDC_PORT }}"
+        put_kv OIDC_ISSUER           "${{ secrets.OIDC_ISSUER }}"
+        put_kv OIDC_BASE_URL         "${{ secrets.OIDC_BASE_URL }}"
+        put_kv OIDC_ISSUER_PROD      "${{ secrets.OIDC_ISSUER_PROD }}"
+        put_kv OIDC_BASE_URL_PROD    "${{ secrets.OIDC_BASE_URL_PROD }}"
+        put_kv OIDC_JWKS_URI         "${{ secrets.OIDC_JWKS_URI }}"
+        put_kv WEB_CLIENT_SECRET     "${{ secrets.WEB_CLIENT_SECRET }}"
+        put_kv ACCESS_TOKEN_LIFETIME "${{ secrets.ACCESS_TOKEN_LIFETIME }}"
+        put_kv REFRESH_TOKEN_LIFETIME       "${{ secrets.REFRESH_TOKEN_LIFETIME }}"
+        put_kv REFRESH_TOKEN_MAX_LIFETIME   "${{ secrets.REFRESH_TOKEN_MAX_LIFETIME }}"
+        put_kv AUTH_CODE_LIFETIME    "${{ secrets.AUTH_CODE_LIFETIME }}"
+
+        # SSL / 도메인
+        put_kv DOMAIN                "${{ secrets.DOMAIN }}"
+        put_kv CERTBOT_EMAIL         "${{ secrets.CERTBOT_EMAIL }}"
+
+        echo '🔍 Validating .env (non-empty for required keys)...'
+        awk -F= '
+          /^[A-Za-z_][A-Za-z0-9_]*=/ {
+            key=$1; val=$0; sub(/^[^=]*=/,"",val);
+            if (key ~ /^(JWT_SECRET|JWT_REFRESH_SECRET|NEXTAUTH_SECRET|SESSION_SECRET|ADMIN_TOKEN|INTERNAL_API_KEY)$/ && length(val)==0) {
+              printf("❌ %s is empty\n", key); bad=1
+            }
+          }
+          END { exit bad }
+        ' .env
+        echo '✅ .env integrity OK'
+        SSH_EOF
+
         
     - name: Login to registry on server
       run: |
@@ -674,116 +645,79 @@ jobs:
         
     - name: Deploy services (Fast deployment with pre-built images)
       run: |
-        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
-          cd ${{ env.DEPLOY_PATH }} &&
-          
-          # 배포 상태 업데이트 함수
-          update_status() {
-            local service=\$1
-            local status=\$2
-            local timestamp=\$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")
-            echo '{}' | jq --arg service \"\$service\" --arg status \"\$status\" --arg ts \"\$timestamp\" \
-              '. + {\$service: \$status, (\$service + \"_timestamp\"): \$ts}' > .deployment_status.json
-          }
-          
-          echo 'Starting fast deployment with pre-built images...' &&
-          
-          # 배포 시작 상태 업데이트
-          update_status 'deployment' 'starting' &&
-          
-          # Docker Compose 버전 확인 및 호환성 처리
-          if command -v docker-compose &> /dev/null; then
-            COMPOSE_CMD='docker-compose'
-          elif docker compose version &> /dev/null; then
-            COMPOSE_CMD='docker compose'
-          else
-            echo 'Error: Neither docker-compose nor docker compose is available'
-            update_status 'deployment' 'failed'
-            exit 1
-          fi
-          
-          echo \"Using compose command: \$COMPOSE_CMD\" &&
-          
-          # 기존 서비스 중지 (오류 무시)
-          \$COMPOSE_CMD --env-file .env down || true &&
-          
-          # 기존 컨테이너 정리
-          docker container prune -f || true &&
-          
-          # 최신 이미지 Pull (조건부)
-          echo 'Pulling pre-built images...' &&
-          if [ '${{ needs.build-game-server.result }}' = 'success' ]; then
-            docker pull ${{ env.IMAGE_PREFIX }}-game-server:${{ env.IMAGE_TAG }} || echo 'Game server image pull failed'
-          fi &&
-          if [ '${{ needs.build-web-server.result }}' = 'success' ]; then
-            docker pull ${{ env.IMAGE_PREFIX }}-web-server:${{ env.IMAGE_TAG }} || echo 'Web server image pull failed'
-          fi &&
-          if [ '${{ needs.build-single-api.result }}' = 'success' ]; then
-            docker pull ${{ env.IMAGE_PREFIX }}-single-api:${{ env.IMAGE_TAG }} || echo 'Single API image pull failed'
-          fi &&
-          if [ '${{ needs.build-oidc-server.result }}' = 'success' ]; then
-            docker pull ${{ env.IMAGE_PREFIX }}-oidc-server:${{ env.IMAGE_TAG }} || echo 'OIDC server image pull failed'
-          fi &&
-          
-          # 환경변수 파일 검증
-          if [ ! -f .env ]; then
-            echo 'Error: .env file not found'
-            update_status 'deployment' 'failed'
-            exit 1
-          fi &&
-          
-          # 서비스 시작 (더 긴 타임아웃 설정)
-          echo 'Starting services with timeout...' &&
-          timeout 300 \$COMPOSE_CMD --env-file .env up -d --remove-orphans &&
-          
-          # 컨테이너 상태 확인
-          echo 'Checking container status...' &&
-          \$COMPOSE_CMD --env-file .env ps -a
-          
-          # 개별 서비스 로그 확인 (실패한 경우)
-          if ! \$COMPOSE_CMD --env-file .env ps --filter status=running | grep -q running; then
-            echo 'Some containers failed to start. Checking logs...'
-            \$COMPOSE_CMD --env-file .env logs --tail=50
-            update_status 'deployment' 'failed'
-            exit 1
-          fi &&
-          
-          # 헬스체크 대기 (개선된 검증)
-          echo 'Waiting for services to be healthy...' &&
-          for i in {1..24}; do
-            HEALTHY_COUNT=\$(\$COMPOSE_CMD --env-file .env ps --filter health=healthy --format json | wc -l)
-            RUNNING_COUNT=\$(\$COMPOSE_CMD --env-file .env ps --filter status=running --format json | wc -l)
-            echo \"Health check \$i/24: \$HEALTHY_COUNT healthy containers, \$RUNNING_COUNT running\"
+        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} 'bash -se' <<'SSH_EOF'
+        set -Eeuo pipefail
+        cd "${{ env.DEPLOY_PATH }}"
+
+        update_status() {
+          local service=$1 status=$2 ts
+          ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          echo '{}' | jq --arg s "$service" --arg st "$status" --arg t "$ts" \
+            '. + {($s): $st, ($s+"_timestamp"): $t}' > .deployment_status.json
+        }
+
+        echo 'Starting fast deployment with pre-built images...'
+        update_status 'deployment' 'starting'
+
+        if command -v docker-compose &>/dev/null; then
+          COMPOSE_CMD='docker-compose'
+        elif docker compose version &>/dev/null; then
+          COMPOSE_CMD='docker compose'
+        else
+          echo 'Error: No compose available'; update_status 'deployment' 'failed'; exit 1
+        fi
+        echo "Using compose command: $COMPOSE_CMD"
+
+        # .env 필수
+        [ -f .env ] || { echo 'Error: .env file not found'; update_status 'deployment' 'failed'; exit 1; }
+
+        # 내려두기
+        $COMPOSE_CMD --env-file .env down || true
+        docker container prune -f || true
+
+        # 사전 pull (선택)
+        [ '${{ needs.build-game-server.result }}' = 'success' ] && docker pull "${{ env.IMAGE_PREFIX }}-game-server:${{ env.IMAGE_TAG }}" || true
+        [ '${{ needs.build-web-server.result }}' = 'success' ] && docker pull "${{ env.IMAGE_PREFIX }}-web-server:${{ env.IMAGE_TAG }}" || true
+        [ '${{ needs.build-single-api.result }}' = 'success' ] && docker pull "${{ env.IMAGE_PREFIX }}-single-api:${{ env.IMAGE_TAG }}" || true
+        [ '${{ needs.build-oidc-server.result }}' = 'success' ] && docker pull "${{ env.IMAGE_PREFIX }}-oidc-server:${{ env.IMAGE_TAG }}" || true
+
+        # 기동
+        echo 'Starting services with timeout...'
+        timeout 300 $COMPOSE_CMD --env-file .env up -d --remove-orphans
+
+        echo 'Checking container status...'
+        $COMPOSE_CMD --env-file .env ps -a
+
+        if ! $COMPOSE_CMD --env-file .env ps --filter status=running | grep -q running; then
+          echo 'Some containers failed to start. Checking logs...'
+          $COMPOSE_CMD --env-file .env logs --tail=50
+          update_status 'deployment' 'failed'
+          exit 1
+        fi
+
+        echo 'Waiting for services to be healthy...'
+        for i in {1..24}; do
+          HEALTHY_COUNT=$($COMPOSE_CMD --env-file .env ps --filter health=healthy --format json | wc -l)
+          RUNNING_COUNT=$($COMPOSE_CMD --env-file .env ps --filter status=running --format json | wc -l)
+          echo "Health check $i/24: $HEALTHY_COUNT healthy containers, $RUNNING_COUNT running"
+          [ $HEALTHY_COUNT -gt 0 ] && [ $RUNNING_COUNT -gt 0 ] && break
+          [ $i -eq 24 ] && { $COMPOSE_CMD --env-file .env ps -a; $COMPOSE_CMD --env-file .env logs --tail=20; }
+          sleep 5
+        done
+
+        echo 'Final deployment status:'
+        $COMPOSE_CMD --env-file .env ps -a
+        update_status 'deployment' 'success'
+        SSH_EOF
+
             
-            if [ \$HEALTHY_COUNT -gt 0 ] && [ \$RUNNING_COUNT -gt 0 ]; then
-              echo 'Services are starting successfully'
-              break
-            fi
-            
-            if [ \$i -eq 24 ]; then
-              echo 'Health check timeout - checking final status'
-              \$COMPOSE_CMD --env-file .env ps -a
-              \$COMPOSE_CMD --env-file .env logs --tail=20
-            fi
-            
-            sleep 5
-          done &&
-          
-          # 최종 상태 확인
-          echo 'Final deployment status:' &&
-          \$COMPOSE_CMD --env-file .env ps -a &&
-          
-          # 배포 성공 상태 업데이트
-          update_status 'deployment' 'success'
-        "
-        
-    - name: Deployment failure handling
-      if: failure()
-      run: |
-        ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
-          cd ${{ env.DEPLOY_PATH }} &&
-          echo '{}' | jq '. + {\"deployment\": \"failed\", \"deployment_timestamp\": \"$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")\"}' > .deployment_status.json
-        " || true
+        - name: Deployment failure handling
+          if: failure()
+          run: |
+            ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
+              cd ${{ env.DEPLOY_PATH }} &&
+              echo '{}' | jq '. + {\"deployment\": \"failed\", \"deployment_timestamp\": \"$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")\"}' > .deployment_status.json
+            " || true
 
   # ==========================================
   # 변경사항 없음 처리 (성공으로 처리)

@@ -46,6 +46,9 @@ services:
     image: ${GAME_SERVER_IMAGE:-ghcr.io/zzzz955/blokus-online/blokus-game-server:${IMAGE_TAG:-latest}}
     container_name: blokus-server
     restart: unless-stopped
+
+    env_file:
+      - .env
     
     environment:
       # 서버 설정
