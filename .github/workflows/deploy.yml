@@ -140,6 +140,12 @@ jobs:
         DEPLOY_SINGLE_API="${{ steps.changes.outputs.single-api }}"
         DEPLOY_OIDC="${{ steps.changes.outputs.oidc }}"
         DEPLOY_INFRA="${{ steps.changes.outputs.infrastructure }}"
+        if [[ "$DEPLOY_INFRA" == "true" ]] || [[ "$GAME_SUCCESS" == "success" ]] || [[ "$WEB_SUCCESS" == "success" ]] || [[ "$SINGLE_SUCCESS" == "success" ]] || [[ "$OIDC_SUCCESS" == "success" ]]; then
+          echo "deployment-performed=true" >> $GITHUB_OUTPUT
+        else
+          echo "deployment-performed=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
 
         LAST_STATUS=$(ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} \
           "cd ${{ env.DEPLOY_PATH }} && cat .deployment_status.json 2>/dev/null || echo '{}'" | jq -r 2>/dev/null || echo '{}')
@@ -428,6 +434,9 @@ jobs:
     name: Deploy to Server
     runs-on: ubuntu-latest
     needs: [detect-changes, build-game-server, build-web-server, build-single-api, build-oidc-server]
+    permissions:
+      contents: read
+      packages: read
     if: always() && (needs.build-game-server.result == 'success' || needs.build-web-server.result == 'success' || needs.build-single-api.result == 'success' || needs.build-oidc-server.result == 'success')
     outputs:
       deployment-performed: ${{ steps.deployment-check.outputs.deployment-performed }}
@@ -605,6 +614,7 @@ jobs:
     - name: Login to registry on server
       run: |
         ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
+          docker logout ${{ env.REGISTRY }} || true
           echo '${{ secrets.GITHUB_TOKEN }}' | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
         "
 
@@ -757,7 +767,14 @@ jobs:
     name: Deployment Summary
     runs-on: ubuntu-latest
     needs: [detect-changes, build-game-server, build-web-server, build-single-api, build-oidc-server, deploy-to-server, no-changes-success, build-failure-handler]
-    if: always() && (needs.deploy-to-server.result == 'success' || needs.deploy-to-server.result == 'failure') && needs.build-failure-handler.result != 'failure'
+    if: |
+      always() && (
+        needs.detect-changes.outputs.deploy-infrastructure == 'true' ||
+        needs.build-game-server.result == 'success' ||
+        needs.build-web-server.result == 'success' ||
+        needs.build-single-api.result == 'success' ||
+        needs.build-oidc-server.result == 'success'
+      )
     steps:
     - name: Display summary
       run: |
