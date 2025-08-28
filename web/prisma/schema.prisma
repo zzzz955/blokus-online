@@ -26,7 +26,15 @@ model User {
   oauth_provider String? @map("oauth_provider")
   oauth_id     String?  @map("oauth_id")
   
+  // 사용자 프로필
+  display_name String?  @map("display_name") @db.VarChar(30)
+  avatar_url   String?  @map("avatar_url")
+  
+  // 계정 상태
+  is_active    Boolean  @default(true) @map("is_active")
+  
   // 시간 정보
+  created_at   DateTime @default(now()) @map("created_at")
   last_login_at DateTime? @map("last_login_at")
   updated_at   DateTime @updatedAt @map("updated_at")
   
