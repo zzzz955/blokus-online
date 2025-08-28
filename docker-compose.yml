@@ -58,12 +58,12 @@ services:
       # 데이터베이스 연결 (postgres 서비스명 사용)
       DB_HOST: postgres
       DB_PORT: ${DB_PORT:-5432}
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER:?must_provide_DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD:?must_provide_DB_PASSWORD}
+      DB_NAME: ${DB_NAME:?must_provide_DB_NAME}
       
       # 보안 설정
-      JWT_SECRET: ${JWT_SECRET}
+      JWT_SECRET: ${JWT_SECRET:?must_provide_JWT_SECRET}
       
       # OIDC 인증 연동
       OIDC_JWKS_URI: ${OIDC_JWKS_URI:-http://blokus-oidc-server:9000/jwks.json}
@@ -331,7 +331,7 @@ services:
       # 인증 설정
       NEXTAUTH_URL: https://${WEB_APP_URL}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
-      JWT_SECRET: ${JWT_SECRET}
+      JWT_SECRET: ${JWT_SECRET:?must_provide_JWT_SECRET}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       

@@ -577,7 +577,7 @@ jobs:
           
           echo '📝 .env 파일 생성 중... JWT_SECRET 길이:' \${#JWT_SECRET}
           
-          cat > .env << EOF
+          cat > .env << 'EOF'
         # Image Configuration
         IMAGE_TAG=${{ env.IMAGE_TAG }}
         GAME_SERVER_IMAGE=${{ env.IMAGE_PREFIX }}-game-server:${{ env.IMAGE_TAG }}
@@ -601,14 +601,6 @@ jobs:
         POSTGRES_USER=${{ secrets.DB_USER }}
         POSTGRES_PASSWORD=${{ secrets.DB_PASSWORD }}
         
-        # Security (모든 민감한 정보는 서버 변수 사용)
-        JWT_SECRET=$JWT_SECRET
-        JWT_REFRESH_SECRET=$JWT_REFRESH_SECRET
-        NEXTAUTH_SECRET=$NEXTAUTH_SECRET
-        SESSION_SECRET=$SESSION_SECRET
-        ADMIN_TOKEN=$ADMIN_TOKEN
-        INTERNAL_API_KEY=$INTERNAL_API_KEY
-        
         # Logging and Debug
         LOG_LEVEL=${{ secrets.LOG_LEVEL }}
         LOG_DIRECTORY=${{ secrets.LOG_DIRECTORY }}
@@ -625,7 +617,7 @@ jobs:
         ADMIN_USERNAME=${{ secrets.ADMIN_USERNAME }}
         ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
         GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
-        GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET
+        GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
         
         # Single Player API Configuration
         SINGLE_API_PORT=${{ secrets.SINGLE_API_PORT }}
@@ -649,22 +641,30 @@ jobs:
         CERTBOT_EMAIL=${{ secrets.CERTBOT_EMAIL }}
         EOF
           
-          # .env 파일 생성 검증
+          # .env 파일 생성 검증 (키 존재 + 빈값 금지)
           echo '🔍 .env 파일 검증 중...'
-          if [ -f .env ]; then
-            echo '✅ .env 파일이 성공적으로 생성되었습니다'
-            echo \"📊 파일 크기: \$(wc -l < .env) lines\"
-            echo '🔍 중요 환경변수 확인:'
-            if grep -q 'JWT_SECRET=' .env; then
-              echo '✅ JWT_SECRET 설정됨'
-            else
-              echo '❌ JWT_SECRET 누락!'
-            fi
-          else
-            echo '❌ .env 파일 생성 실패!'
-            exit 1
+          if [ ! -f .env ]; then
+            echo '❌ .env 파일 생성 실패!'; exit 1
           fi
+          awk -F= '
+            /^[A-Za-z_][A-Za-z0-9_]*=/ {
+              key=$1; val=$0; sub(/^[^=]*=/,"",val);
+              if (key ~ /^(JWT_SECRET|JWT_REFRESH_SECRET|NEXTAUTH_SECRET|SESSION_SECRET|ADMIN_TOKEN|INTERNAL_API_KEY)$/ && length(val)==0) {
+                printf("❌ %s is empty\n", key); bad=1
+              }
+            }
+            END { exit bad }
+          ' .env
+          echo '✅ .env integrity OK'
         "
+
+        # 강제: 동적으로 생성(혹은 시크릿에서 로드)된 보안 변수들을 .env에 덮어쓰기
+        printf 'JWT_SECRET=%s\n' "\$JWT_SECRET" >> .env
+        printf 'JWT_REFRESH_SECRET=%s\n' "\$JWT_REFRESH_SECRET" >> .env
+        printf 'NEXTAUTH_SECRET=%s\n' "\$NEXTAUTH_SECRET" >> .env
+        printf 'SESSION_SECRET=%s\n' "\$SESSION_SECRET" >> .env
+        printf 'ADMIN_TOKEN=%s\n' "\$ADMIN_TOKEN" >> .env
+        printf 'INTERNAL_API_KEY=%s\n' "\$INTERNAL_API_KEY" >> .env
         
     - name: Login to registry on server
       run: |
@@ -705,7 +705,7 @@ jobs:
           echo \"Using compose command: \$COMPOSE_CMD\" &&
           
           # 기존 서비스 중지 (오류 무시)
-          \$COMPOSE_CMD down || true &&
+          \$COMPOSE_CMD --env-file .env down || true &&
           
           # 기존 컨테이너 정리
           docker container prune -f || true &&
@@ -734,16 +734,16 @@ jobs:
           
           # 서비스 시작 (더 긴 타임아웃 설정)
           echo 'Starting services with timeout...' &&
-          timeout 300 \$COMPOSE_CMD up -d --remove-orphans &&
+          timeout 300 \$COMPOSE_CMD --env-file .env up -d --remove-orphans &&
           
           # 컨테이너 상태 확인
           echo 'Checking container status...' &&
-          \$COMPOSE_CMD ps -a &&
+          \$COMPOSE_CMD --env-file .env ps -a
           
           # 개별 서비스 로그 확인 (실패한 경우)
-          if ! \$COMPOSE_CMD ps --filter status=running | grep -q running; then
+          if ! \$COMPOSE_CMD --env-file .env ps --filter status=running | grep -q running; then
             echo 'Some containers failed to start. Checking logs...'
-            \$COMPOSE_CMD logs --tail=50
+            \$COMPOSE_CMD --env-file .env logs --tail=50
             update_status 'deployment' 'failed'
             exit 1
           fi &&
@@ -751,8 +751,8 @@ jobs:
           # 헬스체크 대기 (개선된 검증)
           echo 'Waiting for services to be healthy...' &&
           for i in {1..24}; do
-            HEALTHY_COUNT=\$(\$COMPOSE_CMD ps --filter health=healthy --format json | wc -l)
-            RUNNING_COUNT=\$(\$COMPOSE_CMD ps --filter status=running --format json | wc -l)
+            HEALTHY_COUNT=\$(\$COMPOSE_CMD --env-file .env ps --filter health=healthy --format json | wc -l)
+            RUNNING_COUNT=\$(\$COMPOSE_CMD --env-file .env ps --filter status=running --format json | wc -l)
             echo \"Health check \$i/24: \$HEALTHY_COUNT healthy containers, \$RUNNING_COUNT running\"
             
             if [ \$HEALTHY_COUNT -gt 0 ] && [ \$RUNNING_COUNT -gt 0 ]; then
@@ -762,8 +762,8 @@ jobs:
             
             if [ \$i -eq 24 ]; then
               echo 'Health check timeout - checking final status'
-              \$COMPOSE_CMD ps -a
-              \$COMPOSE_CMD logs --tail=20
+              \$COMPOSE_CMD --env-file .env ps -a
+              \$COMPOSE_CMD --env-file .env logs --tail=20
             fi
             
             sleep 5
@@ -771,7 +771,7 @@ jobs:
           
           # 최종 상태 확인
           echo 'Final deployment status:' &&
-          \$COMPOSE_CMD ps -a &&
+          \$COMPOSE_CMD --env-file .env ps -a &&
           
           # 배포 성공 상태 업데이트
           update_status 'deployment' 'success'
