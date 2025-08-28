@@ -108,7 +108,7 @@ Table: stages
 | created\_at           | timestamp | DEFAULT now()         |
 | updated\_at           | timestamp | DEFAULT now()         |
 | thumbnail\_url        | text      | optional              |
-| initial\_board\_state | int\[]    | CHECK ≤ 400, optional |
+| initial\_board\_state | int\[]    | optional              |
 
 Indexes: idx_stages_number, idx_stages_active, idx_stages_difficulty, idx_stages_featured, idx_stages_initial_board_state
 

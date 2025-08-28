@@ -145,7 +145,7 @@ model Stage {
   created_at           DateTime @default(now()) @map("created_at")
   updated_at           DateTime @default(now()) @updatedAt @map("updated_at")
   thumbnail_url        String? @map("thumbnail_url")
-  initial_board_state  Int[]? @map("initial_board_state")
+  initial_board_state  Int[] @default([]) @map("initial_board_state")
   
   // 관계
   user_stage_progress  UserStageProgress[]
