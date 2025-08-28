@@ -1,4 +1,4 @@
-version: '3.8'
+# Removed obsolete version attribute for Docker Compose v2 compatibility
 
 services:
   # ========== PostgreSQL Database ==========
@@ -107,6 +107,7 @@ services:
 
   # ========== Single Player API Server (NEW) ==========
   blokus-single-api:
+    image: ${SINGLE_API_IMAGE:-ghcr.io/zzzz955/blokus-online/blokus-single-api:${IMAGE_TAG:-latest}}
     build:
       context: ./single-player-api
       dockerfile: Dockerfile
@@ -229,6 +230,7 @@ services:
 
   # ========== OIDC Authentication Server (NEW) ==========
   blokus-oidc-server:
+    image: ${OIDC_SERVER_IMAGE:-ghcr.io/zzzz955/blokus-online/blokus-oidc-server:${IMAGE_TAG:-latest}}
     build:
       context: ./oidc-auth-server
       dockerfile: Dockerfile

@@ -527,15 +527,37 @@ jobs:
         "
         
     - name: Update environment file
-      if: needs.detect-changes.outputs.deploy-infrastructure == 'true'
       run: |
         ssh -i ~/.ssh/id_rsa -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
           cd ${{ env.DEPLOY_PATH }} &&
           
-          # JWT Secret 자동 생성
+          # 민감한 환경변수들 자동 생성
           JWT_SECRET='${{ secrets.JWT_SECRET }}'
+          JWT_REFRESH_SECRET='${{ secrets.JWT_REFRESH_SECRET }}'
+          NEXTAUTH_SECRET='${{ secrets.NEXTAUTH_SECRET }}'
+          SESSION_SECRET='${{ secrets.SESSION_SECRET }}'
+          ADMIN_TOKEN='${{ secrets.ADMIN_TOKEN }}'
+          GOOGLE_CLIENT_SECRET='${{ secrets.GOOGLE_CLIENT_SECRET }}'
+          INTERNAL_API_KEY='${{ secrets.INTERNAL_API_KEY }}'
+          
+          # 누락된 시크릿들 자동 생성
           if [ -z \"\$JWT_SECRET\" ]; then
             JWT_SECRET=\$(openssl rand -hex 32)
+          fi
+          if [ -z \"\$JWT_REFRESH_SECRET\" ]; then
+            JWT_REFRESH_SECRET=\$(openssl rand -hex 32)
+          fi
+          if [ -z \"\$NEXTAUTH_SECRET\" ]; then
+            NEXTAUTH_SECRET=\$(openssl rand -hex 32)
+          fi
+          if [ -z \"\$SESSION_SECRET\" ]; then
+            SESSION_SECRET=\$(openssl rand -hex 32)
+          fi
+          if [ -z \"\$ADMIN_TOKEN\" ]; then
+            ADMIN_TOKEN=\$(openssl rand -hex 16)
+          fi
+          if [ -z \"\$INTERNAL_API_KEY\" ]; then
+            INTERNAL_API_KEY=\$(openssl rand -hex 16)
           fi
           
           cat > .env << 'EOF'
@@ -543,6 +565,8 @@ jobs:
         IMAGE_TAG=${{ env.IMAGE_TAG }}
         GAME_SERVER_IMAGE=${{ env.IMAGE_PREFIX }}-game-server:${{ env.IMAGE_TAG }}
         WEB_SERVER_IMAGE=${{ env.IMAGE_PREFIX }}-web-server:${{ env.IMAGE_TAG }}
+        SINGLE_API_IMAGE=${{ env.IMAGE_PREFIX }}-single-api:${{ env.IMAGE_TAG }}
+        OIDC_SERVER_IMAGE=${{ env.IMAGE_PREFIX }}-oidc-server:${{ env.IMAGE_TAG }}
         
         # Game Server Configuration
         SERVER_PORT=${{ secrets.SERVER_PORT }}
@@ -560,8 +584,13 @@ jobs:
         POSTGRES_USER=${{ secrets.DB_USER }}
         POSTGRES_PASSWORD=${{ secrets.DB_PASSWORD }}
         
-        # Security
+        # Security (모든 민감한 정보는 서버 변수 사용)
         JWT_SECRET=\$JWT_SECRET
+        JWT_REFRESH_SECRET=\$JWT_REFRESH_SECRET
+        NEXTAUTH_SECRET=\$NEXTAUTH_SECRET
+        SESSION_SECRET=\$SESSION_SECRET
+        ADMIN_TOKEN=\$ADMIN_TOKEN
+        INTERNAL_API_KEY=\$INTERNAL_API_KEY
         
         # Logging and Debug
         LOG_LEVEL=${{ secrets.LOG_LEVEL }}
@@ -576,11 +605,10 @@ jobs:
         WEB_APP_URL=${{ secrets.WEB_APP_URL }}
         DATABASE_URL=${{ secrets.DATABASE_URL }}
         CLIENT_DOWNLOAD_URL=${{ secrets.CLIENT_DOWNLOAD_URL }}
-        NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
         ADMIN_USERNAME=${{ secrets.ADMIN_USERNAME }}
         ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
         GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
-        GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+        GOOGLE_CLIENT_SECRET=\$GOOGLE_CLIENT_SECRET
         
         # Single Player API Configuration
         SINGLE_API_PORT=${{ secrets.SINGLE_API_PORT }}
@@ -593,9 +621,7 @@ jobs:
         OIDC_ISSUER_PROD=${{ secrets.OIDC_ISSUER_PROD }}
         OIDC_BASE_URL_PROD=${{ secrets.OIDC_BASE_URL_PROD }}
         OIDC_JWKS_URI=${{ secrets.OIDC_JWKS_URI }}
-        SESSION_SECRET=${{ secrets.SESSION_SECRET }}
         WEB_CLIENT_SECRET=${{ secrets.WEB_CLIENT_SECRET }}
-        ADMIN_TOKEN=${{ secrets.ADMIN_TOKEN }}
         ACCESS_TOKEN_LIFETIME=${{ secrets.ACCESS_TOKEN_LIFETIME }}
         REFRESH_TOKEN_LIFETIME=${{ secrets.REFRESH_TOKEN_LIFETIME }}
         REFRESH_TOKEN_MAX_LIFETIME=${{ secrets.REFRESH_TOKEN_MAX_LIFETIME }}
@@ -632,22 +658,87 @@ jobs:
           # 배포 시작 상태 업데이트
           update_status 'deployment' 'starting' &&
           
-          # 기존 서비스 중지
-          docker compose down || true &&
+          # Docker Compose 버전 확인 및 호환성 처리
+          if command -v docker-compose &> /dev/null; then
+            COMPOSE_CMD='docker-compose'
+          elif docker compose version &> /dev/null; then
+            COMPOSE_CMD='docker compose'
+          else
+            echo 'Error: Neither docker-compose nor docker compose is available'
+            update_status 'deployment' 'failed'
+            exit 1
+          fi
           
-          # 최신 이미지 Pull (Docker Compose 구조에 맞게)
+          echo \"Using compose command: \$COMPOSE_CMD\" &&
+          
+          # 기존 서비스 중지 (오류 무시)
+          \$COMPOSE_CMD down || true &&
+          
+          # 기존 컨테이너 정리
+          docker container prune -f || true &&
+          
+          # 최신 이미지 Pull (조건부)
           echo 'Pulling pre-built images...' &&
-          (docker pull ${{ env.IMAGE_PREFIX }}-game-server:${{ env.IMAGE_TAG }} &) &&
-          (docker pull ${{ env.IMAGE_PREFIX }}-web-server:${{ env.IMAGE_TAG }} &) &&
-          wait &&
+          if [ '${{ needs.build-game-server.result }}' = 'success' ]; then
+            docker pull ${{ env.IMAGE_PREFIX }}-game-server:${{ env.IMAGE_TAG }} || echo 'Game server image pull failed'
+          fi &&
+          if [ '${{ needs.build-web-server.result }}' = 'success' ]; then
+            docker pull ${{ env.IMAGE_PREFIX }}-web-server:${{ env.IMAGE_TAG }} || echo 'Web server image pull failed'
+          fi &&
+          if [ '${{ needs.build-single-api.result }}' = 'success' ]; then
+            docker pull ${{ env.IMAGE_PREFIX }}-single-api:${{ env.IMAGE_TAG }} || echo 'Single API image pull failed'
+          fi &&
+          if [ '${{ needs.build-oidc-server.result }}' = 'success' ]; then
+            docker pull ${{ env.IMAGE_PREFIX }}-oidc-server:${{ env.IMAGE_TAG }} || echo 'OIDC server image pull failed'
+          fi &&
           
-          # 서비스 시작
-          echo 'Starting services...' &&
-          timeout 180 docker compose up -d &&
+          # 환경변수 파일 검증
+          if [ ! -f .env ]; then
+            echo 'Error: .env file not found'
+            update_status 'deployment' 'failed'
+            exit 1
+          fi &&
           
-          # 헬스체크 대기 (간단한 검증)
+          # 서비스 시작 (더 긴 타임아웃 설정)
+          echo 'Starting services with timeout...' &&
+          timeout 300 \$COMPOSE_CMD up -d --remove-orphans &&
+          
+          # 컨테이너 상태 확인
+          echo 'Checking container status...' &&
+          \$COMPOSE_CMD ps -a &&
+          
+          # 개별 서비스 로그 확인 (실패한 경우)
+          if ! \$COMPOSE_CMD ps --filter status=running | grep -q running; then
+            echo 'Some containers failed to start. Checking logs...'
+            \$COMPOSE_CMD logs --tail=50
+            update_status 'deployment' 'failed'
+            exit 1
+          fi &&
+          
+          # 헬스체크 대기 (개선된 검증)
           echo 'Waiting for services to be healthy...' &&
-          timeout 120 docker compose ps --filter health=healthy --format json | grep healthy || echo 'Health check timeout - services may still be starting'
+          for i in {1..24}; do
+            HEALTHY_COUNT=\$(\$COMPOSE_CMD ps --filter health=healthy --format json | wc -l)
+            RUNNING_COUNT=\$(\$COMPOSE_CMD ps --filter status=running --format json | wc -l)
+            echo \"Health check \$i/24: \$HEALTHY_COUNT healthy containers, \$RUNNING_COUNT running\"
+            
+            if [ \$HEALTHY_COUNT -gt 0 ] && [ \$RUNNING_COUNT -gt 0 ]; then
+              echo 'Services are starting successfully'
+              break
+            fi
+            
+            if [ \$i -eq 24 ]; then
+              echo 'Health check timeout - checking final status'
+              \$COMPOSE_CMD ps -a
+              \$COMPOSE_CMD logs --tail=20
+            fi
+            
+            sleep 5
+          done &&
+          
+          # 최종 상태 확인
+          echo 'Final deployment status:' &&
+          \$COMPOSE_CMD ps -a &&
           
           # 배포 성공 상태 업데이트
           update_status 'deployment' 'success'
