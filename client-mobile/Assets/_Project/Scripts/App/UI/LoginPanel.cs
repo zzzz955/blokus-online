@@ -165,15 +165,28 @@ namespace App.UI
 
         private void SetupOidcAuthenticator()
         {
+            // 🔥 글로벌 OIDC Authenticator 사용
+            oidcAuthenticator = App.Core.AppBootstrap.GetGlobalOidcAuthenticator();
+            
             if (oidcAuthenticator == null)
             {
-                oidcAuthenticator = gameObject.AddComponent<OidcAuthenticator>();
-                
+                // Fallback: 글로벌 인스턴스가 없으면 직접 찾기
+                oidcAuthenticator = FindObjectOfType<OidcAuthenticator>();
+                Debug.LogWarning("글로벌 OIDC Authenticator를 찾을 수 없음 - 기존 인스턴스 사용");
+            }
+            
+            if (oidcAuthenticator != null)
+            {
                 // OIDC 이벤트 구독
                 OidcAuthenticator.OnAuthenticationComplete += OnOidcAuthenticationComplete;
                 OidcAuthenticator.OnAuthenticationError += OnOidcAuthenticationError;
                 
-                Debug.Log("OIDC Authenticator 설정 완료");
+                Debug.Log($"OIDC Authenticator 연결 완료 - Ready: {oidcAuthenticator.IsReady()}");
+            }
+            else
+            {
+                Debug.LogError("OIDC Authenticator를 찾을 수 없습니다!");
+                SystemMessageManager.ShowToast("OAuth 서비스를 찾을 수 없음", Shared.UI.MessagePriority.Error);
             }
         }
 

@@ -23,6 +23,10 @@ namespace App.Network
         [SerializeField] private string scope = "openid profile email";
         [SerializeField] private bool useProduction = false;
         
+        [Header("🔥 Debugging & Diagnostics")]
+        [SerializeField] private bool showDetailedLogs = true;
+        [SerializeField] private bool testDeepLinkOnStart = false;
+        
         [Header("Development Options")]
         [SerializeField] private bool useHttpCallbackForTesting = false; // Editor에서 테스트용
         [SerializeField] private bool enableManualCodeInput = true; // 에디터에서 수동 코드 입력
@@ -105,6 +109,12 @@ namespace App.Network
 
         private void Start()
         {
+            // 🔥 시스템 진단 정보 출력
+            LogDebug($"Unity 버전: {Application.unityVersion}");
+            LogDebug($"플랫폼: {Application.platform}");
+            LogDebug($"개발 빌드: {Debug.isDebugBuild}");
+            LogDebug($"에디터 모드: {Application.isEditor}");
+            
             // Development testing option (Editor에서만)
             if (Application.isEditor && useHttpCallbackForTesting)
             {
@@ -114,9 +124,18 @@ namespace App.Network
             
             // 환경별 OIDC 서버 URL 설정
             var oidcServerUrl = EnvironmentConfig.OidcServerUrl;
+            LogDebug($"OIDC 서버 URL: {oidcServerUrl}");
+            
             if (!EnvironmentConfig.IsDevelopment)
             {
                 enableDebugLogs = false;
+            }
+            
+            // Deep Link 스키마 테스트 (개발용)
+            if (testDeepLinkOnStart && Application.isEditor)
+            {
+                LogDebug($"🧪 Deep Link 테스트: {redirectUri}");
+                StartCoroutine(TestDeepLinkSupport());
             }
             
             // Load OIDC Discovery Document on startup
@@ -124,10 +143,12 @@ namespace App.Network
             
             // Register for deep link events
             Application.deepLinkActivated += OnDeepLinkActivated;
+            LogDebug("Deep Link 이벤트 리스너 등록 완료");
             
             // Check if app was opened with deep link
             if (!string.IsNullOrEmpty(Application.absoluteURL))
             {
+                LogDebug($"앱 시작 시 Deep Link 감지: {Application.absoluteURL}");
                 OnDeepLinkActivated(Application.absoluteURL);
             }
         }
@@ -174,11 +195,33 @@ namespace App.Network
             string authUrl = BuildAuthorizationUrl();
             LogDebug($"Opening authorization URL: {authUrl}");
             
-            // Open system browser
-            Application.OpenURL(authUrl);
+            // 🔥 브라우저 열기 시도 및 에러 처리 강화
+            try
+            {
+                // Open system browser
+                Application.OpenURL(authUrl);
+                LogDebug("✅ 브라우저 열기 성공");
+                
+                // Start listening for deep link
+                StartDeepLinkListener();
+            }
+            catch (System.Exception ex)
+            {
+                LogDebug($"❌ 브라우저 열기 실패: {ex.Message}");
+                CompleteAuthentication(false, $"브라우저를 열 수 없습니다: {ex.Message}", null);
+                return;
+            }
             
-            // Start listening for deep link
-            StartDeepLinkListener();
+            // 🔥 추가 진단: 플랫폼별 브라우저 지원 확인
+            #if UNITY_WEBGL
+            LogDebug("⚠️ WebGL: 브라우저 새 창 열기가 제한될 수 있음");
+            #elif UNITY_ANDROID
+            LogDebug("📱 Android: 기본 브라우저로 리디렉트");
+            #elif UNITY_IOS  
+            LogDebug("📱 iOS: Safari로 리디렉트");
+            #else
+            LogDebug($"🖥️ 플랫폼 {Application.platform}: 시스템 기본 브라우저 사용");
+            #endif
         }
 
         /// <summary>
@@ -601,6 +644,59 @@ namespace App.Network
             {
                 Debug.Log($"[OidcAuth] {message}");
             }
+        }
+        #endregion
+
+        #region 🔥 Development & Testing Methods
+        /// <summary>
+        /// Deep Link 지원 테스트 (개발용)
+        /// </summary>
+        private IEnumerator TestDeepLinkSupport()
+        {
+            yield return new WaitForSeconds(1f);
+            
+            LogDebug("=== Deep Link 지원 테스트 시작 ===");
+            LogDebug($"Redirect URI: {redirectUri}");
+            LogDebug($"Application.absoluteURL: {Application.absoluteURL ?? "null"}");
+            
+            // 플랫폼별 Deep Link 지원 상태 확인
+            #if UNITY_ANDROID
+            LogDebug("Android 플랫폼: Deep Link 지원됨");
+            #elif UNITY_IOS
+            LogDebug("iOS 플랫폼: URL Scheme 확인 필요");
+            #else
+            LogDebug("현재 플랫폼에서는 Deep Link가 제한적으로 지원됨");
+            #endif
+            
+            LogDebug("=== Deep Link 테스트 완료 ===");
+        }
+
+        /// <summary>
+        /// 수동으로 Deep Link 테스트 (Inspector에서 호출 가능)
+        /// </summary>
+        [ContextMenu("Test Deep Link Callback")]
+        public void TestDeepLinkCallback()
+        {
+            string testUrl = $"{redirectUri}?code=test_code_12345&state=test_state";
+            LogDebug($"🧪 수동 Deep Link 테스트: {testUrl}");
+            OnDeepLinkActivated(testUrl);
+        }
+        
+        /// <summary>
+        /// OAuth URL 미리보기 (Inspector에서 호출 가능) 
+        /// </summary>
+        [ContextMenu("Preview Auth URL")]
+        public void PreviewAuthUrl()
+        {
+            if (!IsReady())
+            {
+                LogDebug("❌ Discovery document가 로드되지 않았습니다");
+                return;
+            }
+            
+            GeneratePkceParameters();
+            string authUrl = BuildAuthorizationUrl();
+            LogDebug($"🔗 Authorization URL:\n{authUrl}");
         }
         #endregion
 

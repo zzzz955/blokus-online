@@ -672,10 +672,27 @@ jobs:
         echo 'Starting services with timeout...'
         timeout 600 $COMPOSE_CMD --env-file .env up -d --no-build --remove-orphans --pull always
 
-        # infra(nginx/**, docker-compose.yml)만 변경된 경우에도 nginx는 반드시 갱신
+        # 🔥 nginx 설정 변경 시 컨테이너 재시작
         if grep -q '"true"' <<< "${{ needs.detect-changes.outputs.deploy-infrastructure }}"; then
+          echo "Infrastructure changes detected - restarting nginx and related services"
+          
+          # nginx 컨테이너 강제 재생성
           $COMPOSE_CMD --env-file .env up -d --force-recreate nginx
-          $COMPOSE_CMD --env-file .env exec -T nginx nginx -s reload || true
+          
+          # nginx 설정 파일 다시 로드
+          $COMPOSE_CMD --env-file .env exec -T nginx nginx -t
+          $COMPOSE_CMD --env-file .env exec -T nginx nginx -s reload
+          
+          # 다른 영향받는 서비스들도 재시작 (필요시)
+          $COMPOSE_CMD --env-file .env restart blokus-web blokus-single-api blokus-oidc-server
+          
+          echo "✅ Infrastructure services restarted successfully"
+        fi
+        
+        # 🔥 추가: docker-compose.yml 변경 감지 시 전체 서비스 재시작
+        if echo "${{ github.event.head_commit.modified }}" | grep -q "docker-compose.yml"; then
+          echo "docker-compose.yml modified - restarting all services for configuration updates"
+          $COMPOSE_CMD --env-file .env up -d --force-recreate
         fi
 
         echo 'Checking container status...'
