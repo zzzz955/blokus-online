@@ -226,6 +226,14 @@ namespace Features.Single.Core{
         }
         
         /// <summary>
+        /// 🔥 추가: 현재 최대 클리어 스테이지 반환
+        /// </summary>
+        public int GetMaxStageCompleted()
+        {
+            return maxStageCompleted;
+        }
+        
+        /// <summary>
         /// 특정 스테이지 진행도 캐싱
         /// </summary>
         public void CacheStageProgress(int stageNumber, UserStageProgress progress)

@@ -200,7 +200,7 @@ class DatabaseService {
 
       const user = userResult.rows[0]
 
-      // 기본 사용자 통계 생성
+      // 기본 사용자 통계 생성 (멀티플레이 + 싱글플레이 통계 포함)
       const statsQuery = `
         INSERT INTO user_stats (
           user_id,
@@ -208,8 +208,12 @@ class DatabaseService {
           wins,
           losses,
           total_score,
-          best_score
-        ) VALUES ($1, 0, 0, 0, 0, 0)
+          best_score,
+          single_player_level,
+          max_stage_completed,
+          total_single_games,
+          single_player_score
+        ) VALUES ($1, 0, 0, 0, 0, 0, 1, 0, 0, 0)
       `
 
       await client.query(statsQuery, [user.user_id])

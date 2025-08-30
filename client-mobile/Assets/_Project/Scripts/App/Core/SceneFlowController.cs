@@ -411,8 +411,11 @@ namespace App.Core
                 SingleGameManager.ClearInstance();
             }
 
-            // SingleGameplayScene만 언로드 (SingleCore 유지)
+            // SingleGameplayScene 언로드
             yield return UnloadIfLoaded(SingleGameplayScene);
+            
+            // 🔥 수정: SingleCore도 언로드 (메인 복귀 시 완전 정리)
+            yield return UnloadIfLoaded(SingleCoreScene);
 
             // MainScene 활성
             SetActive(MainScene);

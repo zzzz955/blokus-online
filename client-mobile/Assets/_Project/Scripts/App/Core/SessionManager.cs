@@ -163,6 +163,7 @@ namespace App.Core
                     if (success)
                     {
                         authToken = token;
+                        isLoggedIn = true;
                         loginTask.TrySetResult(true);
                     }
                     else
@@ -659,7 +660,6 @@ namespace App.Core
         {
             if (auth?.user == null) return;
 
-            // 🔥 수정: authToken 설정이 누락되어 있었음!
             authToken = auth.token ?? "";
             cachedId = auth.user.username ?? "";
             displayName = auth.user.display_name ?? "";

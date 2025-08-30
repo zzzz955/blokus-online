@@ -224,8 +224,8 @@ namespace Features.Single.UI.StageSelect
                 return;
             }
 
-            // 진행도 매니저 연결
-            progressManager = Features.Single.Core.StageProgressManager.Instance;
+            // 진행도 매니저 연결 (견고한 초기화)
+            EnsureProgressManagerConnection();
 
             // 스테이지 피드 연결
             if (stageFeed != null)
@@ -1994,9 +1994,12 @@ namespace Features.Single.UI.StageSelect
         /// </summary>
         private void UpdateUIInfo()
         {
+            // 🔥 수정: ProgressManager 연결 보장
+            EnsureProgressManagerConnection();
+            
             if (progressManager == null) 
             {
-                Debug.LogWarning("[CandyCrushStageMapView] UpdateUIInfo - progressManager가 null입니다");
+                Debug.LogWarning("[CandyCrushStageMapView] UpdateUIInfo - progressManager가 여전히 null입니다");
                 return;
             }
 
@@ -2025,16 +2028,26 @@ namespace Features.Single.UI.StageSelect
             if (progressText != null)
             {
                 int maxCompleted = 0;
+                
+                // 🔥 수정: ProgressManager와 UserDataCache에서 최대값 사용
+                if (progressManager != null)
+                {
+                    // StageProgressManager에서 서버 max_stage_completed 값 직접 가져오기
+                    int progressManagerMax = progressManager.GetMaxStageCompleted();
+                    maxCompleted = Mathf.Max(maxCompleted, progressManagerMax);
+                }
+                
                 if (UserDataCache.Instance != null && UserDataCache.Instance.IsLoggedIn())
                 {
-                    maxCompleted = UserDataCache.Instance.MaxStageCompleted;
+                    int userCacheMax = UserDataCache.Instance.MaxStageCompleted;
+                    maxCompleted = Mathf.Max(maxCompleted, userCacheMax);
                 }
                 
                 float progress = (float)maxCompleted / totalStages * 100f;
                 string progressString = $"{maxCompleted}/{totalStages}";
                 progressText.text = progressString;
                 
-                Debug.Log($"[CandyCrushStageMapView] 진행률 업데이트: {progressString}");
+                Debug.Log($"[CandyCrushStageMapView] 진행률 업데이트: {progressString} (ProgressManager={progressManager?.GetMaxStageCompleted() ?? -1}, UserCache={UserDataCache.Instance?.MaxStageCompleted ?? -1})");
             }
             else
             {
@@ -2545,6 +2558,27 @@ namespace Features.Single.UI.StageSelect
             else
             {
                 Debug.Log("[CandyCrushStageMapView] 데이터 로딩 대기 중 - 이벤트로 나중에 초기화");
+            }
+        }
+
+        /// <summary>
+        /// 🔥 추가: ProgressManager 연결 보장 (씬 생명주기 문제 방지)
+        /// </summary>
+        private void EnsureProgressManagerConnection()
+        {
+            if (progressManager == null)
+            {
+                progressManager = Features.Single.Core.StageProgressManager.Instance;
+                if (progressManager != null)
+                {
+                    Debug.Log("[CandyCrushStageMapView] ProgressManager 연결 성공");
+                }
+                else
+                {
+                    Debug.LogWarning("[CandyCrushStageMapView] ProgressManager.Instance가 null - 재시도 예약됨");
+                    // 다음 프레임에 재시도
+                    Invoke(nameof(EnsureProgressManagerConnection), 0.1f);
+                }
             }
         }
     }

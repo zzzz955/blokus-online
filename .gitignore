@@ -629,6 +629,7 @@ prompt.txt
 last_log.txt
 *.keystore
 .history/
+ExportHistory/
 
 # Android Build Files
 *.apk

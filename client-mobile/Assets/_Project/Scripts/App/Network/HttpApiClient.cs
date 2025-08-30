@@ -7,6 +7,7 @@ using UnityEngine.Networking;
 using App.Services;
 using App.Utils;
 using App.Config;
+using App.Core;
 using Features.Single.Core;
 using Shared.Models;
 using MessagePriority = Shared.UI.MessagePriority;
@@ -471,7 +472,8 @@ namespace App.Network{
 
             var refreshData = new RefreshTokenRequest
             {
-                refresh_token = refreshToken
+                refresh_token = refreshToken,
+                client_id = "unity-mobile-client"
             };
 
             StartCoroutine(SendPostRequest<LoginResponseData>(
@@ -527,72 +529,150 @@ namespace App.Network{
         {
             Debug.Log("[HttpApiClient] SecureStorage에서 refresh token 자동 로그인 시도");
 
+            // 1. Single-API refresh token 확인
             string savedRefreshToken = App.Security.SecureStorage.GetString("blokus_refresh_token");
-            if (string.IsNullOrEmpty(savedRefreshToken))
+            
+            // 2. OIDC refresh token도 확인
+            var oidcAuthenticator = AppBootstrap.GetGlobalOidcAuthenticator();
+            string oidcRefreshToken = oidcAuthenticator?.GetRefreshToken();
+            
+            if (!string.IsNullOrEmpty(savedRefreshToken))
             {
-                Debug.Log("[HttpApiClient] 저장된 refresh token이 없음 - 자동 로그인 실패");
-                OnAutoLoginComplete?.Invoke(false, "저장된 refresh token이 없음");
+                Debug.Log("[HttpApiClient] 저장된 Single-API refresh token으로 자동 로그인 시도");
+                TryRefreshSingleApiToken(savedRefreshToken);
                 return;
             }
-
-            Debug.Log("[HttpApiClient] 저장된 refresh token으로 자동 로그인 시도");
             
-            // refresh token으로 새로운 access token 요청
+            if (!string.IsNullOrEmpty(oidcRefreshToken))
+            {
+                Debug.Log("[HttpApiClient] 저장된 OIDC refresh token으로 자동 로그인 시도");
+                TryRefreshOidcToken(oidcRefreshToken);
+                return;
+            }
+            
+            Debug.Log("[HttpApiClient] 저장된 refresh token이 없음 - 자동 로그인 실패");
+            OnAutoLoginComplete?.Invoke(false, "저장된 refresh token이 없음");
+        }
+        
+        /// <summary>
+        /// 저장된 refresh token으로 OIDC 서버에서 자동 로그인 (통합 메서드)
+        /// </summary>
+        private void TryRefreshSingleApiToken(string refreshToken)
+        {
+            Debug.Log("[HttpApiClient] OIDC 서버로 refresh token 자동 로그인 시도");
+            
+            // 모든 refresh token은 OIDC 서버로 요청 (포트 9000)
+            StartCoroutine(RefreshOidcTokenCoroutine(null, refreshToken));
+        }
+        
+        /// <summary>
+        /// OIDC refresh token으로 자동 로그인
+        /// </summary>
+        private void TryRefreshOidcToken(string refreshToken)
+        {
+            Debug.Log("[HttpApiClient] OIDC refresh token으로 자동 로그인 시도");
+            
+            var oidcAuthenticator = AppBootstrap.GetGlobalOidcAuthenticator();
+            if (oidcAuthenticator == null)
+            {
+                Debug.LogError("[HttpApiClient] OidcAuthenticator를 찾을 수 없음");
+                OnAutoLoginComplete?.Invoke(false, "OIDC 인증 시스템 오류");
+                return;
+            }
+            
+            // OIDC 서버에서 토큰 갱신
+            StartCoroutine(RefreshOidcTokenCoroutine(oidcAuthenticator, refreshToken));
+        }
+        
+        /// <summary>
+        /// OIDC 토큰 갱신 코루틴 - OIDC 서버의 직접 API 사용
+        /// </summary>
+        private IEnumerator RefreshOidcTokenCoroutine(OidcAuthenticator oidcAuth, string refreshToken)
+        {
+            Debug.Log("[HttpApiClient] OIDC 토큰 갱신 시도 - 직접 API 사용");
+            
             var refreshData = new RefreshTokenRequest
             {
-                refresh_token = savedRefreshToken
+                refresh_token = refreshToken,
+                client_id = "unity-mobile-client"
             };
 
-            StartCoroutine(SendPostRequest<LoginResponseData>(
-                "auth/refresh",
-                refreshData,
-                response =>
-                {
-                    Debug.Log("[HttpApiClient] 자동 로그인 성공 - 새로운 토큰 받음");
-                    
-                    if (!string.IsNullOrEmpty(response?.access_token) && response?.user != null)
-                    {
-                        // 새로운 토큰으로 업데이트
-                        SetAuthToken(response.access_token, response.user.user_id);
-                        
-                        // 🔥 새로운 refresh token이 있다면 SecureStorage에 저장
-                        if (!string.IsNullOrEmpty(response.refresh_token))
-                        {
-                            App.Security.SecureStorage.StoreString("blokus_refresh_token", response.refresh_token);
-                            App.Security.SecureStorage.StoreString("blokus_user_id", response.user.user_id.ToString());
-                            App.Security.SecureStorage.StoreString("blokus_username", response.user.username ?? "");
-                        }
-                        
-                        // SessionManager에 토큰 설정 (refresh_token은 SecureStorage에서 관리하므로 빈 값 전달)
-                        if (App.Core.SessionManager.Instance != null)
-                        {
-                            App.Core.SessionManager.Instance.SetTokens(
-                                response.access_token, 
-                                "", // refresh_token은 SecureStorage에서 관리
-                                response.user.user_id
-                            );
-                        }
+            // OIDC 서버의 직접 API 엔드포인트 사용
+            string oidcUrl = EnvironmentConfig.OidcServerUrl; // http://localhost:9000
+            string endpoint = "api/auth/refresh";
+            string fullUrl = $"{oidcUrl}/{endpoint}";
+            string jsonData = JsonUtility.ToJson(refreshData);
 
-                        OnAutoLoginComplete?.Invoke(true, "자동 로그인 성공");
-                    }
-                    else
-                    {
-                        Debug.LogWarning("[HttpApiClient] 자동 로그인 응답이 불완전함");
-                        OnAutoLoginComplete?.Invoke(false, "자동 로그인 응답 오류");
-                    }
-                },
-                error =>
+            using (UnityWebRequest request = new UnityWebRequest(fullUrl, "POST"))
+            {
+                byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonData);
+                request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+                request.downloadHandler = new DownloadHandlerBuffer();
+
+                request.SetRequestHeader("Content-Type", "application/json");
+                request.timeout = requestTimeoutSeconds;
+
+                Debug.Log($"[HttpApiClient] OIDC 토큰 갱신 요청: {fullUrl}, 데이터: {jsonData}");
+                yield return request.SendWebRequest();
+
+                if (request.result == UnityWebRequest.Result.Success)
                 {
-                    Debug.LogWarning($"[HttpApiClient] 자동 로그인 실패: {error}");
-                    
-                    // 🔥 refresh token이 만료되었으면 SecureStorage에서 삭제
-                    App.Security.SecureStorage.DeleteKey("blokus_refresh_token");
-                    App.Security.SecureStorage.DeleteKey("blokus_user_id");
-                    App.Security.SecureStorage.DeleteKey("blokus_username");
-                    
-                    OnAutoLoginComplete?.Invoke(false, $"자동 로그인 실패: {error}");
+                    string jsonResponse = request.downloadHandler.text;
+                    Debug.Log($"[HttpApiClient] OIDC 토큰 갱신 응답: {jsonResponse}");
+
+                    try
+                    {
+                        LoginResponseData response = JsonUtility.FromJson<LoginResponseData>(jsonResponse);
+                        
+                        if (!string.IsNullOrEmpty(response?.access_token) && response?.user != null)
+                        {
+                            Debug.Log("[HttpApiClient] OIDC 토큰 갱신 성공 - 새로운 토큰 받음");
+                            
+                            // HttpApiClient에 새로운 토큰 설정
+                            SetAuthToken(response.access_token, response.user.user_id);
+                            
+                            // SecureStorage에 새로운 refresh token 저장
+                            if (!string.IsNullOrEmpty(response.refresh_token))
+                            {
+                                App.Security.SecureStorage.StoreString("blokus_refresh_token", response.refresh_token);
+                                App.Security.SecureStorage.StoreString("blokus_user_id", response.user.user_id.ToString());
+                                App.Security.SecureStorage.StoreString("blokus_username", response.user.username ?? "");
+                            }
+                            
+                            // SessionManager에 토큰 설정
+                            if (App.Core.SessionManager.Instance != null)
+                            {
+                                App.Core.SessionManager.Instance.SetTokens(
+                                    response.access_token, 
+                                    "", // refresh_token은 SecureStorage에서 관리
+                                    response.user.user_id
+                                );
+                            }
+
+                            OnAutoLoginComplete?.Invoke(true, "OIDC 토큰 갱신 성공");
+                        }
+                        else
+                        {
+                            Debug.LogWarning("[HttpApiClient] OIDC 토큰 갱신 응답이 불완전함");
+                            OnAutoLoginComplete?.Invoke(false, "OIDC 토큰 갱신 응답 오류");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogError($"[HttpApiClient] OIDC 토큰 갱신 응답 파싱 오류: {ex.Message}\n응답: {jsonResponse}");
+                        OnAutoLoginComplete?.Invoke(false, "OIDC 토큰 갱신 응답 파싱 실패");
+                    }
                 }
-            ));
+                else
+                {
+                    Debug.LogWarning($"[HttpApiClient] OIDC 토큰 갱신 실패: {request.error} (코드: {request.responseCode})");
+                    
+                    // 갱신 실패시 OIDC refresh token을 SecureStorage에서 제거
+                    // (OIDC refresh token은 OIDC Authenticator가 관리하므로 여기서는 제거하지 않음)
+                    
+                    OnAutoLoginComplete?.Invoke(false, $"OIDC 토큰 갱신 실패: {request.error}");
+                }
+            }
         }
 
         /// <summary>
@@ -907,6 +987,7 @@ namespace App.Network{
         public class RefreshTokenRequest
         {
             public string refresh_token;
+            public string client_id;
         }
 
         [System.Serializable]

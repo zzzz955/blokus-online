@@ -182,6 +182,10 @@ namespace App.Core
             {
                 Debug.LogWarning("[AppBootstrap] OIDC Authenticator initialization timeout");
                 SystemMessageManager.ShowToast("OAuth 서비스 초기화 시간 초과", Shared.UI.MessagePriority.Warning);
+                
+                // 🔥 타임아웃이어도 객체는 유지 - 나중에 다시 시도할 수 있도록
+                if (debugMode)
+                    Debug.Log("[AppBootstrap] OIDC Authenticator object created but not ready");
             }
         }
         

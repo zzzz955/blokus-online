@@ -32,6 +32,16 @@ namespace Features.Single.Gameplay
             IsInGameplayMode = (stageNumber > 0);
         }
 
+        /// <summary>
+        /// 🔥 추가: IsInGameplayMode를 명시적으로 제어하는 SetStageContext 오버로드
+        /// </summary>
+        public static void SetStageContext(int stageNumber, Features.Single.Core.StageDataManager stageManager, bool gameplayMode)
+        {
+            CurrentStage = stageNumber;
+            StageManager = stageManager;
+            IsInGameplayMode = gameplayMode;
+        }
+
         private int _currentScore;
         public int CurrentScore => _currentScore;
         public bool HasAnyPlacement => placements.Count > 0;
@@ -167,10 +177,10 @@ namespace Features.Single.Gameplay
                 }
                 else
                 {
-                    // CurrentStage가 지정되어 있으면 시도
-                    if (CurrentStage > 0)
+                    // 🔥 수정: CurrentStage가 지정되어 있어도 GameplayMode일 때만 자동 시작
+                    if (CurrentStage > 0 && IsInGameplayMode)
                     {
-                        if (verboseLog) Debug.Log($"[SingleGameManager] CurrentStage({CurrentStage}) SelectStage 시도");
+                        if (verboseLog) Debug.Log($"[SingleGameManager] CurrentStage({CurrentStage}) + GameplayMode - SelectStage 시도");
                         StageManager.SelectStage(CurrentStage);
                         stageData = StageManager.GetCurrentStageData();
                         if (stageData != null)
@@ -179,10 +189,16 @@ namespace Features.Single.Gameplay
                         }
                         else
                         {
-                            // 자동 테스트 초기화는 하지 않음 (의도치 않은 “테스트 모드” 진입 방지)
+                            // 자동 테스트 초기화는 하지 않음 (의도치 않은 "테스트 모드" 진입 방지)
                             if (verboseLog) Debug.Log("[SingleGameManager] 데이터 없음 - 스테이지 선택 대기");
                             IsInGameplayMode = false;
                         }
+                    }
+                    else if (CurrentStage > 0)
+                    {
+                        // 🔥 추가: CurrentStage는 있지만 GameplayMode가 아닌 경우 (스테이지 선택 모드)
+                        if (verboseLog) Debug.Log($"[SingleGameManager] CurrentStage({CurrentStage}) 참조용 - 스테이지 선택 모드 대기");
+                        IsInGameplayMode = false;
                     }
                     else
                     {

@@ -20,6 +20,7 @@ const revocationRoutes = require('./routes/revocation')
 const adminRoutes = require('./routes/admin')
 const oauthRoutes = require('./routes/oauth')
 const manualAuthRoutes = require('./routes/manual-auth')
+const directAuthRoutes = require('./routes/direct-auth')
 
 const app = express()
 const PORT = env.PORT
@@ -136,6 +137,9 @@ app.use('/admin', adminRoutes)
 // Mount OAuth routes
 app.use('/', oauthRoutes)
 app.use('/manual-auth', manualAuthRoutes)
+
+// Mount Direct API routes
+app.use('/api/auth', directAuthRoutes)
 
 // 404 handler
 app.use('*', (req, res) => {

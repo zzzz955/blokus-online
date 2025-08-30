@@ -724,7 +724,7 @@ namespace App.Core{
                 int col = position % 20;
                 int row = position / 20;
                 
-                Debug.Log($"[GameLogic] encoded={encoded}, colorIndex={colorIndex}, position={position}, row={row}, col={col}");
+                // Debug.Log($"[GameLogic] encoded={encoded}, colorIndex={colorIndex}, position={position}, row={row}, col={col}");
                 
                 // 유효한 범위 체크
                 if (row >= 0 && row < GameConstants.BOARD_SIZE && col >= 0 && col < GameConstants.BOARD_SIZE)
@@ -742,7 +742,7 @@ namespace App.Core{
                     };
                     
                     board[row, col] = color;
-                    Debug.Log($"[GameLogic] 초기 보드 설정: ({row},{col}) = {color} (encoded: {encoded}, colorIndex: {colorIndex})");
+                    // Debug.Log($"[GameLogic] 초기 보드 설정: ({row},{col}) = {color} (encoded: {encoded}, colorIndex: {colorIndex})");
                 }
                 else
                 {

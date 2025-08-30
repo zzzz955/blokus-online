@@ -278,15 +278,30 @@ class DatabaseService {
 
   // 사용자 통계 업데이트
   async updateUserStats (userId, scoreGained, completed) {
-    const updateQuery = `
-      UPDATE user_stats SET
-        total_single_games = total_single_games + 1,
-        single_player_score = single_player_score + $2,
+    // UPSERT: 레코드가 없으면 생성, 있으면 업데이트
+    const upsertQuery = `
+      INSERT INTO user_stats (
+        user_id,
+        total_games,
+        wins, 
+        losses,
+        total_score,
+        best_score,
+        single_player_level,
+        max_stage_completed,
+        total_single_games,
+        single_player_score,
+        created_at,
+        updated_at
+      ) VALUES ($1, 0, 0, 0, 0, 0, 1, 0, 1, $2, NOW(), NOW())
+      ON CONFLICT (user_id) 
+      DO UPDATE SET
+        total_single_games = user_stats.total_single_games + 1,
+        single_player_score = user_stats.single_player_score + $2,
         updated_at = NOW()
-      WHERE user_id = $1
     `
 
-    await this.query(updateQuery, [userId, scoreGained])
+    await this.query(upsertQuery, [userId, scoreGained])
   }
 
   // 별점 계산 헬퍼 (클라이언트에서 계산하는 것과 동일한 로직)

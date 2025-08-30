@@ -167,7 +167,7 @@ namespace Features.Single.Core
             if (App.Core.SessionManager.Instance != null && App.Core.SessionManager.Instance.IsLoggedIn)
             {
                 Debug.Log("[UserDataCache] 기존 로그인 상태 감지 - 사용자 정보 동기화 시작");
-                
+                isLoggedIn = true;
                 // HttpApiClient가 준비될 때까지 대기한 후 동기화
                 StartCoroutine(DelayedSyncWithExistingLogin());
             }
@@ -242,6 +242,7 @@ namespace Features.Single.Core
 
             CleanupHttpApiEventHandlers();
             isInitialized = false;
+            isLoggedIn = false;
 
             Debug.Log("[UserDataCache] Cleaned up for scene unload");
         }

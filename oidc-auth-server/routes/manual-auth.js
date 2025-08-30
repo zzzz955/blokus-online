@@ -170,45 +170,50 @@ router.post('/',
         ip: req.ip
       })
 
-      // 테스트 계정 (개발 환경)
-      const testAccounts = {
-        'testuser': 'testpass123',
-        'zzzz955': 'fostj137sw!@',
-        'admin': 'admin123'
-      }
-
+      // 데이터베이스 기반 사용자 인증
       let user = null
       
-      // 테스트 계정 체크
-      if (testAccounts[username] && password === testAccounts[username]) {
-        user = {
-          user_id: username === 'zzzz955' ? 1 : 999,
-          username: username,
-          email: `${username}@example.com`,
-          display_name: username,
-          level: 1,
-          experience_points: 0,
-          single_player_level: 1,
-          max_stage_completed: 0
-        }
-        logger.info('Test account login successful', { username, ip: req.ip })
-      } else {
-        // 데이터베이스 조회
-        try {
-          const dbUser = await dbService.getUserByUsername(username)
-          if (dbUser && dbUser.password_hash) {
-            const isValidPassword = await argon2.verify(dbUser.password_hash, password)
-            if (isValidPassword) {
-              user = dbUser
-            }
-          }
-        } catch (dbError) {
-          logger.error('Database authentication error', { 
-            error: dbError.message, 
-            username, 
-            ip: req.ip 
+      try {
+        const dbUser = await dbService.getUserByUsername(username)
+        if (!dbUser) {
+          logger.warn('Manual login failed - user not found', { username, ip: req.ip })
+          return res.status(401).json({
+            error: 'invalid_credentials',
+            error_description: 'Invalid username or password'
           })
         }
+
+        if (!dbUser.password_hash) {
+          logger.warn('Manual login failed - no password hash', { username, ip: req.ip })
+          return res.status(401).json({
+            error: 'invalid_credentials',
+            error_description: 'Invalid username or password'
+          })
+        }
+
+        const isValidPassword = await argon2.verify(dbUser.password_hash, password)
+        if (!isValidPassword) {
+          logger.warn('Manual login failed - invalid password', { username, ip: req.ip })
+          return res.status(401).json({
+            error: 'invalid_credentials',
+            error_description: 'Invalid username or password'
+          })
+        }
+        
+        user = dbUser
+        logger.info('Database authentication successful', { username, ip: req.ip })
+        
+      } catch (dbError) {
+        logger.error('Database authentication error in manual login', { 
+          error: dbError.message, 
+          username, 
+          ip: req.ip 
+        })
+        
+        return res.status(500).json({
+          error: 'server_error',
+          error_description: 'Authentication service temporarily unavailable'
+        })
       }
 
       if (!user) {
@@ -424,10 +429,8 @@ function generateManualLoginForm(authParams) {
         <div style="text-align: center; margin: 20px 0; color: #999;">또는</div>
 
         <div class="test-accounts">
-            <strong>테스트 계정:</strong><br>
-            • testuser / testpass123<br>
-            • zzzz955 / fostj137sw!@<br>
-            • admin / admin123
+            <strong>안내:</strong><br>
+            데이터베이스에 등록된 계정으로 로그인하세요.
         </div>
 
         <form method="POST" action="/manual-auth">

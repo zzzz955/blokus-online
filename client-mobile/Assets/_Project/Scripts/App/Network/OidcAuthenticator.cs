@@ -28,7 +28,7 @@ namespace App.Network
         [SerializeField] private bool testDeepLinkOnStart = false;
         
         [Header("Development Options")]
-        [SerializeField] private bool useHttpCallbackForTesting = false; // Editor에서 테스트용
+        public bool useHttpCallbackForTesting = true; // 🔥 Editor에서 테스트용 - 기본 활성화
         [SerializeField] private bool enableManualCodeInput = true; // 에디터에서 수동 코드 입력
         
         [Header("Development Settings")]
@@ -119,7 +119,12 @@ namespace App.Network
             if (Application.isEditor && useHttpCallbackForTesting)
             {
                 redirectUri = "http://localhost:7777/auth/callback";
-                LogDebug("Editor 테스트 모드: HTTP 콜백 URI 사용");
+                LogDebug("✅ Editor 테스트 모드: HTTP 콜백 URI 사용");
+                LogDebug($"🔄 Redirect URI: {redirectUri}");
+            }
+            else
+            {
+                LogDebug($"📱 프로덕션 모드: Deep Link URI 사용 - {redirectUri}");
             }
             
             // 환경별 OIDC 서버 URL 설정
@@ -136,6 +141,12 @@ namespace App.Network
             {
                 LogDebug($"🧪 Deep Link 테스트: {redirectUri}");
                 StartCoroutine(TestDeepLinkSupport());
+            }
+            
+            // 🔥 Editor용 HTTP 콜백 서버 시작
+            if (Application.isEditor && useHttpCallbackForTesting)
+            {
+                StartHttpCallbackServer();
             }
             
             // Load OIDC Discovery Document on startup
@@ -160,6 +171,33 @@ namespace App.Network
             if (_deepLinkTimeoutCoroutine != null)
             {
                 StopCoroutine(_deepLinkTimeoutCoroutine);
+            }
+            
+            StopHttpCallbackServer();
+        }
+        
+        /// <summary>
+        /// HTTP 콜백 서버 정지
+        /// </summary>
+        private void StopHttpCallbackServer()
+        {
+            if (_isHttpListening && _httpListener != null)
+            {
+                try
+                {
+                    _isHttpListening = false;
+                    _httpListener.Stop();
+                    _httpListener.Close();
+                    LogDebug("🛑 HTTP 콜백 서버 정지됨");
+                }
+                catch (System.Exception ex)
+                {
+                    LogDebug($"HTTP 서버 정지 중 오류: {ex.Message}");
+                }
+                finally
+                {
+                    _httpListener = null;
+                }
             }
         }
         #endregion
@@ -222,6 +260,25 @@ namespace App.Network
             #else
             LogDebug($"🖥️ 플랫폼 {Application.platform}: 시스템 기본 브라우저 사용");
             #endif
+        }
+
+        /// <summary>
+        /// Check if authentication is in progress
+        /// </summary>
+        public bool IsAuthenticating()
+        {
+            return _isAuthenticating;
+        }
+
+        /// <summary>
+        /// Start listening for callback (for manual auth flows)
+        /// </summary>
+        public void StartListeningForCallback()
+        {
+            if (!_isListeningForDeepLink)
+            {
+                StartDeepLinkListener();
+            }
         }
 
         /// <summary>
@@ -380,9 +437,15 @@ namespace App.Network
         {
             LogDebug($"Deep link activated: {url}");
 
-            if (!_isListeningForDeepLink || !url.StartsWith(redirectUri))
+            // HTTP callback에서 변환된 Deep Link도 허용
+            string originalDeepLinkUri = "blokus://auth/callback";
+            bool isValidUri = url.StartsWith(redirectUri) || url.StartsWith(originalDeepLinkUri);
+            
+            if (!_isListeningForDeepLink || !isValidUri)
             {
-                LogDebug("Ignoring deep link - not listening or wrong URI");
+                LogDebug($"Ignoring deep link - Listening: {_isListeningForDeepLink}, Valid URI: {isValidUri}");
+                LogDebug($"Expected: {redirectUri} or {originalDeepLinkUri}");
+                LogDebug($"Received: {url}");
                 return;
             }
 
@@ -643,6 +706,163 @@ namespace App.Network
             if (enableDebugLogs)
             {
                 Debug.Log($"[OidcAuth] {message}");
+            }
+        }
+        #endregion
+
+        #region 🔥 HTTP Callback Server for Editor
+        private System.Net.HttpListener _httpListener;
+        private bool _isHttpListening = false;
+        
+        /// <summary>
+        /// Editor용 HTTP 콜백 서버 시작
+        /// </summary>
+        private void StartHttpCallbackServer()
+        {
+            if (!Application.isEditor)
+            {
+                LogDebug("⏭️ HTTP 콜백 서버: Editor 모드가 아니므로 시작하지 않음");
+                return;
+            }
+                
+            if (_isHttpListening)
+            {
+                LogDebug("⏭️ HTTP 콜백 서버: 이미 실행 중");
+                return;
+            }
+                
+            try
+            {
+                _httpListener = new System.Net.HttpListener();
+                _httpListener.Prefixes.Add("http://localhost:7777/");
+                _httpListener.Start();
+                _isHttpListening = true;
+                
+                LogDebug("🌐 HTTP 콜백 서버 성공적으로 시작: http://localhost:7777/");
+                LogDebug("🔄 OAuth 콜백을 대기 중...");
+                
+                // 비동기로 요청 처리
+                StartCoroutine(HandleHttpRequests());
+            }
+            catch (System.Exception ex)
+            {
+                LogDebug($"❌ HTTP 콜백 서버 시작 실패: {ex.Message}");
+                LogDebug("💡 포트 7777이 이미 사용 중일 수 있습니다. Unity를 재시작해보세요.");
+            }
+        }
+        
+        /// <summary>
+        /// HTTP 요청 처리 코루틴
+        /// </summary>
+        private IEnumerator HandleHttpRequests()
+        {
+            while (_isHttpListening && _httpListener != null)
+            {
+                System.Threading.Tasks.Task<System.Net.HttpListenerContext> contextTask = null;
+                bool hasError = false;
+                
+                try
+                {
+                    contextTask = _httpListener.GetContextAsync();
+                }
+                catch (System.Exception ex)
+                {
+                    if (_isHttpListening) // 정상 종료가 아닌 경우만 로그
+                    {
+                        LogDebug($"HTTP 콜백 GetContext 오류: {ex.Message}");
+                    }
+                    yield break;
+                }
+                
+                // 비동기 대기 (try-catch 밖에서)
+                while (contextTask != null && !contextTask.IsCompleted)
+                {
+                    yield return null;
+                }
+                
+                // 결과 처리
+                try
+                {
+                    if (contextTask != null && contextTask.IsCompletedSuccessfully)
+                    {
+                        var context = contextTask.Result;
+                        ProcessHttpCallback(context);
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    if (_isHttpListening) // 정상 종료가 아닌 경우만 로그
+                    {
+                        LogDebug($"HTTP 콜백 처리 오류: {ex.Message}");
+                    }
+                    // 에러가 발생해도 계속 루프를 돌도록 yield break 대신 continue
+                    continue;
+                }
+                
+                yield return null; // 한 프레임 대기
+            }
+        }
+        
+        /// <summary>
+        /// HTTP 콜백 처리
+        /// </summary>
+        private void ProcessHttpCallback(System.Net.HttpListenerContext context)
+        {
+            var request = context.Request;
+            var response = context.Response;
+            
+            LogDebug($"🌐 HTTP 콜백 수신: {request.Url}");
+            LogDebug($"🔍 요청 메소드: {request.HttpMethod}");
+            LogDebug($"🔍 User-Agent: {request.UserAgent}");
+            
+            try
+            {
+                // OAuth 콜백 URL 파싱
+                string url = request.Url.ToString();
+                if (url.Contains("/auth/callback"))
+                {
+                    LogDebug($"✅ OAuth 콜백 감지됨");
+                    
+                    // Deep Link 형태로 변환
+                    string deepLinkUrl = url.Replace("http://localhost:7777/auth/callback", "blokus://auth/callback");
+                    LogDebug($"🔄 HTTP → Deep Link 변환: {deepLinkUrl}");
+                    
+                    // 성공 페이지 응답
+                    string responseString = @"
+                    <html><head><meta charset='UTF-8'></head>
+                    <body style='font-family: Arial; text-align: center; padding: 50px;'>
+                        <h2>✅ Login Success!</h2>
+                        <p>Returning to Unity app...</p>
+                        <script>setTimeout(() => window.close(), 2000);</script>
+                    </body></html>";
+                    
+                    byte[] buffer = System.Text.Encoding.UTF8.GetBytes(responseString);
+                    response.ContentLength64 = buffer.Length;
+                    response.ContentType = "text/html";
+                    response.OutputStream.Write(buffer, 0, buffer.Length);
+                    
+                    LogDebug($"📄 성공 페이지 응답 전송 완료");
+                    
+                    // Deep Link 콜백 처리
+                    LogDebug($"🎯 Deep Link 콜백 처리 시작");
+                    OnDeepLinkActivated(deepLinkUrl);
+                }
+                else
+                {
+                    // 404 응답
+                    response.StatusCode = 404;
+                    byte[] buffer = System.Text.Encoding.UTF8.GetBytes("Not Found");
+                    response.ContentLength64 = buffer.Length;
+                    response.OutputStream.Write(buffer, 0, buffer.Length);
+                }
+            }
+            catch (System.Exception ex)
+            {
+                LogDebug($"HTTP 콜백 처리 중 오류: {ex.Message}");
+            }
+            finally
+            {
+                response.Close();
             }
         }
         #endregion

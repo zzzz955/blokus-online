@@ -213,7 +213,7 @@ namespace Features.Single.Core{
         }
 
         /// <summary>
-        /// 🔥 추가: 사용자 변경 확인 및 강제 데이터 재로딩
+        /// 🔥 수정: 사용자 변경 확인 및 강제 데이터 재로딩 (null 체크 개선)
         /// </summary>
         public bool CheckUserChangedAndReload()
         {
@@ -234,17 +234,33 @@ namespace Features.Single.Core{
                 return false;
             }
 
-            // 사용자가 변경되었거나 아직 로딩된 적이 없는 경우
-            bool userChanged = (lastLoadedUserId != currentUserId);
+            // 🔥 수정: 첫 로딩인 경우와 실제 사용자 변경을 구분
+            bool isFirstLoad = string.IsNullOrEmpty(lastLoadedUserId);
+            bool userActuallyChanged = !isFirstLoad && (lastLoadedUserId != currentUserId);
             
-            if (userChanged)
+            if (debugMode)
             {
-                if (debugMode)
+                if (isFirstLoad)
+                    Debug.Log($"[SingleCoreBootstrap] 첫 로딩 감지: (없음) → {currentUserId}");
+                else if (userActuallyChanged)
                     Debug.Log($"[SingleCoreBootstrap] 사용자 변경 감지: {lastLoadedUserId} → {currentUserId}");
-                
-                // 강제 데이터 재로딩
+                else
+                    Debug.Log($"[SingleCoreBootstrap] 동일 사용자: {currentUserId}");
+            }
+            
+            // 🔥 수정: 실제 사용자 변경일 때만 데이터 재로딩
+            if (userActuallyChanged)
+            {
                 ForceReloadData();
                 return true;
+            }
+            
+            // 🔥 추가: 첫 로딩인 경우 lastLoadedUserId 설정하고 기존 데이터 사용
+            if (isFirstLoad)
+            {
+                lastLoadedUserId = currentUserId;
+                if (debugMode)
+                    Debug.Log($"[SingleCoreBootstrap] 첫 로딩 - lastLoadedUserId 설정: {lastLoadedUserId}");
             }
             
             return false;
@@ -385,6 +401,19 @@ namespace Features.Single.Core{
                 lastLoadedUserId = userDataCache.GetCurrentUserId();
                 if (debugMode)
                     Debug.Log($"[SingleCoreBootstrap] 데이터 로딩 완료 - 사용자 ID 기록: {lastLoadedUserId}");
+            }
+
+            // 🔥 추가: 사용자 진행도 기반 CurrentStage 설정 (스테이지 선택 모드)
+            if (stageProgressManager != null && stageDataManager != null)
+            {
+                int nextStage = stageProgressManager.GetMaxUnlockedStage(); // 다음 도전할 스테이지
+                nextStage = UnityEngine.Mathf.Max(1, nextStage); // 최소 1스테이지
+                
+                // 🔥 수정: IsInGameplayMode=false로 설정하여 스테이지 선택 모드 유지
+                Features.Single.Gameplay.SingleGameManager.SetStageContext(nextStage, stageDataManager, false);
+                
+                if (debugMode)
+                    Debug.Log($"[SingleCoreBootstrap] CurrentStage를 진행도 기반으로 설정: {nextStage} (스테이지 선택 모드)");
             }
 
             if (debugMode)

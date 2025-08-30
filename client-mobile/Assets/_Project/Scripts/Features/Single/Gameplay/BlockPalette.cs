@@ -313,7 +313,7 @@ namespace Features.Single.Gameplay{
             if (cellSpriteProvider != null)
             {
                 bb.SetCellSpriteProvider(cellSpriteProvider);
-                Debug.Log($"[BlockPalette] BlockButton({type})에 CellSpriteProvider 설정 완료");
+                // Debug.Log($"[BlockPalette] BlockButton({type})에 CellSpriteProvider 설정 완료");
             }
             else
             {

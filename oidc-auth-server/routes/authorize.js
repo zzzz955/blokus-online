@@ -105,7 +105,32 @@ router.get('/',
         })
       }
 
-      // 로그인 선택 페이지 렌더링
+      // Accept 헤더 확인 - API 요청인지 브라우저 요청인지 구분
+      const acceptsJson = req.headers.accept && req.headers.accept.includes('application/json')
+      const isApiRequest = acceptsJson && !req.headers.accept.includes('text/html')
+
+      if (isApiRequest) {
+        // API 요청 - JSON으로 파라미터 반환 (클라이언트에서 직접 로그인 처리)
+        return res.json({
+          message: 'Authorization parameters validated',
+          authorization_params: {
+            response_type,
+            client_id,
+            redirect_uri,
+            scope,
+            state,
+            nonce,
+            code_challenge,
+            code_challenge_method
+          },
+          endpoints: {
+            direct_login: '/api/auth/login',
+            google_oauth: `/auth/google?${new URLSearchParams(req.query).toString()}`
+          }
+        })
+      }
+
+      // 브라우저 요청 - HTML 로그인 페이지 렌더링
       const authParams = {
         response_type,
         client_id,

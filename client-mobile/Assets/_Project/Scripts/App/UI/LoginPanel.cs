@@ -8,6 +8,7 @@ using App.Core;
 using App.Config;
 using System;
 using System.Collections;
+using UnityEngine.Networking;
 using Newtonsoft.Json;
 
 namespace App.UI
@@ -70,23 +71,23 @@ namespace App.UI
 
         void OnEnable()
         {
-            // 🔥 수정: LoginPanel이 활성화될 때마다 refresh token 체크 리셋
-            // 로그아웃 후 재로그인을 위해 필요하지만, 무한 루프를 방지하기 위해 조건 추가
-            
             // Refresh Token 기반 자동 로그인 시도
             if (autoLoginWithRefreshToken && !hasCheckedRefreshToken)
             {
-                // 실제로 저장된 refresh token이 있는지 확인
-                string savedRefreshToken = PlayerPrefs.GetString("refresh_token", "");
-                if (!string.IsNullOrEmpty(savedRefreshToken))
+                // SecureStorage와 OIDC에서 저장된 refresh token이 있는지 확인
+                string savedRefreshToken = App.Security.SecureStorage.GetString("blokus_refresh_token");
+                var oidcAuthenticator = App.Core.AppBootstrap.GetGlobalOidcAuthenticator();
+                string oidcRefreshToken = oidcAuthenticator?.GetRefreshToken();
+                
+                if (!string.IsNullOrEmpty(savedRefreshToken) || !string.IsNullOrEmpty(oidcRefreshToken))
                 {
-                    // 🔥 수정: CoroutineRunner 사용하여 안전한 코루틴 실행
                     App.Core.CoroutineRunner.Run(TryAutoLoginWithRefreshToken());
                 }
                 else
                 {
                     // refresh token이 없으면 체크 완료로 표시
                     hasCheckedRefreshToken = true;
+                    Debug.Log("저장된 refresh token이 없음 - 수동 로그인 필요");
                 }
             }
         }
@@ -198,45 +199,76 @@ namespace App.UI
         {
             hasCheckedRefreshToken = true;
             
-            // 저장된 Refresh Token 확인
-            string refreshToken = PlayerPrefs.GetString("refresh_token", "");
-            if (string.IsNullOrEmpty(refreshToken))
-            {
-                Debug.Log("저장된 Refresh Token이 없습니다. 수동 로그인 필요");
-                yield break;
-            }
-
             SetStatusText("자동 로그인 시도 중...", Shared.UI.MessagePriority.Info);
             SetLoadingState(true);
             isAuthenticating = true;
 
-            // Refresh Token으로 자동 로그인 시도 (ValidateToken 사용)
+            // HttpApiClient의 통합된 자동 로그인 이벤트 구독
+            bool autoLoginCompleted = false;
+            bool autoLoginSuccess = false;
+            string autoLoginMessage = "";
+
+            System.Action<bool, string> onAutoLoginComplete = (success, message) =>
+            {
+                autoLoginCompleted = true;
+                autoLoginSuccess = success;
+                autoLoginMessage = message;
+            };
+
             if (HttpApiClient.Instance != null)
             {
-                Debug.Log("저장된 토큰으로 자동 로그인 시도");
-                string accessToken = PlayerPrefs.GetString("access_token", "");
-                if (!string.IsNullOrEmpty(accessToken))
+                HttpApiClient.Instance.OnAutoLoginComplete += onAutoLoginComplete;
+                
+                // HttpApiClient의 통합된 자동 로그인 시도 (중복 체크 방지)
+                HttpApiClient.Instance.ValidateRefreshTokenFromStorage();
+                
+                // 완료 대기 (최대 15초)
+                float timeout = 5f;
+                float elapsed = 0f;
+                
+                while (!autoLoginCompleted && elapsed < timeout)
                 {
-                    HttpApiClient.Instance.ValidateToken();
+                    yield return new WaitForSeconds(0.1f);
+                    elapsed += 0.1f;
+                }
+                
+                HttpApiClient.Instance.OnAutoLoginComplete -= onAutoLoginComplete;
+                
+                if (autoLoginCompleted && autoLoginSuccess)
+                {
+                    Debug.Log("[Info] 자동 로그인 성공!");
+                    SetStatusText("자동 로그인 성공!", Shared.UI.MessagePriority.Success);
+                    
+                    // 로그인 성공 처리
+                    isAuthenticating = false;
+                    SetLoadingState(false);
+                    
+                    // HttpApiClient에서 토큰 가져오기
+                    string currentToken = HttpApiClient.Instance?.GetAuthToken() ?? "";
+                    OnLoginSuccess("자동 로그인 성공", currentToken);
+                }
+                else
+                {
+                    Debug.Log($"[Warning] 자동 로그인 실패: {autoLoginMessage}");
+                    SetStatusText("로그인이 필요합니다", Shared.UI.MessagePriority.Warning);
+                    
+                    // 개발용 테스트 계정 자동 채우기
+                    if (IsTestModeEnabled)
+                    {
+                        if (usernameInput != null) usernameInput.text = testUsername;
+                        if (passwordInput != null) passwordInput.text = testPassword;
+                    }
+                    
+                    isAuthenticating = false;
+                    SetLoadingState(false);
                 }
             }
-
-            yield return new WaitForSeconds(0.5f);
-
-            // 자동 로그인 실패 시 UI 복구
-            if (isAuthenticating)
+            else
             {
-                Debug.Log("자동 로그인 실패 - 수동 로그인 필요");
+                Debug.LogError("HttpApiClient.Instance가 null입니다");
                 SetStatusText("로그인이 필요합니다", Shared.UI.MessagePriority.Warning);
-                SetLoadingState(false);
                 isAuthenticating = false;
-                
-                // 개발용 테스트 계정 자동 채우기
-                if (IsTestModeEnabled)
-                {
-                    if (usernameInput != null) usernameInput.text = testUsername;
-                    if (passwordInput != null) passwordInput.text = testPassword;
-                }
+                SetLoadingState(false);
             }
         }
 
@@ -315,22 +347,212 @@ namespace App.UI
 
         private void PerformHttpLogin(string username, string password)
         {
+            // OIDC manual-auth POST 요청으로 직접 로그인
+            if (oidcAuthenticator == null || !oidcAuthenticator.IsReady())
+            {
+                SetStatusText("인증 서버 연결 확인 중...", Shared.UI.MessagePriority.Warning);
+                SystemMessageManager.ShowToast("인증 서버 연결 확인 중...", Shared.UI.MessagePriority.Warning);
+                return;
+            }
+
             isAuthenticating = true;
-            SetStatusText($"로그인 중: {username}", Shared.UI.MessagePriority.Info);
+            SetStatusText($"ID/PW 로그인 중: {username}", Shared.UI.MessagePriority.Info);
             SetLoadingState(true);
 
-            if (HttpApiClient.Instance != null)
+            // OIDC manual-auth POST 요청 수행
+            StartCoroutine(PerformOidcManualLoginPost(username, password));
+            Debug.Log($"OIDC manual-auth POST 로그인 요청 전송: {username}");
+        }
+        
+        /// <summary>
+        /// OIDC 직접 API(/api/auth/login)를 통한 로그인
+        /// </summary>
+        private IEnumerator PerformOidcManualLoginPost(string username, string password)
+        {
+            var oidcServerUrl = EnvironmentConfig.OidcServerUrl;
+            var clientId = "unity-mobile-client";
+            var scope = "openid profile email";
+            
+            // 직접 API 요청 데이터 (JSON)
+            var loginRequest = new DirectLoginRequest
             {
-                HttpApiClient.Instance.Login(username, password);
-                Debug.Log($"ID/PW 로그인 요청 전송: {username}");
-            }
-            else
+                username = username,
+                password = password,
+                client_id = clientId,
+                scope = scope
+            };
+            
+            string jsonData = JsonUtility.ToJson(loginRequest);
+            byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(jsonData);
+            
+            var directAuthUrl = $"{oidcServerUrl}/api/auth/login";
+            Debug.Log($"🔐 OIDC 직접 API 로그인: {directAuthUrl}");
+            
+            using (UnityWebRequest request = new UnityWebRequest(directAuthUrl, "POST"))
             {
-                SystemMessageManager.ShowToast("HttpApiClient 인스턴스가 없습니다!", Shared.UI.MessagePriority.Error);
-                Debug.LogError("HttpApiClient 인스턴스가 없습니다");
-                OnLoginFailed("네트워크 오류가 발생했습니다");
+                request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+                request.downloadHandler = new DownloadHandlerBuffer();
+                request.SetRequestHeader("Content-Type", "application/json");
+                request.timeout = 15;
+                
+                yield return request.SendWebRequest();
+                
+                if (request.result == UnityWebRequest.Result.Success)
+                {
+                    string responseText = request.downloadHandler.text;
+                    Debug.Log($"직접 API 로그인 성공: {responseText.Substring(0, Math.Min(100, responseText.Length))}...");
+                    
+                    try
+                    {
+                        // JSON 응답 파싱
+                        var loginResponse = JsonUtility.FromJson<DirectLoginResponse>(responseText);
+
+                        if (loginResponse != null && !string.IsNullOrEmpty(loginResponse.access_token))
+                        {
+                            // 토큰을 SecurityStorage에 저장
+                            App.Security.SecureStorage.StoreString("blokus_access_token", loginResponse.access_token);
+                            App.Security.SecureStorage.StoreString("blokus_refresh_token", loginResponse.refresh_token);
+                            App.Security.SecureStorage.StoreString("blokus_id_token", loginResponse.id_token);
+
+                            // 사용자 정보 저장
+                            if (loginResponse.user != null)
+                            {
+                                App.Security.SecureStorage.StoreString("blokus_user_id", loginResponse.user.user_id.ToString());
+                                App.Security.SecureStorage.StoreString("blokus_username", loginResponse.user.username);
+                                App.Security.SecureStorage.StoreString("blokus_email", loginResponse.user.email);
+                            }
+
+                            Debug.Log($"토큰 저장 완료: access_token 길이={loginResponse.access_token.Length}");
+
+                            // HttpApiClient에 토큰 설정
+                            if (HttpApiClient.Instance != null && loginResponse.user != null)
+                            {
+                                HttpApiClient.Instance.SetAuthToken(loginResponse.access_token, loginResponse.user.user_id);
+                            }
+
+                            // SessionManager에 access token만 저장 (refresh_token은 SecureStorage에서 관리)
+                            if (App.Core.SessionManager.Instance != null)
+                            {
+                                App.Core.SessionManager.Instance.SetTokens(
+                                    loginResponse.access_token,
+                                    "", // refresh_token은 SecureStorage에서 관리
+                                    loginResponse.user.user_id
+                                );
+                            }
+
+                            // 로그인 성공 처리
+                            OnLoginSuccess("직접 API 로그인 성공", loginResponse.access_token);
+                            isAuthenticating = false;
+                            SetLoadingState(false);
+                        }
+                        else
+                        {
+                            OnLoginFailed("서버 응답에서 토큰을 찾을 수 없습니다");
+                        }
+                    }
+                    catch (System.Exception ex)
+                    {
+                        Debug.LogError($"직접 API 응답 파싱 오류: {ex.Message}");
+                        OnLoginFailed("서버 응답을 처리할 수 없습니다");
+                    }
+                }
+                else
+                {
+                    Debug.LogError($"직접 API 로그인 오류: {request.error} (코드: {request.responseCode})");
+                    string errorResponse = request.downloadHandler.text;
+                    
+                    string errorMessage = "로그인 실패";
+                    if (!string.IsNullOrEmpty(errorResponse))
+                    {
+                        try
+                        {
+                            // JSON 오류 응답 파싱
+                            var errorJson = JsonUtility.FromJson<DirectAuthErrorResponse>(errorResponse);
+                            if (errorJson != null && !string.IsNullOrEmpty(errorJson.error_description))
+                            {
+                                errorMessage = errorJson.error_description;
+                            }
+                        }
+                        catch
+                        {
+                            if (errorResponse.Contains("invalid_credentials"))
+                            {
+                                errorMessage = "아이디 또는 비밀번호가 올바르지 않습니다";
+                            }
+                            else if (errorResponse.Contains("invalid_request"))
+                            {
+                                errorMessage = "요청이 올바르지 않습니다";
+                            }
+                            else if (errorResponse.Contains("server_error"))
+                            {
+                                errorMessage = "서버에서 일시적인 오류가 발생했습니다";
+                            }
+                        }
+                    }
+                    
+                    OnLoginFailed(errorMessage);
+                }
             }
         }
+        
+        /// <summary>
+        /// OIDC 서버를 통한 ID/PW 로그인 (사용 안함 - OAuth 전용)
+        /// </summary>
+        /*
+        private IEnumerator PerformOidcManualLogin(string username, string password)
+        {
+            // OIDC 서버의 manual-auth 엔드포인트로 브라우저 열기
+            var oidcServerUrl = EnvironmentConfig.OidcServerUrl;
+            var clientId = "unity-mobile-client";
+            var redirectUri = Application.isEditor && oidcAuthenticator.useHttpCallbackForTesting 
+                ? "http://localhost:7777/auth/callback" 
+                : "blokus://auth/callback";
+            
+            // Manual auth URL 구성
+            var authParams = new System.Collections.Generic.Dictionary<string, string>
+            {
+                ["client_id"] = clientId,
+                ["redirect_uri"] = redirectUri,
+                ["scope"] = "openid profile email",
+                ["state"] = System.Guid.NewGuid().ToString("N"),
+                ["response_type"] = "code"
+            };
+            
+            var paramString = string.Join("&", 
+                System.Linq.Enumerable.Select(authParams, 
+                    kv => $"{UnityEngine.Networking.UnityWebRequest.EscapeURL(kv.Key)}={UnityEngine.Networking.UnityWebRequest.EscapeURL(kv.Value)}"));
+            
+            var manualAuthUrl = $"{oidcServerUrl}/manual-auth?{paramString}";
+            
+            Debug.Log($"🔐 Opening OIDC manual auth: {manualAuthUrl}");
+
+            bool openSuccess = false;
+            try
+            {
+                // 브라우저에서 manual auth 페이지 열기
+                Application.OpenURL(manualAuthUrl);
+                
+                // OIDC 콜백 리스너 시작
+                oidcAuthenticator.StartListeningForCallback();
+                openSuccess = true;
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"OIDC Manual 로그인 오류: {ex.Message}");
+                SetStatusText("로그인 처리 중 오류가 발생했습니다", Shared.UI.MessagePriority.Error);
+                OnLoginFailed("인증 서버 연결 실패");
+                yield break;
+            }
+
+            if (!openSuccess)
+            {
+                yield break;
+            }
+            
+            // 인증 완료까지 대기 (기존 OIDC 플로우 활용)
+            yield return new WaitUntil(() => !isAuthenticating || !oidcAuthenticator.IsAuthenticating());
+        }
+        */
 
         private void PerformOAuthLogin(string provider)
         {
@@ -351,6 +573,8 @@ namespace App.UI
                 if (success && tokenResponse != null)
                 {
                     OnOAuthLoginSuccess(tokenResponse.access_token, tokenResponse.refresh_token);
+                    isAuthenticating = false;
+                    SetLoadingState(false);
                 }
                 else
                 {
@@ -426,6 +650,13 @@ namespace App.UI
 
             if (success && tokens != null)
             {
+                // OIDC 토큰을 OidcAuthenticator에 저장
+                var oidcAuthenticator = App.Core.AppBootstrap.GetGlobalOidcAuthenticator();
+                if (oidcAuthenticator != null)
+                {
+                    oidcAuthenticator.SaveTokens(tokens);
+                }
+                
                 OnOAuthLoginSuccess(tokens.access_token, tokens.refresh_token);
             }
             else
@@ -451,25 +682,35 @@ namespace App.UI
             
             Debug.Log($"로그인 성공 - {message}");
 
+            if (HttpApiClient.Instance != null)
+            {
+                HttpApiClient.Instance.SetAuthToken(token, 0);
+                Debug.Log("HttpApiClient에 OAuth 토큰 설정 완료");
+            }
+
             // 게임 메인 화면으로 전환
             App.Core.CoroutineRunner.Run(NavigateToMainAfterDelay());
         }
 
         private void OnOAuthLoginSuccess(string accessToken, string refreshToken)
         {
-            // OAuth 토큰 저장
-            PlayerPrefs.SetString("access_token", accessToken);
-            PlayerPrefs.SetString("refresh_token", refreshToken);
-            PlayerPrefs.Save();
-
             SetStatusText("OAuth 로그인 성공!", Shared.UI.MessagePriority.Success);
-            Debug.Log("OAuth 로그인 성공 - 토큰 저장 완료");
+            Debug.Log("OAuth 로그인 성공 - 토큰 저장 시작");
 
+            // OIDC 토큰은 OidcAuthenticator에서 관리하므로 별도 저장 불필요
             // HttpApiClient에 토큰 설정 (userId는 임시로 0 사용)
             if (HttpApiClient.Instance != null)
             {
                 HttpApiClient.Instance.SetAuthToken(accessToken, 0);
-                // 추가로 사용자 정보 요청할 수 있음
+                Debug.Log("HttpApiClient에 OAuth 토큰 설정 완료");
+            }
+
+            // 🔥 수정: SessionManager에도 OAuth 로그인 상태 동기화
+            if (App.Core.SessionManager.Instance != null)
+            {
+                // JWT에서 사용자 정보 추출하여 SessionManager 업데이트
+                App.Core.SessionManager.Instance.SetTokens(accessToken, refreshToken, 0); // userId는 JWT에서 파싱됨
+                Debug.Log("SessionManager에 OAuth 로그인 상태 동기화 완료");
             }
 
             // 게임 메인 화면으로 전환
@@ -485,9 +726,23 @@ namespace App.UI
             // 유효하지 않은 refresh token 삭제
             if (errorMessage.Contains("refresh") || errorMessage.Contains("token"))
             {
+                // SecureStorage에서 토큰 삭제
+                App.Security.SecureStorage.DeleteKey("blokus_refresh_token");
+                App.Security.SecureStorage.DeleteKey("blokus_user_id");
+                App.Security.SecureStorage.DeleteKey("blokus_username");
+                
+                // PlayerPrefs에서도 삭제 (하위 호환성)
                 PlayerPrefs.DeleteKey("refresh_token");
                 PlayerPrefs.DeleteKey("access_token");
                 PlayerPrefs.Save();
+                
+                // OIDC 토큰도 삭제
+                var oidcAuthenticator = App.Core.AppBootstrap.GetGlobalOidcAuthenticator();
+                if (oidcAuthenticator != null)
+                {
+                    oidcAuthenticator.ClearTokens();
+                }
+                
                 SystemMessageManager.ShowToast("유효하지 않은 토큰 삭제됨", Shared.UI.MessagePriority.Warning);
                 Debug.Log("유효하지 않은 토큰 삭제 완료");
             }
@@ -523,7 +778,7 @@ namespace App.UI
                 if (usernameInput != null) usernameInput.text = testUsername;
                 if (passwordInput != null) passwordInput.text = testPassword;
             }
-
+            isAuthenticating = false;
             SetLoadingState(false);
             SetStatusText("로그인 정보를 입력하세요", Shared.UI.MessagePriority.Info);
         }
@@ -625,4 +880,48 @@ namespace App.UI
         // 유틸리티
         // ==========================================
     }
+
+    // ==========================================
+    // 직접 API 호출을 위한 데이터 구조
+    // ==========================================
+    
+    [System.Serializable]
+    public class DirectLoginRequest
+    {
+        public string username;
+        public string password;
+        public string client_id;
+        public string scope;
+    }
+    
+    [System.Serializable]
+    public class DirectLoginResponse
+    {
+        public string access_token;
+        public string id_token;
+        public string refresh_token;
+        public string token_type;
+        public int expires_in;
+        public string scope;
+        public DirectLoginUser user;
+    }
+    
+    [System.Serializable]
+    public class DirectLoginUser
+    {
+        public int user_id;
+        public string username;
+        public string email;
+        public string display_name;
+        public int level;
+        public int experience_points;
+    }
+    
+    [System.Serializable]
+    public class DirectAuthErrorResponse
+    {
+        public string error;
+        public string error_description;
+    }
+    
 }

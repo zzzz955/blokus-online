@@ -331,7 +331,7 @@ namespace Blokus::Server {
         spdlog::info("새 세션 추가: {} (총 연결: {})",
             sessionId, getCurrentConnections());
 
-        // 🔥 핵심 수정: Session에 MessageHandler가 없으면 생성
+        // Session에 MessageHandler가 없으면 생성
         if (!session->getMessageHandler()) {
             spdlog::info("🔧 [addSession] MessageHandler 생성 - SessionId: {}", sessionId);
 
@@ -340,9 +340,9 @@ namespace Blokus::Server {
                 session.get(),          // Session 포인터
                 roomManager_.get(),     // RoomManager 포인터  
                 authService_.get(),     // AuthenticationService 포인터
-                databaseManager_.get(),
-                this,                    // GameServer 포인터
-                versionManager_.get()
+                databaseManager_.get(), // DBManager 포인터
+                this,                   // GameServer 포인터
+                versionManager_.get()   // VersionManager 포인터
             );
 
             // Session에 MessageHandler 설정
