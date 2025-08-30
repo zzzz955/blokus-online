@@ -11,7 +11,7 @@ namespace Blokus {
     namespace Server {
 
         // ========================================
-        // 🔥 ConnectionPool 구현 (cpp에만 정의)
+        // ConnectionPool 구현 (cpp에만 정의)
         // ========================================
         class ConnectionPool {
         private:
@@ -53,7 +53,7 @@ namespace Blokus {
         };
 
         // ========================================
-        // 🔥 UserAccount 메서드 구현
+        // UserAccount 메서드 구현
         // ========================================
         double UserAccount::getWinRate() const {
             return totalGames > 0 ? static_cast<double>(wins) / totalGames * 100.0 : 0.0;
@@ -64,7 +64,7 @@ namespace Blokus {
         }
 
         // ========================================
-        // 🔥 DatabaseManager 구현
+        // DatabaseManager 구현
         // ========================================
 
         DatabaseManager::DatabaseManager() : isInitialized_(false) {}
@@ -99,7 +99,7 @@ namespace Blokus {
 
                 if (!result.empty()) {
                     isInitialized_ = true;
-                    spdlog::info("✅ DatabaseManager initialized successfully");
+                    spdlog::info("DatabaseManager initialized successfully");
                     return true;
                 }
 
@@ -125,7 +125,7 @@ namespace Blokus {
         }
 
         // ========================================
-        // 🔥 사용자 관리 구현
+        // 사용자 관리 구현
         // ========================================
 
         std::optional<UserAccount> DatabaseManager::getUserByUsername(const std::string& username) {
@@ -445,7 +445,7 @@ namespace Blokus {
         }
 
         // ========================================
-        // 🔥 통계 및 조회 기능
+        // 통계 및 조회 기능
         // ========================================
 
         DatabaseStats DatabaseManager::getStats() {
@@ -487,7 +487,7 @@ namespace Blokus {
         }
 
         // ========================================
-        // 🔥 게임 관련 기능 (PostgreSQL 함수 사용)
+        // 게임 관련 기능 (PostgreSQL 함수 사용)
         // ========================================
 
         bool DatabaseManager::updateGameStats(uint32_t userId, bool won, bool draw, int score) {
@@ -571,7 +571,7 @@ namespace Blokus {
                             "INSERT INTO user_stats (user_id) VALUES ($1)",
                             playerIds[i]
                         );
-                        spdlog::info("📊 새 통계 레코드 생성: 사용자 ID {}", playerIds[i]);
+                        spdlog::info("새 통계 레코드 생성: 사용자 ID {}", playerIds[i]);
                     }
                     
                     // 통계 업데이트
@@ -592,13 +592,13 @@ namespace Blokus {
                         playerIds[i], won, draw, score
                     );
                     
-                    spdlog::info("📈 플레이어 {} 통계 업데이트: 점수={}, 승리={}", 
+                    spdlog::info("플레이어 {} 통계 업데이트: 점수={}, 승리={}", 
                                playerIds[i], score, won);
                 }
 
                 txn.commit();
                 dbPool_->returnConnection(std::move(conn));
-                spdlog::info("✅ 게임 결과 저장 완료");
+                spdlog::info("게임 결과 저장 완료");
                 return true;
 
             }
@@ -611,7 +611,7 @@ namespace Blokus {
         }
 
         // ========================================
-        // 🔥 기타 필수 함수들 (간단 구현)
+        // 기타 필수 함수들 (간단 구현)
         // ========================================
 
         bool DatabaseManager::setUserActive(uint32_t userId, bool active) {
@@ -640,7 +640,7 @@ namespace Blokus {
 
 
         // ========================================
-        // 🔥 경험치 및 레벨 시스템
+        // 경험치 및 레벨 시스템
         // ========================================
         
         int DatabaseManager::getRequiredExpForLevel(int level) const {
@@ -679,7 +679,7 @@ namespace Blokus {
                         "INSERT INTO user_stats (user_id, experience_points) VALUES ($1, $2)",
                         userId, expGained
                     );
-                    spdlog::info("📊 새 통계 레코드 생성 및 경험치 추가: 사용자 ID {}, 경험치 +{}", userId, expGained);
+                    spdlog::info("새 통계 레코드 생성 및 경험치 추가: 사용자 ID {}, 경험치 +{}", userId, expGained);
                 } else {
                     int currentLevel = currentStats[0]["level"].as<int>();
                     int currentExp = currentStats[0]["experience_points"].as<int>();
@@ -691,7 +691,7 @@ namespace Blokus {
                         newExp, userId
                     );
                     
-                    spdlog::info("📈 플레이어 {} 경험치 업데이트: {} -> {} (+{})", 
+                    spdlog::info("플레이어 {} 경험치 업데이트: {} -> {} (+{})", 
                                userId, currentExp, newExp, expGained);
                 }
 
@@ -742,7 +742,7 @@ namespace Blokus {
                     if (remainingExp >= requiredExp) {
                         remainingExp -= requiredExp;  // 경험치 소모
                         newLevel++;
-                        spdlog::info("🎉 레벨업! 플레이어 {} : {} -> {} (소모: {}, 남은 경험치: {})", 
+                        spdlog::info("레벨업! 플레이어 {} : {} -> {} (소모: {}, 남은 경험치: {})", 
                                    userId, newLevel-1, newLevel, requiredExp, remainingExp);
                     } else {
                         break;
@@ -759,7 +759,7 @@ namespace Blokus {
                     txn.commit();
                     dbPool_->returnConnection(std::move(conn));
                     
-                    spdlog::info("✅ 플레이어 {} 레벨업 완료: {} -> {} (남은 경험치: {})", 
+                    spdlog::info("플레이어 {} 레벨업 완료: {} -> {} (남은 경험치: {})", 
                                userId, currentLevel, newLevel, remainingExp);
                     return true;
                 } else {

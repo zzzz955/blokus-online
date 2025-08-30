@@ -59,16 +59,29 @@ jobs:
     - name: Detect file changes
       id: changes
       run: |
+        echo "=== Change Detection Debug Info ==="
+        echo "Event name: ${{ github.event_name }}"
+        echo "Event before: ${{ github.event.before }}"
+        echo "Current SHA: ${{ github.sha }}"
+        
         if [ "${{ github.event_name }}" = "push" ]; then
-          if [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
-            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD || git ls-files)
+          if [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ] || [ -z "${{ github.event.before }}" ]; then
+            echo "Using HEAD~1 comparison (initial push or empty before)"
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || git ls-files)
           else
-            CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
+            echo "Using before/after comparison: ${{ github.event.before }}..${{ github.sha }}"
+            CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} 2>/dev/null || git diff --name-only HEAD~1 HEAD 2>/dev/null || git ls-files)
           fi
         else
           CHANGED_FILES=""
         fi
-        echo "Changed files: $CHANGED_FILES"
+        
+        echo "Changed files:"
+        if [ -n "$CHANGED_FILES" ]; then
+          echo "$CHANGED_FILES" | while read -r file; do echo "  - $file"; done
+        else
+          echo "  (no files detected)"
+        fi
 
         GAME_CHANGED=false
         if echo "$CHANGED_FILES" | grep -qE '^(server/|client/|common/|CMakeLists\.txt|vcpkg\.json|Dockerfile)'; then
@@ -91,10 +104,17 @@ jobs:
         fi
 
         INFRA_CHANGED=false
-        if echo "$CHANGED_FILES" | grep -qE '^(docker-compose\.yml|\.github/|\.env\.example|nginx/)'; then
+        if echo "$CHANGED_FILES" | grep -qE '^(docker-compose\.yml|\.github/|\.env\.example|nginx/|\.gitignore|README\.md|LICENSE|package\.json)'; then
           INFRA_CHANGED=true
         fi
 
+        echo "=== Pattern Matching Results ==="
+        echo "Game Server: $GAME_CHANGED"
+        echo "Web Server: $WEB_CHANGED"  
+        echo "Single API: $SINGLE_API_CHANGED"
+        echo "OIDC Server: $OIDC_CHANGED"
+        echo "Infrastructure: $INFRA_CHANGED"
+        
         echo "game-server=$GAME_CHANGED" >> $GITHUB_OUTPUT
         echo "web=$WEB_CHANGED" >> $GITHUB_OUTPUT
         echo "single-api=$SINGLE_API_CHANGED" >> $GITHUB_OUTPUT

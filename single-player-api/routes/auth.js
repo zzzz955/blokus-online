@@ -92,8 +92,6 @@ router.get('/oidc-discovery', async (req, res) => {
   }
 })
 
-
-
 /**
  * POST /api/auth/validate
  * OIDC JWT 토큰 유효성 검증 (JWKS 기반)
