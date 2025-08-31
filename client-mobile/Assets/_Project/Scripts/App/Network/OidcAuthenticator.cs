@@ -109,6 +109,10 @@ namespace App.Network
 
         private void Start()
         {
+            // 🔧 원격 로깅 시스템 초기화 (릴리즈 빌드용)
+            RemoteLogger.Initialize(this);
+            RemoteLogger.LogInfo($"🚀 OidcAuthenticator 시작 - Platform: {Application.platform}, BuildType: {(Debug.isDebugBuild ? "Debug" : "Release")}", "OIDC");
+            
             // 🔥 시스템 진단 정보 출력
             LogDebug($"Unity 버전: {Application.unityVersion}");
             LogDebug($"플랫폼: {Application.platform}");
@@ -309,28 +313,49 @@ namespace App.Network
             var currentOidcUrl = EnvironmentConfig.OidcServerUrl;
             string discoveryUrl = $"{currentOidcUrl}/.well-known/openid-configuration";
             LogDebug($"Loading OIDC discovery document from: {discoveryUrl}");
+            RemoteLogger.LogInfo($"🌐 OIDC Discovery 요청 시작: {discoveryUrl}", "OIDC");
 
-            using (UnityWebRequest request = UnityWebRequest.Get(discoveryUrl))
+            // 🔧 Unity 2021.3+ 방식으로 변경
+            using (UnityWebRequest request = new UnityWebRequest(discoveryUrl, "GET"))
             {
+                request.downloadHandler = new DownloadHandlerBuffer();
+                
+                // 명시적 헤더 설정
+                request.SetRequestHeader("Accept", "application/json");
+                request.SetRequestHeader("User-Agent", "Unity-Mobile-Client/1.0");
+                
+                // SSL 인증서 검증 우회 (디버깅용)
+                request.certificateHandler = new BypassCertificate();
                 request.timeout = 10;
+                
+                LogDebug($"🌐 Sending request to: {discoveryUrl}");
+                RemoteLogger.LogInfo($"📡 UnityWebRequest 전송: {discoveryUrl} (timeout: 10초)", "OIDC");
                 yield return request.SendWebRequest();
 
                 if (request.result != UnityWebRequest.Result.Success)
                 {
+                    string errorMsg = $"OIDC Discovery 실패: {request.error} (Response Code: {request.responseCode})";
                     LogDebug($"Failed to load discovery document: {request.error}");
+                    RemoteLogger.LogError($"❌ {errorMsg}", "OIDC");
+                    RemoteLogger.LogError($"🔧 RequestResult: {request.result}, ResponseCode: {request.responseCode}", "OIDC");
                     _isDiscoveryLoaded = false;
                     yield break;
                 }
 
                 try
                 {
-                    _discoveryDocument = JsonConvert.DeserializeObject<OidcDiscoveryDocument>(request.downloadHandler.text);
+                    string responseText = request.downloadHandler.text;
+                    RemoteLogger.LogInfo($"✅ OIDC Discovery 응답 수신 (길이: {responseText.Length})", "OIDC");
+                    
+                    _discoveryDocument = JsonConvert.DeserializeObject<OidcDiscoveryDocument>(responseText);
                     _isDiscoveryLoaded = true;
                     LogDebug("OIDC discovery document loaded successfully");
+                    RemoteLogger.LogInfo($"✅ OIDC Discovery 문서 파싱 성공", "OIDC");
                 }
                 catch (Exception ex)
                 {
                     LogDebug($"Failed to parse discovery document: {ex.Message}");
+                    RemoteLogger.LogError($"❌ OIDC Discovery 파싱 실패: {ex.Message}", "OIDC");
                     _isDiscoveryLoaded = false;
                 }
             }
@@ -940,5 +965,18 @@ namespace App.Network
             return instance;
         }
         #endregion
+    }
+
+    /// <summary>
+    /// SSL 인증서 검증 우회 (디버깅용)
+    /// 프로덕션에서는 사용하지 마세요!
+    /// </summary>
+    public class BypassCertificate : CertificateHandler
+    {
+        protected override bool ValidateCertificate(byte[] certificateData)
+        {
+            Debug.Log("[BypassCertificate] SSL 인증서 검증 우회됨 (디버깅 모드)");
+            return true; // 모든 인증서 허용
+        }
     }
 }

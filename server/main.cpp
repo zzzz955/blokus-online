@@ -46,17 +46,29 @@ int main() {
         SetConsoleMode(hOut, dwMode);
 #endif
         spdlog::set_pattern("[%Y-%m-%d %H:%M:%S] [%l] [%t] %v");
-        spdlog::set_level(spdlog::level::info);  // 개발용 상세 로그
+        
+        // ========================================
+        // 2. 설정 및 환경 초기화 (로그 레벨 설정 전에 먼저)
+        // ========================================
+        Blokus::Server::ConfigManager::initialize();
+        
+        // LOG_LEVEL 환경변수에 따른 로그 레벨 설정
+        std::string logLevel = Blokus::Server::ConfigManager::logLevel;
+        if (logLevel == "debug") {
+            spdlog::set_level(spdlog::level::debug);
+        } else if (logLevel == "info") {
+            spdlog::set_level(spdlog::level::info);
+        } else if (logLevel == "warn") {
+            spdlog::set_level(spdlog::level::warn);
+        } else if (logLevel == "error") {
+            spdlog::set_level(spdlog::level::err);
+        } else {
+            spdlog::set_level(spdlog::level::info);  // 기본값
+        }
 
         spdlog::info("블로커스 온라인 서버 v1.0.0");
         spdlog::info("========================================");
-
-        // ========================================
-        // 2. 설정 및 환경 초기화
-        // ========================================
-        spdlog::info("설정 및 환경 초기화 진행 중...");
-
-        Blokus::Server::ConfigManager::initialize();
+        spdlog::info("현재 로그 레벨: {}", logLevel);
         if (!Blokus::Server::ConfigManager::validate()) {
             spdlog::error("환경 초기화 실패");
             return 1;

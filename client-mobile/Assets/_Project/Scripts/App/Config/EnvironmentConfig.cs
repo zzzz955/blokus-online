@@ -142,9 +142,8 @@ namespace App.Config
 #if UNITY_EDITOR
                 return "http://localhost:9000";
 #else
-                // 프로덕션에서는 Nginx 서브패스 사용
-                string webUrl = GetEnvVariable("WEB_APP_URL", "https://blokus-online.mooo.com");
-                return $"{webUrl}/oidc";
+                // 🔧 3단계 테스트: HTTP 폴백 (HTTPS → HTTP)
+                return "http://blokus-online.mooo.com/oidc";
 #endif
             }
         }
