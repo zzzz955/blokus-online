@@ -1,13 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
+  <!-- 기본은 HTTPS만 허용(명시적으로 선언) -->
+  <base-config cleartextTrafficPermitted="false" />
+
+  <!-- 개발 환경용: 에뮬레이터/로컬은 HTTP 허용 -->
   <domain-config cleartextTrafficPermitted="true">
-    <domain includeSubdomains="true">blokus-online.mooo.com</domain>
     <domain includeSubdomains="true">localhost</domain>
+    <domain includeSubdomains="true">127.0.0.1</domain>
+    <domain includeSubdomains="true">10.0.2.2</domain>
   </domain-config>
-  
-  <!-- 비표준 포트 허용 (8080: API, 9000: OIDC) -->
-  <domain-config cleartextTrafficPermitted="true">
-    <domain includeSubdomains="true">blokus-online.mooo.com:8080</domain>
-    <domain includeSubdomains="true">blokus-online.mooo.com:9000</domain>
+
+  <!-- 프로덕션: HTTPS만 허용 -->
+  <domain-config cleartextTrafficPermitted="false">
+    <domain includeSubdomains="true">blokus-online.mooo.com</domain>
   </domain-config>
 </network-security-config>

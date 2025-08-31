@@ -7,11 +7,18 @@ namespace App.Config
 {
     /// <summary>
     /// 환경변수 기반 설정 관리
-    /// UNITY_EDITOR: localhost 하드코딩
-    /// BUILD: 루트 .env 파일 참조
+    /// - 에디터: 기본적으로 프로덕션 서버(HTTPS)로 테스트
+    /// - 빌드: StreamingAssets/.env 의 WEB_APP_URL 등을 사용(없으면 프로덕션 기본값)
     /// </summary>
     public static class EnvironmentConfig
     {
+        // === 편의 스위치 ===
+        // 에디터에서도 프로덕션 서버로 붙어서 통합 테스트 (권장)
+        private const bool UseProdServerInEditor = true;
+
+        // === 기본값 ===
+        private const string DefaultProdBaseUrl = "https://blokus-online.mooo.com";
+
         private static bool? _isDevelopment = null;
         private static Dictionary<string, string> _envVariables = null;
         private static bool _envLoaded = false;
@@ -25,9 +32,7 @@ namespace App.Config
             {
                 if (_isDevelopment == null)
                 {
-#if UNITY_EDITOR
-                    _isDevelopment = true;
-#elif DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
                     _isDevelopment = true;
 #else
                     _isDevelopment = false;
@@ -39,19 +44,19 @@ namespace App.Config
 
         /// <summary>
         /// .env 파일에서 환경변수 로드 (빌드용)
+        /// Android의 StreamingAssets는 File.* 접근이 제한될 수 있습니다.
+        /// 그 경우 기본값을 사용하거나, Resources/TextAsset로 전환을 권장합니다.
         /// </summary>
         private static void LoadEnvironmentVariables()
         {
             if (_envLoaded) return;
-            
+
             _envVariables = new Dictionary<string, string>();
-            
+
 #if !UNITY_EDITOR
             try
             {
-                // 빌드된 앱의 StreamingAssets에서 .env 파일 읽기
                 string envPath = Path.Combine(Application.streamingAssetsPath, ".env");
-                
                 if (File.Exists(envPath))
                 {
                     string[] lines = File.ReadAllLines(envPath);
@@ -59,7 +64,7 @@ namespace App.Config
                     {
                         if (string.IsNullOrEmpty(line) || line.StartsWith("#"))
                             continue;
-                            
+
                         int equalIndex = line.IndexOf('=');
                         if (equalIndex > 0)
                         {
@@ -86,69 +91,61 @@ namespace App.Config
         /// <summary>
         /// 환경변수 값 가져오기
         /// </summary>
-        private static string GetEnvVariable(string key, string defaultValue = "")
+        private static string GetEnv(string key, string defaultValue = "")
         {
 #if UNITY_EDITOR
-            // 에디터에서는 하드코딩된 개발값 사용
+            // 에디터에서는 기본값 사용(프로덕션 테스트 기준)
             return defaultValue;
 #else
             LoadEnvironmentVariables();
-            return _envVariables.ContainsKey(key) ? _envVariables[key] : defaultValue;
+            return _envVariables != null && _envVariables.ContainsKey(key) ? _envVariables[key] : defaultValue;
 #endif
         }
 
+        private static string NormalizeBase(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return DefaultProdBaseUrl;
+            url = url.Trim().TrimEnd('/');
+            if (!url.StartsWith("http")) url = "https://" + url;
+            return url;
+        }
+
         /// <summary>
-        /// 웹 서버 URL
+        /// 서비스 베이스 URL (스킴/도메인 기준)
         /// </summary>
-        public static string WebServerUrl
+        private static string BaseUrl
         {
             get
             {
 #if UNITY_EDITOR
-                return "http://localhost:3000";
+                return UseProdServerInEditor
+                    ? DefaultProdBaseUrl
+                    : "http://localhost:3000"; // 필요 시 로컬 웹앱 테스트
 #else
-                return GetEnvVariable("WEB_APP_URL", "https://blokus-online.mooo.com");
+                // 빌드: .env 의 WEB_APP_URL 우선
+                var envUrl = GetEnv("WEB_APP_URL", DefaultProdBaseUrl);
+                return NormalizeBase(envUrl);
 #endif
             }
         }
 
         /// <summary>
-        /// API 서버 URL
+        /// 웹 앱 URL (Next.js)
         /// </summary>
-        public static string ApiServerUrl
-        {
-            get
-            {
-#if UNITY_EDITOR
-                // 🔧 nginx 프록시 경로 사용 (Single API 서버)
-                return "https://blokus-online.mooo.com/single-api";
-#else
-                // WEB_APP_URL에서 도메인 추출 후 HTTP로 API URL 생성
-                string webUrl = GetEnvVariable("WEB_APP_URL", "blokus-online.mooo.com");
-                string domain = webUrl;
-                if (domain.StartsWith("http://")) domain = domain.Substring(7);
-                if (domain.StartsWith("https://")) domain = domain.Substring(8);
-                return $"http://{domain}:8080/api";
-#endif
-            }
-        }
+        public static string WebServerUrl => BaseUrl;
 
         /// <summary>
-        /// OIDC 서버 URL
+        /// Single API 서버 베이스 URL
+        /// 업스트림이 /api/... 라우트를 쓰므로, 프록시 서브패스 + /api 로 맞춥니다.
+        /// 결과: https://.../single-api/api
         /// </summary>
-        public static string OidcServerUrl
-        {
-            get
-            {
-#if UNITY_EDITOR
-                // 🔧 HTTPS 사용 + BypassCertificate로 SSL 해결
-                return "https://blokus-online.mooo.com/oidc";
-#else
-                // 🔧 3단계 테스트: HTTP 폴백 (HTTPS → HTTP)
-                return "http://blokus-online.mooo.com/oidc";
-#endif
-            }
-        }
+        public static string ApiServerUrl => $"{BaseUrl}/single-api/api";
+
+        /// <summary>
+        /// OIDC 서버 베이스 URL (서브패스)
+        /// 결과: https://.../oidc
+        /// </summary>
+        public static string OidcServerUrl => $"{BaseUrl}/oidc";
 
         /// <summary>
         /// TCP 게임 서버 호스트
@@ -158,15 +155,21 @@ namespace App.Config
             get
             {
 #if UNITY_EDITOR
-                return "localhost";
+                return "localhost"; // 에디터 로컬 테스트
 #else
-                // WEB_APP_URL에서 도메인 추출
-                string webUrl = GetEnvVariable("WEB_APP_URL", "https://blokus-online.mooo.com");
-                if (webUrl.StartsWith("http://"))
-                    return webUrl.Substring(7);
-                if (webUrl.StartsWith("https://"))
-                    return webUrl.Substring(8);
-                return webUrl;
+                try
+                {
+                    var uri = new Uri(BaseUrl);
+                    return uri.Host;
+                }
+                catch
+                {
+                    // BaseUrl이 비정상일 경우 대비
+                    var webUrl = GetEnv("WEB_APP_URL", DefaultProdBaseUrl);
+                    if (webUrl.StartsWith("http://")) return webUrl.Substring(7);
+                    if (webUrl.StartsWith("https://")) return webUrl.Substring(8);
+                    return webUrl;
+                }
 #endif
             }
         }
@@ -181,7 +184,7 @@ namespace App.Config
 #if UNITY_EDITOR
                 return 9999;
 #else
-                string portStr = GetEnvVariable("SERVER_PORT", "9999");
+                string portStr = GetEnv("SERVER_PORT", "9999");
                 return int.TryParse(portStr, out int port) ? port : 9999;
 #endif
             }
@@ -198,9 +201,13 @@ namespace App.Config
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void LogEnvironmentInfo()
         {
-            // 🔧 TLS 1.2 강제 설정 (Unity 2022 + TLS 1.3 호환성 문제 해결)
+            // UnityWebRequest는 UnityTLS를 주로 사용하지만,
+            // .NET 스택을 쓰는 일부 코드 대비로 TLS1.2 최소 보장
             System.Net.ServicePointManager.SecurityProtocol = System.Net.SecurityProtocolType.Tls12;
-            Debug.Log("🔒 TLS 1.2 강제 설정 완료");
+            System.Net.ServicePointManager.CheckCertificateRevocationList = false;
+            System.Net.ServicePointManager.DefaultConnectionLimit = 10;
+
+            Debug.Log("🔒 네트워크 스택 설정: TLS1.2");
             Debug.Log($"🔧 Unity Environment Config:");
             Debug.Log($"   IsDevelopment: {IsDevelopment}");
             Debug.Log($"   WebServerUrl: {WebServerUrl}");
