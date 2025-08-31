@@ -63,8 +63,9 @@ services:
 
       JWT_SECRET: ${JWT_SECRET:?must_provide_JWT_SECRET}
 
-      OIDC_JWKS_URI: ${OIDC_JWKS_URI:-https://blokus-online.mooo.com/oidc/jwks.json}
-      OIDC_ISSUER: ${OIDC_ISSUER:-https://blokus-online.mooo.com/oidc}
+      OIDC_ISSUER: https://blokus-online.mooo.com/oidc
+      OIDC_JWKS_URI: https://blokus-online.mooo.com/oidc/jwks.json
+      OIDC_ALLOWED_AUDIENCES: unity-mobile-client,blokus-desktop-client
 
       LOG_LEVEL: ${LOG_LEVEL:-info}
       LOG_DIRECTORY: ${LOG_DIRECTORY:-/app/logs}
@@ -119,8 +120,9 @@ services:
       DB_POOL_MIN: 5
       DB_POOL_MAX: 10
 
-      OIDC_JWKS_URI: ${OIDC_JWKS_URI:-https://blokus-online.mooo.com/oidc/jwks.json}
-      OIDC_BASE_URL: ${OIDC_BASE_URL:-https://blokus-online.mooo.com/oidc}
+      OIDC_ISSUER: https://blokus-online.mooo.com/oidc
+      OIDC_JWKS_URI: https://blokus-online.mooo.com/oidc/jwks.json
+      OIDC_ALLOWED_AUDIENCES: unity-mobile-client
 
       JWT_EXPIRE_IN: 7d
 
