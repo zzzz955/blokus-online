@@ -19,7 +19,6 @@ if (missingEnvVars.length > 0) {
 // Route imports
 const stagesRouter = require('./routes/stages')
 const userRouter = require('./routes/user')
-const authRouter = require('./routes/auth')
 const healthRouter = require('./routes/health')
 
 const app = express()
@@ -140,7 +139,6 @@ const apiPrefix = process.env.API_PREFIX || '/api'
 
 app.use(`${apiPrefix}/stages`, stagesRouter)
 app.use(`${apiPrefix}/user`, userRouter)
-app.use(`${apiPrefix}/auth`, authRouter)
 app.use(`${apiPrefix}/health`, healthRouter)
 
 // Root endpoint
@@ -158,7 +156,6 @@ app.get('/', (req, res) => {
       complete: `${apiPrefix}/stages/complete`,
       profile: `${apiPrefix}/user/profile`,
       stats: `${apiPrefix}/user/stats`,
-      auth: `${apiPrefix}/auth/validate`
     }
   })
 })
@@ -223,18 +220,6 @@ app.get(`${apiPrefix}`, (req, res) => {
         path: `${apiPrefix}/user/progress`,
         methods: ['GET'],
         description: 'Get user progress list (paginated)',
-        auth: true
-      },
-      {
-        path: `${apiPrefix}/auth/validate`,
-        methods: ['POST'],
-        description: 'Validate JWT token',
-        auth: true
-      },
-      {
-        path: `${apiPrefix}/auth/info`,
-        methods: ['GET'],
-        description: 'Get token information',
         auth: true
       }
     ]
