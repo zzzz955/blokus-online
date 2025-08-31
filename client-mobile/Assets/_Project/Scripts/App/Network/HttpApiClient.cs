@@ -608,6 +608,7 @@ namespace App.Network{
                 byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonData);
                 request.uploadHandler = new UploadHandlerRaw(bodyRaw);
                 request.downloadHandler = new DownloadHandlerBuffer();
+                request.certificateHandler = new BypassCertificate();
 
                 request.SetRequestHeader("Content-Type", "application/json");
                 request.timeout = requestTimeoutSeconds;

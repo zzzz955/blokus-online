@@ -319,14 +319,12 @@ namespace App.Network
             using (UnityWebRequest request = new UnityWebRequest(discoveryUrl, "GET"))
             {
                 request.downloadHandler = new DownloadHandlerBuffer();
+                request.certificateHandler = new BypassCertificate();
+                request.timeout = 10;
                 
                 // 명시적 헤더 설정
                 request.SetRequestHeader("Accept", "application/json");
                 request.SetRequestHeader("User-Agent", "Unity-Mobile-Client/1.0");
-                
-                // SSL 인증서 검증 우회 (디버깅용)
-                request.certificateHandler = new BypassCertificate();
-                request.timeout = 10;
                 
                 LogDebug($"🌐 Sending request to: {discoveryUrl}");
                 RemoteLogger.LogInfo($"📡 UnityWebRequest 전송: {discoveryUrl} (timeout: 10초)", "OIDC");
@@ -567,6 +565,7 @@ namespace App.Network
 
             using (UnityWebRequest request = UnityWebRequest.Post(_discoveryDocument.token_endpoint, form))
             {
+                request.certificateHandler = new BypassCertificate();
                 request.timeout = 15;
                 yield return request.SendWebRequest();
 

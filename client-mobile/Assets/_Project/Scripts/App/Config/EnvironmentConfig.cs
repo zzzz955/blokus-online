@@ -120,7 +120,8 @@ namespace App.Config
             get
             {
 #if UNITY_EDITOR
-                return "http://localhost:8080/api";
+                // 🔧 nginx 프록시 경로 사용 (Single API 서버)
+                return "https://blokus-online.mooo.com/single-api";
 #else
                 // WEB_APP_URL에서 도메인 추출 후 HTTP로 API URL 생성
                 string webUrl = GetEnvVariable("WEB_APP_URL", "blokus-online.mooo.com");
@@ -140,7 +141,8 @@ namespace App.Config
             get
             {
 #if UNITY_EDITOR
-                return "http://localhost:9000";
+                // 🔧 HTTPS 사용 + BypassCertificate로 SSL 해결
+                return "https://blokus-online.mooo.com/oidc";
 #else
                 // 🔧 3단계 테스트: HTTP 폴백 (HTTPS → HTTP)
                 return "http://blokus-online.mooo.com/oidc";
@@ -191,11 +193,14 @@ namespace App.Config
         public static bool EnableDebugLog => IsDevelopment;
 
         /// <summary>
-        /// 환경변수 디버그 정보 출력
+        /// TLS 설정 및 환경변수 디버그 정보 출력
         /// </summary>
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void LogEnvironmentInfo()
         {
+            // 🔧 TLS 1.2 강제 설정 (Unity 2022 + TLS 1.3 호환성 문제 해결)
+            System.Net.ServicePointManager.SecurityProtocol = System.Net.SecurityProtocolType.Tls12;
+            Debug.Log("🔒 TLS 1.2 강제 설정 완료");
             Debug.Log($"🔧 Unity Environment Config:");
             Debug.Log($"   IsDevelopment: {IsDevelopment}");
             Debug.Log($"   WebServerUrl: {WebServerUrl}");
