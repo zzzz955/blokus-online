@@ -768,15 +768,15 @@ jobs:
           
           # nginx 컨테이너 재시작
           echo "Restarting nginx container..."
-          $COMPOSE_CMD --env-file .env restart blokus-nginx
+          $COMPOSE_CMD --env-file .env restart nginx
           
           # nginx 설정 검증 및 리로드
           echo "Validating and reloading nginx configuration..."
-          $COMPOSE_CMD --env-file .env exec -T blokus-nginx nginx -t
-          $COMPOSE_CMD --env-file .env exec -T blokus-nginx nginx -s reload
+          $COMPOSE_CMD --env-file .env exec -T nginx nginx -t
+          $COMPOSE_CMD --env-file .env exec -T nginx nginx -s reload
           
           # nginx 상태 확인
-          $COMPOSE_CMD --env-file .env ps blokus-nginx
+          $COMPOSE_CMD --env-file .env ps nginx
           
           echo "✅ nginx restarted successfully for server changes"
         else
