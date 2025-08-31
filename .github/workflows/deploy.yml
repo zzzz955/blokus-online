@@ -750,27 +750,44 @@ jobs:
         echo 'Starting services with timeout...'
         timeout 600 $COMPOSE_CMD --env-file .env up -d --no-build --remove-orphans --pull always
 
-        # 🔥 nginx 설정 변경 시 컨테이너 재시작
-        if grep -q '"true"' <<< "${{ needs.detect-changes.outputs.deploy-infrastructure }}"; then
-          echo "Infrastructure changes detected - restarting nginx and related services"
+        # 🔥 서버 변경 감지 시 nginx 재시작 (모든 서버 변경에 대해)
+        GAME_SUCCESS="${{ needs.build-game-server.result }}"
+        WEB_SUCCESS="${{ needs.build-web-server.result }}"
+        SINGLE_SUCCESS="${{ needs.build-single-api.result }}"
+        OIDC_SUCCESS="${{ needs.build-oidc-server.result }}"
+        INFRA_CHANGED="${{ needs.detect-changes.outputs.deploy-infrastructure }}"
+        
+        # 어떤 서버든 변경되었다면 nginx 재시작
+        if [[ "$GAME_SUCCESS" == "success" ]] || [[ "$WEB_SUCCESS" == "success" ]] || [[ "$SINGLE_SUCCESS" == "success" ]] || [[ "$OIDC_SUCCESS" == "success" ]] || [[ "$INFRA_CHANGED" == "true" ]]; then
+          echo "🔧 Server changes detected - restarting nginx for proxy updates"
+          echo "  Game Server: $GAME_SUCCESS"
+          echo "  Web Server: $WEB_SUCCESS" 
+          echo "  Single API: $SINGLE_SUCCESS"
+          echo "  OIDC Server: $OIDC_SUCCESS"
+          echo "  Infrastructure: $INFRA_CHANGED"
           
-          # nginx 컨테이너 강제 재생성
-          $COMPOSE_CMD --env-file .env up -d --force-recreate nginx
+          # nginx 컨테이너 재시작
+          echo "Restarting nginx container..."
+          $COMPOSE_CMD --env-file .env restart blokus-nginx
           
-          # nginx 설정 파일 다시 로드
-          $COMPOSE_CMD --env-file .env exec -T nginx nginx -t
-          $COMPOSE_CMD --env-file .env exec -T nginx nginx -s reload
+          # nginx 설정 검증 및 리로드
+          echo "Validating and reloading nginx configuration..."
+          $COMPOSE_CMD --env-file .env exec -T blokus-nginx nginx -t
+          $COMPOSE_CMD --env-file .env exec -T blokus-nginx nginx -s reload
           
-          # 다른 영향받는 서비스들도 재시작 (필요시)
-          $COMPOSE_CMD --env-file .env restart blokus-web blokus-single-api blokus-oidc-server
+          # nginx 상태 확인
+          $COMPOSE_CMD --env-file .env ps blokus-nginx
           
-          echo "✅ Infrastructure services restarted successfully"
+          echo "✅ nginx restarted successfully for server changes"
+        else
+          echo "ℹ️ No server changes detected - skipping nginx restart"
         fi
         
-        # 🔥 추가: docker-compose.yml 변경 감지 시 전체 서비스 재시작
+        # 🔥 docker-compose.yml 변경 감지 시 전체 서비스 재시작
         if echo "${{ github.event.head_commit.modified }}" | grep -q "docker-compose.yml"; then
-          echo "docker-compose.yml modified - restarting all services for configuration updates"
+          echo "🔧 docker-compose.yml modified - performing full service restart"
           $COMPOSE_CMD --env-file .env up -d --force-recreate
+          echo "✅ Full service restart completed"
         fi
 
         echo 'Checking container status...'
