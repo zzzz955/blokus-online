@@ -498,40 +498,6 @@ namespace App.Network
         }
 
         /// <summary>
-        /// 토큰 유효성 검증 - POST 요청으로 변경
-        /// </summary>
-        public void ValidateToken()
-        {
-            if (string.IsNullOrEmpty(authToken))
-            {
-                OnAuthResponse?.Invoke(false, "토큰이 없습니다.", null);
-                return;
-            }
-
-            StartCoroutine(SendPostRequest<TokenValidationData>(
-                "auth/validate",
-                new { }, // 빈 객체, Authorization 헤더에서 토큰 확인
-                response =>
-                {
-                    if (response.valid)
-                    {
-                        OnAuthResponse?.Invoke(true, "토큰이 유효합니다.", authToken);
-                    }
-                    else
-                    {
-                        ClearAuthToken();
-                        OnAuthResponse?.Invoke(false, "토큰이 만료되었습니다.", null);
-                    }
-                },
-                error =>
-                {
-                    ClearAuthToken();
-                    OnAuthResponse?.Invoke(false, $"토큰 검증 실패: {error}", null);
-                }
-            ));
-        }
-
-        /// <summary>
         /// Refresh Token을 사용한 자동 로그인
         /// </summary>
         // public void RefreshToken(string refreshToken)

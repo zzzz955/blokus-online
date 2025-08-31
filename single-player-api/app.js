@@ -24,10 +24,8 @@ const healthRouter = require('./routes/health')
 
 const app = express()
 
-// Trust proxy (for rate limiting and IP detection)
-if (process.env.TRUST_PROXY === 'true') {
-  app.set('trust proxy', 1)
-}
+// Trust proxy (for rate limiting and IP detection) - Always enabled for Nginx reverse proxy
+app.set('trust proxy', 1)
 
 // Security middleware
 app.use(helmet({

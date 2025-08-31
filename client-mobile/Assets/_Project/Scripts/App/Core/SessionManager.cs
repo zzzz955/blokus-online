@@ -278,69 +278,6 @@ namespace App.Core
             }
         }
 
-        /// <summary>
-        /// Get refresh token for automatic login
-        /// 🔥 수정: SecureStorage에서 refresh token 반환
-        /// </summary>
-        public string GetRefreshToken()
-        {
-            return App.Security.SecureStorage.GetString("blokus_refresh_token", "");
-        }
-
-        /// <summary>
-        /// Check if refresh token is available
-        /// 🔥 수정: SecureStorage에서 refresh token 확인
-        /// </summary>
-        public bool HasRefreshToken()
-        {
-            return App.Security.SecureStorage.HasKey("blokus_refresh_token");
-        }
-
-        /// <summary>
-        /// Validate current session
-        /// </summary>
-        public async Task<bool> ValidateSession()
-        {
-            if (!isLoggedIn || string.IsNullOrEmpty(authToken))
-            {
-                return false;
-            }
-
-            try
-            {
-                var validateTask = new TaskCompletionSource<bool>();
-
-                HttpApiClient.Instance.OnAuthResponse += OnValidateResponse;
-                HttpApiClient.Instance.ValidateToken();
-
-                bool isValid = await WaitForLoginResult(validateTask, 5f);
-
-                HttpApiClient.Instance.OnAuthResponse -= OnValidateResponse;
-
-                if (!isValid)
-                {
-                    ClearSession();
-                    OnLoginStateChanged?.Invoke(false);
-                }
-
-                return isValid;
-
-                void OnValidateResponse(bool success, string message, string token)
-                {
-                    validateTask.TrySetResult(success);
-                }
-            }
-            catch (System.Exception ex)
-            {
-                if (debugMode)
-                    Debug.LogError($"[SessionManager] Session validation exception: {ex.Message}");
-
-                ClearSession();
-                OnLoginStateChanged?.Invoke(false);
-                return false;
-            }
-        }
-
         // ========================================
         // Private Methods
         // ========================================
