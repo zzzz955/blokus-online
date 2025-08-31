@@ -36,9 +36,9 @@ OidcAuthenticator::OidcAuthenticator(QObject* parent)
     // 기본 OIDC 설정: 빌드 모드에 따른 하드코딩된 값 사용
     #ifdef _DEBUG
         // Debug 모드: localhost 사용
-        m_config.issuer = "http://localhost:9000";
-        m_config.authorizationEndpoint = "http://localhost:9000/authorize";
-        m_config.tokenEndpoint = "http://localhost:9000/token";
+        m_config.issuer = "https://blokus-online.mooo.com/oidc";
+        m_config.authorizationEndpoint = "https://blokus-online.mooo.com/oidc/authorize";
+        m_config.tokenEndpoint = "https://blokus-online.mooo.com/oidc/token";
         qDebug() << QString::fromUtf8("🔧 디버그 모드: localhost OIDC 서버 사용");
     #else
         // Release 모드: 프로덕션 서버 사용 (Nginx 서브패스 프록시)
