@@ -36,11 +36,11 @@ jobs:
     name: Smart Change Detection
     runs-on: ubuntu-latest
     outputs:
-      game-server-changed: ${{ steps.changes.outputs.game-server }}
-      web-changed: ${{ steps.changes.outputs.web }}
-      single-api-changed: ${{ steps.changes.outputs.single-api }}
-      oidc-changed: ${{ steps.changes.outputs.oidc }}
-      infrastructure-changed: ${{ steps.changes.outputs.infrastructure }}
+      game-server-changed: ${{ steps.changes.outputs.game-server-changed }}
+      web-changed: ${{ steps.changes.outputs.web-changed }}
+      single-api-changed: ${{ steps.changes.outputs.single-api-changed }}
+      oidc-changed: ${{ steps.changes.outputs.oidc-changed }}
+      infrastructure-changed: ${{ steps.changes.outputs.infrastructure-changed }}
       deploy-game-server: ${{ steps.deploy-decision.outputs.deploy-game-server }}
       deploy-web: ${{ steps.deploy-decision.outputs.deploy-web }}
       deploy-single-api: ${{ steps.deploy-decision.outputs.deploy-single-api }}
@@ -172,11 +172,11 @@ jobs:
         echo ""
         
         echo "📤 Setting GitHub outputs:"
-        echo "game-server=$GAME_CHANGED" >> $GITHUB_OUTPUT
-        echo "web=$WEB_CHANGED" >> $GITHUB_OUTPUT
-        echo "single-api=$SINGLE_API_CHANGED" >> $GITHUB_OUTPUT
-        echo "oidc=$OIDC_CHANGED" >> $GITHUB_OUTPUT
-        echo "infrastructure=$INFRA_CHANGED" >> $GITHUB_OUTPUT
+        echo "game-server-changed=$GAME_CHANGED" >> $GITHUB_OUTPUT
+        echo "web-changed=$WEB_CHANGED" >> $GITHUB_OUTPUT
+        echo "single-api-changed=$SINGLE_API_CHANGED" >> $GITHUB_OUTPUT
+        echo "oidc-changed=$OIDC_CHANGED" >> $GITHUB_OUTPUT
+        echo "infrastructure-changed=$INFRA_CHANGED" >> $GITHUB_OUTPUT
         echo "✅ GitHub outputs set successfully"
 
     - name: Generate cache keys
@@ -213,11 +213,11 @@ jobs:
         FORCE_WEB="${{ github.event.inputs.force_deploy_web }}"
         FORCE_INFRA="${{ github.event.inputs.force_deploy_full }}"
 
-        DEPLOY_GAME="${{ steps.changes.outputs.game-server }}"
-        DEPLOY_WEB="${{ steps.changes.outputs.web }}"
-        DEPLOY_SINGLE_API="${{ steps.changes.outputs.single-api }}"
-        DEPLOY_OIDC="${{ steps.changes.outputs.oidc }}"
-        DEPLOY_INFRA="${{ steps.changes.outputs.infrastructure }}"
+        DEPLOY_GAME="${{ steps.changes.outputs.game-server-changed }}"
+        DEPLOY_WEB="${{ steps.changes.outputs.web-changed }}"
+        DEPLOY_SINGLE_API="${{ steps.changes.outputs.single-api-changed }}"
+        DEPLOY_OIDC="${{ steps.changes.outputs.oidc-changed }}"
+        DEPLOY_INFRA="${{ steps.changes.outputs.infrastructure-changed }}"
         if [[ "$DEPLOY_INFRA" == "true" ]] || [[ "$GAME_SUCCESS" == "success" ]] || [[ "$WEB_SUCCESS" == "success" ]] || [[ "$SINGLE_SUCCESS" == "success" ]] || [[ "$OIDC_SUCCESS" == "success" ]]; then
           echo "deployment-performed=true" >> $GITHUB_OUTPUT
         else
