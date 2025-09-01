@@ -13,6 +13,7 @@ namespace App.UI
         [Header("UI 컴포넌트")]
         [SerializeField] private Button singlePlayerButton;
         [SerializeField] private Button multiPlayerButton;
+        [SerializeField] private Button settingsButton;
         [SerializeField] private Button backButton; // 로그아웃 버튼으로 사용
         [SerializeField] private TMP_Text GreatingMessage;
 
@@ -94,6 +95,17 @@ namespace App.UI
             else
             {
                 Debug.LogWarning("multiPlayerButton이 인스펙터에서 할당되지 않았습니다!");
+            }
+
+            if (settingsButton != null)
+            {
+                settingsButton.onClick.AddListener(OnMultiPlayerClicked);
+                settingsButton.interactable = false;
+                Debug.Log("멀티플레이 버튼 이벤트 연결 완료, 비활성화(스텁)");
+            }
+            else
+            {
+                Debug.LogWarning("settingsButton 인스펙터에서 할당되지 않았습니다!");
             }
 
             if (backButton != null)

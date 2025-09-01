@@ -1,0 +1,38 @@
+// ---- MODULE (Library) build.gradle template ----
+apply plugin: 'com.android.library'
+
+android {
+    ndkPath "**NDKPATH**"
+    compileSdkVersion **APIVERSION**
+    ndkVersion "**NDKVERSION**"
+    namespace '**APPLICATIONID**'
+
+    defaultConfig {
+        minSdkVersion **MINSDKVERSION**
+        targetSdkVersion **TARGETSDKVERSION**
+        versionCode **VERSIONCODE**
+        versionName '**VERSIONNAME**'
+        ndk { abiFilters **ABI_FILTERS** }
+        consumerProguardFiles 'proguard-unity.txt'**USER_PROGUARD**
+    }
+
+    androidResources { noCompress += unityStreamingAssets.tokenize(', ') }
+
+    packagingOptions {
+        jniLibs { useLegacyPackaging true }
+        resources { excludes += ['META-INF/*'] }
+    }
+
+    lintOptions { abortOnError false }
+
+    // ❌ 라이브러리 모듈에는 signingConfigs 금지!
+    // **SIGN** 도 절대 넣지 마세요.
+}
+
+// 🔻 모듈에서는 repositories 선언하지 않습니다
+// repositories { }
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    **DEPS**
+}

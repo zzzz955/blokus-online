@@ -14,10 +14,11 @@ namespace Features.Single.UI.InGame{
         [SerializeField] private GameObject modalPanel;
         [SerializeField] private TextMeshProUGUI messageText;
         [SerializeField] private Button acceptButton;
+        [SerializeField] private Button backgroundButton;
         [SerializeField] private Button rejectButton;
         
         [Header("설정")]
-        [SerializeField] private string confirmMessage = "게임을 종료하고 스테이지 목록으로 돌아가시겠습니까?";
+        [SerializeField] private string confirmMessage = "";
         [SerializeField] private string mainSceneName = "MainScene";
         
         void Awake()
@@ -26,6 +27,11 @@ namespace Features.Single.UI.InGame{
             if (acceptButton != null)
             {
                 acceptButton.onClick.AddListener(OnAcceptClicked);
+            }
+
+            if (backgroundButton != null)
+            {
+                backgroundButton.onClick.AddListener(OnRejectClicked);
             }
             
             if (rejectButton != null)

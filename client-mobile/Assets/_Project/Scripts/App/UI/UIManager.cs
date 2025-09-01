@@ -352,13 +352,25 @@ namespace App.UI
                 Debug.Log($"=== ShowPanel 시작 ===");
                 Debug.Log($"요청된 State: {state}");
                 Debug.Log($"현재 State: {currentState}");
+                Debug.Log($"현재 패널: {(currentPanel != null ? currentPanel.name : "null")}");
+                Debug.Log($"현재 패널 활성 상태: {(currentPanel != null ? currentPanel.gameObject.activeInHierarchy.ToString() : "N/A")}");
             }
             
-            // 🔥 수정: StageSelect 패널의 경우 씬 간 전환이 있을 수 있으므로 재초기화 허용
-            if (currentState == state && currentPanel != null && state != UIState.StageSelect) 
+            // 🔥 수정: 패널이 실제로 활성화되어 있을 때만 early return 
+            // StageSelect 패널의 경우 씬 간 전환이 있을 수 있으므로 재초기화 허용
+            if (currentState == state && currentPanel != null && currentPanel.gameObject.activeInHierarchy && state != UIState.StageSelect) 
             {
-                Debug.Log("동일한 State이고 패널이 활성화되어 있어서 return");
+                if (enableDebugLogs)
+                    Debug.Log("동일한 State이고 패널이 활성화되어 있어서 return");
                 return;
+            }
+
+            // 🔥 추가: currentPanel이 null이 아니지만 gameObject가 파괴된 경우 상태 리셋
+            if (currentPanel != null && currentPanel.gameObject == null)
+            {
+                Debug.LogWarning($"[UIManager] currentPanel의 gameObject가 파괴됨 - 상태 리셋");
+                currentPanel = null;
+                currentState = (UIState)(-1);
             }
 
             // 현재 패널 숨기기
@@ -595,6 +607,15 @@ namespace App.UI
             {
                 Debug.Log("[UIManager] ModeSelection 패널 숨기기");
                 modePanel.Hide();
+                
+                // 🔥 중요: ModeSelection 패널이 숨겨지면 currentState와 currentPanel을 리셋
+                // 나중에 ShowPanel(ModeSelection)이 호출될 때 정상적으로 표시되도록 함
+                if (currentState == UIState.ModeSelection && currentPanel == modePanel)
+                {
+                    Debug.Log("[UIManager] ModeSelection 패널 숨김으로 인한 상태 리셋");
+                    currentState = (UIState)(-1);
+                    currentPanel = null;
+                }
             }
             
             // 🔥 핵심: StageSelect 패널은 유지 (기획 의도)
@@ -607,7 +628,6 @@ namespace App.UI
                 }
             }
             
-            // currentPanel과 currentState는 무효화하지 않음 (StageSelect 상태 유지)
             Debug.Log("[UIManager] MainScene 패널 숨기기 완료 - StageSelectPanel 유지됨");
         }
 

@@ -28,6 +28,9 @@ namespace App.UI
         [Header("기타 버튼")]
         [SerializeField] private Button registerButton;
 
+        [Header("게임 종료 모달")]
+        [SerializeField] private GameExitModal gameExitModal;
+
         [Header("설정")]
         [SerializeField] private bool autoLoginWithRefreshToken = true;
 
@@ -50,6 +53,26 @@ namespace App.UI
         {
             base.Awake();
             Debug.Log("LoginPanel 초기화");
+            
+            // 🔥 디버깅: GameExitModal 참조 상태 확인
+            if (gameExitModal == null)
+            {
+                Debug.LogWarning("[LoginPanel] GameExitModal이 Inspector에서 할당되지 않음 - 자동으로 찾기 시도");
+                gameExitModal = FindObjectOfType<GameExitModal>();
+                
+                if (gameExitModal != null)
+                {
+                    Debug.Log($"[LoginPanel] GameExitModal 자동으로 발견: {gameExitModal.name}");
+                }
+                else
+                {
+                    Debug.LogError("[LoginPanel] GameExitModal을 찾을 수 없습니다! Scene에 GameExitModal이 있는지 확인하세요.");
+                }
+            }
+            else
+            {
+                Debug.Log($"[LoginPanel] GameExitModal 참조 확인됨: {gameExitModal.name}");
+            }
         }
 
         protected override void Start()
@@ -105,6 +128,57 @@ namespace App.UI
             {
                 OidcAuthenticator.OnAuthenticationComplete -= OnOidcAuthenticationComplete;
                 OidcAuthenticator.OnAuthenticationError -= OnOidcAuthenticationError;
+            }
+        }
+
+        private void Update()
+        {
+            // Android 뒤로가기 버튼 처리 (에뮬레이터에서는 ESC키)
+            if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                OnAndroidBackButtonPressed();
+            }
+        }
+
+        /// <summary>
+        /// Android 뒤로가기 버튼 클릭 시 처리
+        /// </summary>
+        private void OnAndroidBackButtonPressed()
+        {
+            Debug.Log("[LoginPanel] Android 뒤로가기 버튼 클릭됨");
+            
+            // 로그인 중이거나 게임 종료 모달이 이미 표시 중이면 무시
+            if (isAuthenticating)
+            {
+                Debug.Log("[LoginPanel] 로그인 중에는 뒤로가기 버튼 무시");
+                return;
+            }
+
+            if (gameExitModal != null && gameExitModal.gameObject.activeInHierarchy)
+            {
+                Debug.Log("[LoginPanel] 게임 종료 모달이 이미 표시 중");
+                return;
+            }
+
+            // GameExitModal 표시
+            if (gameExitModal != null)
+            {
+                Debug.Log("[LoginPanel] Android 뒤로가기 버튼 - 게임 종료 모달 표시");
+                Debug.Log($"[LoginPanel] GameExitModal 상태: gameObject={gameExitModal.gameObject != null}, active={gameExitModal.gameObject?.activeSelf}");
+                
+                gameExitModal.ShowModal();
+                
+                // ShowModal 호출 후 상태 재확인
+                Debug.Log($"[LoginPanel] ShowModal 호출 후 상태: active={gameExitModal.gameObject?.activeSelf}, activeInHierarchy={gameExitModal.gameObject?.activeInHierarchy}");
+            }
+            else
+            {
+                Debug.LogWarning("[LoginPanel] GameExitModal이 설정되지 않음 - 직접 종료");
+#if UNITY_EDITOR
+                UnityEditor.EditorApplication.isPlaying = false;
+#else
+                Application.Quit();
+#endif
             }
         }
 

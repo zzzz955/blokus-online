@@ -1,0 +1,16 @@
+// ---- ROOT (Project-level) build.gradle template ----
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:7.4.2'
+        **BUILD_SCRIPT_DEPS**
+    }
+}
+
+// repositories 는 settings.gradle 의 dependencyResolutionManagement에서 관리합니다.
+// allprojects { repositories { ... } } 블록은 제거하여 다음 경고를 없앱니다:
+// "Build was configured to prefer settings repositories over project repositories..."
