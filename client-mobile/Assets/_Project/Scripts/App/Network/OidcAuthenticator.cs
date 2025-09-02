@@ -45,6 +45,11 @@ namespace App.Network
         private string _codeChallenge;
         private string _state;
         
+        // Deep Link 처리 변수들
+        private string _receivedAuthCode;
+        private string _receivedError;
+        private bool _deepLinkHandlerRegistered = false;
+        
         // Authentication State
         private bool _isAuthenticating = false;
         private Action<bool, string, TokenResponse> _authCallback;
@@ -262,12 +267,10 @@ namespace App.Network
             _isAuthenticating = true;
 
             // 🚀 Unity Editor에서 배포 서버의 기존 Google OAuth 직접 사용
-            if (Application.isEditor && useUnityEditorAPI)
-            {
-                LogDebug("🚀 배포 서버의 기존 Google OAuth API를 직접 사용합니다");
-                StartCoroutine(StartDirectGoogleOAuth(callback));
-                return;
-            }
+            // 모든 환경에서 동일한 배포 빌드 방식 사용
+            LogDebug("🚀 배포 빌드 방식 Google OAuth 사용");
+            StartCoroutine(StartProductionGoogleOAuth(callback));
+            return;
 
             // 🔥 HTTP 콜백 서버 상태 확인 (기존 localhost 방식)
             if (Application.isEditor && useHttpCallbackForTesting && !_isHttpListening)
@@ -1329,21 +1332,21 @@ namespace App.Network
 
         #region Direct Google OAuth (Unity Editor)
         /// <summary>
-        /// Unity Editor에서 배포 서버의 기존 Google OAuth를 직접 사용
+        /// 배포 빌드 방식 Google OAuth - Deep Link 기반
         /// </summary>
-        private IEnumerator StartDirectGoogleOAuth(Action<bool, string, TokenResponse> callback)
+        private IEnumerator StartProductionGoogleOAuth(Action<bool, string, TokenResponse> callback)
         {
             // PKCE 파라미터 생성
             GeneratePkceParameters();
             
             var oidcServerUrl = EnvironmentConfig.OidcServerUrl;
-            LogDebug($"🚀 배포 서버 Google OAuth 직접 사용: {oidcServerUrl}");
+            LogDebug($"🚀 배포 빌드 방식 Google OAuth: {oidcServerUrl}");
             
-            // Google OAuth URL 생성 (기존 /auth/google 사용)
+            // Google OAuth URL 생성 - 서버 콜백 방식 (자동 Deep Link 리다이렉트)
             var queryParams = new Dictionary<string, string>
             {
                 ["client_id"] = clientId,
-                ["redirect_uri"] = $"{oidcServerUrl}/unity-editor-callback", // Unity Editor 전용 콜백 페이지
+                ["redirect_uri"] = $"{oidcServerUrl}/auth/google/callback", // 기존 등록된 서버 콜백
                 ["scope"] = scope,
                 ["state"] = _state,
                 ["code_challenge"] = _codeChallenge,
@@ -1354,68 +1357,185 @@ namespace App.Network
             string authUrl = $"{oidcServerUrl}/auth/google?{queryString}";
             
             LogDebug($"🌐 Google OAuth URL: {authUrl}");
+            LogDebug($"🔗 Redirect URI: {redirectUri}");
             
             // 브라우저에서 OAuth 수행
             Application.OpenURL(authUrl);
             LogDebug("✅ Google OAuth 브라우저 열기 성공");
             
-            // Unity Editor 콜백 페이지를 폴링해서 결과 확인
-            yield return StartCoroutine(PollForAuthResult());
+            // Deep Link 콜백 대기
+            yield return StartCoroutine(WaitForDeepLinkCallback());
         }
 
         /// <summary>
-        /// Unity Editor 콜백 페이지를 폴링해서 authorization code 확인
+        /// Deep Link 콜백 대기 (배포 빌드 방식)
         /// </summary>
-        private IEnumerator PollForAuthResult()
+        private IEnumerator WaitForDeepLinkCallback()
         {
-            var oidcServerUrl = EnvironmentConfig.OidcServerUrl;
-            string pollUrl = $"{oidcServerUrl}/unity-editor-callback?check=1&state={_state}";
+            LogDebug("🔗 Deep Link 콜백 대기 시작");
             
             float startTime = Time.time;
             const float timeout = 300f; // 5분
             
-            LogDebug($"🔄 Unity Editor 콜백 페이지 폴링 시작");
+            // Deep Link 이벤트 등록
+            RegisterDeepLinkHandler();
             
             while (Time.time - startTime < timeout)
             {
-                using (var request = UnityWebRequest.Get(pollUrl))
+                // Deep Link에서 authorization code가 수신되었는지 확인
+                if (!string.IsNullOrEmpty(_receivedAuthCode))
                 {
-                    yield return request.SendWebRequest();
+                    LogDebug($"✅ Deep Link에서 Authorization Code 수신!");
                     
-                    if (request.result == UnityWebRequest.Result.Success)
-                    {
-                        string responseText = request.downloadHandler.text;
-                        
-                        // HTML에서 authorization code 추출
-                        if (responseText.Contains("authorization_code:"))
-                        {
-                            string code = ExtractCodeFromHtml(responseText);
-                            if (!string.IsNullOrEmpty(code))
-                            {
-                                LogDebug($"✅ Authorization Code 받음!");
-                                yield return StartCoroutine(ExchangeCodeForTokens(code));
-                                yield break;
-                            }
-                        }
-                        
-                        // 에러 체크
-                        if (responseText.Contains("error:"))
-                        {
-                            string error = ExtractErrorFromHtml(responseText);
-                            LogDebug($"❌ OAuth 에러: {error}");
-                            CompleteAuthentication(false, $"OAuth 인증 실패: {error}", null);
-                            yield break;
-                        }
-                    }
+                    string authCode = _receivedAuthCode;
+                    _receivedAuthCode = null; // 사용 후 초기화
+                    
+                    yield return StartCoroutine(ExchangeCodeForTokens(authCode));
+                    yield break;
                 }
                 
-                // 2초마다 폴링
-                yield return new WaitForSeconds(2f);
+                // Deep Link 에러 확인
+                if (!string.IsNullOrEmpty(_receivedError))
+                {
+                    LogDebug($"❌ Deep Link 에러: {_receivedError}");
+                    CompleteAuthentication(false, $"OAuth 인증 실패: {_receivedError}", null);
+                    yield break;
+                }
+                
+                yield return new WaitForSeconds(0.5f); // 0.5초마다 체크
             }
             
             // 타임아웃
-            LogDebug("⏰ OAuth 폴링 타임아웃");
+            LogDebug("⏰ Deep Link 콜백 타임아웃");
             CompleteAuthentication(false, "OAuth 인증 시간이 초과되었습니다.", null);
+        }
+
+        /// <summary>
+        /// Deep Link 이벤트 핸들러 등록
+        /// </summary>
+        private void RegisterDeepLinkHandler()
+        {
+            if (_deepLinkHandlerRegistered) return;
+            
+            // Unity Deep Link 이벤트 등록
+            Application.deepLinkActivated += OnDeepLinkReceived;
+            _deepLinkHandlerRegistered = true;
+            
+            LogDebug("🔗 Deep Link 이벤트 리스너 등록 완료");
+        }
+
+        /// <summary>
+        /// Deep Link 수신 처리
+        /// </summary>
+        private void OnDeepLinkReceived(string deepLinkUrl)
+        {
+            LogDebug($"🔗 Deep Link 수신: {deepLinkUrl}");
+            
+            try
+            {
+                // blokus://auth/callback?code=xxx&state=xxx 파싱
+                var uri = new Uri(deepLinkUrl);
+                
+                if (uri.Scheme == "blokus" && uri.Host == "auth" && uri.AbsolutePath == "/callback")
+                {
+                    var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+                    
+                    string code = query["code"];
+                    string state = query["state"];
+                    string error = query["error"];
+                    
+                    // State 검증
+                    if (state != _state)
+                    {
+                        LogDebug($"❌ State 불일치: 예상={_state}, 수신={state}");
+                        _receivedError = "Invalid state parameter";
+                        return;
+                    }
+                    
+                    if (!string.IsNullOrEmpty(error))
+                    {
+                        LogDebug($"❌ OAuth 에러: {error}");
+                        _receivedError = error;
+                        return;
+                    }
+                    
+                    if (!string.IsNullOrEmpty(code))
+                    {
+                        LogDebug($"✅ Authorization Code 수신: {code.Substring(0, Math.Min(10, code.Length))}...");
+                        _receivedAuthCode = code;
+                    }
+                    else
+                    {
+                        LogDebug("❌ Authorization Code가 없음");
+                        _receivedError = "Missing authorization code";
+                    }
+                }
+                else
+                {
+                    LogDebug($"⚠️ 알 수 없는 Deep Link 형식: {deepLinkUrl}");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"❌ Deep Link 파싱 오류: {ex.Message}");
+                _receivedError = $"Deep Link parsing error: {ex.Message}";
+            }
+        }
+
+        /// <summary>
+        /// Deep Link 이벤트 핸들러 해제
+        /// </summary>
+        private void UnregisterDeepLinkHandler()
+        {
+            if (_deepLinkHandlerRegistered)
+            {
+                Application.deepLinkActivated -= OnDeepLinkReceived;
+                _deepLinkHandlerRegistered = false;
+                LogDebug("🔗 Deep Link 이벤트 리스너 해제 완료");
+            }
+            
+            // LogDebug($"🔄 Unity Editor 콜백 페이지 폴링 시작");
+            
+            // while (Time.time - startTime < timeout)
+            // {
+            //     using (var request = UnityWebRequest.Get(pollUrl))
+            //     {
+            //         yield return request.SendWebRequest();
+                    
+            //         if (request.result == UnityWebRequest.Result.Success)
+            //         {
+            //             string responseText = request.downloadHandler.text;
+                        
+            //             // HTML에서 authorization code 추출
+            //             if (responseText.Contains("authorization_code:"))
+            //             {
+            //                 string code = ExtractCodeFromHtml(responseText);
+            //                 if (!string.IsNullOrEmpty(code))
+            //                 {
+            //                     LogDebug($"✅ Authorization Code 받음!");
+            //                     yield return StartCoroutine(ExchangeCodeForTokens(code));
+            //                     yield break;
+            //                 }
+            //             }
+                        
+            //             // 에러 체크
+            //             if (responseText.Contains("error:"))
+            //             {
+            //                 string error = ExtractErrorFromHtml(responseText);
+            //                 LogDebug($"❌ OAuth 에러: {error}");
+            //                 CompleteAuthentication(false, $"OAuth 인증 실패: {error}", null);
+            //                 yield break;
+            //             }
+            //         }
+            //     }
+                
+            //     // 2초마다 폴링
+            //     yield return new WaitForSeconds(2f);
+            // }
+            
+            // // 타임아웃
+            // LogDebug("⏰ OAuth 폴링 타임아웃");
+            // CompleteAuthentication(false, "OAuth 인증 시간이 초과되었습니다.", null);
         }
 
         /// <summary>
