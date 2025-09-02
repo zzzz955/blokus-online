@@ -189,31 +189,5 @@ namespace App.Config
 #endif
             }
         }
-
-        /// <summary>
-        /// 디버그 로그 활성화 여부
-        /// </summary>
-        public static bool EnableDebugLog => IsDevelopment;
-
-        /// <summary>
-        /// TLS 설정 및 환경변수 디버그 정보 출력
-        /// </summary>
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-        private static void LogEnvironmentInfo()
-        {
-            // UnityWebRequest는 UnityTLS를 주로 사용하지만,
-            // .NET 스택을 쓰는 일부 코드 대비로 TLS1.2 최소 보장
-            System.Net.ServicePointManager.SecurityProtocol = System.Net.SecurityProtocolType.Tls12;
-            System.Net.ServicePointManager.CheckCertificateRevocationList = false;
-            System.Net.ServicePointManager.DefaultConnectionLimit = 10;
-
-            Debug.Log("🔒 네트워크 스택 설정: TLS1.2");
-            Debug.Log($"🔧 Unity Environment Config:");
-            Debug.Log($"   IsDevelopment: {IsDevelopment}");
-            Debug.Log($"   WebServerUrl: {WebServerUrl}");
-            Debug.Log($"   ApiServerUrl: {ApiServerUrl}");
-            Debug.Log($"   OidcServerUrl: {OidcServerUrl}");
-            Debug.Log($"   TcpServerHost: {TcpServerHost}:{TcpServerPort}");
-        }
     }
 }

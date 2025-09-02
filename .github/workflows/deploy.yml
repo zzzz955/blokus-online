@@ -108,8 +108,8 @@ jobs:
         echo "🔍 Pattern Matching Analysis:"
         
         GAME_CHANGED=false
-        echo "Testing game-server pattern: '^(server/|client/|common/|CMakeLists\.txt|vcpkg\.json|Dockerfile)'"
-        GAME_MATCHES=$(echo "$CHANGED_FILES" | grep -E '^(server/|client/|common/|CMakeLists\.txt|vcpkg\.json|Dockerfile)' || echo "")
+        echo "Testing game-server pattern: '^(server/|common/|CMakeLists\.txt|vcpkg-server\.json|Dockerfile)'"
+        GAME_MATCHES=$(echo "$CHANGED_FILES" | grep -E '^(server/|common/|CMakeLists\.txt|vcpkg-server\.json|Dockerfile)' || echo "")
         if [ -n "$GAME_MATCHES" ]; then
           GAME_CHANGED=true
           echo "  ✅ GAME SERVER matches found:"
@@ -182,7 +182,7 @@ jobs:
     - name: Generate cache keys
       id: cache-keys
       run: |
-        GAME_DEPS_HASH=$(find . -name "vcpkg.json" -o -name "CMakeLists.txt" -o -name "*.cpp" -o -name "*.h" | head -20 | xargs cat | sha256sum | cut -d' ' -f1)
+        GAME_DEPS_HASH=$(find . -name "vcpkg-server.json" -o -name "CMakeLists.txt" -o -path "./server/*" -name "*.cpp" -o -path "./server/*" -name "*.h" -o -path "./common/*" -name "*.cpp" -o -path "./common/*" -name "*.h" | head -20 | xargs cat 2>/dev/null | sha256sum | cut -d' ' -f1)
         GAME_CACHE_KEY="game-server-v2-$GAME_DEPS_HASH"
 
         WEB_DEPS_HASH=$(find web -name "package*.json" -o -name "*.ts" -o -name "*.tsx" | head -20 | xargs cat 2>/dev/null | sha256sum | cut -d' ' -f1 || echo "default")
