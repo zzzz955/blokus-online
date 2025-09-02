@@ -68,25 +68,45 @@ jobs:
         echo ""
         
         if [ "${{ github.event_name }}" = "push" ]; then
-          if [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ] || [ -z "${{ github.event.before }}" ]; then
-            echo "🔍 Using HEAD~1 comparison (initial push or empty before)"
-            echo "Command: git diff --name-only HEAD~1 HEAD"
-            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || git ls-files)
-            DIFF_STATUS=$?
-            echo "Git diff exit status: $DIFF_STATUS"
-          else
-            echo "🔍 Using before/after comparison: ${{ github.event.before }}..${{ github.sha }}"
-            echo "Command: git diff --name-only ${{ github.event.before }} ${{ github.sha }}"
-            CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} 2>&1)
-            DIFF_STATUS=$?
-            echo "Git diff exit status: $DIFF_STATUS"
+          # Multiple fallback strategies for robust diff detection
+          DIFF_STRATEGIES=(
+            "git diff --name-only ${{ github.event.before }}..${{ github.sha }}"
+            "git diff --name-only ${{ github.event.before }} ${{ github.sha }}"
+            "git diff --name-only HEAD~1 HEAD"
+            "git show --name-only --format= ${{ github.sha }}"
+            "git ls-tree -r --name-only ${{ github.sha }}"
+          )
+          
+          CHANGED_FILES=""
+          DIFF_SUCCESS=false
+          
+          for i in "${!DIFF_STRATEGIES[@]}"; do
+            strategy="${DIFF_STRATEGIES[$i]}"
+            echo "🔍 Strategy $((i+1)): $strategy"
             
-            if [ $DIFF_STATUS -ne 0 ]; then
-              echo "⚠️ Primary diff failed, trying fallback: git diff --name-only HEAD~1 HEAD"
-              CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || git ls-files)
-              DIFF_STATUS=$?
-              echo "Fallback diff exit status: $DIFF_STATUS"
+            if [ $i -eq 0 ] && ([ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ] || [ -z "${{ github.event.before }}" ]); then
+              echo "  ⏭️ Skipping before/after diff (initial push or empty before)"
+              continue
             fi
+            
+            CHANGED_FILES=$(eval "$strategy" 2>/dev/null || echo "")
+            DIFF_STATUS=$?
+            
+            echo "  Exit status: $DIFF_STATUS"
+            echo "  Raw output: \"$CHANGED_FILES\""
+            
+            if [ $DIFF_STATUS -eq 0 ] && [ -n "$CHANGED_FILES" ]; then
+              echo "  ✅ Strategy $((i+1)) succeeded"
+              DIFF_SUCCESS=true
+              break
+            else
+              echo "  ❌ Strategy $((i+1)) failed or empty"
+            fi
+          done
+          
+          if [ "$DIFF_SUCCESS" = false ]; then
+            echo "🚨 All diff strategies failed! Using git ls-files as final fallback"
+            CHANGED_FILES=$(git ls-files)
           fi
         else
           CHANGED_FILES=""
@@ -142,13 +162,24 @@ jobs:
 
         OIDC_CHANGED=false
         echo "Testing oidc pattern: '^oidc-auth-server/'"
+        echo "Raw files for OIDC matching:"
+        echo "$CHANGED_FILES" | grep -E '^oidc-auth-server/' | sed 's/^/  DEBUG: /' || echo "  DEBUG: No matches found"
         OIDC_MATCHES=$(echo "$CHANGED_FILES" | grep -E '^oidc-auth-server/' || echo "")
-        if [ -n "$OIDC_MATCHES" ]; then
+        
+        echo "OIDC pattern test details:"
+        echo "  Pattern: '^oidc-auth-server/'"
+        echo "  Matches found: $(echo "$OIDC_MATCHES" | wc -l)"
+        echo "  Match content: \"$OIDC_MATCHES\""
+        
+        if [ -n "$OIDC_MATCHES" ] && [ "$(echo "$OIDC_MATCHES" | tr -d '[:space:]')" != "" ]; then
           OIDC_CHANGED=true
           echo "  ✅ OIDC matches found:"
           echo "$OIDC_MATCHES" | sed 's/^/    - /'
         else
-          echo "  ❌ No oidc matches"
+          echo "  ❌ No oidc matches (empty or whitespace-only)"
+          # Additional debug: show all files that start with 'oidc'
+          echo "  🔍 Files starting with 'oidc':"
+          echo "$CHANGED_FILES" | grep -i '^oidc' | sed 's/^/    DEBUG: /' || echo "    DEBUG: None"
         fi
 
         INFRA_CHANGED=false
