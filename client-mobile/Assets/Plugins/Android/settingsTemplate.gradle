@@ -19,10 +19,4 @@ include(":launcher")
 include(":unityLibrary")
 project(":unityLibrary").projectDir = file("unityLibrary")
 
-// ❌ 아래 두 줄(수동 include/경로 매핑) 모두 삭제해야 합니다:
-// def unityProjectPath = $/file:project("..")/$
-// include(":BlokusConfig.androidlib")
-// project(":BlokusConfig.androidlib").projectDir = new File(unityProjectPath, "Assets/Plugins/Android/BlokusConfig.androidlib")
-
-// ✅ Unity가 필요한 .androidlib/.aar 들을 자동 주입하는 자리 (반드시 유지)
 **INCLUDES**

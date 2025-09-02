@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+  <!-- 기본: HTTPS만 -->
+  <base-config cleartextTrafficPermitted="false" />
+
+  <!-- 개발용 HTTP 허용 -->
+  <domain-config cleartextTrafficPermitted="true">
+    <domain includeSubdomains="true">localhost</domain>
+    <domain includeSubdomains="true">127.0.0.1</domain>
+    <domain includeSubdomains="true">10.0.2.2</domain>
+  </domain-config>
+
+  <!-- 프로덕션 도메인: HTTPS만 -->
+  <domain-config cleartextTrafficPermitted="false">
+    <domain includeSubdomains="true">blokus-online.mooo.com</domain>
+  </domain-config>
+</network-security-config>

@@ -1,11 +1,9 @@
-// ---- MODULE (Library) build.gradle template ----
 apply plugin: 'com.android.library'
 
 android {
     ndkPath "**NDKPATH**"
     compileSdkVersion **APIVERSION**
     ndkVersion "**NDKVERSION**"
-    namespace '**APPLICATIONID**'
 
     defaultConfig {
         minSdkVersion **MINSDKVERSION**
@@ -16,6 +14,20 @@ android {
         consumerProguardFiles 'proguard-unity.txt'**USER_PROGUARD**
     }
 
+    buildFeatures { buildConfig false }
+
+    sourceSets {
+        main {
+            manifest.srcFile 'AndroidManifest.xml'
+            res.srcDirs = ['res']
+            assets.srcDirs = ['assets']
+            jniLibs.srcDirs = ['libs', 'jni']
+            java.srcDirs = []
+            aidl.srcDirs = []
+            renderscript.srcDirs = []
+        }
+    }
+
     androidResources { noCompress += unityStreamingAssets.tokenize(', ') }
 
     packagingOptions {
@@ -24,15 +36,8 @@ android {
     }
 
     lintOptions { abortOnError false }
-
-    // ❌ 라이브러리 모듈에는 signingConfigs 금지!
-    // **SIGN** 도 절대 넣지 마세요.
 }
-
-// 🔻 모듈에서는 repositories 선언하지 않습니다
-// repositories { }
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
-    **DEPS**
 }

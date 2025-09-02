@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using UnityEngine;
@@ -29,6 +30,7 @@ namespace App.Network
         
         [Header("Development Options")]
         public bool useHttpCallbackForTesting = true; // 🔥 Editor에서 테스트용 - 기본 활성화
+        [SerializeField] private bool useUnityEditorAPI = true; // Unity Editor API 사용 (배포 서버와 직접 연결)
         [SerializeField] private bool enableManualCodeInput = true; // 에디터에서 수동 코드 입력
         
         [Header("Development Settings")]
@@ -170,6 +172,8 @@ namespace App.Network
 
         private void OnDestroy()
         {
+            LogDebug("🗑️ OidcAuthenticator OnDestroy 호출됨");
+            
             Application.deepLinkActivated -= OnDeepLinkActivated;
             
             if (_deepLinkTimeoutCoroutine != null)
@@ -177,7 +181,17 @@ namespace App.Network
                 StopCoroutine(_deepLinkTimeoutCoroutine);
             }
             
-            StopHttpCallbackServer();
+            // OAuth 인증 중이면 서버를 즉시 종료하지 않음
+            if (_isAuthenticating)
+            {
+                LogDebug("⚠️ OAuth 인증 중이므로 HTTP 서버 종료를 연기합니다");
+                // 인증 완료 후에 서버가 종료되도록 함
+            }
+            else
+            {
+                LogDebug("🛑 OAuth 인증 중이 아니므로 HTTP 서버를 종료합니다");
+                StopHttpCallbackServer();
+            }
         }
         
         /// <summary>
@@ -189,18 +203,35 @@ namespace App.Network
             {
                 try
                 {
+                    LogDebug("🛑 HTTP 콜백 서버 정지 시작");
                     _isHttpListening = false;
+                    
+                    // HttpListener 정지
                     _httpListener.Stop();
                     _httpListener.Close();
-                    LogDebug("🛑 HTTP 콜백 서버 정지됨");
+                    
+                    // 백그라운드 스레드 정리
+                    if (_httpListenerThread != null && _httpListenerThread.IsAlive)
+                    {
+                        LogDebug("🧵 백그라운드 스레드 종료 대기 중...");
+                        if (!_httpListenerThread.Join(5000)) // 5초 대기
+                        {
+                            LogDebug("⚠️ 백그라운드 스레드가 5초 내에 종료되지 않음");
+                            _httpListenerThread.Abort(); // 강제 종료 (deprecated이지만 안전장치)
+                        }
+                        _httpListenerThread = null;
+                    }
+                    
+                    LogDebug("✅ HTTP 콜백 서버 정지 완료");
                 }
                 catch (System.Exception ex)
                 {
-                    LogDebug($"HTTP 서버 정지 중 오류: {ex.Message}");
+                    LogDebug($"❌ HTTP 서버 정지 중 오류: {ex.Message}");
                 }
                 finally
                 {
                     _httpListener = null;
+                    _httpListenerThread = null;
                 }
             }
         }
@@ -229,6 +260,25 @@ namespace App.Network
 
             _authCallback = callback;
             _isAuthenticating = true;
+
+            // 🚀 Unity Editor에서 배포 서버의 기존 Google OAuth 직접 사용
+            if (Application.isEditor && useUnityEditorAPI)
+            {
+                LogDebug("🚀 배포 서버의 기존 Google OAuth API를 직접 사용합니다");
+                StartCoroutine(StartDirectGoogleOAuth(callback));
+                return;
+            }
+
+            // 🔥 HTTP 콜백 서버 상태 확인 (기존 localhost 방식)
+            if (Application.isEditor && useHttpCallbackForTesting && !_isHttpListening)
+            {
+                LogDebug("🔄 HTTP 콜백 서버가 꺼져있어서 다시 시작합니다");
+                StartHttpCallbackServer();
+                
+                // 서버 시작 대기
+                StartCoroutine(WaitForServerAndStartAuth(callback));
+                return;
+            }
 
             // Generate PKCE parameters
             GeneratePkceParameters();
@@ -264,6 +314,36 @@ namespace App.Network
             #else
             LogDebug($"🖥️ 플랫폼 {Application.platform}: 시스템 기본 브라우저 사용");
             #endif
+        }
+        
+        /// <summary>
+        /// 서버 시작 후 인증 재시도
+        /// </summary>
+        private IEnumerator WaitForServerAndStartAuth(Action<bool, string, TokenResponse> callback)
+        {
+            // 최대 3초 대기
+            float timeout = 3f;
+            float elapsed = 0f;
+            
+            while (!_isHttpListening && elapsed < timeout)
+            {
+                yield return new WaitForSeconds(0.1f);
+                elapsed += 0.1f;
+            }
+            
+            if (_isHttpListening)
+            {
+                LogDebug("✅ HTTP 서버 재시작 완료, 인증 계속 진행");
+                
+                // 인증 다시 시작 (재귀 호출 방지를 위해 상태 리셋)
+                _isAuthenticating = false;
+                StartAuthentication(callback);
+            }
+            else
+            {
+                LogDebug("❌ HTTP 서버 시작 실패");
+                CompleteAuthentication(false, "HTTP 콜백 서버를 시작할 수 없습니다", null);
+            }
         }
 
         /// <summary>
@@ -643,6 +723,32 @@ namespace App.Network
             finally
             {
                 _authCallback = null;
+                
+                // 🔥 인증 완료 후 HTTP 서버 정리 (에디터에서만)
+                if (Application.isEditor && useHttpCallbackForTesting)
+                {
+                    LogDebug("🧹 인증 완료, HTTP 콜백 서버 정리 예약 (5초 후)");
+                    StartCoroutine(DelayedServerCleanup());
+                }
+            }
+        }
+        
+        /// <summary>
+        /// 지연된 서버 정리 (다른 인증 시도를 방해하지 않도록)
+        /// </summary>
+        private IEnumerator DelayedServerCleanup()
+        {
+            yield return new WaitForSeconds(5f);
+            
+            // 다른 인증이 진행 중이 아닐 때만 서버 정리
+            if (!_isAuthenticating)
+            {
+                LogDebug("🧹 HTTP 콜백 서버 정리 실행");
+                StopHttpCallbackServer();
+            }
+            else
+            {
+                LogDebug("⚠️ 다른 인증이 진행 중이므로 서버 정리 연기");
             }
         }
         #endregion
@@ -737,6 +843,11 @@ namespace App.Network
         #region 🔥 HTTP Callback Server for Editor
         private System.Net.HttpListener _httpListener;
         private bool _isHttpListening = false;
+        private System.Threading.Thread _httpListenerThread;
+        private readonly System.Collections.Concurrent.ConcurrentQueue<System.Action> _mainThreadActions = new System.Collections.Concurrent.ConcurrentQueue<System.Action>();
+        private int _requestCount = 0;
+        private string _serverStatus = "Stopped";
+        private System.DateTime _lastRequestTime = System.DateTime.MinValue;
         
         /// <summary>
         /// Editor용 HTTP 콜백 서버 시작
@@ -761,70 +872,173 @@ namespace App.Network
                 _httpListener.Prefixes.Add("http://localhost:7777/");
                 _httpListener.Start();
                 _isHttpListening = true;
+                _serverStatus = "Running";
+                _requestCount = 0;
                 
                 LogDebug("🌐 HTTP 콜백 서버 성공적으로 시작: http://localhost:7777/");
                 LogDebug("🔄 OAuth 콜백을 대기 중...");
+                LogDebug("🧪 테스트 URL: http://localhost:7777/health");
+                LogDebug("🧪 콜백 URL: http://localhost:7777/auth/callback");
                 
-                // 비동기로 요청 처리
-                StartCoroutine(HandleHttpRequests());
+                // 백그라운드 스레드에서 요청 처리
+                _httpListenerThread = new System.Threading.Thread(HandleHttpRequestsOnBackgroundThread)
+                {
+                    IsBackground = true,
+                    Name = "OidcHttpListener"
+                };
+                _httpListenerThread.Start();
+                
+                // 메인 스레드 액션 처리를 위한 코루틴 시작
+                StartCoroutine(ProcessMainThreadActions());
+                
+                // 🔥 서버 상태 모니터링 코루틴 시작
+                StartCoroutine(MonitorServerStatus());
             }
             catch (System.Exception ex)
             {
                 LogDebug($"❌ HTTP 콜백 서버 시작 실패: {ex.Message}");
                 LogDebug("💡 포트 7777이 이미 사용 중일 수 있습니다. Unity를 재시작해보세요.");
+                _isHttpListening = false;
             }
         }
         
         /// <summary>
-        /// HTTP 요청 처리 코루틴
+        /// 백그라운드 스레드에서 HTTP 요청 처리
         /// </summary>
-        private IEnumerator HandleHttpRequests()
+        private void HandleHttpRequestsOnBackgroundThread()
         {
-            while (_isHttpListening && _httpListener != null)
+            LogDebug("🧵 HTTP 콜백 서버 백그라운드 스레드 시작");
+            LogDebug($"🧵 스레드 ID: {System.Threading.Thread.CurrentThread.ManagedThreadId}");
+            LogDebug($"🧵 스레드 이름: {System.Threading.Thread.CurrentThread.Name}");
+            
+            int consecutiveErrors = 0;
+            const int maxConsecutiveErrors = 5;
+            
+            while (_isHttpListening && _httpListener != null && consecutiveErrors < maxConsecutiveErrors)
             {
-                System.Threading.Tasks.Task<System.Net.HttpListenerContext> contextTask = null;
-                bool hasError = false;
-                
                 try
                 {
-                    contextTask = _httpListener.GetContextAsync();
+                    _serverStatus = "Listening";
+                    LogDebug("🔄 HTTP 요청 대기 중... (GetContext 호출)");
+                    
+                    // GetContext()는 동기 호출로 요청을 대기 - 여기서 블로킹됨
+                    var context = _httpListener.GetContext();
+                    
+                    _requestCount++;
+                    _lastRequestTime = System.DateTime.Now;
+                    consecutiveErrors = 0; // 성공하면 에러 카운터 리셋
+                    
+                    LogDebug($"📨 HTTP 요청 수신됨! (총 {_requestCount}번째)");
+                    LogDebug($"📨 요청 URL: {context.Request.Url}");
+                    LogDebug($"📨 요청 시각: {_lastRequestTime:HH:mm:ss.fff}");
+                    
+                    // 메인 스레드에서 콜백 처리하도록 큐에 추가
+                    _mainThreadActions.Enqueue(() => ProcessHttpCallback(context));
+                }
+                catch (System.Net.HttpListenerException ex) when (!_isHttpListening)
+                {
+                    // 정상 종료 시에는 로그 생략
+                    LogDebug("🛑 HTTP 콜백 서버 정상 종료 (HttpListenerException)");
+                    break;
+                }
+                catch (System.ObjectDisposedException ex) when (!_isHttpListening)
+                {
+                    // 정상 종료 시에는 로그 생략
+                    LogDebug("🛑 HTTP 콜백 서버 정상 종료 (ObjectDisposed)");
+                    break;
                 }
                 catch (System.Exception ex)
                 {
-                    if (_isHttpListening) // 정상 종료가 아닌 경우만 로그
+                    consecutiveErrors++;
+                    _serverStatus = $"Error ({consecutiveErrors}/{maxConsecutiveErrors})";
+                    
+                    if (_isHttpListening)
                     {
-                        LogDebug($"HTTP 콜백 GetContext 오류: {ex.Message}");
+                        LogDebug($"❌ HTTP 콜백 처리 오류 ({consecutiveErrors}/{maxConsecutiveErrors}): {ex.Message}");
+                        LogDebug($"🔧 오류 타입: {ex.GetType().Name}");
+                        LogDebug($"🔧 스택 트레이스: {ex.StackTrace}");
+                        
+                        if (consecutiveErrors >= maxConsecutiveErrors)
+                        {
+                            LogDebug($"❌ 연속 오류가 {maxConsecutiveErrors}회 발생하여 서버를 중단합니다");
+                            _serverStatus = "Failed";
+                            break;
+                        }
                     }
-                    yield break;
+                    
+                    // 오류 발생 시 잠시 대기 후 재시도
+                    System.Threading.Thread.Sleep(1000);
                 }
-                
-                // 비동기 대기 (try-catch 밖에서)
-                while (contextTask != null && !contextTask.IsCompleted)
+            }
+            
+            _serverStatus = "Stopped";
+            LogDebug("🏁 HTTP 콜백 서버 백그라운드 스레드 종료");
+        }
+        
+        /// <summary>
+        /// 메인 스레드에서 액션 처리하는 코루틴
+        /// </summary>
+        private IEnumerator ProcessMainThreadActions()
+        {
+            LogDebug("🧵 메인 스레드 액션 처리 코루틴 시작");
+            
+            while (_isHttpListening)
+            {
+                int processedActions = 0;
+                while (_mainThreadActions.TryDequeue(out var action))
                 {
-                    yield return null;
-                }
-                
-                // 결과 처리
-                try
-                {
-                    if (contextTask != null && contextTask.IsCompletedSuccessfully)
+                    try
                     {
-                        var context = contextTask.Result;
-                        ProcessHttpCallback(context);
+                        processedActions++;
+                        LogDebug($"🔄 메인 스레드에서 HTTP 액션 처리 중... ({processedActions})");
+                        action.Invoke();
+                        LogDebug($"✅ HTTP 액션 처리 완료 ({processedActions})");
                     }
-                }
-                catch (System.Exception ex)
-                {
-                    if (_isHttpListening) // 정상 종료가 아닌 경우만 로그
+                    catch (System.Exception ex)
                     {
-                        LogDebug($"HTTP 콜백 처리 오류: {ex.Message}");
+                        LogDebug($"❌ 메인 스레드 액션 처리 오류: {ex.Message}");
+                        LogDebug($"❌ 스택 트레이스: {ex.StackTrace}");
                     }
-                    // 에러가 발생해도 계속 루프를 돌도록 yield break 대신 continue
-                    continue;
                 }
                 
                 yield return null; // 한 프레임 대기
             }
+            
+            LogDebug("🧵 메인 스레드 액션 처리 코루틴 종료");
+        }
+        
+        /// <summary>
+        /// 서버 상태 모니터링 코루틴
+        /// </summary>
+        private IEnumerator MonitorServerStatus()
+        {
+            LogDebug("📊 HTTP 서버 상태 모니터링 시작");
+            
+            while (_isHttpListening)
+            {
+                // 5초마다 상태 출력
+                yield return new WaitForSeconds(5f);
+                
+                if (_isHttpListening)
+                {
+                    LogDebug($"📊 HTTP 서버 상태: {_serverStatus}");
+                    LogDebug($"📊 총 요청 수: {_requestCount}");
+                    LogDebug($"📊 마지막 요청: {(_lastRequestTime == System.DateTime.MinValue ? "없음" : _lastRequestTime.ToString("HH:mm:ss"))}");
+                    LogDebug($"📊 대기 중인 액션: {_mainThreadActions.Count}");
+                    
+                    // 백그라운드 스레드 상태 확인
+                    if (_httpListenerThread != null)
+                    {
+                        LogDebug($"📊 백그라운드 스레드 상태: {(_httpListenerThread.IsAlive ? "실행 중" : "중단됨")}");
+                    }
+                    else
+                    {
+                        LogDebug($"📊 백그라운드 스레드: null");
+                    }
+                }
+            }
+            
+            LogDebug("📊 HTTP 서버 상태 모니터링 종료");
         }
         
         /// <summary>
@@ -838,14 +1052,86 @@ namespace App.Network
             LogDebug($"🌐 HTTP 콜백 수신: {request.Url}");
             LogDebug($"🔍 요청 메소드: {request.HttpMethod}");
             LogDebug($"🔍 User-Agent: {request.UserAgent}");
+            LogDebug($"🔍 쿼리 스트링: {request.Url.Query}");
             
             try
             {
                 // OAuth 콜백 URL 파싱
                 string url = request.Url.ToString();
-                if (url.Contains("/auth/callback"))
+                string path = request.Url.AbsolutePath;
+                LogDebug($"📋 전체 URL: {url}");
+                LogDebug($"📋 경로: {path}");
+                
+                // 🧪 테스트 엔드포인트: /health
+                if (path.Equals("/health", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    LogDebug($"🧪 헬스체크 요청 처리");
+                    
+                    var healthResponse = new {
+                        status = "OK",
+                        server = "Unity OAuth Callback Server",
+                        timestamp = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                        requestCount = _requestCount,
+                        serverStatus = _serverStatus,
+                        lastRequest = _lastRequestTime == System.DateTime.MinValue ? "None" : _lastRequestTime.ToString("HH:mm:ss"),
+                        threadAlive = _httpListenerThread?.IsAlive ?? false
+                    };
+                    
+                    string jsonResponse = JsonConvert.SerializeObject(healthResponse, Formatting.Indented);
+                    string htmlResponse = $@"
+                    <html><head><meta charset='UTF-8'><title>Unity OAuth Server Health</title></head>
+                    <body style='font-family: Arial; padding: 20px; background: #f0f8ff;'>
+                        <h1>🚀 Unity OAuth Callback Server</h1>
+                        <div style='background: white; padding: 15px; border-radius: 8px; margin: 10px 0;'>
+                            <h2>✅ 서버 상태: 정상</h2>
+                            <p><strong>현재 시각:</strong> {System.DateTime.Now:yyyy-MM-dd HH:mm:ss}</p>
+                            <p><strong>총 요청 수:</strong> {_requestCount}</p>
+                            <p><strong>서버 상태:</strong> {_serverStatus}</p>
+                            <p><strong>마지막 요청:</strong> {(_lastRequestTime == System.DateTime.MinValue ? "없음" : _lastRequestTime.ToString("yyyy-MM-dd HH:mm:ss"))}</p>
+                            <p><strong>백그라운드 스레드:</strong> {(_httpListenerThread?.IsAlive == true ? "실행 중" : "중단됨")}</p>
+                        </div>
+                        <div style='background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 10px 0;'>
+                            <h3>📱 테스트 URL들</h3>
+                            <ul>
+                                <li><strong>헬스체크:</strong> <a href='http://localhost:7777/health'>http://localhost:7777/health</a></li>
+                                <li><strong>OAuth 콜백:</strong> http://localhost:7777/auth/callback</li>
+                            </ul>
+                        </div>
+                        <div style='background: #e8f5e8; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 12px;'>
+                            <h3>📊 JSON 응답</h3>
+                            <pre>{jsonResponse}</pre>
+                        </div>
+                    </body></html>";
+                    
+                    byte[] buffer = System.Text.Encoding.UTF8.GetBytes(htmlResponse);
+                    response.ContentLength64 = buffer.Length;
+                    response.ContentType = "text/html; charset=utf-8";
+                    response.StatusCode = 200;
+                    response.OutputStream.Write(buffer, 0, buffer.Length);
+                    
+                    LogDebug($"🧪 헬스체크 응답 전송 완료 (크기: {buffer.Length} bytes)");
+                }
+                // 🎯 OAuth 콜백 처리  
+                else if (url.Contains("/auth/callback"))
                 {
                     LogDebug($"✅ OAuth 콜백 감지됨");
+                    
+                    // URL에서 파라미터 추출 및 로깅
+                    var uri = new System.Uri(url);
+                    var queryParams = ParseQueryString(uri.Query);
+                    
+                    LogDebug($"📊 URL 파라미터:");
+                    foreach (var kvp in queryParams)
+                    {
+                        if (kvp.Key == "code")
+                        {
+                            LogDebug($"  - {kvp.Key}: {kvp.Value?.Substring(0, System.Math.Min(10, kvp.Value.Length))}...");
+                        }
+                        else
+                        {
+                            LogDebug($"  - {kvp.Key}: {kvp.Value}");
+                        }
+                    }
                     
                     // Deep Link 형태로 변환
                     string deepLinkUrl = url.Replace("http://localhost:7777/auth/callback", "blokus://auth/callback");
@@ -854,39 +1140,76 @@ namespace App.Network
                     // 성공 페이지 응답
                     string responseString = @"
                     <html><head><meta charset='UTF-8'></head>
-                    <body style='font-family: Arial; text-align: center; padding: 50px;'>
-                        <h2>✅ Login Success!</h2>
-                        <p>Returning to Unity app...</p>
-                        <script>setTimeout(() => window.close(), 2000);</script>
+                    <body style='font-family: Arial; text-align: center; padding: 50px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;'>
+                        <h2>✅ Google Login Success!</h2>
+                        <p>인증이 완료되었습니다. Unity 앱으로 돌아갑니다...</p>
+                        <div style='margin: 20px; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 10px;'>
+                            <small>이 창은 2초 후 자동으로 닫힙니다.</small>
+                        </div>
+                        <script>
+                            console.log('OAuth callback processed successfully');
+                            setTimeout(() => {
+                                console.log('Closing callback window');
+                                window.close();
+                            }, 2000);
+                        </script>
                     </body></html>";
                     
                     byte[] buffer = System.Text.Encoding.UTF8.GetBytes(responseString);
                     response.ContentLength64 = buffer.Length;
-                    response.ContentType = "text/html";
+                    response.ContentType = "text/html; charset=utf-8";
+                    response.StatusCode = 200;
                     response.OutputStream.Write(buffer, 0, buffer.Length);
                     
-                    LogDebug($"📄 성공 페이지 응답 전송 완료");
+                    LogDebug($"📄 성공 페이지 응답 전송 완료 (크기: {buffer.Length} bytes)");
                     
                     // Deep Link 콜백 처리
-                    LogDebug($"🎯 Deep Link 콜백 처리 시작");
+                    LogDebug($"🎯 Deep Link 콜백 처리 시작: {deepLinkUrl}");
                     OnDeepLinkActivated(deepLinkUrl);
+                    LogDebug($"🎯 Deep Link 콜백 처리 완료");
                 }
                 else
                 {
+                    LogDebug($"❌ 예상하지 못한 경로: {url}");
                     // 404 응답
                     response.StatusCode = 404;
-                    byte[] buffer = System.Text.Encoding.UTF8.GetBytes("Not Found");
+                    string notFoundResponse = "<html><body><h1>404 Not Found</h1><p>OAuth callback path not found</p></body></html>";
+                    byte[] buffer = System.Text.Encoding.UTF8.GetBytes(notFoundResponse);
                     response.ContentLength64 = buffer.Length;
+                    response.ContentType = "text/html";
                     response.OutputStream.Write(buffer, 0, buffer.Length);
                 }
             }
             catch (System.Exception ex)
             {
-                LogDebug($"HTTP 콜백 처리 중 오류: {ex.Message}");
+                LogDebug($"❌ HTTP 콜백 처리 중 심각한 오류: {ex.Message}");
+                LogDebug($"❌ 스택 트레이스: {ex.StackTrace}");
+                
+                try
+                {
+                    response.StatusCode = 500;
+                    string errorResponse = $"<html><body><h1>500 Server Error</h1><p>Error processing callback: {ex.Message}</p></body></html>";
+                    byte[] buffer = System.Text.Encoding.UTF8.GetBytes(errorResponse);
+                    response.ContentLength64 = buffer.Length;
+                    response.ContentType = "text/html";
+                    response.OutputStream.Write(buffer, 0, buffer.Length);
+                }
+                catch (System.Exception responseEx)
+                {
+                    LogDebug($"❌ 에러 응답 전송 실패: {responseEx.Message}");
+                }
             }
             finally
             {
-                response.Close();
+                try
+                {
+                    response.Close();
+                    LogDebug($"🔒 HTTP 응답 스트림 닫기 완료");
+                }
+                catch (System.Exception closeEx)
+                {
+                    LogDebug($"⚠️ 응답 스트림 닫기 실패: {closeEx.Message}");
+                }
             }
         }
         #endregion
@@ -962,6 +1285,155 @@ namespace App.Network
                 instance = go.AddComponent<OidcAuthenticator>();
             }
             return instance;
+        }
+        
+        /// <summary>
+        /// Unity용 쿼리 스트링 파싱 (System.Web 의존성 없이)
+        /// </summary>
+        private Dictionary<string, string> ParseQueryString(string queryString)
+        {
+            var result = new Dictionary<string, string>();
+            
+            if (string.IsNullOrEmpty(queryString))
+                return result;
+                
+            // '?' 제거
+            if (queryString.StartsWith("?"))
+                queryString = queryString.Substring(1);
+                
+            // '&'로 분할
+            var pairs = queryString.Split('&');
+            
+            foreach (var pair in pairs)
+            {
+                if (string.IsNullOrEmpty(pair))
+                    continue;
+                    
+                var parts = pair.Split('=');
+                if (parts.Length >= 2)
+                {
+                    string key = UnityWebRequest.UnEscapeURL(parts[0]);
+                    string value = UnityWebRequest.UnEscapeURL(parts[1]);
+                    result[key] = value;
+                }
+                else if (parts.Length == 1)
+                {
+                    string key = UnityWebRequest.UnEscapeURL(parts[0]);
+                    result[key] = "";
+                }
+            }
+            
+            return result;
+        }
+        #endregion
+
+        #region Direct Google OAuth (Unity Editor)
+        /// <summary>
+        /// Unity Editor에서 배포 서버의 기존 Google OAuth를 직접 사용
+        /// </summary>
+        private IEnumerator StartDirectGoogleOAuth(Action<bool, string, TokenResponse> callback)
+        {
+            // PKCE 파라미터 생성
+            GeneratePkceParameters();
+            
+            var oidcServerUrl = EnvironmentConfig.OidcServerUrl;
+            LogDebug($"🚀 배포 서버 Google OAuth 직접 사용: {oidcServerUrl}");
+            
+            // Google OAuth URL 생성 (기존 /auth/google 사용)
+            var queryParams = new Dictionary<string, string>
+            {
+                ["client_id"] = clientId,
+                ["redirect_uri"] = $"{oidcServerUrl}/unity-editor-callback", // Unity Editor 전용 콜백 페이지
+                ["scope"] = scope,
+                ["state"] = _state,
+                ["code_challenge"] = _codeChallenge,
+                ["code_challenge_method"] = "S256"
+            };
+
+            string queryString = string.Join("&", queryParams.Select(kv => $"{kv.Key}={UnityWebRequest.EscapeURL(kv.Value)}"));
+            string authUrl = $"{oidcServerUrl}/auth/google?{queryString}";
+            
+            LogDebug($"🌐 Google OAuth URL: {authUrl}");
+            
+            // 브라우저에서 OAuth 수행
+            Application.OpenURL(authUrl);
+            LogDebug("✅ Google OAuth 브라우저 열기 성공");
+            
+            // Unity Editor 콜백 페이지를 폴링해서 결과 확인
+            yield return StartCoroutine(PollForAuthResult());
+        }
+
+        /// <summary>
+        /// Unity Editor 콜백 페이지를 폴링해서 authorization code 확인
+        /// </summary>
+        private IEnumerator PollForAuthResult()
+        {
+            var oidcServerUrl = EnvironmentConfig.OidcServerUrl;
+            string pollUrl = $"{oidcServerUrl}/unity-editor-callback?check=1&state={_state}";
+            
+            float startTime = Time.time;
+            const float timeout = 300f; // 5분
+            
+            LogDebug($"🔄 Unity Editor 콜백 페이지 폴링 시작");
+            
+            while (Time.time - startTime < timeout)
+            {
+                using (var request = UnityWebRequest.Get(pollUrl))
+                {
+                    yield return request.SendWebRequest();
+                    
+                    if (request.result == UnityWebRequest.Result.Success)
+                    {
+                        string responseText = request.downloadHandler.text;
+                        
+                        // HTML에서 authorization code 추출
+                        if (responseText.Contains("authorization_code:"))
+                        {
+                            string code = ExtractCodeFromHtml(responseText);
+                            if (!string.IsNullOrEmpty(code))
+                            {
+                                LogDebug($"✅ Authorization Code 받음!");
+                                yield return StartCoroutine(ExchangeCodeForTokens(code));
+                                yield break;
+                            }
+                        }
+                        
+                        // 에러 체크
+                        if (responseText.Contains("error:"))
+                        {
+                            string error = ExtractErrorFromHtml(responseText);
+                            LogDebug($"❌ OAuth 에러: {error}");
+                            CompleteAuthentication(false, $"OAuth 인증 실패: {error}", null);
+                            yield break;
+                        }
+                    }
+                }
+                
+                // 2초마다 폴링
+                yield return new WaitForSeconds(2f);
+            }
+            
+            // 타임아웃
+            LogDebug("⏰ OAuth 폴링 타임아웃");
+            CompleteAuthentication(false, "OAuth 인증 시간이 초과되었습니다.", null);
+        }
+
+        /// <summary>
+        /// HTML에서 authorization code 추출
+        /// </summary>
+        private string ExtractCodeFromHtml(string html)
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(html, @"authorization_code:\s*([A-Za-z0-9\-_]+)");
+            return match.Success ? match.Groups[1].Value : null;
+        }
+
+        /// <summary>
+        /// HTML에서 에러 메시지 추출
+        /// </summary>
+        private string ExtractErrorFromHtml(string html)
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(html, @"error:\s*([^<\n]+)");
+            return match.Success ? match.Groups[1].Value.Trim() : "Unknown error";
         }
         #endregion
     }

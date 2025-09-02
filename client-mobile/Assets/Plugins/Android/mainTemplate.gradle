@@ -1,4 +1,4 @@
-// ---- MODULE (App) build.gradle template ----
+// ---- MODULE (unityLibrary) build.gradle template ----
 apply plugin: 'com.android.library'
 
 android {
@@ -14,6 +14,7 @@ android {
         versionName '**VERSIONNAME**'
         ndk { abiFilters **ABI_FILTERS** }
         consumerProguardFiles 'proguard-unity.txt'**USER_PROGUARD**
+        multiDexEnabled true
     }
 
     androidResources { noCompress += unityStreamingAssets.tokenize(', ') }
@@ -24,15 +25,30 @@ android {
     }
 
     lintOptions { abortOnError false }
-
-    **SIGN**
 }
 
-// 모듈단 repositories 선언 없음 (settings로 일원화)
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation 'androidx.multidex:multidex:2.0.1'
     **DEPS**
 }
 
-**BUILT_APK_LOCATION**
-**PROGUARD**
+afterEvaluate {
+    configurations.configureEach { conf ->
+        try {
+            conf.dependencies.removeAll { dep ->
+                dep instanceof org.gradle.api.artifacts.ProjectDependency &&
+                (dep.dependencyProject?.path == ':BlokusConfig.androidlib' ||
+                 dep.dependencyProject?.path == ':mobilenotifications.androidlib')
+            }
+        } catch (ignored) { }
+    }
+    def ensureProj = { String p ->
+        def has = configurations.implementation.allDependencies.find {
+            it instanceof org.gradle.api.artifacts.ProjectDependency && it.dependencyProject?.path == p
+        } != null
+        if (!has) dependencies.add("implementation", project(p))
+    }
+    ensureProj(':unityLibrary:BlokusConfig.androidlib')
+    ensureProj(':unityLibrary:mobilenotifications.androidlib')
+}

@@ -21,6 +21,7 @@ const adminRoutes = require('./routes/admin')
 const oauthRoutes = require('./routes/oauth')
 const manualAuthRoutes = require('./routes/manual-auth')
 const directAuthRoutes = require('./routes/direct-auth')
+const unityEditorCallbackRoutes = require('./routes/unity-editor-callback')
 
 const app = express()
 const PORT = env.PORT
@@ -140,6 +141,9 @@ app.use('/manual-auth', manualAuthRoutes)
 
 // Mount Direct API routes
 app.use('/api/auth', directAuthRoutes)
+
+// Mount Unity Editor Callback routes
+app.use('/unity-editor-callback', unityEditorCallbackRoutes)
 
 // 404 handler
 app.use('*', (req, res) => {

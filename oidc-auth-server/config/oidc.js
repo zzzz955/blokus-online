@@ -34,8 +34,9 @@ class OIDCConfig {
         client_secret: null, // Public client (PKCE 사용)
         redirect_uris: [
           'blokus://auth/callback',
-          'http://localhost:7777/auth/callback', // Unity 에디터 테스트용
-          'http://127.0.0.1:7777/auth/callback'  // Unity 에디터 대안
+          'http://localhost:7777/auth/callback', // Unity 에디터 localhost 방식
+          'http://127.0.0.1:7777/auth/callback',  // Unity 에디터 대안
+          'https://blokus-online.mooo.com/oidc/unity-editor-callback' // Unity 에디터 배포 서버 방식
         ],
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
