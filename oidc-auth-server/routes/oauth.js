@@ -217,14 +217,33 @@ router.get('/auth/google/callback', (req, res, next) => {
             // CSRF 토큰 정리
             delete req.session.csrf_token
 
-            // OIDC 클라이언트로 리다이렉트 (Authorization Code와 함께)
-            const redirectUrl = new URL(oidcState.redirect_uri)
-            redirectUrl.searchParams.append('code', authCode)
-            if (oidcState.state) {
-              redirectUrl.searchParams.append('state', oidcState.state)
-            }
+            // 모바일 클라이언트는 Deep Link로 자동 리다이렉트
+            if (oidcState.client_id === 'unity-mobile-client') {
+              // Unity 모바일 앱을 위한 Deep Link 리다이렉트
+              const deepLinkUrl = new URL('blokus://auth/callback')
+              deepLinkUrl.searchParams.append('code', authCode)
+              if (oidcState.state) {
+                deepLinkUrl.searchParams.append('state', oidcState.state)
+              }
 
-            res.redirect(redirectUrl.toString())
+              logger.info('Redirecting Unity mobile client to Deep Link', {
+                userId: user.user_id,
+                username: user.username,
+                deepLinkUrl: deepLinkUrl.toString(),
+                ip: req.ip
+              })
+
+              res.redirect(deepLinkUrl.toString())
+            } else {
+              // 일반 OIDC 클라이언트로 리다이렉트 (Authorization Code와 함께)
+              const redirectUrl = new URL(oidcState.redirect_uri)
+              redirectUrl.searchParams.append('code', authCode)
+              if (oidcState.state) {
+                redirectUrl.searchParams.append('state', oidcState.state)
+              }
+
+              res.redirect(redirectUrl.toString())
+            }
 
           } catch (codeError) {
             logger.error('Authorization code generation error', {
