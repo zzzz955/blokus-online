@@ -126,16 +126,14 @@ namespace App.Network
             LogDebug($"개발 빌드: {Debug.isDebugBuild}");
             LogDebug($"에디터 모드: {Application.isEditor}");
             
-            // Development testing option (Editor에서만)
-            if (Application.isEditor && useHttpCallbackForTesting)
+            // 배포 빌드 방식: Deep Link 사용
+            if (Application.isEditor)
             {
-                redirectUri = "http://localhost:7777/auth/callback";
-                LogDebug("✅ Editor 테스트 모드: HTTP 콜백 URI 사용");
-                LogDebug($"🔄 Redirect URI: {redirectUri}");
+                LogDebug($"✅ Unity Editor: Deep Link URI 사용 ({redirectUri})");
             }
             else
             {
-                LogDebug($"📱 프로덕션 모드: Deep Link URI 사용 - {redirectUri}");
+                LogDebug($"📱 모바일 빌드: Deep Link URI 사용 ({redirectUri})");
             }
             
             // 환경별 OIDC 서버 URL 설정
@@ -154,10 +152,11 @@ namespace App.Network
                 StartCoroutine(TestDeepLinkSupport());
             }
             
-            // 🔥 Editor용 HTTP 콜백 서버 시작
+            // 🔥 Editor용 HTTP 콜백 서버 시작 (배포 빌드 방식 사용 시에는 불필요)
             if (Application.isEditor && useHttpCallbackForTesting)
             {
-                StartHttpCallbackServer();
+                LogDebug("⚠️ HTTP 콜백 서버 시작 건너뜀 - 배포 빌드 방식 사용 중");
+                // StartHttpCallbackServer(); // 배포 빌드 방식에서는 불필요
             }
             
             // Load OIDC Discovery Document on startup
@@ -1357,7 +1356,7 @@ namespace App.Network
             string authUrl = $"{oidcServerUrl}/auth/google?{queryString}";
             
             LogDebug($"🌐 Google OAuth URL: {authUrl}");
-            LogDebug($"🔗 Redirect URI: {redirectUri}");
+            LogDebug($"🔗 서버 콜백 URI: {oidcServerUrl}/auth/google/callback");
             
             // 브라우저에서 OAuth 수행
             Application.OpenURL(authUrl);
