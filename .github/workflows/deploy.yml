@@ -249,7 +249,8 @@ jobs:
         DEPLOY_SINGLE_API="${{ steps.changes.outputs.single-api-changed }}"
         DEPLOY_OIDC="${{ steps.changes.outputs.oidc-changed }}"
         DEPLOY_INFRA="${{ steps.changes.outputs.infrastructure-changed }}"
-        if [[ "$DEPLOY_INFRA" == "true" ]] || [[ "$GAME_SUCCESS" == "success" ]] || [[ "$WEB_SUCCESS" == "success" ]] || [[ "$SINGLE_SUCCESS" == "success" ]] || [[ "$OIDC_SUCCESS" == "success" ]]; then
+        # 변경 감지 결과에 따른 배포 필요성 확인 (빌드 성공 여부가 아닌 변경사항 기준)
+        if [[ "$DEPLOY_GAME" == "true" ]] || [[ "$DEPLOY_WEB" == "true" ]] || [[ "$DEPLOY_SINGLE_API" == "true" ]] || [[ "$DEPLOY_OIDC" == "true" ]] || [[ "$DEPLOY_INFRA" == "true" ]]; then
           echo "deployment-performed=true" >> $GITHUB_OUTPUT
         else
           echo "deployment-performed=false" >> $GITHUB_OUTPUT
