@@ -5,17 +5,19 @@
 import type { BoardState } from '@/lib/blokus/solver';
 import { calculateOptimalScoreExact } from '@/lib/blokus/calc';
 
-export default class OptimalScoreCalculator {
+export class OptimalScoreCalculator {
   async calculateGreedy(boardState: BoardState, availableBlockIds: number[]): Promise<number> {
-    // 그리디 대신 정확 탐색 사용(시간 제한으로 빠르게 반환)
-    return await calculateOptimalScoreExact(boardState, availableBlockIds, 15000);
+    // 정확 탐색 결과 객체에서 score만 반환
+    const { score /*, timedOut, iterations */ } =
+      await calculateOptimalScoreExact(boardState, availableBlockIds, 15000);
+    return score;
   }
 }
 
 // 과거에 쓰던 헬퍼 이름을 유지
-export const calculateOptimalScore = async (
-  boardState: BoardState,
-  availableBlockIds: number[]
-): Promise<number> => {
-  return await calculateOptimalScoreExact(boardState, availableBlockIds, 15000);
-};
+// export const calculateOptimalScore = async (
+//   boardState: BoardState,
+//   availableBlockIds: number[]
+// ): Promise<number> => {
+//   return await calculateOptimalScoreExact(boardState, availableBlockIds, 15000);
+// };
