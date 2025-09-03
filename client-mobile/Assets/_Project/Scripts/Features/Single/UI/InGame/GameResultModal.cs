@@ -258,53 +258,49 @@ namespace Features.Single.UI.InGame
         }
 
         /// <summary>
-        /// 🔥 GameEndResult 기반 진행도 업데이트 (단일 진실원천)
+        /// UI 전용 스테이지 진행도 업데이트 (중복 API 호출 제거)
+        /// 실제 서버 통신은 SingleGame에서만 처리하고, 여기서는 UI만 업데이트
         /// </summary>
         private void UpdateStageProgress(GameEndResult gameResult)
         {
-            var gm = SingleGameManager.Instance;
-            if (gm == null)
-            {
-                Debug.LogWarning("[GameResultModal] SingleGameManager 없음 → 진행도 전송 생략");
-                return;
-            }
-
-            // 🔥 GameEndResult의 isCleared 값 사용 (stars >= 1 규칙 준수)
-            bool completed = gameResult.isCleared;
-
-            Debug.Log($"[GameResultModal] 서버 진행도 업데이트 요청: stage={gameResult.stageNumber}, " +
-                     $"done={completed}, stars={gameResult.stars}, score={gameResult.finalScore}, " +
+            Debug.Log($"[GameResultModal] UI 전용 진행도 업데이트: stage={gameResult.stageNumber}, " +
+                     $"done={gameResult.isCleared}, stars={gameResult.stars}, score={gameResult.finalScore}, " +
                      $"t={gameResult.elapsedTime:F1}s");
 
-            // 🚨 규칙 위반 재검증
-            if (gameResult.stars == 0 && completed)
+            // 🚨 규칙 위반 재검증 (로깅용)
+            if (gameResult.stars == 0 && gameResult.isCleared)
             {
-                Debug.LogError($"[GameResultModal] 🚨 규칙 위반: 0별인데 completed=true로 전송 시도 - Stage {gameResult.stageNumber}");
+                Debug.LogError($"[GameResultModal] 🚨 규칙 위반 감지: 0별인데 completed=true - Stage {gameResult.stageNumber}");
             }
 
-            gm.UpdateStageProgress(gameResult.stageNumber, completed, gameResult.stars, 
-                                 gameResult.finalScore, gameResult.elapsedTime);
+            // ✅ 중복 API 호출 제거: SingleGame에서 이미 서버 통신 완료됨
+            // ✅ UI 리프레시만 수행하여 스테이지 버튼 상태 업데이트
+            RefreshStageUI();
         }
 
         /// <summary>
-        /// 레거시 진행도 업데이트 (deprecated)
+        /// 스테이지 UI 상태만 갱신 (API 호출 없음)
         /// </summary>
-        [System.Obsolete("Use UpdateStageProgress(GameEndResult) instead")]
-        private void UpdateStageProgress(int score, int starCount, float elapsedTime, bool isSuccess)
+        private void RefreshStageUI()
         {
-            // 임시로 GameEndResult 생성하여 새로운 메서드 호출
-            var tempResult = new GameEndResult(
-                stageNumber: SingleGameManager.CurrentStage,
-                stageName: $"Stage {SingleGameManager.CurrentStage}",
-                finalScore: score,
-                optimalScore: 0, // 불명
-                elapsedTime: elapsedTime,
-                stars: starCount,
-                isNewBest: false,
-                endReason: "Legacy progress update"
-            );
-            
-            UpdateStageProgress(tempResult);
+            try
+            {
+                // CandyCrushStageMapView 강제 리프레시
+                var stageMapView = FindObjectOfType<Features.Single.UI.StageSelect.CandyCrushStageMapView>();
+                if (stageMapView != null)
+                {
+                    Debug.Log("[GameResultModal] CandyCrushStageMapView 강제 리프레시 요청");
+                    stageMapView.ForceRefreshStageButtons();
+                }
+                else
+                {
+                    Debug.LogWarning("[GameResultModal] CandyCrushStageMapView를 찾을 수 없습니다.");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[GameResultModal] UI 리프레시 실패: {ex.Message}");
+            }
         }
 
         private void CloseToSelection()

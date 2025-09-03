@@ -28,6 +28,9 @@ namespace Features.Single.Core
 
         // 현재 선택된 스테이지 (API 데이터 기반)  
         private LocalStageData currentSelectedStage;
+
+        // 중복 요청 방지를 위한 pending requests 추적
+        private static System.Collections.Generic.HashSet<string> pendingRequests = new System.Collections.Generic.HashSet<string>();
         private int currentSelectedStageNumber;
 
         // 이벤트
@@ -354,11 +357,20 @@ namespace Features.Single.Core
         // ========================================
 
         /// <summary>
-        /// API 기반 스테이지 완료 처리 (서버 동기화 포함)
+        /// API 기반 스테이지 완료 처리 (서버 동기화 포함, 중복 요청 방지)
         /// </summary>
         public void CompleteStage(int stageNumber, int score, int stars, int completionTime = 0)
         {
-            Debug.Log($"API 스테이지 {stageNumber} 완료 처리: {score}점, {stars}별");
+            // 중복 요청 방지
+            string requestKey = $"complete_stage_{stageNumber}_{score}_{stars}_{completionTime}";
+            if (pendingRequests.Contains(requestKey))
+            {
+                Debug.LogWarning($"[StageDataManager] 중복 완료 요청 감지 및 차단: Stage {stageNumber}");
+                return;
+            }
+
+            pendingRequests.Add(requestKey);
+            Debug.Log($"API 스테이지 {stageNumber} 완료 처리: {score}점, {stars}별 (RequestKey: {requestKey})");
 
             // 1. API 기반 StageManager 업데이트
             if (apiStageManager != null && enableApiIntegration)
@@ -377,13 +389,27 @@ namespace Features.Single.Core
                 System.Action<bool, string> onServerResponse = null;
                 onServerResponse = (success, message) =>
                 {
+                    // 요청 완료 처리
+                    pendingRequests.Remove(requestKey);
+
                     // 이벤트 구독 해제
                     if (HttpApiClient.Instance != null)
                         HttpApiClient.Instance.OnStageCompleteResponse -= onServerResponse;
 
                     if (success)
                     {
-                        // 서버 성공 시에만 로컬 상태 업데이트
+                        Debug.Log($"[StageDataManager] 스테이지 {stageNumber} 서버 저장 성공: {message}");
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[StageDataManager] 스테이지 {stageNumber} 서버 저장 실패: {message}");
+                    }
+                    
+                    // 유효한 완료(stars >= 1)인 경우 서버 실패와 관계없이 로컬 업데이트
+                    // 게임플레이 자체는 성공했으므로 진행도는 저장되어야 함
+                    if (stars >= 1)
+                    {
+                        Debug.Log($"[StageDataManager] 유효한 완료(stars={stars}) - 서버 상태와 관계없이 로컬 진행도 업데이트");
                         UpdateLocalStageProgress(stageNumber, score, stars, completionTime);
 
                         // 이벤트 발생
@@ -399,8 +425,7 @@ namespace Features.Single.Core
                     }
                     else
                     {
-                        Debug.LogWarning($"[StageDataManager] 스테이지 {stageNumber} 서버 저장 실패: {message}");
-                        // 실패 시에는 로컬 상태 업데이트 안함
+                        Debug.Log($"[StageDataManager] 실패한 완료(stars={stars}) - 로컬 진행도 업데이트 건너뜀");
                     }
                 };
 
@@ -411,6 +436,7 @@ namespace Features.Single.Core
             else
             {
                 // API 통합이 비활성화된 경우 바로 로컬 업데이트
+                pendingRequests.Remove(requestKey);
                 UpdateLocalStageProgress(stageNumber, score, stars, completionTime);
                 OnStageCompleted?.Invoke(stageNumber, score, stars);
 

@@ -120,6 +120,9 @@ namespace App.Network
             RemoteLogger.Initialize(this);
             RemoteLogger.LogInfo($"🚀 OidcAuthenticator 시작 - Platform: {Application.platform}, BuildType: {(Debug.isDebugBuild ? "Debug" : "Release")}", "OIDC");
             
+            // 🔥 SecureStorage 초기화 및 토큰 마이그레이션
+            InitializeSecureStorage();
+            
             // 🔥 시스템 진단 정보 출력
             LogDebug($"Unity 버전: {Application.unityVersion}");
             LogDebug($"플랫폼: {Application.platform}");
@@ -755,7 +758,7 @@ namespace App.Network
         }
         #endregion
 
-        #region Secure Storage (PlayerPrefs for now, can be upgraded to Keychain/Keystore)
+        #region Secure Storage (Using SecureStorage with Keychain/Keystore support)
         private const string PREF_ACCESS_TOKEN = "oidc_access_token";
         private const string PREF_REFRESH_TOKEN = "oidc_refresh_token";
         private const string PREF_TOKEN_EXPIRY = "oidc_token_expiry";
@@ -767,19 +770,23 @@ namespace App.Network
 
             try
             {
-                PlayerPrefs.SetString(PREF_ACCESS_TOKEN, tokenResponse.access_token ?? "");
-                PlayerPrefs.SetString(PREF_REFRESH_TOKEN, tokenResponse.refresh_token ?? "");
+                // Migrate existing PlayerPrefs data first
+                MigratePlayerPrefsToSecureStorage();
+                
+                App.Security.SecureStorage.StoreString(PREF_ACCESS_TOKEN, tokenResponse.access_token ?? "");
+                App.Security.SecureStorage.StoreString(PREF_REFRESH_TOKEN, tokenResponse.refresh_token ?? "");
                 
                 // Calculate expiry time
                 var expiryTime = DateTime.UtcNow.AddSeconds(tokenResponse.expires_in - 60); // 1 minute buffer
-                PlayerPrefs.SetString(PREF_TOKEN_EXPIRY, expiryTime.ToBinary().ToString());
+                App.Security.SecureStorage.StoreString(PREF_TOKEN_EXPIRY, expiryTime.ToBinary().ToString());
                 
-                PlayerPrefs.Save();
-                LogDebug("Tokens saved to secure storage");
+                LogDebug("Tokens saved to SecureStorage successfully");
+                LogDebug($"SecureStorage Platform: {App.Security.SecureStorage.GetPlatformInfo()}");
             }
             catch (Exception ex)
             {
-                LogDebug($"Failed to save tokens: {ex.Message}");
+                LogDebug($"Failed to save tokens to SecureStorage: {ex.Message}");
+                throw; // Re-throw to indicate save failure
             }
         }
 
@@ -787,12 +794,21 @@ namespace App.Network
         {
             try
             {
-                string token = PlayerPrefs.GetString(PREF_ACCESS_TOKEN, "");
+                // Try SecureStorage first
+                string token = App.Security.SecureStorage.GetString(PREF_ACCESS_TOKEN, "");
+                
+                // If SecureStorage is empty, try migrating from PlayerPrefs
+                if (string.IsNullOrEmpty(token))
+                {
+                    MigratePlayerPrefsToSecureStorage();
+                    token = App.Security.SecureStorage.GetString(PREF_ACCESS_TOKEN, "");
+                }
+                
                 if (string.IsNullOrEmpty(token))
                     return null;
 
                 // Check if token is expired
-                string expiryString = PlayerPrefs.GetString(PREF_TOKEN_EXPIRY, "");
+                string expiryString = App.Security.SecureStorage.GetString(PREF_TOKEN_EXPIRY, "");
                 if (!string.IsNullOrEmpty(expiryString) && long.TryParse(expiryString, out long expiry))
                 {
                     var expiryTime = DateTime.FromBinary(expiry);
@@ -807,28 +823,209 @@ namespace App.Network
             }
             catch (Exception ex)
             {
-                LogDebug($"Failed to get access token: {ex.Message}");
+                LogDebug($"Failed to get access token from SecureStorage: {ex.Message}");
                 return null;
             }
         }
 
         public string GetRefreshToken()
         {
-            return PlayerPrefs.GetString(PREF_REFRESH_TOKEN, "");
+            try
+            {
+                // Try SecureStorage first
+                string token = App.Security.SecureStorage.GetString(PREF_REFRESH_TOKEN, "");
+                
+                // If SecureStorage is empty, try migrating from PlayerPrefs
+                if (string.IsNullOrEmpty(token))
+                {
+                    MigratePlayerPrefsToSecureStorage();
+                    token = App.Security.SecureStorage.GetString(PREF_REFRESH_TOKEN, "");
+                }
+                
+                return token;
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"Failed to get refresh token from SecureStorage: {ex.Message}");
+                return "";
+            }
         }
 
         public void ClearTokens()
         {
-            PlayerPrefs.DeleteKey(PREF_ACCESS_TOKEN);
-            PlayerPrefs.DeleteKey(PREF_REFRESH_TOKEN);
-            PlayerPrefs.DeleteKey(PREF_TOKEN_EXPIRY);
-            PlayerPrefs.Save();
-            LogDebug("Tokens cleared from secure storage");
+            try
+            {
+                App.Security.SecureStorage.DeleteKey(PREF_ACCESS_TOKEN);
+                App.Security.SecureStorage.DeleteKey(PREF_REFRESH_TOKEN);
+                App.Security.SecureStorage.DeleteKey(PREF_TOKEN_EXPIRY);
+                LogDebug("Tokens cleared from SecureStorage");
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"Failed to clear tokens from SecureStorage: {ex.Message}");
+            }
+            
+            // Also clear from PlayerPrefs during migration cleanup
+            try
+            {
+                PlayerPrefs.DeleteKey(PREF_ACCESS_TOKEN);
+                PlayerPrefs.DeleteKey(PREF_REFRESH_TOKEN);
+                PlayerPrefs.DeleteKey(PREF_TOKEN_EXPIRY);
+                PlayerPrefs.Save();
+                LogDebug("Legacy PlayerPrefs tokens also cleared");
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"Failed to clear legacy PlayerPrefs tokens: {ex.Message}");
+            }
         }
 
         public bool HasValidTokens()
         {
             return !string.IsNullOrEmpty(GetAccessToken());
+        }
+
+        /// <summary>
+        /// Migrates existing PlayerPrefs token data to SecureStorage
+        /// This ensures backward compatibility for users upgrading from PlayerPrefs
+        /// </summary>
+        private void MigratePlayerPrefsToSecureStorage()
+        {
+            try
+            {
+                // Check if migration is needed (PlayerPrefs has data but SecureStorage doesn't)
+                bool hasPlayerPrefsTokens = PlayerPrefs.HasKey(PREF_REFRESH_TOKEN) || PlayerPrefs.HasKey(PREF_ACCESS_TOKEN);
+                bool hasSecureStorageTokens = App.Security.SecureStorage.HasKey(PREF_REFRESH_TOKEN) || App.Security.SecureStorage.HasKey(PREF_ACCESS_TOKEN);
+                
+                if (!hasPlayerPrefsTokens || hasSecureStorageTokens)
+                {
+                    // No migration needed
+                    return;
+                }
+                
+                LogDebug("Starting token migration from PlayerPrefs to SecureStorage...");
+                
+                // Migrate refresh token
+                string refreshToken = PlayerPrefs.GetString(PREF_REFRESH_TOKEN, "");
+                if (!string.IsNullOrEmpty(refreshToken))
+                {
+                    App.Security.SecureStorage.StoreString(PREF_REFRESH_TOKEN, refreshToken);
+                    LogDebug("Refresh token migrated to SecureStorage");
+                }
+                
+                // Migrate access token
+                string accessToken = PlayerPrefs.GetString(PREF_ACCESS_TOKEN, "");
+                if (!string.IsNullOrEmpty(accessToken))
+                {
+                    App.Security.SecureStorage.StoreString(PREF_ACCESS_TOKEN, accessToken);
+                    LogDebug("Access token migrated to SecureStorage");
+                }
+                
+                // Migrate expiry time
+                string expiryTime = PlayerPrefs.GetString(PREF_TOKEN_EXPIRY, "");
+                if (!string.IsNullOrEmpty(expiryTime))
+                {
+                    App.Security.SecureStorage.StoreString(PREF_TOKEN_EXPIRY, expiryTime);
+                    LogDebug("Token expiry time migrated to SecureStorage");
+                }
+                
+                // Clear PlayerPrefs after successful migration
+                PlayerPrefs.DeleteKey(PREF_REFRESH_TOKEN);
+                PlayerPrefs.DeleteKey(PREF_ACCESS_TOKEN);
+                PlayerPrefs.DeleteKey(PREF_TOKEN_EXPIRY);
+                PlayerPrefs.Save();
+                
+                LogDebug("Token migration completed successfully. PlayerPrefs cleaned up.");
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"Token migration failed: {ex.Message}. Will continue with existing data.");
+            }
+        }
+
+        /// <summary>
+        /// Check SecureStorage availability and log platform info for debugging
+        /// </summary>
+        public bool IsSecureStorageAvailable()
+        {
+            try
+            {
+                bool available = App.Security.SecureStorage.IsAvailable();
+                LogDebug($"SecureStorage available: {available}");
+                LogDebug($"SecureStorage platform: {App.Security.SecureStorage.GetPlatformInfo()}");
+                return available;
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"SecureStorage availability check failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Initialize SecureStorage and perform token migration if needed
+        /// Called during Start() to ensure proper setup
+        /// </summary>
+        private void InitializeSecureStorage()
+        {
+            try
+            {
+                LogDebug("🔧 Initializing SecureStorage...");
+                
+                // Check SecureStorage availability
+                if (IsSecureStorageAvailable())
+                {
+                    LogDebug("✅ SecureStorage is available");
+                    
+                    // Perform token migration if needed
+                    MigratePlayerPrefsToSecureStorage();
+                    
+                    // Log current storage status
+                    LogTokenStorageStatus();
+                }
+                else
+                {
+                    LogDebug("⚠️ SecureStorage is not available, will use fallback mechanisms");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"❌ SecureStorage initialization failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Debug method to check token storage status
+        /// </summary>
+        public void LogTokenStorageStatus()
+        {
+            try
+            {
+                LogDebug("=== Token Storage Status ===");
+                LogDebug($"SecureStorage available: {App.Security.SecureStorage.IsAvailable()}");
+                LogDebug($"SecureStorage platform: {App.Security.SecureStorage.GetPlatformInfo()}");
+                LogDebug($"SecureStorage has refresh token: {App.Security.SecureStorage.HasKey(PREF_REFRESH_TOKEN)}");
+                LogDebug($"SecureStorage has access token: {App.Security.SecureStorage.HasKey(PREF_ACCESS_TOKEN)}");
+                LogDebug($"SecureStorage has expiry: {App.Security.SecureStorage.HasKey(PREF_TOKEN_EXPIRY)}");
+                
+                // Legacy PlayerPrefs status (for migration detection only)
+                bool hasLegacyTokens = PlayerPrefs.HasKey(PREF_REFRESH_TOKEN) || PlayerPrefs.HasKey(PREF_ACCESS_TOKEN);
+                if (hasLegacyTokens)
+                {
+                    LogDebug("⚠️ Legacy PlayerPrefs tokens detected - will be migrated");
+                    LogDebug($"Legacy PlayerPrefs has refresh token: {PlayerPrefs.HasKey(PREF_REFRESH_TOKEN)}");
+                    LogDebug($"Legacy PlayerPrefs has access token: {PlayerPrefs.HasKey(PREF_ACCESS_TOKEN)}");
+                }
+                else
+                {
+                    LogDebug("✅ No legacy PlayerPrefs tokens found");
+                }
+                LogDebug("=== End Token Storage Status ===");
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"Failed to log token storage status: {ex.Message}");
+            }
         }
         #endregion
 
