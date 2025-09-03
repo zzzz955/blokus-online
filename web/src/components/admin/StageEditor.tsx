@@ -112,21 +112,28 @@ export default function StageEditor({ stage, onSave, onCancel }: StageEditorProp
     const mySeq = ++calcSeqRef.current;  // ✅ ref 사용
 
     try {
-      const score = await withTimeout(
+      const result = await withTimeout(
         calculateOptimalScoreExact(
           formData.initial_board_state,
           formData.available_blocks,
-          15000,
+          60000, // ⬆️ 15초 → 60초로 증가
           1
         ),
-        30000
+        90000 // ⬆️ 30초 → 90초로 증가
       );
 
       // ✅ 최신 실행만 반영
       if (mySeq !== calcSeqRef.current) return;
 
-      setCalculatedScore(score);
-      setFormData(prev => ({ ...prev, optimal_score: score }));
+      setCalculatedScore(result.score);
+      setFormData(prev => ({ ...prev, optimal_score: result.score }));
+      
+      // ⚠️ 타임아웃 경고 메시지
+      if (result.timedOut) {
+        alert(`⚠️ 계산 시간이 초과되었습니다!\n\n계산된 점수: ${result.score}점\n반복 횟수: ${result.iterations?.toLocaleString()}번\n\n이 점수는 최적해가 아닐 수 있습니다. 더 정확한 계산을 위해 보드를 단순화하거나 블록 수를 줄여보세요.`);
+      } else if (result.iterations) {
+        console.log(`✅ 최적 점수 계산 완료: ${result.score}점 (반복: ${result.iterations.toLocaleString()}번)`);
+      }
     } catch (err: any) {
       if (mySeq !== calcSeqRef.current) return;
       console.error(err);
