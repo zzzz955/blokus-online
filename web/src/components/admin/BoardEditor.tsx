@@ -472,6 +472,31 @@ export default function BoardEditor({ boardState, onChange }: BoardEditorProps) 
     }
   };
 
+  // Remove all blocks of a specific color
+  const removeColorBlocks = (colorId: number) => {
+    const colorName = BOARD_COLORS.find(c => c.id === colorId)?.name || '알 수 없는 색상';
+    const matrix = getBoardMatrix();
+    const blocksToRemove = matrix.flat().filter(cell => cell.color === colorId).length;
+    
+    if (blocksToRemove === 0) {
+      alert(`제거할 ${colorName} 블록이 없습니다.`);
+      return;
+    }
+    
+    if (confirm(`정말로 모든 ${colorName} 블록 ${blocksToRemove}개를 제거하시겠습니까?`)) {
+      // Create new matrix with specified color removed
+      matrix.forEach((row, y) => {
+        row.forEach((cell, x) => {
+          if (cell.color === colorId) {
+            matrix[y][x] = { type: 'empty' };
+          }
+        });
+      });
+      
+      onChange(matrixToBoardState(matrix));
+    }
+  };
+
   const generateRandomPlacements = (count: number) => {
     const matrix = getBoardMatrix();
     const emptyCells: Array<{x: number, y: number}> = [];
@@ -855,7 +880,9 @@ export default function BoardEditor({ boardState, onChange }: BoardEditorProps) 
             <h4 className="text-white font-medium mb-3">
               {selectedTool === 'eraser' ? '지우개' : '범위 채우기'} 도구 설정
             </h4>
-            <div className="flex items-center gap-4">
+            
+            {/* Size Controls */}
+            <div className="flex items-center gap-4 mb-4">
               <span className="text-gray-400 text-sm">크기:</span>
               {[1, 2, 3, 4, 5].map(size => {
                 const isSelected = eraserSize === size;
@@ -879,6 +906,57 @@ export default function BoardEditor({ boardState, onChange }: BoardEditorProps) 
               })}
               <span className="text-gray-400 text-sm">({eraserSize}x{eraserSize} 영역)</span>
             </div>
+            
+            {/* Color-specific removal for eraser tool only */}
+            {selectedTool === 'eraser' && (
+              <div className="border-t border-gray-600 pt-4">
+                <h5 className="text-white text-sm font-medium mb-3">색상별 일괄 제거</h5>
+                <p className="text-gray-400 text-xs mb-3">
+                  보드에서 특정 색상의 모든 블록을 한 번에 제거할 수 있습니다.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {BOARD_COLORS.map((color) => {
+                    const count = colorCounts[color.id] || 0;
+                    return (
+                      <button
+                        key={color.id}
+                        onClick={() => removeColorBlocks(color.id)}
+                        disabled={count === 0}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 transition-all text-sm ${
+                          count > 0
+                            ? 'border-red-400 hover:bg-red-600 hover:text-white text-gray-300'
+                            : 'border-gray-600 text-gray-500 cursor-not-allowed'
+                        }`}
+                        title={count > 0 ? `${color.name} ${count}개 제거` : `제거할 ${color.name} 블록이 없습니다`}
+                      >
+                        <div 
+                          className="w-4 h-4 rounded border border-gray-400 flex items-center justify-center"
+                          style={{ backgroundColor: color.color }}
+                        >
+                          {color.id === 5 ? (
+                            <div className="w-full h-full bg-gray-600 opacity-80 rounded-sm"></div>
+                          ) : (
+                            <div className="w-2 h-2 bg-white bg-opacity-30 rounded-full"></div>
+                          )}
+                        </div>
+                        <span>{color.name}</span>
+                        <span className="text-xs bg-gray-700 px-1.5 py-0.5 rounded">
+                          {count}
+                        </span>
+                        {count > 0 && (
+                          <span className="text-red-400 ml-1">🗑️</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                
+                {/* Warning notice */}
+                <div className="mt-3 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded text-xs text-yellow-300">
+                  ⚠️ <strong>주의:</strong> 색상별 제거는 되돌릴 수 없습니다. 신중하게 선택하세요.
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1002,7 +1080,7 @@ export default function BoardEditor({ boardState, onChange }: BoardEditorProps) 
           <li>• <strong>블록 배치:</strong> 21개 테트로미노 블록 시각적 선택, R키(회전)/F키(뒤집기) 지원</li>
           <li>• <strong>범위 채우기:</strong> 1x1~5x5 크기로 선택한 색상 채우기</li>
           <li>• <strong>전체 채우기:</strong> 보드 전체를 선택한 색상으로 채웁</li>
-          <li>• <strong>지우개:</strong> 1x1~5x5 크기로 영역 지우기</li>
+          <li>• <strong>지우개:</strong> 1x1~5x5 크기로 영역 지우기 또는 색상별 일괄 제거</li>
           <li>• <strong>이미지:</strong> PNG/JPG 업로드로 5색 도트화 변환</li>
           <li>• <strong>드래그:</strong> 마우스를 누른 채 드래그하여 연속 편집</li>
         </ul>
