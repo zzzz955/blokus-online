@@ -4,10 +4,10 @@ const logger = require('../config/logger')
 const dbService = require('../config/database')
 
 /**
- * GET /api/health
- * 서버 상태 확인
+ * GET/POST /api/health
+ * 서버 상태 확인 (Unity에서 POST로 요청할 수 있도록 둘 다 지원)
  */
-router.get('/', async (req, res) => {
+const healthHandler = async (req, res) => {
   const startTime = Date.now()
 
   try {
@@ -100,7 +100,11 @@ router.get('/', async (req, res) => {
       }
     })
   }
-})
+}
+
+// GET과 POST 모두 지원
+router.get('/', healthHandler)
+router.post('/', healthHandler)
 
 /**
  * GET /api/health/ready

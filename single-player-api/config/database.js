@@ -291,9 +291,8 @@ class DatabaseService {
         max_stage_completed,
         total_single_games,
         single_player_score,
-        created_at,
         updated_at
-      ) VALUES ($1, 0, 0, 0, 0, 0, 1, 0, 1, $2, NOW(), NOW())
+      ) VALUES ($1, 0, 0, 0, 0, 0, 1, 0, 1, $2, NOW())
       ON CONFLICT (user_id) 
       DO UPDATE SET
         total_single_games = user_stats.total_single_games + 1,
