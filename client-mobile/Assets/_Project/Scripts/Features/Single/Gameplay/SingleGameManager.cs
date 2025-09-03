@@ -78,6 +78,10 @@ namespace Features.Single.Gameplay
         private float startTimeRealtime;
         public bool IsInitialized { get; private set; }
 
+        // 게임 완료 상태 추적 (중복 처리 방지)
+        private bool isGameCompleted = false;
+        public bool IsGameCompleted => isGameCompleted;
+
         public int ElapsedSeconds => !IsInitialized ? 0 :
             Mathf.Max(0, Mathf.FloorToInt(Time.realtimeSinceStartup - startTimeRealtime));
 
@@ -300,6 +304,9 @@ namespace Features.Single.Gameplay
         {
             // 이벤트 중복 연결 방지
             DetachHandlers();
+
+            // 게임 완료 상태 초기화
+            isGameCompleted = false;
 
             payload = p ?? new StagePayload();
             logic = new GameLogic();
@@ -604,6 +611,17 @@ namespace Features.Single.Gameplay
         {
             if (verboseLog) Debug.Log($"[SingleGame] ExitRequested - elapsed={ElapsedSeconds}s");
 
+            // 게임 완료 상태 설정 (Exit 시에도 중복 처리 방지)
+            if (isGameCompleted)
+            {
+                Debug.LogWarning($"[SingleGame] 게임이 이미 완료됨 - Exit 중복 처리 방지");
+                return;
+            }
+            isGameCompleted = true;
+            
+            // 즉시 이벤트 연결 해제 (추가 블록 배치 방지)
+            DetachHandlers();
+
             var scores = logic?.CalculateScores();
             int currentScore = (scores != null && scores.ContainsKey(playerColor)) ? scores[playerColor] : 0;
             int optimalScore = payload?.ParScore ?? 0;
@@ -740,6 +758,13 @@ namespace Features.Single.Gameplay
 
         private void OnBlockPlacedToBoard(Block block, Position pos)
         {
+            // 게임 완료 후 지연된 블록 배치 이벤트 무시 (서버 오류 방지)
+            if (isGameCompleted)
+            {
+                Debug.LogWarning($"[SingleGame] 게임 완료 후 블록 배치 이벤트 무시: {block.Type} at ({pos.row},{pos.col})");
+                return;
+            }
+            
             var placement = new BlockPlacement(
                 block.Type, pos, block.CurrentRotation, block.CurrentFlipState, block.Player);
 
@@ -793,6 +818,17 @@ namespace Features.Single.Gameplay
 
         private void EndGame(string reason)
         {
+            // 게임 완료 상태 설정 (중복 처리 방지)
+            if (isGameCompleted)
+            {
+                Debug.LogWarning($"[SingleGame] 게임이 이미 완료됨 - 중복 종료 처리 방지");
+                return;
+            }
+            isGameCompleted = true;
+            
+            // 즉시 이벤트 연결 해제 (추가 블록 배치 방지)
+            DetachHandlers();
+            
             var scores = logic.CalculateScores();
             int myScore = scores.ContainsKey(playerColor) ? scores[playerColor] : 0;
             int optimalScore = payload?.ParScore ?? 0;

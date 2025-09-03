@@ -306,8 +306,12 @@ namespace Features.Single.Core{
         {
             if (completed && App.Network.HttpApiClient.Instance != null)
             {
-                // HTTP API를 통한 스테이지 완료 보고
-                App.Network.HttpApiClient.Instance.CompleteStage(stageNumber, score, (int)time, completed);
+                // ✅ 중복 API 호출 방지: StageDataManager에서 이미 서버 통신을 처리함
+                // StageProgressManager는 로컬 상태 관리만 담당하도록 변경
+                Debug.Log($"[StageProgressManager] 스테이지 {stageNumber} 완료 - 서버 통신은 StageDataManager에서 처리됨");
+                
+                // 로컬 상태만 업데이트
+                // (서버 통신은 StageDataManager.CompleteStage()에서 이미 처리됨)
             }
             else if (!completed)
             {

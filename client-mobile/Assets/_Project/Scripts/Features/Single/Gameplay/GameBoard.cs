@@ -609,6 +609,15 @@ namespace Features.Single.Gameplay
 
         public void OnConfirmPlacement()
         {
+            // 게임 완료 후 지연된 블록 배치 확정 무시 (서버 오류 방지)
+            if (SingleGameManager.Instance != null && SingleGameManager.Instance.IsGameCompleted)
+            {
+                Debug.LogWarning($"[GameBoard] 게임 완료 후 배치 확정 이벤트 무시: {pendingBlock?.Type} at ({pendingPosition.row}, {pendingPosition.col})");
+                ClearPreview();
+                HideActionButtons();
+                return;
+            }
+            
             if (!hasPendingPlacement || pendingBlock == null || !ValidationUtility.IsValidPosition(pendingPosition))
             {
                 Debug.LogWarning("확정할 배치가 없습니다");
