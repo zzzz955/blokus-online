@@ -434,7 +434,7 @@ namespace App.Network
                         // 🔥 수정: refresh token을 SecureStorage에 저장
                         if (!string.IsNullOrEmpty(response.refresh_token))
                         {
-                            App.Security.SecureStorage.StoreString("blokus_refresh_token", response.refresh_token);
+                            App.Security.SecureStorage.StoreString(App.Security.TokenKeys.Refresh, response.refresh_token);
                             App.Security.SecureStorage.StoreString("blokus_user_id", response.user.user_id.ToString());
                             App.Security.SecureStorage.StoreString("blokus_username", response.user.username ?? "");
                         }
@@ -569,7 +569,7 @@ namespace App.Network
             Debug.Log("[HttpApiClient] OIDC refresh token 자동 로그인 시도");
 
             // OIDC refresh token만 확인 (Single-API refresh token 지원 중단)
-            string oidcRefreshToken = App.Security.SecureStorage.GetString("blokus_refresh_token");
+            string oidcRefreshToken = App.Security.SecureStorage.GetString(App.Security.TokenKeys.Refresh);
 
             if (!string.IsNullOrEmpty(oidcRefreshToken))
             {
@@ -641,7 +641,7 @@ namespace App.Network
             Debug.LogWarning($"[HttpApiClient] 401 Unauthorized 처리 시작: {endpoint}");
 
             // OIDC refresh token만 사용 (Single-API refresh token 지원 중단)
-            var refreshToken = App.Security.SecureStorage.GetString("blokus_refresh_token");
+            var refreshToken = App.Security.SecureStorage.GetString(App.Security.TokenKeys.Refresh);
             if (string.IsNullOrEmpty(refreshToken))
             {
                 Debug.LogError("[HttpApiClient] OIDC refresh token 없음 - 재로그인 필요");
@@ -733,7 +733,7 @@ namespace App.Network
                             // 새 refresh token 저장
                             if (!string.IsNullOrEmpty(response.refresh_token))
                             {
-                                App.Security.SecureStorage.StoreString("blokus_refresh_token", response.refresh_token);
+                                App.Security.SecureStorage.StoreString(App.Security.TokenKeys.Refresh, response.refresh_token);
                                 App.Security.SecureStorage.StoreString("blokus_user_id", response.user.user_id.ToString());
                                 App.Security.SecureStorage.StoreString("blokus_username", response.user.username ?? "");
                             }

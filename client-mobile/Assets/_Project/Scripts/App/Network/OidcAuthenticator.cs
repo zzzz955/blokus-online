@@ -759,9 +759,9 @@ namespace App.Network
         #endregion
 
         #region Secure Storage (Using SecureStorage with Keychain/Keystore support)
-        private const string PREF_ACCESS_TOKEN = "oidc_access_token";
-        private const string PREF_REFRESH_TOKEN = "oidc_refresh_token";
-        private const string PREF_TOKEN_EXPIRY = "oidc_token_expiry";
+        private const string PREF_ACCESS_TOKEN = App.Security.TokenKeys.Access;
+        private const string PREF_REFRESH_TOKEN = App.Security.TokenKeys.Refresh;
+        private const string PREF_TOKEN_EXPIRY = App.Security.TokenKeys.Expiry;
 
         public void SaveTokens(TokenResponse tokenResponse)
         {

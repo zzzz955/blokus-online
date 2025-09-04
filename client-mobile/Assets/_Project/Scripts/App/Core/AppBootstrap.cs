@@ -123,6 +123,11 @@ namespace App.Core
                 
             LoadingOverlay.Show("글로벌 서비스 초기화 중...");
             
+            // Token key migration (must be done before other services initialize)
+            if (debugMode)
+                Debug.Log("[AppBootstrap] Migrating legacy token keys");
+            App.Security.SecureStorage.MigrateLegacyTokenKeys();
+            
             // OIDC Authenticator 초기화
             if (initializeOidcAuthenticator)
             {

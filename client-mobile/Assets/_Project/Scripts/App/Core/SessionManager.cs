@@ -41,8 +41,8 @@ namespace App.Core
         public event System.Action<string> OnSavedUsernameLoaded; // 저장된 사용자명 로드시
 
         // 세션 영속성을 위한 상수 (6시간 짧은 세션)
-        private const string SAVED_ACCESS_TOKEN_KEY = "blokus_access_token";
-        private const string SAVED_REFRESH_TOKEN_KEY = "blokus_refresh_token";
+        private const string SAVED_ACCESS_TOKEN_KEY = App.Security.TokenKeys.Access;
+        private const string SAVED_REFRESH_TOKEN_KEY = App.Security.TokenKeys.Refresh;
         private const string SAVED_USER_ID_KEY = "blokus_user_id";
         private const string SAVED_USERNAME_KEY = "blokus_username";
         private const string SAVED_DISPLAY_NAME_KEY = "blokus_display_name";
@@ -314,7 +314,7 @@ namespace App.Core
             ClearMemorySession();
 
             // 🔥 SecureStorage에서 refresh token 삭제
-            App.Security.SecureStorage.DeleteKey("blokus_refresh_token");
+            App.Security.SecureStorage.DeleteKey(App.Security.TokenKeys.Refresh);
             App.Security.SecureStorage.DeleteKey("blokus_user_id");
             App.Security.SecureStorage.DeleteKey("blokus_username");
             

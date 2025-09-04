@@ -98,7 +98,7 @@ namespace App.UI
             if (autoLoginWithRefreshToken && !hasCheckedRefreshToken)
             {
                 // SecureStorage와 OIDC에서 저장된 refresh token이 있는지 확인
-                string savedRefreshToken = App.Security.SecureStorage.GetString("blokus_refresh_token");
+                string savedRefreshToken = App.Security.SecureStorage.GetString(App.Security.TokenKeys.Refresh);
                 var oidcAuthenticator = App.Core.AppBootstrap.GetGlobalOidcAuthenticator();
                 string oidcRefreshToken = oidcAuthenticator?.GetRefreshToken();
                 
@@ -484,8 +484,8 @@ namespace App.UI
                         if (loginResponse != null && !string.IsNullOrEmpty(loginResponse.access_token))
                         {
                             // 토큰을 SecurityStorage에 저장
-                            App.Security.SecureStorage.StoreString("blokus_access_token", loginResponse.access_token);
-                            App.Security.SecureStorage.StoreString("blokus_refresh_token", loginResponse.refresh_token);
+                            App.Security.SecureStorage.StoreString(App.Security.TokenKeys.Access, loginResponse.access_token);
+                            App.Security.SecureStorage.StoreString(App.Security.TokenKeys.Refresh, loginResponse.refresh_token);
                             App.Security.SecureStorage.StoreString("blokus_id_token", loginResponse.id_token);
 
                             // 사용자 정보 저장
@@ -801,7 +801,7 @@ namespace App.UI
             if (errorMessage.Contains("refresh") || errorMessage.Contains("token"))
             {
                 // SecureStorage에서 토큰 삭제
-                App.Security.SecureStorage.DeleteKey("blokus_refresh_token");
+                App.Security.SecureStorage.DeleteKey(App.Security.TokenKeys.Refresh);
                 App.Security.SecureStorage.DeleteKey("blokus_user_id");
                 App.Security.SecureStorage.DeleteKey("blokus_username");
                 

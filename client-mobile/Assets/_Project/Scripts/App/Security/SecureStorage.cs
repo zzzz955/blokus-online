@@ -326,12 +326,22 @@ namespace App.Security
         {
             try
             {
-                // SharedPreferences에서 암호화된 데이터 읽기
+                // 1) SharedPreferences 우선
                 string encryptedValue = GetSharedPreference($"SecureStorage_{key}", "");
+
                 if (string.IsNullOrEmpty(encryptedValue))
+                {
+                    // 2) 폴백도 확인 (저장이 폴백으로 되었을 수 있음)
+                    var fb = GetStringAndroidFallback(key, defaultValue);
+                    if (!string.IsNullOrEmpty(fb) && fb != defaultValue)
+                    {
+                        if (DEBUG_MODE) Debug.Log($"[SecureStorage][ANDROID_FALLBACK] Retrieved key: {key}");
+                        return fb;
+                    }
                     return defaultValue;
-                
-                // Android Keystore로 복호화
+                }
+
+                // 3) Keystore로 복호화
                 if (EnsureKeyExists())
                 {
                     string decryptedValue = DecryptWithKeystore(encryptedValue);
@@ -342,8 +352,8 @@ namespace App.Security
                         return decryptedValue;
                     }
                 }
-                
-                // Keystore 실패 시 폴백
+
+                // 4) Keystore 실패 시 폴백
                 Debug.LogWarning($"[SecureStorage] [ANDROID] Keystore failed, using encrypted fallback for key: {key}");
                 return GetStringAndroidFallback(key, defaultValue);
             }
@@ -363,6 +373,7 @@ namespace App.Security
                         Debug.LogError($"[SecureStorage] [ANDROID] Corrupted data cleanup failed: {cleanupEx.Message}");
                     }
                 }
+                // 최후의 폴백
                 return GetStringAndroidFallback(key, defaultValue);
             }
         }
@@ -919,6 +930,77 @@ namespace App.Security
             }
         }
 #endif
+
+        // ========================================
+        // Token Key Migration
+        // ========================================
+        
+        /// <summary>
+        /// Migrate tokens from legacy keys to unified keys
+        /// Should be called once during app initialization
+        /// </summary>
+        public static void MigrateLegacyTokenKeys()
+        {
+            try
+            {
+                if (DEBUG_MODE)
+                    Debug.Log("[SecureStorage] Starting token key migration");
+
+                // Migrate refresh tokens from legacy keys
+                foreach (var oldKey in TokenKeys.LegacyRefresh)
+                {
+                    var value = GetString(oldKey, "");
+                    if (!string.IsNullOrEmpty(value))
+                    {
+                        StoreString(TokenKeys.Refresh, value);
+                        DeleteKey(oldKey);
+                        if (DEBUG_MODE)
+                            Debug.Log($"[SecureStorage] Migrated refresh token from {oldKey} to {TokenKeys.Refresh}");
+                    }
+                }
+
+                // Migrate access tokens from legacy keys
+                foreach (var oldKey in TokenKeys.LegacyAccess)
+                {
+                    var value = GetString(oldKey, "");
+                    if (!string.IsNullOrEmpty(value))
+                    {
+                        StoreString(TokenKeys.Access, value);
+                        DeleteKey(oldKey);
+                        if (DEBUG_MODE)
+                            Debug.Log($"[SecureStorage] Migrated access token from {oldKey} to {TokenKeys.Access}");
+                    }
+                }
+
+                // Also check PlayerPrefs for very old tokens (pre-SecureStorage)
+                var ppRefresh = PlayerPrefs.GetString("blokus_refresh_token", "");
+                if (!string.IsNullOrEmpty(ppRefresh))
+                {
+                    StoreString(TokenKeys.Refresh, ppRefresh);
+                    PlayerPrefs.DeleteKey("blokus_refresh_token");
+                    if (DEBUG_MODE)
+                        Debug.Log("[SecureStorage] Migrated refresh token from PlayerPrefs");
+                }
+
+                var ppAccess = PlayerPrefs.GetString("blokus_access_token", "");
+                if (!string.IsNullOrEmpty(ppAccess))
+                {
+                    StoreString(TokenKeys.Access, ppAccess);
+                    PlayerPrefs.DeleteKey("blokus_access_token");
+                    if (DEBUG_MODE)
+                        Debug.Log("[SecureStorage] Migrated access token from PlayerPrefs");
+                }
+                
+                PlayerPrefs.Save();
+
+                if (DEBUG_MODE)
+                    Debug.Log("[SecureStorage] Token key migration completed");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[SecureStorage] Token migration failed: {ex.Message}");
+            }
+        }
 
         // ========================================
         // Enhanced Error Recovery
