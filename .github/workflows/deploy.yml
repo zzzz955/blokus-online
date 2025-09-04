@@ -658,12 +658,38 @@ jobs:
         : > .env
         put_kv(){ printf '%s=%s\n' "$1" "$2" >> .env; }
 
-        # images
+        # images - conditionally set based on build success
         put_kv IMAGE_TAG             "${{ env.IMAGE_TAG }}"
-        put_kv GAME_SERVER_IMAGE     "${{ env.IMAGE_PREFIX }}-game-server:${{ env.IMAGE_TAG }}"
-        put_kv WEB_SERVER_IMAGE      "${{ env.IMAGE_PREFIX }}-web-server:${{ env.IMAGE_TAG }}"
-        put_kv SINGLE_API_IMAGE      "${{ env.IMAGE_PREFIX }}-single-api:${{ env.IMAGE_TAG }}"
-        put_kv OIDC_SERVER_IMAGE     "${{ env.IMAGE_PREFIX }}-oidc-server:${{ env.IMAGE_TAG }}"
+        
+        # Set image tags based on build results: use commit SHA if build succeeded, otherwise use latest
+        GAME_BUILD_RESULT="${{ needs.build-game-server.result }}"
+        WEB_BUILD_RESULT="${{ needs.build-web-server.result }}"
+        SINGLE_BUILD_RESULT="${{ needs.build-single-api.result }}"
+        OIDC_BUILD_RESULT="${{ needs.build-oidc-server.result }}"
+        
+        if [ "$GAME_BUILD_RESULT" = "success" ]; then
+          put_kv GAME_SERVER_IMAGE   "${{ env.IMAGE_PREFIX }}-game-server:${{ env.IMAGE_TAG }}"
+        else
+          put_kv GAME_SERVER_IMAGE   "${{ env.IMAGE_PREFIX }}-game-server:latest"
+        fi
+        
+        if [ "$WEB_BUILD_RESULT" = "success" ]; then
+          put_kv WEB_SERVER_IMAGE    "${{ env.IMAGE_PREFIX }}-web-server:${{ env.IMAGE_TAG }}"
+        else
+          put_kv WEB_SERVER_IMAGE    "${{ env.IMAGE_PREFIX }}-web-server:latest"
+        fi
+        
+        if [ "$SINGLE_BUILD_RESULT" = "success" ]; then
+          put_kv SINGLE_API_IMAGE    "${{ env.IMAGE_PREFIX }}-single-api:${{ env.IMAGE_TAG }}"
+        else
+          put_kv SINGLE_API_IMAGE    "${{ env.IMAGE_PREFIX }}-single-api:latest"
+        fi
+        
+        if [ "$OIDC_BUILD_RESULT" = "success" ]; then
+          put_kv OIDC_SERVER_IMAGE   "${{ env.IMAGE_PREFIX }}-oidc-server:${{ env.IMAGE_TAG }}"
+        else
+          put_kv OIDC_SERVER_IMAGE   "${{ env.IMAGE_PREFIX }}-oidc-server:latest"
+        fi
 
         # DB
         put_kv DB_HOST               "postgres"
@@ -861,6 +887,8 @@ jobs:
         # --- Prisma migrate ---
         $COMPOSE_CMD --env-file .env exec -T blokus-web npx prisma generate || true
         echo 'Deployment success.'
+        
+        SSH_EOF
 
     - name: Deployment failure handling
       if: failure()
