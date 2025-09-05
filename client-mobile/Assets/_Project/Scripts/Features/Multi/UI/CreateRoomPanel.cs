@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 using App.UI;
 using App.Core;
 
@@ -12,11 +13,11 @@ namespace Features.Multi.UI
     public class CreateRoomPanel : MonoBehaviour
     {
         [Header("UI 컴포넌트")]
-        [SerializeField] private InputField roomNameInput;
-        [SerializeField] private Dropdown gameModeDropdown;
-        [SerializeField] private Dropdown maxPlayersDropdown;
+        [SerializeField] private TMP_InputField roomNameInput;
+        [SerializeField] private TMP_Dropdown gameModeDropdown;
+        [SerializeField] private TMP_Dropdown maxPlayersDropdown;
         [SerializeField] private Toggle privateToggle;
-        [SerializeField] private InputField passwordInput;
+        [SerializeField] private TMP_InputField passwordInput;
         [SerializeField] private Button createButton;
         [SerializeField] private Button cancelButton;
         
@@ -69,7 +70,7 @@ namespace Features.Multi.UI
             privateToggle.interactable = false; // 클래식 모드에서는 비활성화
             
             // 패스워드 입력
-            passwordInput.contentType = InputField.ContentType.Password;
+            passwordInput.contentType = TMP_InputField.ContentType.Password;
             passwordInput.characterLimit = 20;
             passwordInput.interactable = false; // 초기에는 비활성화
             
