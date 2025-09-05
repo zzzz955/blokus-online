@@ -4452,6 +4452,7 @@ GameObject:
   - component: {fileID: 1927847734}
   - component: {fileID: 1927847733}
   - component: {fileID: 1927847732}
+  - component: {fileID: 1927847735}
   m_Layer: 5
   m_Name: MultiModeButton
   m_TagString: Untagged
@@ -4561,6 +4562,27 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1927847730}
   m_CullTransparentMesh: 1
+--- !u!114 &1927847735
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1927847730}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ef19c0127986bef44bf008b5ae47151a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  multiplayerButton: {fileID: 1927847732}
+  connectButton: {fileID: 0}
+  disconnectButton: {fileID: 0}
+  connectionStatusText: {fileID: 0}
+  networkInfoText: {fileID: 0}
+  usernameInput: {fileID: 0}
+  passwordInput: {fileID: 0}
+  loginButton: {fileID: 0}
+  guestLoginButton: {fileID: 0}
 --- !u!1 &1944319494
 GameObject:
   m_ObjectHideFlags: 0

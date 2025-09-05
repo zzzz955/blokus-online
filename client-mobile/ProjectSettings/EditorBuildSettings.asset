@@ -18,6 +18,9 @@ EditorBuildSettings:
     path: Assets/_Project/Scenes/SingleGameplayScene.unity
     guid: 936cdc184c80b014ba17974e526b5309
   - enabled: 1
+    path: Assets/_Project/Scenes/MultiCore.unity
+    guid: 89129a7315e23d147b8aa06a862248c8
+  - enabled: 1
     path: Assets/_Project/Scenes/MultiGameplayScene.unity
     guid: ddbb585a891c85b4ea6f63f30ee1dcc2
   m_configObjects: {}

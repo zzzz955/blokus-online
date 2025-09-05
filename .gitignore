@@ -637,3 +637,6 @@ ExportHistory/
 *_mapping.txt
 proguard/
 client-mobile/nul
+
+# GUIDE
+UNITY_SETUP_GUIDE.md
