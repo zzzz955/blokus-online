@@ -1,7 +1,7 @@
 // Assets/_Project/Scripts/Features/Single/UI/Scene/SingleGameplayUIScreenController.cs
 using UnityEngine;
 using Features.Single.Gameplay; // SingleGameManager
-using Features.Single.UI.InGame; // ExitConfirmModal
+using Shared.UI; // ConfirmModal
 
 namespace Features.Single.UI.Scene
 {
@@ -19,7 +19,7 @@ namespace Features.Single.UI.Scene
         [SerializeField] private bool verboseLog = true;
 
         [Header("Back Button & Modals")]
-        [SerializeField] private ExitConfirmModal exitConfirmModal; // 게임 종료 확인 모달
+        [SerializeField] private ConfirmModal exitConfirmModal; // 게임 종료 확인 모달
         [SerializeField] private Features.Single.UI.StageSelect.StageInfoModal stageInfoModal; // 스테이지 정보 모달
 
         private void Awake()
@@ -34,7 +34,7 @@ namespace Features.Single.UI.Scene
             if (verboseLog) Debug.Log("[UIScreenController] 초기 상태: StageSelect=ON, GamePanel=OFF");
             
             // ExitConfirmModal 자동 찾기 (설정되지 않은 경우)
-            if (!exitConfirmModal) exitConfirmModal = FindObjectOfType<ExitConfirmModal>();
+            if (!exitConfirmModal) exitConfirmModal = FindObjectOfType<ConfirmModal>();
             
             // StageInfoModal 자동 찾기 (설정되지 않은 경우)
             if (!stageInfoModal) stageInfoModal = Features.Single.UI.StageSelect.StageInfoModal.Instance;
@@ -238,14 +238,14 @@ namespace Features.Single.UI.Scene
         /// <summary>
         /// ConfirmationModal 찾기 (TopBarUI 로직과 동일)
         /// </summary>
-        private Features.Single.UI.InGame.ConfirmationModal GetConfirmationModal()
+        private ConfirmModal GetConfirmationModal()
         {
             // 활성 오브젝트에서 먼저 찾기
-            var active = FindObjectOfType<Features.Single.UI.InGame.ConfirmationModal>();
+            var active = FindObjectOfType<ConfirmModal>();
             if (active != null) return active;
             
             // 비활성까지 검색
-            var all = Resources.FindObjectsOfTypeAll<Features.Single.UI.InGame.ConfirmationModal>();
+            var all = Resources.FindObjectsOfTypeAll<ConfirmModal>();
             if (all != null && all.Length > 0)
             {
                 var confirmationModal = all[0];

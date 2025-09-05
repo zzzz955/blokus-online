@@ -7,6 +7,7 @@ using GameResult = Features.Multi.Core.GameResult;
 using Features.Multi.Models;
 using NetRoomInfo = Features.Multi.Net.RoomInfo;
 using TMPro;
+using Shared.UI;
 
 namespace Features.Multi.UI
 {
@@ -45,6 +46,9 @@ namespace Features.Multi.UI
         [SerializeField] private Button gameStartButton;
         [SerializeField] private TextMeshProUGUI gameStatusLabel;
         [SerializeField] private TextMeshProUGUI coordinateLabel;
+        
+        [Header("Modals")]
+        [SerializeField] private ConfirmModal leaveRoomConfirmModal;
 
         // Dependencies
         private NetworkManager networkManager;
@@ -80,6 +84,17 @@ namespace Features.Multi.UI
         void Update()
         {
             UpdateTurnTimer();
+            
+            // Android 뒤로가기 버튼 처리
+            if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                // 모달이 활성화된 경우 무시 (모달에서 처리)
+                if (leaveRoomConfirmModal != null && leaveRoomConfirmModal.gameObject.activeInHierarchy)
+                    return;
+                
+                // 방 나가기 확인 모달 표시
+                OnLeaveRoomButtonClicked();
+            }
         }
 
         void OnDestroy()
@@ -352,17 +367,33 @@ namespace Features.Multi.UI
 
         private void OnLeaveRoomButtonClicked()
         {
-            // TODO: 확인 다이얼로그
-            if (networkManager != null)
+            Debug.Log("[GameRoomPanel] Leave room button clicked");
+            
+            // 방 나가기 확인 모달 표시
+            if (leaveRoomConfirmModal != null)
             {
-                networkManager.LeaveRoom();
+                string message = isGameStarted 
+                    ? "게임이 진행 중입니다.\n정말로 방에서 나가시겠습니까?\n게임이 중단될 수 있습니다."
+                    : "정말로 방에서 나가시겠습니까?";
+                    
+                leaveRoomConfirmModal.ShowModal(
+                    "방 나가기",
+                    message,
+                    OnLeaveRoomConfirmed,
+                    null
+                );
+            }
+            else
+            {
+                Debug.LogError("[GameRoomPanel] leaveRoomConfirmModal이 설정되지 않았습니다!");
+                OnLeaveRoomConfirmed(); // 폴백: 바로 방 나가기
             }
         }
 
         private void OnSettingsButtonClicked()
         {
-            // TODO: 설정 창
             Debug.Log("[GameRoomPanel] Settings button clicked");
+            // TODO: 설정 창 열기
         }
 
         private void OnGameStartButtonClicked()
@@ -703,5 +734,64 @@ namespace Features.Multi.UI
                 networkManager.KickPlayer((int)color);
             }
         }
+        
+        // ========================================
+        // Additional Helper Methods
+        // ========================================
+        
+        /// <summary>
+        /// 방 나가기 확인 후 실제 처리
+        /// </summary>
+        private void OnLeaveRoomConfirmed()
+        {
+            Debug.Log("[GameRoomPanel] 방 나가기 확인됨 - 방 퇴장 시작");
+            
+            // TCP 서버로 방 나가기 메시지 전송
+            if (networkManager != null && currentRoom != null)
+            {
+                networkManager.LeaveRoom();
+                Debug.Log("[GameRoomPanel] 방 나가기 메시지 전송 완료");
+            }
+            else
+            {
+                Debug.LogError("[GameRoomPanel] NetworkManager 또는 currentRoom이 null입니다!");
+                // 폴백: 직접 로비로 이동
+                ReturnToLobby();
+            }
+        }
+        
+        /// <summary>
+        /// 로비로 복귀
+        /// </summary>
+        private void ReturnToLobby()
+        {
+            Debug.Log("[GameRoomPanel] 로비로 복귀");
+            
+            // 게임 상태 초기화
+            isGameStarted = false;
+            isMyTurn = false;
+            isReady = false;
+            myPlayerColor = PlayerColor.None;
+            
+            // 데이터 정리
+            if (dataCache != null)
+            {
+                // 방 관련 데이터만 정리 (로그아웃이 아니므로)
+                Debug.Log("[GameRoomPanel] 방 데이터 정리 완료");
+            }
+            
+            // MultiGameplaySceneController를 통해 로비로 전환
+            var sceneController = GetComponentInParent<MultiGameplaySceneController>();
+            if (sceneController != null)
+            {
+                sceneController.ShowLobby();
+                Debug.Log("[GameRoomPanel] 로비로 전환 요청 완료");
+            }
+            else
+            {
+                Debug.LogError("[GameRoomPanel] SceneController를 찾을 수 없습니다!");
+            }
+        }
+        
     }
 }

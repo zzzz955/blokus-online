@@ -6,6 +6,7 @@ using Features.Multi.Core;
 using Features.Multi.Models;
 using App.UI;
 using TMPro;
+using Shared.UI;
 using NetRoomInfo = Features.Multi.Net.RoomInfo;
 using NetUserInfo = Features.Multi.Net.UserInfo;
 using SharedRoomInfo = Shared.Models.RoomInfo;
@@ -25,19 +26,15 @@ namespace Features.Multi.UI
         [SerializeField] private Button settingsButton;
         [SerializeField] private Button logoutButton;
 
-        [Header("Left Panel - Users & Ranking")]
-        [SerializeField] private TabGroup leftTabs;
-        [SerializeField] private Transform usersTab;
-        [SerializeField] private Transform rankingTab;
+        [Header("Mobile Layout - Vertical Structure")]
         [SerializeField] private TextMeshProUGUI onlineCountLabel;
         [SerializeField] private ScrollRect userListScrollRect;
         [SerializeField] private Transform userListContent;
         [SerializeField] private GameObject userItemPrefab;
-        [SerializeField] private ScrollRect rankingScrollRect;
-        [SerializeField] private Transform rankingContent;
-        [SerializeField] private GameObject rankingItemPrefab;
+        
+        // 모바일 최적화: Ranking 기능 제거, Tab Group 제거
 
-        [Header("Center Panel - Rooms")]
+        [Header("Mobile Section - Room List")]
         [SerializeField] private ScrollRect roomListScrollRect;
         [SerializeField] private Transform roomListContent;
         [SerializeField] private GameObject roomItemPrefab;
@@ -45,7 +42,7 @@ namespace Features.Multi.UI
         [SerializeField] private Button joinRoomButton;
         [SerializeField] private Button refreshRoomButton;
 
-        [Header("Right Panel - Chat")]
+        [Header("Mobile Section - Chat")]
         [SerializeField] private ScrollRect chatScrollRect;
         [SerializeField] private TextMeshProUGUI chatDisplay;
         [SerializeField] private TMP_InputField chatInput;
@@ -53,6 +50,9 @@ namespace Features.Multi.UI
 
         [Header("Create Room Panel")]
         [SerializeField] private CreateRoomPanel createRoomPanel;
+        
+        [Header("Modals")]
+        [SerializeField] private ConfirmModal logoutConfirmModal;
 
         // Dependencies
         private NetworkManager networkManager;
@@ -60,8 +60,8 @@ namespace Features.Multi.UI
 
         // Data
         private List<NetUserInfo> onlineUsers = new List<NetUserInfo>();
-        private List<NetUserInfo> rankingData = new List<NetUserInfo>();
         private List<NetRoomInfo> roomList = new List<NetRoomInfo>();
+        // 모바일 최적화: rankingData 제거
         private List<ChatMessage> chatHistory = new List<ChatMessage>();
         
         // State
@@ -169,7 +169,7 @@ namespace Features.Multi.UI
             if (dataCache != null)
             {
                 dataCache.OnOnlineUsersUpdated += OnOnlineUsersUpdated;
-                dataCache.OnRankingUpdated += OnRankingUpdated;
+                // 모바일 최적화: OnRankingUpdated 제거
                 dataCache.OnUserDataUpdated += OnUserDataUpdated;
             }
         }
@@ -189,7 +189,7 @@ namespace Features.Multi.UI
             if (dataCache != null)
             {
                 dataCache.OnOnlineUsersUpdated -= OnOnlineUsersUpdated;
-                dataCache.OnRankingUpdated -= OnRankingUpdated;
+                // 모바일 최적화: OnRankingUpdated 제거
                 dataCache.OnUserDataUpdated -= OnUserDataUpdated;
             }
         }
@@ -202,11 +202,11 @@ namespace Features.Multi.UI
         {
             if (networkManager != null)
             {
-                // 서버에 데이터 요청
+                // 서버에 데이터 요청 (모바일: Ranking 제외)
                 networkManager.EnterLobby();
                 networkManager.RequestRoomList();
                 networkManager.RequestOnlineUsers();
-                networkManager.RequestRanking();
+                // 모바일 최적화: Ranking 요청 제거
             }
         }
 
@@ -298,33 +298,7 @@ namespace Features.Multi.UI
                 onlineCountLabel.text = $"접속자 ({onlineUsers.Count}명)";
         }
 
-        private void UpdateRankingList()
-        {
-            if (rankingContent == null || rankingItemPrefab == null) return;
-
-            // 기존 아이템 제거
-            foreach (Transform child in rankingContent)
-            {
-                Destroy(child.gameObject);
-            }
-
-            // 새 아이템 생성
-            var ranking = dataCache?.GetRankingData();
-            if (ranking != null)
-            {
-                for (int i = 0; i < ranking.Count; i++)
-                {
-                    GameObject rankingItem = Instantiate(rankingItemPrefab, rankingContent);
-                    
-                    // RankingItemUI 컴포넌트에 데이터 설정
-                    var rankingItemUI = rankingItem.GetComponent<RankingItemUI>();
-                    if (rankingItemUI != null)
-                    {
-                        rankingItemUI.SetupRanking(ranking[i], i + 1);
-                    }
-                }
-            }
-        }
+        // 모바일 최적화: UpdateRankingList 제거 (Ranking 기능 제거)
 
         private void UpdateRoomList()
         {
@@ -393,14 +367,53 @@ namespace Features.Multi.UI
 
         private void OnLogoutButtonClicked()
         {
-            // TODO: 로그아웃 확인 다이얼로그
             Debug.Log("[LobbyPanel] Logout button clicked");
             
-            // 메인 씬으로 돌아가기
+            // 로그아웃 확인 모달 표시
+            if (logoutConfirmModal != null)
+            {
+                logoutConfirmModal.ShowModal(
+                    "로그아웃",
+                    "정말로 로그아웃 하시겠습니까?\n진행 중인 내용이 저장되지 않을 수 있습니다.",
+                    OnLogoutConfirmed,
+                    null
+                );
+            }
+            else
+            {
+                Debug.LogError("[LobbyPanel] logoutConfirmModal이 설정되지 않았습니다!");
+                OnLogoutConfirmed(); // 폴백: 바로 로그아웃
+            }
+        }
+        
+        /// <summary>
+        /// 로그아웃 확인 후 실제 로그아웃 처리
+        /// </summary>
+        private void OnLogoutConfirmed()
+        {
+            Debug.Log("[LobbyPanel] 로그아웃 확인됨 - 세션 정리 시작");
+            
+            // 1. TCP 연결 해제 및 세션 정리
+            if (networkManager != null)
+            {
+                networkManager.DisconnectFromServer();
+                Debug.Log("[LobbyPanel] TCP 연결 해제 완료");
+            }
+            
+            // 2. 데이터 캐시 정리 (로그아웃 시 자동으로 정리됨)
+            Debug.Log("[LobbyPanel] 데이터 캐시는 연결 해제 시 자동 정리됨");
+            
+            // 3. 씬 정리 및 메인으로 복귀
             var sceneController = GetComponentInParent<MultiGameplaySceneController>();
             if (sceneController != null)
             {
                 sceneController.ReturnToMainScene();
+            }
+            else
+            {
+                Debug.LogError("[LobbyPanel] SceneController를 찾을 수 없음 - 직접 씬 전환");
+                // 폴백: 직접 씬 전환
+                UnityEngine.SceneManagement.SceneManager.LoadScene("MainScene");
             }
         }
 
@@ -491,10 +504,7 @@ namespace Features.Multi.UI
             UpdateOnlineUsersList();
         }
 
-        private void OnRankingUpdated()
-        {
-            UpdateRankingList();
-        }
+        // 모바일 최적화: OnRankingUpdated 제거
 
         private void OnUserDataUpdated()
         {
@@ -541,6 +551,22 @@ namespace Features.Multi.UI
         {
             Debug.Log($"[LobbyPanel] {message}");
             // TODO: Toast 메시지 표시
+        }
+        
+        /// <summary>
+        /// Android 뒤로가기 버튼 처리
+        /// </summary>
+        void Update()
+        {
+            if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                // 모달이 활성화된 경우 무시 (모달에서 처리)
+                if (logoutConfirmModal != null && logoutConfirmModal.gameObject.activeInHierarchy)
+                    return;
+                
+                // 로그아웃 확인 모달 표시
+                OnLogoutButtonClicked();
+            }
         }
 
         // ========================================

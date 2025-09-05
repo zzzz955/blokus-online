@@ -203,6 +203,27 @@ namespace Features.Multi
         }
         
         /// <summary>
+        /// 로비로 돌아가기 (방에서 나갈 때)
+        /// </summary>
+        public void ShowLobby()
+        {
+            if (debugMode)
+                Debug.Log("[MultiGameplaySceneController] Switching to Lobby");
+                
+            // 게임방에서 로비로 전환
+            if (gameRoomPanel != null)
+                gameRoomPanel.gameObject.SetActive(false);
+                
+            if (lobbyPanel != null)
+                lobbyPanel.gameObject.SetActive(true);
+                
+            currentState = SceneState.Lobby;
+            
+            if (debugMode)
+                Debug.Log("[MultiGameplaySceneController] Switched to Lobby successfully");
+        }
+        
+        /// <summary>
         /// 메인 씬으로 돌아가기
         /// </summary>
         public void ReturnToMainScene()

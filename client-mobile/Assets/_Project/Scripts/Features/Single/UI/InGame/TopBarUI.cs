@@ -4,6 +4,7 @@ using UnityEngine.UI;
 using TMPro; // Text를 쓰면 UnityEngine.UI.Text로 바꿔도 됩니다.
 using Features.Single.Gameplay;
 using Features.Single.UI.Scene; // SingleGameplayUIScreenController
+using Shared.UI; // ConfirmModal
 
 namespace Features.Single.UI.InGame
 {
@@ -19,7 +20,7 @@ namespace Features.Single.UI.InGame
         [SerializeField] private Button undoButton;
         [SerializeField] private TMP_Text undoCountText;   // 또는 Text
         [SerializeField] private Button exitButton;
-        [SerializeField] private ConfirmationModal confirmationModal;
+        [SerializeField] private ConfirmModal confirmationModal;
 
         [Header("Config")]
         [SerializeField] private string scoreFormat = "{0}";
@@ -47,12 +48,12 @@ namespace Features.Single.UI.InGame
             // 모달 자동 찾기(활성 오브젝트 우선)
             if (confirmationModal == null)
             {
-                var active = FindObjectOfType<ConfirmationModal>();
+                var active = FindObjectOfType<ConfirmModal>();
                 if (active != null) confirmationModal = active;
                 else
                 {
                     // 비활성까지 검색(비활성은 Show가 안 먹으니, 찾으면 루트 활성화 필요)
-                    var all = Resources.FindObjectsOfTypeAll<ConfirmationModal>();
+                    var all = Resources.FindObjectsOfTypeAll<ConfirmModal>();
                     if (all != null && all.Length > 0)
                     {
                         confirmationModal = all[0];
@@ -144,7 +145,7 @@ namespace Features.Single.UI.InGame
             }
             else
             {
-                Debug.LogWarning("[TopBarUI] ConfirmationModal이 없습니다. 바로 Undo 실행");
+                Debug.LogWarning("[TopBarUI] ConfirmModal이 없습니다. 바로 Undo 실행");
                 gm.OnUndoMove();
                 if (undoButton != null) undoButton.interactable = true;
             }

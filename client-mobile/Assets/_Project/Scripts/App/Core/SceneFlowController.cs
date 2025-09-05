@@ -764,12 +764,13 @@ namespace App.Core
         }
         
         /// <summary>
-        /// Exit multiplayer mode to main
+        /// Multi → Main 씬 전환 시작 (로그아웃)
         /// </summary>
         public void StartExitMultiToMain()
         {
             StartCoroutine(ExitMultiToMain());
         }
+        
 
         /// <summary>
         /// Check if scene is currently loaded
