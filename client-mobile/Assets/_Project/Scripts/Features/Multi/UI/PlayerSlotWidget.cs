@@ -17,10 +17,20 @@ namespace Features.Multi.UI
         [SerializeField] private Image readyIndicator;
         [SerializeField] private Button kickButton;
         
+        [Header("게임 정보 UI")]
+        [SerializeField] private Image hostIndicator;              // 호스트 표시 이미지
+        [SerializeField] private TextMeshProUGUI scoreText;       // 현재 점수
+        [SerializeField] private TextMeshProUGUI remainingBlocksText; // 남은 블록 개수
+        
         [Header("상태 색상")]
-        [SerializeField] private Color readyColor = Color.green;
-        [SerializeField] private Color notReadyColor = Color.gray;
         [SerializeField] private Color emptySlotColor = Color.white;
+        
+        [Header("준비 상태 스프라이트")]
+        [SerializeField] private Sprite readySprite;    // isReady = true 시 사용할 스프라이트
+        [SerializeField] private Sprite notReadySprite; // isReady = false 시 사용할 스프라이트
+        
+        [Header("호스트 표시")]
+        [SerializeField] private Sprite hostCrownSprite; // 호스트 표시용 왕관 스프라이트
         
         // 플레이어 데이터
         private PlayerSlot playerData;
@@ -68,9 +78,20 @@ namespace Features.Multi.UI
                 
             if (readyIndicator != null)
             {
-                readyIndicator.color = emptySlotColor;
+                readyIndicator.sprite = null;
                 readyIndicator.gameObject.SetActive(false);
             }
+            
+            // 호스트 표시 숨김
+            if (hostIndicator != null)
+                hostIndicator.gameObject.SetActive(false);
+                
+            // 점수 및 블록 정보 초기화
+            if (scoreText != null)
+                scoreText.text = "";
+                
+            if (remainingBlocksText != null)
+                remainingBlocksText.text = "";
             
             if (playerAvatar != null)
             {
@@ -98,11 +119,33 @@ namespace Features.Multi.UI
             if (playerNameText != null)
                 playerNameText.text = playerData.playerName;
             
-            // 준비 상태 표시
+            // 준비 상태 표시 (스프라이트 기반)
             if (readyIndicator != null)
             {
                 readyIndicator.gameObject.SetActive(true);
-                readyIndicator.color = playerData.isReady ? readyColor : notReadyColor;
+                readyIndicator.sprite = playerData.isReady ? readySprite : notReadySprite;
+            }
+            
+            // 호스트 표시
+            if (hostIndicator != null)
+            {
+                hostIndicator.gameObject.SetActive(playerData.isHost);
+                if (playerData.isHost && hostCrownSprite != null)
+                {
+                    hostIndicator.sprite = hostCrownSprite;
+                }
+            }
+            
+            // 점수 표시
+            if (scoreText != null)
+            {
+                scoreText.text = $"점수: {playerData.currentScore}";
+            }
+            
+            // 남은 블록 개수 표시
+            if (remainingBlocksText != null)
+            {
+                remainingBlocksText.text = $"블록: {playerData.remainingBlocks}";
             }
             
             // 아바타 (Stub)
@@ -178,11 +221,14 @@ namespace Features.Multi.UI
         /// </summary>
         public void SetTurnHighlight(bool highlight)
         {
-            // Stub: 턴 하이라이트 효과 (추후 구현)
-            if (readyIndicator != null)
+            // 턴 하이라이트 효과 - 플레이어 이름 색상 변경으로 표시
+            if (playerNameText != null)
             {
-                readyIndicator.color = highlight ? Color.yellow : (playerData.isReady ? readyColor : notReadyColor);
+                playerNameText.color = highlight ? Color.yellow : Color.white;
             }
+            
+            // 또는 준비 상태 표시기에 노란색 테두리 등 추가 효과 가능
+            // 현재는 이름 색상 변경으로 턴 표시
         }
         
         /// <summary>
@@ -205,9 +251,42 @@ namespace Features.Multi.UI
             playerData.isReady = isReady;
             if (readyIndicator != null)
             {
-                readyIndicator.color = isReady ? readyColor : notReadyColor;
+                readyIndicator.sprite = isReady ? readySprite : notReadySprite;
                 readyIndicator.gameObject.SetActive(!playerData.isEmpty);
             }
+        }
+        
+        /// <summary>
+        /// 점수 업데이트 (서버 브로드캐스트 데이터 적용)
+        /// </summary>
+        public void UpdateScore(int newScore)
+        {
+            playerData.currentScore = newScore;
+            if (scoreText != null)
+            {
+                scoreText.text = $"점수: {newScore}";
+            }
+        }
+        
+        /// <summary>
+        /// 남은 블록 개수 업데이트 (서버 브로드캐스트 데이터 적용)
+        /// </summary>
+        public void UpdateRemainingBlocks(int blocksLeft)
+        {
+            playerData.remainingBlocks = blocksLeft;
+            if (remainingBlocksText != null)
+            {
+                remainingBlocksText.text = $"블록: {blocksLeft}";
+            }
+        }
+        
+        /// <summary>
+        /// 게임 정보 전체 업데이트 (서버 브로드캐스트 데이터 적용)
+        /// </summary>
+        public void UpdateGameInfo(int score, int blocksLeft)
+        {
+            UpdateScore(score);
+            UpdateRemainingBlocks(blocksLeft);
         }
         
         private void OnDestroy()
@@ -228,6 +307,8 @@ namespace Features.Multi.UI
         public bool isReady;
         public bool isHost;
         public int colorIndex; // 플레이어 색상 인덱스 (0=빨강, 1=파랑, 2=노랑, 3=초록)
+        public int currentScore;      // 현재 점수
+        public int remainingBlocks;   // 남은 블록 개수
         
         /// <summary>
         /// 빈 슬롯인지 확인
@@ -258,7 +339,9 @@ namespace Features.Multi.UI
             playerName = "",
             isReady = false,
             isHost = false,
-            colorIndex = -1
+            colorIndex = -1,
+            currentScore = 0,
+            remainingBlocks = 0
         };
     }
 }

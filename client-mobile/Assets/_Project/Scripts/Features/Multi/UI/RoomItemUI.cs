@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 using Shared.Models;
 
 namespace Features.Multi.UI
@@ -11,13 +12,12 @@ namespace Features.Multi.UI
     public class RoomItemUI : MonoBehaviour
     {
         [Header("UI 요소")]
-        [SerializeField] private Text roomNameText;
-        [SerializeField] private Text playerCountText;
-        [SerializeField] private Text statusText;
+        [SerializeField] private TextMeshProUGUI roomNameText;
+        [SerializeField] private TextMeshProUGUI playerCountText;
+        [SerializeField] private TextMeshProUGUI statusText;
         [SerializeField] private Button joinButton;
         
         private Features.Multi.Net.RoomInfo roomInfo;
-        private MultiplayerLobbyController lobbyController;
         
         // 더블클릭 이벤트 처리  
         public event System.Action<Features.Multi.Net.RoomInfo> OnRoomSelected;
@@ -28,10 +28,9 @@ namespace Features.Multi.UI
         /// <summary>
         /// 방 정보 설정
         /// </summary>
-        public void SetupRoom(RoomInfo room, MultiplayerLobbyController controller)
+        public void SetupRoom(RoomInfo room)
         {
             roomInfo = room;
-            lobbyController = controller;
             
             UpdateUI();
             
@@ -111,12 +110,6 @@ namespace Features.Multi.UI
                 // 더블클릭 - 방 참가
                 Debug.Log($"[RoomItemUI] 방 더블클릭 참가: {roomInfo.roomName}");
                 OnRoomDoubleClicked?.Invoke(roomInfo);
-                
-                // 기존 방식도 호출 (호환성)
-                if (lobbyController != null)
-                {
-                    lobbyController.JoinRoom(roomInfo.roomId);
-                }
             }
             else
             {

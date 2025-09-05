@@ -44,7 +44,8 @@ namespace Features.Multi.UI
 
         [Header("Mobile Section - Chat")]
         [SerializeField] private ScrollRect chatScrollRect;
-        [SerializeField] private TextMeshProUGUI chatDisplay;
+        [SerializeField] private Transform chatContent;
+        [SerializeField] private GameObject chatItemPrefab;
         [SerializeField] private TMP_InputField chatInput;
         [SerializeField] private Button chatSendButton;
 
@@ -63,6 +64,10 @@ namespace Features.Multi.UI
         private List<NetRoomInfo> roomList = new List<NetRoomInfo>();
         // 모바일 최적화: rankingData 제거
         private List<ChatMessage> chatHistory = new List<ChatMessage>();
+        private List<GameObject> chatItemInstances = new List<GameObject>();
+        
+        // 채팅 설정
+        private const int MAX_CHAT_MESSAGES = 100;
         
         // State
         private int selectedRoomId = -1;
@@ -322,7 +327,7 @@ namespace Features.Multi.UI
                     var roomItemUI = roomItem.GetComponent<RoomItemUI>();
                     if (roomItemUI != null)
                     {
-                        roomItemUI.SetupRoom(room, null);
+                        roomItemUI.SetupRoom(room);
                     }
                 }
             }
@@ -490,7 +495,14 @@ namespace Features.Multi.UI
         {
             // 메시지를 ChatMessage 객체로 변환
             ChatMessage chatMsg = new ChatMessage("Unknown", message, "Unknown");
+            
+            // 채팅 히스토리에 추가 (100개 제한)
             chatHistory.Add(chatMsg);
+            if (chatHistory.Count > MAX_CHAT_MESSAGES)
+            {
+                chatHistory.RemoveAt(0);
+            }
+            
             UpdateChatDisplay();
         }
 
@@ -528,22 +540,47 @@ namespace Features.Multi.UI
 
         private void UpdateChatDisplay()
         {
-            if (chatDisplay == null) return;
+            if (chatContent == null || chatItemPrefab == null) return;
 
-            System.Text.StringBuilder sb = new System.Text.StringBuilder();
-            foreach (ChatMessage msg in chatHistory)
+            // 최신 메시지만 UI에 추가 (마지막 메시지)
+            if (chatHistory.Count > 0)
             {
-                string timestamp = msg.timestamp.ToString("HH:mm");
-                sb.AppendLine($"[{timestamp}] {msg.displayName}: {msg.message}");
+                var latestMessage = chatHistory[chatHistory.Count - 1];
+                CreateChatItem(latestMessage);
             }
-
-            chatDisplay.text = sb.ToString();
 
             // 스크롤을 맨 아래로
             if (chatScrollRect != null)
             {
                 Canvas.ForceUpdateCanvases();
                 chatScrollRect.verticalNormalizedPosition = 0f;
+            }
+        }
+        
+        private void CreateChatItem(ChatMessage message)
+        {
+            // 채팅 아이템 인스턴스 생성
+            GameObject chatItem = Instantiate(chatItemPrefab, chatContent);
+            chatItemInstances.Add(chatItem);
+            
+            // ChatItemUI 컴포넌트 설정
+            var chatItemUI = chatItem.GetComponent<ChatItemUI>();
+            if (chatItemUI != null)
+            {
+                // 내 메시지인지 확인 (TODO: 실제 사용자 이름과 비교)
+                bool isMyMessage = false; // 추후 실제 구현 필요
+                chatItemUI.SetupMessage(message.displayName, message.message, isMyMessage);
+            }
+            
+            // 메시지 수 제한 - 100개 초과 시 오래된 메시지 삭제
+            if (chatItemInstances.Count > MAX_CHAT_MESSAGES)
+            {
+                var oldestItem = chatItemInstances[0];
+                chatItemInstances.RemoveAt(0);
+                if (oldestItem != null)
+                {
+                    DestroyImmediate(oldestItem);
+                }
             }
         }
 
