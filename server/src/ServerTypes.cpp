@@ -75,6 +75,7 @@ namespace Blokus
                 {"version:check", MessageType::VersionCheck}};
 
             auto it = typeMap.find(clean);
+            spdlog::warn("parseMessageType DEBUG: '{}' -> {}", clean, (it != typeMap.end()) ? "FOUND" : "NOT_FOUND");
             return (it != typeMap.end()) ? it->second : MessageType::Unknown;
         }
 
