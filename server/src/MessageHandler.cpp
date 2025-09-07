@@ -248,6 +248,13 @@ namespace Blokus::Server
             result = authService_->authenticateMobileClient(accessToken);
             spdlog::info("모바일 클라이언트 JWT 인증 시도: {}", accessToken.substr(0, 20) + "...");
         }
+        // 기존 클라이언트 JWT 인증 (JWT)
+        else if (params.size() == 2 && params[0] == "JWT")
+        {
+            std::string jwtToken = params[1];
+            result = authService_->loginWithJwt(jwtToken);
+            spdlog::info("클라이언트 JWT 토큰 인증 시도: {}", jwtToken.substr(0, 20) + "...");
+        }
         // 기존 JWT 토큰인지 확인 (JWT는 '.'로 구분된 3개 부분으로 구성)
         else if (params.size() == 1 && std::count(params[0].begin(), params[0].end(), '.') == 2)
         {

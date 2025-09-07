@@ -38,6 +38,7 @@ namespace Blokus
 
                 // ����
                 {"auth", MessageType::Auth},
+                {"auth_request", MessageType::Auth},  // 모바일 클라이언트 호환
                 {"register", MessageType::Register},
                 {"guest", MessageType::Guest},
                 {"logout", MessageType::Logout},
