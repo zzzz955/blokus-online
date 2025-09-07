@@ -159,9 +159,8 @@ namespace Features.Multi.Net
                 messageHandler = gameObject.AddComponent<MessageHandler>();
             }
             
-            // 토큰 검증 서비스 초기화
-            string authServerUrl = "https://blokus-online.mooo.com"; // TODO: 설정에서 가져오기
-            tokenVerificationService = new TokenVerificationService(authServerUrl);
+            // 토큰 검증 서비스 초기화 (EnvironmentModeManager에서 자동으로 URL 설정)
+            tokenVerificationService = new TokenVerificationService(null);
             
             // 연결 상태 변경 이벤트 구독
             networkClient.OnConnectionChanged += OnConnectionStatusChanged;
@@ -295,7 +294,21 @@ namespace Features.Multi.Net
                 if (verifyResult.Refreshed)
                 {
                     Debug.Log("[NetworkManager] 토큰이 자동으로 갱신되었습니다.");
-                    // TODO: 갱신된 토큰을 저장소에 업데이트
+                    
+                    // 갱신된 토큰을 SecureStorage에 저장
+                    if (!string.IsNullOrEmpty(verifyResult.AccessToken))
+                    {
+                        App.Security.SecureStorage.StoreString(App.Security.TokenKeys.Access, verifyResult.AccessToken);
+                        
+                        // 만료 시간 업데이트 (1분 버퍼 포함)
+                        if (verifyResult.ExpiresIn > 0)
+                        {
+                            var expiryTime = DateTime.UtcNow.AddSeconds(verifyResult.ExpiresIn - 60);
+                            App.Security.SecureStorage.StoreString(App.Security.TokenKeys.Expiry, expiryTime.ToBinary().ToString());
+                        }
+                        
+                        Debug.Log("[NetworkManager] 갱신된 토큰을 SecureStorage에 저장 완료");
+                    }
                 }
 
                 Debug.Log($"[NetworkManager] 토큰 검증 성공 (만료: {verifyResult.ExpiresIn}초 후)");

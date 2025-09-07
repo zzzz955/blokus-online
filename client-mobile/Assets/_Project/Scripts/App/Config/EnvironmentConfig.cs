@@ -7,13 +7,13 @@ namespace App.Config
 {
     /// <summary>
     /// 환경변수 기반 설정 관리
-    /// - 에디터: 기본적으로 프로덕션 서버(HTTPS)로 테스트
+    /// - 에디터: EnvironmentModeManager를 통한 dev/release 모드 분기 처리
     /// - 빌드: StreamingAssets/.env 의 WEB_APP_URL 등을 사용(없으면 프로덕션 기본값)
     /// </summary>
     public static class EnvironmentConfig
     {
         // === 편의 스위치 ===
-        // 에디터에서도 프로덕션 서버로 붙어서 통합 테스트 (권장)
+        // EnvironmentModeManager가 없을 경우 폴백용 설정
         private const bool UseProdServerInEditor = true;
 
         // === 기본값 ===
@@ -118,6 +118,14 @@ namespace App.Config
             get
             {
 #if UNITY_EDITOR
+                // EnvironmentModeManager를 통한 모드 확인
+                var envManager = EnvironmentModeManager.Instance;
+                if (envManager != null)
+                {
+                    return envManager.GetWebServerUrl();
+                }
+                
+                // 폴백: EnvironmentModeManager가 없을 경우 기존 로직 사용
                 return UseProdServerInEditor
                     ? DefaultProdBaseUrl
                     : "http://localhost:3000"; // 필요 시 로컬 웹앱 테스트
@@ -137,15 +145,45 @@ namespace App.Config
         /// <summary>
         /// Single API 서버 베이스 URL
         /// 업스트림이 /api/... 라우트를 쓰므로, 프록시 서브패스 + /api 로 맞춥니다.
-        /// 결과: https://.../single-api/api
+        /// 결과: https://.../single-api/api (release) 또는 http://localhost:8080/api (dev)
         /// </summary>
-        public static string ApiServerUrl => $"{BaseUrl}/single-api/api";
+        public static string ApiServerUrl 
+        {
+            get
+            {
+#if UNITY_EDITOR
+                // EnvironmentModeManager를 통한 모드 확인
+                var envManager = EnvironmentModeManager.Instance;
+                if (envManager != null)
+                {
+                    return envManager.GetApiServerUrl();
+                }
+#endif
+                // 폴백 또는 빌드 환경에서는 기존 로직 사용
+                return $"{BaseUrl}/single-api/api";
+            }
+        }
 
         /// <summary>
         /// OIDC 서버 베이스 URL (서브패스)
-        /// 결과: https://.../oidc
+        /// 결과: https://.../oidc (release) 또는 http://localhost:9000 (dev)
         /// </summary>
-        public static string OidcServerUrl => $"{BaseUrl}/oidc";
+        public static string OidcServerUrl 
+        {
+            get
+            {
+#if UNITY_EDITOR
+                // EnvironmentModeManager를 통한 모드 확인
+                var envManager = EnvironmentModeManager.Instance;
+                if (envManager != null)
+                {
+                    return envManager.GetAuthServerUrl();
+                }
+#endif
+                // 폴백 또는 빌드 환경에서는 기존 로직 사용
+                return $"{BaseUrl}/oidc";
+            }
+        }
 
         /// <summary>
         /// TCP 게임 서버 호스트
@@ -155,6 +193,14 @@ namespace App.Config
             get
             {
 #if UNITY_EDITOR
+                // EnvironmentModeManager를 통한 모드 확인
+                var envManager = EnvironmentModeManager.Instance;
+                if (envManager != null)
+                {
+                    return envManager.GetTcpServerHost();
+                }
+                
+                // 폴백: EnvironmentModeManager가 없을 경우 기존 로직 사용
                 return "localhost"; // 에디터 로컬 테스트
 #else
                 try
@@ -182,6 +228,14 @@ namespace App.Config
             get
             {
 #if UNITY_EDITOR
+                // EnvironmentModeManager를 통한 모드 확인
+                var envManager = EnvironmentModeManager.Instance;
+                if (envManager != null)
+                {
+                    return envManager.GetTcpServerPort();
+                }
+                
+                // 폴백: EnvironmentModeManager가 없을 경우 기존 로직 사용
                 return 9999;
 #else
                 string portStr = GetEnv("SERVER_PORT", "9999");

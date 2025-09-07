@@ -251,15 +251,10 @@ namespace Features.Multi.Core
                 yield break;
             }
 
-            // refreshToken 가져오기 (TCP 소켓 인증에는 refresh token 사용)
-            string refreshToken = GetRefreshTokenFromSession();
+            // accessToken 가져오기 (만료된 경우 자동 갱신됨)
+            string accessToken = GetAccessTokenFromSession();
+            string clientId = "unity-mobile-client"; // OIDC 클라이언트 ID
             
-            if (string.IsNullOrEmpty(refreshToken))
-            {
-                Debug.LogError("[MultiCoreBootstrap] refreshToken을 가져올 수 없음");
-                yield break;
-            }
-
             // NetworkManager 인스턴스 가져오기
             var networkManager = NetworkManager.Instance;
             if (networkManager == null)
@@ -268,32 +263,28 @@ namespace Features.Multi.Core
                 yield break;
             }
 
-            // JWT 로그인 요청
-            bool authResult = false;
-            bool authComplete = false;
+            // 고급 연결/인증 방식 사용 (토큰 자동 갱신 포함)
+            bool connectionResult = false;
+            bool connectionComplete = false;
 
-            networkManager.OnAuthResponse += (success, message) => {
-                authResult = success;
-                authComplete = true;
+            // 비동기 작업을 코루틴에서 처리
+            StartCoroutine(ConnectWithTokenRefreshCoroutine(accessToken, clientId, (success) => {
+                connectionResult = success;
+                connectionComplete = true;
                 isAuthenticated = success;
-                
-                if (debugMode)
-                    Debug.Log($"[MultiCoreBootstrap] 인증 응답: {success}, {message}");
-            };
+            }));
 
-            networkManager.JwtLogin(refreshToken);
-
-            // 인증 완료까지 대기 (최대 5초)
-            float timeout = 5f;
-            while (!authComplete && timeout > 0)
+            // 연결 완료까지 대기 (최대 10초)
+            float timeout = 10f;
+            while (!connectionComplete && timeout > 0)
             {
                 yield return new WaitForSeconds(0.1f);
                 timeout -= 0.1f;
             }
 
-            if (!authComplete || !authResult)
+            if (!connectionComplete || !connectionResult)
             {
-                Debug.LogError("[MultiCoreBootstrap] 사용자 인증 실패");
+                Debug.LogError("[MultiCoreBootstrap] 사용자 인증 실패 (토큰 갱신 포함)");
                 isAuthenticated = false;
                 
                 // 인증 실패 시 MainScene으로 복귀
@@ -362,24 +353,26 @@ namespace Features.Multi.Core
         // Utility Methods
         // ========================================
 
-        private string GetRefreshTokenFromSession()
+        private string GetAccessTokenFromSession()
         {
             if (SessionManager.Instance != null && SessionManager.Instance.IsLoggedIn)
             {
-                // OidcAuthenticator를 통해 refreshToken 가져오기 (TCP 소켓 인증에는 refresh token이 더 적합)
+                // OidcAuthenticator를 통해 accessToken 가져오기 (만료된 토큰도 갱신을 위해 전달)
                 var oidcAuthenticator = FindObjectOfType<App.Network.OidcAuthenticator>();
                 if (oidcAuthenticator != null)
                 {
-                    string refreshToken = oidcAuthenticator.GetRefreshToken();
-                    if (!string.IsNullOrEmpty(refreshToken))
+                    // 만료 여부에 상관없이 저장된 토큰을 가져옴 (ConnectToMultiplayerAsync에서 갱신 처리)
+                    string storedToken = App.Security.SecureStorage.GetString("oidc_access_token", "");
+                    
+                    if (!string.IsNullOrEmpty(storedToken))
                     {
                         if (debugMode)
-                            Debug.Log("[MultiCoreBootstrap] RefreshToken 획득 성공");
-                        return refreshToken;
+                            Debug.Log("[MultiCoreBootstrap] AccessToken 획득 (만료 여부는 ConnectToMultiplayerAsync에서 처리)");
+                        return storedToken;
                     }
                     else
                     {
-                        Debug.LogWarning("[MultiCoreBootstrap] RefreshToken이 비어있거나 만료되었습니다.");
+                        Debug.LogWarning("[MultiCoreBootstrap] 저장된 AccessToken이 없습니다.");
                     }
                 }
                 else
@@ -393,6 +386,41 @@ namespace Features.Multi.Core
             }
             
             return null;
+        }
+
+        /// <summary>
+        /// 토큰 자동 갱신을 포함한 연결/인증 코루틴
+        /// </summary>
+        private IEnumerator ConnectWithTokenRefreshCoroutine(string accessToken, string clientId, System.Action<bool> onComplete)
+        {
+            var networkManager = NetworkManager.Instance;
+            
+            if (debugMode)
+                Debug.Log("[MultiCoreBootstrap] 토큰 갱신 포함 연결 시작...");
+
+            // Unity의 Task를 코루틴으로 변환
+            var connectTask = networkManager.ConnectToMultiplayerAsync(accessToken, clientId);
+            
+            // Task 완료까지 대기
+            while (!connectTask.IsCompleted)
+            {
+                yield return new WaitForSeconds(0.1f);
+            }
+
+            // 결과 처리
+            bool success = false;
+            if (connectTask.IsFaulted)
+            {
+                Debug.LogError($"[MultiCoreBootstrap] 연결 중 예외 발생: {connectTask.Exception?.GetBaseException()?.Message}");
+            }
+            else
+            {
+                success = connectTask.Result;
+                if (debugMode)
+                    Debug.Log($"[MultiCoreBootstrap] 연결 결과: {success}");
+            }
+
+            onComplete?.Invoke(success);
         }
 
         /// <summary>
