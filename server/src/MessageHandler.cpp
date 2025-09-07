@@ -171,37 +171,14 @@ namespace Blokus::Server
             commandStr = commandStr.substr(3);
             spdlog::warn("DEBUG: UTF-8 BOM removed from commandStr");
         }
-        
-        // 강화된 trim 처리 - 모든 제어 문자와 공백 제거
-        commandStr.erase(0, commandStr.find_first_not_of(" \t\r\n\v\f\0"));
-        commandStr.erase(commandStr.find_last_not_of(" \t\r\n\v\f\0") + 1);
-        
-        // 추가 안전장치: ASCII 제어 문자(0-31) 모두 제거
-        commandStr.erase(std::remove_if(commandStr.begin(), commandStr.end(), 
-            [](unsigned char c) { return c < 32; }), commandStr.end());
-        
-        spdlog::warn("DEBUG: parts.size()={}, commandStr='{}' (len={})", parts.size(), commandStr, commandStr.length());
-        
-        // 각 바이트 값 출력
-        std::string hexDump = "";
-        for(size_t i = 0; i < commandStr.length(); ++i) {
-            char buffer[10];
-            sprintf(buffer, "%02X ", (unsigned char)commandStr[i]);
-            hexDump += buffer;
-        }
-        spdlog::warn("DEBUG: commandStr hex bytes: [{}]", hexDump);
 
         // room:xxx, game:xxx 형태 처리
         if (parts.size() >= 2)
         {
-            spdlog::warn("DEBUG: commandStr='{}', parts[1]='{}', checking composite...", commandStr, parts[1]);
-            bool isAuthMatch = (commandStr == "auth");
-            spdlog::warn("DEBUG: (commandStr == \"auth\") = {}", isAuthMatch);
             
             if (commandStr == "room" || commandStr == "game" || commandStr == "lobby" || commandStr == "user" || commandStr == "version" || commandStr == "auth")
             {
                 commandStr += ":" + parts[1];
-                spdlog::warn("DEBUG: Composite command created: '{}'", commandStr);
                 // 파라미터는 2번째 인덱스부터
                 std::vector<std::string> params(parts.begin() + 2, parts.end());
                 return {parseMessageType(commandStr), params};
