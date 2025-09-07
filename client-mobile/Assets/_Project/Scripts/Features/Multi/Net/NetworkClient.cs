@@ -436,7 +436,7 @@ namespace Features.Multi.Net
         /// </summary>
         public bool SendJwtLoginRequest(string token)
         {
-            return SendProtocolMessage("AUTH", "JWT", token);
+            return SendProtocolMessage("auth", "jwt", token);
         }
         
         /// <summary>
@@ -444,7 +444,7 @@ namespace Features.Multi.Net
         /// </summary>
         public bool SendLoginRequest(string username, string password)
         {
-            return SendProtocolMessage("AUTH", "LOGIN", username, password);
+            return SendProtocolMessage("auth", "login", username, password);
         }
         
         /// <summary>
@@ -452,7 +452,7 @@ namespace Features.Multi.Net
         /// </summary>
         public bool SendRegisterRequest(string username, string password)
         {
-            return SendProtocolMessage("AUTH", "REGISTER", username, password);
+            return SendProtocolMessage("auth", "register", username, password);
         }
         
         /// <summary>
@@ -461,7 +461,7 @@ namespace Features.Multi.Net
         public bool SendGuestLoginRequest()
         {
             string guestName = $"Guest_{UnityEngine.Random.Range(1000, 9999)}";
-            return SendProtocolMessage("AUTH", "GUEST", guestName);
+            return SendProtocolMessage("auth", "guest", guestName);
         }
         
         /// <summary>

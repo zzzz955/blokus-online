@@ -350,7 +350,7 @@ namespace Features.Multi.Net
             }
             
             // 모바일 클라이언트 전용 인증 요청 (기존 JWT 메시지와 구분)
-            return networkClient.SendProtocolMessage("AUTH", "MOBILE_JWT", validatedToken);
+            return networkClient.SendProtocolMessage("auth", "mobile_jwt", validatedToken);
         }
 
         /// <summary>
