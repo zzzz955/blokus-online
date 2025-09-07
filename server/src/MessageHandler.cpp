@@ -161,13 +161,17 @@ namespace Blokus::Server
 
         // 첫 번째 부분으로 MessageType 결정
         std::string commandStr = parts[0];
+        
+        spdlog::warn("DEBUG: parts.size()={}, commandStr='{}'", parts.size(), commandStr);
 
         // room:xxx, game:xxx 형태 처리
         if (parts.size() >= 2)
         {
+            spdlog::warn("DEBUG: Checking composite command for '{}'", commandStr);
             if (commandStr == "room" || commandStr == "game" || commandStr == "lobby" || commandStr == "user" || commandStr == "version" || commandStr == "auth")
             {
                 commandStr += ":" + parts[1];
+                spdlog::warn("DEBUG: Composite command created: '{}'", commandStr);
                 // 파라미터는 2번째 인덱스부터
                 std::vector<std::string> params(parts.begin() + 2, parts.end());
                 return {parseMessageType(commandStr), params};
