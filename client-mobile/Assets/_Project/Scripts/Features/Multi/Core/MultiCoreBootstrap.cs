@@ -15,8 +15,9 @@ namespace Features.Multi.Core
     public class MultiCoreBootstrap : MonoBehaviour
     {
         [Header("Managers")]
-        [SerializeField] private NetworkManager networkManager;
         [SerializeField] private MultiUserDataCache multiUserDataCache;
+        
+        // NetworkManager는 DontDestroyOnLoad로 인해 Instance를 통해 접근
         
         [Header("Loading UI")]
         [SerializeField] private LoadingOverlay loadingOverlay;
@@ -53,6 +54,9 @@ namespace Features.Multi.Core
             if (debugMode)
                 Debug.Log("[MultiCoreBootstrap] Start - Starting multicore initialization");
 
+            // Audio Listener 중복 문제 해결
+            Utilities.AudioListenerManager.FixDuplicateAudioListeners();
+
             ShowLoadingUI();
             InitializeManagers();
             StartCoroutine(InitializeMulticoreDataCoroutine());
@@ -73,19 +77,20 @@ namespace Features.Multi.Core
 
         private void FindManagers()
         {
-            if (networkManager == null)
-                networkManager = FindObjectOfType<NetworkManager>();
-
             if (multiUserDataCache == null)
                 multiUserDataCache = FindObjectOfType<MultiUserDataCache>();
 
             if (loadingOverlay == null)
                 loadingOverlay = FindObjectOfType<LoadingOverlay>();
 
-            // Validate required managers
-            if (networkManager == null)
+            // NetworkManager는 Instance를 통해 접근하므로 별도 검증
+            if (NetworkManager.Instance == null)
             {
-                Debug.LogError("[MultiCoreBootstrap] NetworkManager not found in scene!", this);
+                Debug.LogError("[MultiCoreBootstrap] NetworkManager Instance not found!", this);
+            }
+            else if (debugMode)
+            {
+                Debug.Log("[MultiCoreBootstrap] NetworkManager Instance found successfully");
             }
         }
 
@@ -105,9 +110,9 @@ namespace Features.Multi.Core
                 Debug.Log("[MultiCoreBootstrap] Initializing managers...");
 
             // NetworkManager 초기화
-            if (networkManager != null)
+            if (NetworkManager.Instance != null)
             {
-                networkManager.Initialize();
+                NetworkManager.Instance.Initialize();
                 if (debugMode)
                     Debug.Log("[MultiCoreBootstrap] NetworkManager initialized");
             }
@@ -126,8 +131,8 @@ namespace Features.Multi.Core
             if (debugMode)
                 Debug.Log("[MultiCoreBootstrap] Cleaning up managers...");
 
-            if (networkManager != null)
-                networkManager.Cleanup();
+            if (NetworkManager.Instance != null)
+                NetworkManager.Instance.Cleanup();
 
             if (multiUserDataCache != null)
                 multiUserDataCache.Cleanup();
@@ -172,14 +177,17 @@ namespace Features.Multi.Core
 
         private IEnumerator ConnectToTcpServerCoroutine()
         {
-            if (networkManager == null)
+            if (NetworkManager.Instance == null)
             {
-                Debug.LogError("[MultiCoreBootstrap] NetworkManager가 없습니다.");
+                Debug.LogError("[MultiCoreBootstrap] NetworkManager Instance가 없습니다.");
                 yield break;
             }
 
-            if (loadingOverlay != null)
-                LoadingOverlay.Show("TCP 서버 연결 중...");
+            var networkManager = NetworkManager.Instance;
+
+            // LoadingOverlay 표시 (정적 메소드 사용)
+            LoadingOverlay.Show("TCP 서버 연결 중...");
+            Debug.Log("[MultiCoreBootstrap] LoadingOverlay 표시됨");
 
             // 서버 연결 시도
             bool connectionResult = false;
@@ -189,8 +197,23 @@ namespace Features.Multi.Core
                 connectionResult = connected;
                 connectionComplete = true;
                 isNetworkConnected = connected;
+                Debug.Log($"[MultiCoreBootstrap] 연결 상태 변경: {connected}");
             };
 
+            Debug.Log($"[MultiCoreBootstrap] 서버 연결 시도: {networkManager.GetStatusInfo()}");
+            
+            // NetworkSetup에서 설정된 서버 정보 재확인 및 동기화
+            var networkSetup = FindObjectOfType<NetworkSetup>();
+            if (networkSetup != null)
+            {
+                Debug.Log("[MultiCoreBootstrap] NetworkSetup 발견 - 서버 정보 동기화 확인");
+                // NetworkSetup이 이미 서버 정보를 설정했을 것임
+            }
+            else
+            {
+                Debug.LogWarning("[MultiCoreBootstrap] NetworkSetup이 없음 - 기본 서버 정보 사용");
+            }
+            
             networkManager.ConnectToServer();
 
             // 연결 완료까지 대기 (최대 10초)
@@ -228,12 +251,20 @@ namespace Features.Multi.Core
                 yield break;
             }
 
-            // refreshToken 가져오기 (실제 구현은 SessionManager API 확인 필요)
+            // refreshToken 가져오기 (TCP 소켓 인증에는 refresh token 사용)
             string refreshToken = GetRefreshTokenFromSession();
             
             if (string.IsNullOrEmpty(refreshToken))
             {
                 Debug.LogError("[MultiCoreBootstrap] refreshToken을 가져올 수 없음");
+                yield break;
+            }
+
+            // NetworkManager 인스턴스 가져오기
+            var networkManager = NetworkManager.Instance;
+            if (networkManager == null)
+            {
+                Debug.LogError("[MultiCoreBootstrap] NetworkManager Instance가 없습니다.");
                 yield break;
             }
 
@@ -277,8 +308,7 @@ namespace Features.Multi.Core
 
         private IEnumerator LoadMultiplayerDataCoroutine()
         {
-            if (loadingOverlay != null)
-                LoadingOverlay.Show("멀티플레이 데이터 로딩 중...");
+            LoadingOverlay.Show("멀티플레이 데이터 로딩 중...");
 
             // 멀티플레이 전용 데이터 로딩 (사용자 통계, 랭킹 등)
             // TODO: 실제 구현 시 필요한 데이터들 로딩
@@ -301,8 +331,17 @@ namespace Features.Multi.Core
 
             OnDataLoadingComplete?.Invoke();
 
-            // MultiGameplayScene으로 전환
-            TransitionToGameplayScene();
+            // 서버 연결과 인증이 모두 성공했을 때만 MultiGameplayScene으로 전환
+            if (isNetworkConnected && isAuthenticated)
+            {
+                TransitionToGameplayScene();
+            }
+            else
+            {
+                string errorMessage = "데이터 로딩이 완료되었으나 서버 연결 또는 인증에 실패했습니다.";
+                Debug.LogError($"[MultiCoreBootstrap] {errorMessage}");
+                HandleConnectionFailure(errorMessage);
+            }
         }
 
         private void TransitionToGameplayScene()
@@ -327,14 +366,30 @@ namespace Features.Multi.Core
         {
             if (SessionManager.Instance != null && SessionManager.Instance.IsLoggedIn)
             {
-                // OidcAuthenticator를 통해 실제 refreshToken 가져오기
+                // OidcAuthenticator를 통해 refreshToken 가져오기 (TCP 소켓 인증에는 refresh token이 더 적합)
                 var oidcAuthenticator = FindObjectOfType<App.Network.OidcAuthenticator>();
                 if (oidcAuthenticator != null)
                 {
-                    return oidcAuthenticator.GetRefreshToken();
+                    string refreshToken = oidcAuthenticator.GetRefreshToken();
+                    if (!string.IsNullOrEmpty(refreshToken))
+                    {
+                        if (debugMode)
+                            Debug.Log("[MultiCoreBootstrap] RefreshToken 획득 성공");
+                        return refreshToken;
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[MultiCoreBootstrap] RefreshToken이 비어있거나 만료되었습니다.");
+                    }
                 }
-                
-                Debug.LogWarning("[MultiCoreBootstrap] OidcAuthenticator를 찾을 수 없습니다.");
+                else
+                {
+                    Debug.LogWarning("[MultiCoreBootstrap] OidcAuthenticator를 찾을 수 없습니다.");
+                }
+            }
+            else
+            {
+                Debug.LogWarning("[MultiCoreBootstrap] SessionManager가 로그인 상태가 아닙니다.");
             }
             
             return null;
@@ -408,7 +463,7 @@ namespace Features.Multi.Core
 
         public NetworkManager GetNetworkManager()
         {
-            return networkManager;
+            return NetworkManager.Instance;
         }
     }
 }

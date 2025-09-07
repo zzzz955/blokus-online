@@ -505,7 +505,19 @@ namespace App.UI
 
         public void OnMultiModeSelected()
         {
-            ShowPanel(UIState.Lobby);
+            Debug.Log("[UIManager] OnMultiModeSelected() 호출됨");
+            
+            // 멀티플레이 모드 선택 시 MultiCore 씬으로 전환
+            if (App.Core.SceneFlowController.Instance != null)
+            {
+                Debug.Log("[UIManager] SceneFlowController로 멀티플레이 모드 진입");
+                App.Core.SceneFlowController.Instance.StartGoMulti();
+            }
+            else
+            {
+                Debug.LogError("[UIManager] SceneFlowController.Instance가 null입니다!");
+                SystemMessageManager.ShowToast("멀티플레이 화면을 로드할 수 없습니다.", MessagePriority.Error);
+            }
         }
 
         /// <summary>

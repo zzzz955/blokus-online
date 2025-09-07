@@ -21,7 +21,7 @@ namespace Features.Multi.Net
         [Header("서버 연결 설정")]
         [SerializeField] private string serverHost = "localhost";
         [SerializeField] private int serverPort = 9999;
-        [SerializeField] private int connectionTimeoutMs = 5000;
+        [SerializeField] private int connectionTimeoutMs = 15000; // 15초로 증가
         
         // 연결 상태
         private TcpClient tcpClient;
@@ -154,16 +154,30 @@ namespace Features.Multi.Net
             {
                 Debug.Log($"[NetworkClient] 서버 연결 시도: {serverHost}:{serverPort}");
                 
+                // 모바일 플랫폼에서 네트워크 상태 확인
+                if (Application.isMobilePlatform)
+                {
+                    if (Application.internetReachability == NetworkReachability.NotReachable)
+                    {
+                        throw new System.Exception("인터넷 연결이 없습니다. 네트워크를 확인해주세요.");
+                    }
+                    Debug.Log($"[NetworkClient] 모바일 네트워크 상태: {Application.internetReachability}");
+                }
+                
                 tcpClient = new TcpClient();
                 cancellationTokenSource = new CancellationTokenSource();
                 
+                // 모바일에서 연결 타임아웃 더 길게 설정
+                int actualTimeout = Application.isMobilePlatform ? connectionTimeoutMs * 2 : connectionTimeoutMs;
+                Debug.Log($"[NetworkClient] 연결 타임아웃: {actualTimeout}ms (모바일: {Application.isMobilePlatform})");
+                
                 // 연결 타임아웃 설정
                 var connectTask = tcpClient.ConnectAsync(serverHost, serverPort);
-                var timeoutTask = Task.Delay(connectionTimeoutMs);
+                var timeoutTask = Task.Delay(actualTimeout);
                 
                 if (await Task.WhenAny(connectTask, timeoutTask) == timeoutTask)
                 {
-                    throw new TimeoutException($"서버 연결 타임아웃 ({connectionTimeoutMs}ms)");
+                    throw new TimeoutException($"서버 연결 타임아웃 ({actualTimeout}ms)");
                 }
                 
                 await connectTask; // 실제 연결 완료 확인

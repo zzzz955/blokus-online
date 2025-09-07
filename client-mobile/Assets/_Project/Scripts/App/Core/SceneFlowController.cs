@@ -39,6 +39,9 @@ namespace App.Core
         }
 
         public static AutoLoginState CurrentAutoLoginState { get; private set; } = AutoLoginState.NotChecked;
+        
+        // 중복 실행 방지 플래그
+        private static bool isGoMultiInProgress = false;
 
         void Awake()
         {
@@ -752,7 +755,30 @@ namespace App.Core
         /// </summary>
         public void StartGoMulti()
         {
-            StartCoroutine(GoMulti());
+            if (isGoMultiInProgress)
+            {
+                if (debugMode)
+                    Debug.LogWarning("[SceneFlowController] GoMulti already in progress, ignoring duplicate call");
+                return;
+            }
+            
+            StartCoroutine(GoMultiWithFlag());
+        }
+        
+        /// <summary>
+        /// GoMulti wrapper with progress flag management
+        /// </summary>
+        private System.Collections.IEnumerator GoMultiWithFlag()
+        {
+            isGoMultiInProgress = true;
+            try
+            {
+                yield return StartCoroutine(GoMulti());
+            }
+            finally
+            {
+                isGoMultiInProgress = false;
+            }
         }
 
         /// <summary>

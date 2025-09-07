@@ -909,7 +909,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2a94ebdce554095499af4b1c64f8bb4d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  serverHost: https://blokus-online.mooo.com
+  serverHost: blokus-online.mooo.com
   serverPort: 9999
   connectOnStart: 0
   enableDebugLogs: 1

@@ -10,8 +10,8 @@ namespace Features.Multi.Net
     public class NetworkSetup : MonoBehaviour
     {
         [Header("서버 연결 설정")]
-        [SerializeField] private string serverHost = "127.0.0.1";
-        [SerializeField] private int serverPort = 12345;
+        [SerializeField] private string serverHost = "blokus-online.mooo.com";
+        [SerializeField] private int serverPort = 9999;
         [SerializeField] private bool connectOnStart = false;
         
         [Header("디버그")]
@@ -134,6 +134,23 @@ namespace Features.Multi.Net
             {
                 Debug.Log($"[NetworkSetup] {NetworkManager.Instance.GetStatusInfo()}");
                 Debug.Log($"[NetworkSetup] {NetworkManager.Instance.GetNetworkStats()}");
+            }
+        }
+        
+        [ContextMenu("서버 연결 진단 실행")]
+        private async void RunConnectionDiagnostics()
+        {
+            Debug.Log("[NetworkSetup] 서버 연결 진단 시작...");
+            
+            bool result = await NetworkDiagnostics.DiagnoseConnection(serverHost, serverPort);
+            
+            if (result)
+            {
+                Debug.Log("[NetworkSetup] ✅ 서버 연결 진단 성공! 연결 시도를 진행하세요.");
+            }
+            else
+            {
+                Debug.LogError("[NetworkSetup] ❌ 서버 연결 진단 실패! 네트워크나 서버 상태를 확인하세요.");
             }
         }
     }

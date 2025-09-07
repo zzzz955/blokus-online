@@ -4395,8 +4395,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3fa3431777c5f494bb131095c2db4087, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  lobbyPanel: {fileID: 0}
-  gameRoomPanel: {fileID: 0}
+  lobbyPanel: {fileID: 1927599814}
+  gameRoomPanel: {fileID: 1822165762}
   debugMode: 1
 --- !u!4 &639974923
 Transform:

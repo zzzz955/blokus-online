@@ -71,11 +71,11 @@ namespace Features.Multi.UI
         }
         
         /// <summary>
-        /// 멀티플레이어 버튼 클릭 처리 - refreshToken 기반
+        /// 멀티플레이어 버튼 클릭 처리 - UIManager로 위임
         /// </summary>
         private void OnMultiplayerButtonClicked()
         {
-            Debug.Log("[MultiplayerMenuController] 멀티플레이어 버튼 클릭");
+            Debug.Log("[MultiplayerMenuController] 멀티플레이어 버튼 클릭 - UIManager로 위임");
             
             // SessionManager 로그인 상태 확인
             if (SessionManager.Instance == null || !SessionManager.Instance.IsLoggedIn)
@@ -84,7 +84,7 @@ namespace Features.Multi.UI
                 return;
             }
             
-            // refreshToken 유효성 확인
+            // refreshToken 유효성 확인 (TCP 소켓 인증에는 refresh token 사용)
             string refreshToken = GetRefreshTokenFromSession();
             if (string.IsNullOrEmpty(refreshToken))
             {
@@ -92,8 +92,16 @@ namespace Features.Multi.UI
                 return;
             }
             
-            // MultiCore 씬으로 전환 (네트워크 연결 및 인증은 MultiCore에서 처리)
-            LoadMultiCoreScene();
+            // UIManager의 멀티플레이 모드 선택으로 위임 (중복 실행 방지)
+            var uiManager = UIManager.GetInstance();
+            if (uiManager != null)
+            {
+                uiManager.OnMultiModeSelected();
+            }
+            else
+            {
+                ShowError("UI 관리자를 찾을 수 없습니다.");
+            }
         }
         
         /// <summary>
