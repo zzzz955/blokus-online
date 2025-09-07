@@ -312,6 +312,48 @@ namespace Features.Multi.Net
         }
         
         /// <summary>
+        /// 깨끗한 TCP 메시지 전송 (불필요한 제어 문자 없이)
+        /// </summary>
+        public bool SendCleanTCPMessage(string messageType, params string[] parameters)
+        {
+            if (!isConnected || streamWriter == null)
+            {
+                Debug.LogWarning("[NetworkClient] 서버에 연결되지 않음");
+                return false;
+            }
+            
+            try
+            {
+                List<string> messageParts = new List<string> { messageType };
+                messageParts.AddRange(parameters);
+                
+                string message = string.Join(":", messageParts);
+                
+                // WriteLine 대신 Write + 단일 \n 사용 (불필요한 \r 제거)
+                streamWriter.Write(message + "\n");
+                streamWriter.Flush(); // 즉시 전송 보장
+                
+                Debug.Log($"[NetworkClient] 깨끗한 메시지 전송: {message}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[NetworkClient] 깨끗한 메시지 전송 실패: {ex.Message}");
+                
+                // 메인스레드에서 에러 이벤트 발생
+                UnityMainThreadDispatcher.Enqueue(() => OnError?.Invoke($"전송 실패: {ex.Message}"));
+                
+                // 연결 상태 확인 및 재연결 시도
+                if (!IsSocketConnected())
+                {
+                    _ = ReconnectAsync();
+                }
+                
+                return false;
+            }
+        }
+        
+        /// <summary>
         /// 메시지 수신 스레드
         /// </summary>
         private void ReceiveMessagesThread()
@@ -436,7 +478,7 @@ namespace Features.Multi.Net
         /// </summary>
         public bool SendJwtLoginRequest(string token)
         {
-            return SendProtocolMessage("auth", "jwt", token);
+            return SendCleanTCPMessage("auth", "jwt", token);
         }
         
         /// <summary>
