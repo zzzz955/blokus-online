@@ -162,23 +162,13 @@ namespace Blokus::Server
         // 첫 번째 부분으로 MessageType 결정
         std::string commandStr = parts[0];
         
-        // 강화된 trim 처리 - 모든 제어 문자와 공백 제거
-        commandStr.erase(0, commandStr.find_first_not_of(" \t\r\n\v\f\0"));
-        commandStr.erase(commandStr.find_last_not_of(" \t\r\n\v\f\0") + 1);
-        
-        // 추가 안전장치: ASCII 제어 문자(0-31) 모두 제거
-        commandStr.erase(std::remove_if(commandStr.begin(), commandStr.end(), 
-            [](unsigned char c) { return c < 32; }), commandStr.end());
-        
-        spdlog::warn("DEBUG: parts.size()={}, commandStr='{}' (len={})", parts.size(), commandStr, commandStr.length());
+        // 기본 trim 처리 (클라이언트가 깨끗한 메시지를 보내므로 최소한만 처리)
+        commandStr.erase(0, commandStr.find_first_not_of(" \t\r\n"));
+        commandStr.erase(commandStr.find_last_not_of(" \t\r\n") + 1);
 
         // room:xxx, game:xxx 형태 처리
         if (parts.size() >= 2)
         {
-            spdlog::warn("DEBUG: Checking composite command for '{}'", commandStr);
-            bool isAuth = (commandStr == "auth");
-            spdlog::warn("DEBUG: commandStr == 'auth' ? {}", isAuth);
-            
             if (commandStr == "room" || commandStr == "game" || commandStr == "lobby" || commandStr == "user" || commandStr == "version" || commandStr == "auth")
             {
                 commandStr += ":" + parts[1];
@@ -250,21 +240,21 @@ namespace Blokus::Server
 
         if (params.size() < 1)
         {
-            sendError("사용법: auth:사용자명:비밀번호 또는 auth:JWT_토큰");
+            sendError("사용법: auth:사용자명:비밀번호 또는 auth:jwt:토큰");
             return;
         }
 
         AuthResult result;
 
-        // 모바일 클라이언트 전용 JWT 인증 (MOBILE_JWT)
-        if (params.size() == 2 && params[0] == "MOBILE_JWT")
+        // 모바일 클라이언트 전용 JWT 인증 (mobile_jwt)  
+        if (params.size() == 2 && params[0] == "mobile_jwt")
         {
             std::string accessToken = params[1];
             result = authService_->authenticateMobileClient(accessToken);
             spdlog::info("모바일 클라이언트 JWT 인증 시도: {}", accessToken.substr(0, 20) + "...");
         }
-        // 기존 클라이언트 JWT 인증 (JWT)
-        else if (params.size() == 2 && params[0] == "JWT")
+        // 표준 JWT 인증 (jwt) - 모바일 및 기존 클라이언트 공통
+        else if (params.size() == 2 && params[0] == "jwt")
         {
             std::string jwtToken = params[1];
             result = authService_->loginWithJwt(jwtToken);
@@ -278,7 +268,7 @@ namespace Blokus::Server
             result = authService_->loginWithJwt(jwtToken);
             spdlog::info("데스크톱 클라이언트 JWT 토큰 인증 시도: {}", jwtToken.substr(0, 20) + "...");
         }
-        else if (params.size() >= 2 && params[0] != "MOBILE_JWT")
+        else if (params.size() >= 2 && params[0] != "mobile_jwt" && params[0] != "jwt")
         {
             // 기존 username/password 인증
             std::string username = params[0];
@@ -288,7 +278,7 @@ namespace Blokus::Server
         }
         else
         {
-            sendError("사용법: auth:사용자명:비밀번호, auth:JWT_토큰, 또는 auth:MOBILE_JWT:access_token");
+            sendError("사용법: auth:사용자명:비밀번호, auth:jwt:토큰, 또는 auth:mobile_jwt:access_token");
             return;
         }
 
