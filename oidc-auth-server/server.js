@@ -22,6 +22,7 @@ const oauthRoutes = require('./routes/oauth')
 const manualAuthRoutes = require('./routes/manual-auth')
 const directAuthRoutes = require('./routes/direct-auth')
 const unityEditorCallbackRoutes = require('./routes/unity-editor-callback')
+const mobileAuthRoutes = require('./routes/mobile-auth')
 
 const app = express()
 const PORT = env.PORT
@@ -144,6 +145,9 @@ app.use('/api/auth', directAuthRoutes)
 
 // Mount Unity Editor Callback routes
 app.use('/unity-editor-callback', unityEditorCallbackRoutes)
+
+// Mount Mobile Auth routes
+app.use('/auth/mobile', mobileAuthRoutes)
 
 // 404 handler
 app.use('*', (req, res) => {

@@ -197,8 +197,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   autoConnectOnStart: 0
   autoReconnect: 1
-  reconnectDelay: 3
-  maxReconnectAttempts: 5
+  reconnectDelay: 1
+  maxReconnectAttempts: 3
   enableHeartbeat: 1
   heartbeatInterval: 30
 --- !u!4 &372329648
@@ -289,7 +289,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c5adce273b7e98041b66381ca5ebd9b8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  networkManager: {fileID: 372329647}
   multiUserDataCache: {fileID: 2106719736}
   loadingOverlay: {fileID: 0}
   debugMode: 1

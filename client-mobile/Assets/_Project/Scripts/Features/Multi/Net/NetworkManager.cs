@@ -1,7 +1,10 @@
+using System;
 using System.Collections;
+using System.Threading.Tasks;
 using UnityEngine;
 using Shared.Models;
 using Features.Multi.Net;
+using App.Network;
 using MultiModels = Features.Multi.Models;
 
 namespace Features.Multi.Net
@@ -15,8 +18,8 @@ namespace Features.Multi.Net
         [Header("자동 연결 설정")]
         [SerializeField] private bool autoConnectOnStart = false;
         [SerializeField] private bool autoReconnect = true;
-        [SerializeField] private float reconnectDelay = 3.0f;
-        [SerializeField] private int maxReconnectAttempts = 5;
+        [SerializeField] private float reconnectDelay = 1f;
+        [SerializeField] private int maxReconnectAttempts = 3;
         
         [Header("하트비트 설정")]
         [SerializeField] private bool enableHeartbeat = true;
@@ -25,6 +28,7 @@ namespace Features.Multi.Net
         // 컴포넌트 참조
         private NetworkClient networkClient;
         private MessageHandler messageHandler;
+        private TokenVerificationService tokenVerificationService;
         
         // 상태 관리
         private bool isInitialized;
@@ -155,12 +159,16 @@ namespace Features.Multi.Net
                 messageHandler = gameObject.AddComponent<MessageHandler>();
             }
             
+            // 토큰 검증 서비스 초기화
+            string authServerUrl = "https://blokus-online.mooo.com"; // TODO: 설정에서 가져오기
+            tokenVerificationService = new TokenVerificationService(authServerUrl);
+            
             // 연결 상태 변경 이벤트 구독
             networkClient.OnConnectionChanged += OnConnectionStatusChanged;
             networkClient.OnError += OnNetworkError;
             
             isInitialized = true;
-            Debug.Log("[NetworkManager] 초기화 완료");
+            Debug.Log("[NetworkManager] 초기화 완료 (토큰 검증 서비스 포함)");
         }
         
         // ========================================
@@ -226,7 +234,7 @@ namespace Features.Multi.Net
         // ========================================
         
         /// <summary>
-        /// JWT 로그인 요청
+        /// JWT 로그인 요청 (기존 - 호환성 유지)
         /// </summary>
         public bool JwtLogin(string token)
         {
@@ -237,6 +245,120 @@ namespace Features.Multi.Net
             }
             
             return networkClient.SendJwtLoginRequest(token);
+        }
+
+        /// <summary>
+        /// 모바일 클라이언트용 개선된 연결 및 인증
+        /// 사전 토큰 검증 → TCP 연결 → 간소화 인증 플로우
+        /// </summary>
+        /// <param name="currentAccessToken">현재 Access Token</param>
+        /// <param name="clientId">OIDC 클라이언트 ID</param>
+        /// <returns>연결 및 인증 성공 여부</returns>
+        public async Task<bool> ConnectToMultiplayerAsync(string currentAccessToken, string clientId)
+        {
+            try
+            {
+                if (!isInitialized)
+                {
+                    Debug.LogError("[NetworkManager] NetworkManager가 초기화되지 않았습니다.");
+                    return false;
+                }
+
+                if (string.IsNullOrEmpty(currentAccessToken))
+                {
+                    Debug.LogError("[NetworkManager] Access Token이 필요합니다.");
+                    return false;
+                }
+
+                if (string.IsNullOrEmpty(clientId))
+                {
+                    Debug.LogError("[NetworkManager] Client ID가 필요합니다.");
+                    return false;
+                }
+
+                Debug.Log("[NetworkManager] 모바일 멀티플레이어 연결 시작...");
+
+                // Step 1: 토큰 사전 검증 및 갱신
+                Debug.Log("[NetworkManager] Step 1: 토큰 사전 검증 중...");
+                var verifyResult = await tokenVerificationService.VerifyTokenForTcpConnection(currentAccessToken, clientId);
+                
+                if (!verifyResult.Valid)
+                {
+                    Debug.LogError($"[NetworkManager] 토큰 검증 실패: {verifyResult.GetUserFriendlyMessage()}");
+                    OnNetworkError($"인증 실패: {verifyResult.GetUserFriendlyMessage()}");
+                    return false;
+                }
+
+                // 갱신된 토큰이 있으면 사용
+                string validToken = verifyResult.AccessToken ?? currentAccessToken;
+                
+                if (verifyResult.Refreshed)
+                {
+                    Debug.Log("[NetworkManager] 토큰이 자동으로 갱신되었습니다.");
+                    // TODO: 갱신된 토큰을 저장소에 업데이트
+                }
+
+                Debug.Log($"[NetworkManager] 토큰 검증 성공 (만료: {verifyResult.ExpiresIn}초 후)");
+
+                // Step 2: TCP 서버 연결
+                Debug.Log("[NetworkManager] Step 2: TCP 서버 연결 중...");
+                bool connected = await networkClient.ConnectToServerAsync();
+                
+                if (!connected)
+                {
+                    Debug.LogError("[NetworkManager] TCP 서버 연결 실패");
+                    OnNetworkError("서버 연결에 실패했습니다.");
+                    return false;
+                }
+
+                Debug.Log("[NetworkManager] TCP 서버 연결 성공");
+
+                // Step 3: 모바일 클라이언트 인증 (간소화된 JWT 전송)
+                Debug.Log("[NetworkManager] Step 3: 모바일 클라이언트 인증 중...");
+                bool authSuccess = SendMobileJwtLogin(validToken);
+                
+                if (!authSuccess)
+                {
+                    Debug.LogError("[NetworkManager] 모바일 클라이언트 인증 실패");
+                    DisconnectFromServer();
+                    OnNetworkError("인증 요청 전송에 실패했습니다.");
+                    return false;
+                }
+
+                Debug.Log("[NetworkManager] 모바일 멀티플레이어 연결 완료!");
+                return true;
+
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[NetworkManager] 모바일 연결 중 예외 발생: {ex.Message}");
+                DisconnectFromServer();
+                OnNetworkError($"연결 중 오류가 발생했습니다: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 모바일 클라이언트 전용 JWT 로그인 (TCP 서버 간소화 인증)
+        /// </summary>
+        private bool SendMobileJwtLogin(string validatedToken)
+        {
+            if (!IsConnected())
+            {
+                Debug.LogWarning("[NetworkManager] TCP 서버에 연결되지 않았습니다.");
+                return false;
+            }
+            
+            // 모바일 클라이언트 전용 인증 요청 (기존 JWT 메시지와 구분)
+            return networkClient.SendProtocolMessage("AUTH_REQUEST", "MOBILE_JWT", validatedToken);
+        }
+
+        /// <summary>
+        /// 동기 버전 (Unity 코루틴/이벤트 핸들러용)
+        /// </summary>
+        public void ConnectToMultiplayer(string currentAccessToken, string clientId)
+        {
+            _ = ConnectToMultiplayerAsync(currentAccessToken, clientId);
         }
         
         /// <summary>
@@ -430,8 +552,8 @@ namespace Features.Multi.Net
         {
             Debug.LogError($"[NetworkManager] 네트워크 에러: {errorMessage}");
             
-            // UI에서 에러 처리 필요시 이벤트 발생
-            // OnErrorReceived?.Invoke(errorMessage);
+            // MessageHandler를 통해 에러 이벤트 발생 (UI에서 구독 가능)
+            messageHandler?.TriggerError(errorMessage);
         }
         
         // ========================================

@@ -344,6 +344,58 @@ namespace Blokus
             }
         }
 
+        AuthResult AuthenticationService::authenticateMobileClient(const std::string &accessToken)
+        {
+            try
+            {
+                if (accessToken.empty())
+                {
+                    return AuthResult(false, "Access token이 비어있습니다", "", "", "");
+                }
+
+                if (!m_jwtVerifier)
+                {
+                    spdlog::error("JWT 검증기가 초기화되지 않았습니다");
+                    return AuthResult(false, "서버 오류가 발생했습니다", "", "", "");
+                }
+
+                // JWT 토큰 검증만 수행 (토큰 갱신 로직 불필요 - REST API에서 이미 처리됨)
+                auto verifyResult = m_jwtVerifier->verifyToken(accessToken);
+                if (!verifyResult.success)
+                {
+                    spdlog::warn("모바일 클라이언트 JWT 토큰 검증 실패: {}", verifyResult.error);
+                    return AuthResult(false, "Access token이 유효하지 않습니다", "", "", "");
+                }
+
+                if (!verifyResult.claims)
+                {
+                    return AuthResult(false, "토큰 클레임 정보가 없습니다", "", "", "");
+                }
+
+                auto &claims = *verifyResult.claims;
+
+                // 사용자 정보 추출
+                std::string userId = claims.sub;
+                std::string username = claims.preferred_username.empty() ? claims.sub : claims.preferred_username;
+
+                if (userId.empty())
+                {
+                    return AuthResult(false, "토큰에서 사용자 ID를 찾을 수 없습니다", "", "", "");
+                }
+
+                // 모바일 클라이언트는 세션 토큰 생성 불필요 - Access Token 자체를 세션으로 사용
+                // TCP 연결이 유지되는 동안 인증 상태 유지됨
+                
+                spdlog::info("모바일 클라이언트 인증 성공: {} (ID: {})", username, userId);
+                return AuthResult(true, "모바일 클라이언트 인증 성공", userId, accessToken, username);
+            }
+            catch (const std::exception &e)
+            {
+                spdlog::error("모바일 클라이언트 인증 중 오류: {}", e.what());
+                return AuthResult(false, "서버 오류가 발생했습니다", "", "", "");
+            }
+        }
+
         bool AuthenticationService::logoutUser(const std::string &sessionToken)
         {
             try

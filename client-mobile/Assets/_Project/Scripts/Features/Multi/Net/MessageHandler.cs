@@ -546,6 +546,19 @@ namespace Features.Multi.Net
             Debug.Log("[MessageHandler] 하트비트 응답 수신");
             OnHeartbeatReceived?.Invoke();
         }
+        
+        // ========================================
+        // Public 메서드들 (외부에서 직접 호출)
+        // ========================================
+        
+        /// <summary>
+        /// 외부에서 에러를 직접 전달할 때 사용 (NetworkManager용)
+        /// </summary>
+        public void TriggerError(string errorMessage)
+        {
+            Debug.LogError($"[MessageHandler] 외부 에러 전달: {errorMessage}");
+            OnErrorReceived?.Invoke(errorMessage);
+        }
     }
     
     // ========================================

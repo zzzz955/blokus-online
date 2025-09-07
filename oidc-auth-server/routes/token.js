@@ -415,3 +415,4 @@ function extractJtiFromRefreshToken(refreshToken) {
 }
 
 module.exports = router
+module.exports.generateTokens = generateTokens
