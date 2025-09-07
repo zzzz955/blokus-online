@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <iomanip>
 #include <ctime>
+#include <cstdio>
 
 namespace Blokus::Server
 {
@@ -171,6 +172,15 @@ namespace Blokus::Server
             [](unsigned char c) { return c < 32; }), commandStr.end());
         
         spdlog::warn("DEBUG: parts.size()={}, commandStr='{}' (len={})", parts.size(), commandStr, commandStr.length());
+        
+        // 각 바이트 값 출력
+        std::string hexDump = "";
+        for(size_t i = 0; i < commandStr.length(); ++i) {
+            char buffer[10];
+            sprintf(buffer, "%02X ", (unsigned char)commandStr[i]);
+            hexDump += buffer;
+        }
+        spdlog::warn("DEBUG: commandStr hex bytes: [{}]", hexDump);
 
         // room:xxx, game:xxx 형태 처리
         if (parts.size() >= 2)
