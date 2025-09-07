@@ -162,12 +162,19 @@ namespace Blokus::Server
         // 첫 번째 부분으로 MessageType 결정
         std::string commandStr = parts[0];
         
-        spdlog::warn("DEBUG: parts.size()={}, commandStr='{}'", parts.size(), commandStr);
+        // 문자열 trim 처리 (숨겨진 문자 제거)
+        commandStr.erase(0, commandStr.find_first_not_of(" \t\r\n"));
+        commandStr.erase(commandStr.find_last_not_of(" \t\r\n") + 1);
+        
+        spdlog::warn("DEBUG: parts.size()={}, commandStr='{}' (len={})", parts.size(), commandStr, commandStr.length());
 
         // room:xxx, game:xxx 형태 처리
         if (parts.size() >= 2)
         {
             spdlog::warn("DEBUG: Checking composite command for '{}'", commandStr);
+            bool isAuth = (commandStr == "auth");
+            spdlog::warn("DEBUG: commandStr == 'auth' ? {}", isAuth);
+            
             if (commandStr == "room" || commandStr == "game" || commandStr == "lobby" || commandStr == "user" || commandStr == "version" || commandStr == "auth")
             {
                 commandStr += ":" + parts[1];
