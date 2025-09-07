@@ -162,13 +162,23 @@ namespace Blokus::Server
         // 첫 번째 부분으로 MessageType 결정
         std::string commandStr = parts[0];
         
-        // 기본 trim 처리 (클라이언트가 깨끗한 메시지를 보내므로 최소한만 처리)
-        commandStr.erase(0, commandStr.find_first_not_of(" \t\r\n"));
-        commandStr.erase(commandStr.find_last_not_of(" \t\r\n") + 1);
+        // 강화된 trim 처리 - 모든 제어 문자와 공백 제거
+        commandStr.erase(0, commandStr.find_first_not_of(" \t\r\n\v\f\0"));
+        commandStr.erase(commandStr.find_last_not_of(" \t\r\n\v\f\0") + 1);
+        
+        // 추가 안전장치: ASCII 제어 문자(0-31) 모두 제거
+        commandStr.erase(std::remove_if(commandStr.begin(), commandStr.end(), 
+            [](unsigned char c) { return c < 32; }), commandStr.end());
+        
+        spdlog::warn("DEBUG: parts.size()={}, commandStr='{}' (len={})", parts.size(), commandStr, commandStr.length());
 
         // room:xxx, game:xxx 형태 처리
         if (parts.size() >= 2)
         {
+            spdlog::warn("DEBUG: commandStr='{}', parts[1]='{}', checking composite...", commandStr, parts[1]);
+            bool isAuthMatch = (commandStr == "auth");
+            spdlog::warn("DEBUG: (commandStr == \"auth\") = {}", isAuthMatch);
+            
             if (commandStr == "room" || commandStr == "game" || commandStr == "lobby" || commandStr == "user" || commandStr == "version" || commandStr == "auth")
             {
                 commandStr += ":" + parts[1];
