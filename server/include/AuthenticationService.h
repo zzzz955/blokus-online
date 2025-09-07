@@ -79,6 +79,9 @@ namespace Blokus {
             // JWT ��ū �α���
             AuthResult loginWithJwt(const std::string& jwtToken);
 
+            // 모바일 클라이언트 전용 간소화된 인증 (사전 검증된 토큰)
+            AuthResult authenticateMobileClient(const std::string& accessToken);
+
             // �α׾ƿ�
             bool logoutUser(const std::string& sessionToken);
 

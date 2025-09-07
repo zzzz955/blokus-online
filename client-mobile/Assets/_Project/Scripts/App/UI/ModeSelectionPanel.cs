@@ -89,8 +89,6 @@ namespace App.UI
             if (multiPlayerButton != null)
             {
                 multiPlayerButton.onClick.AddListener(OnMultiPlayerClicked);
-                multiPlayerButton.interactable = false;
-                Debug.Log("멀티플레이 버튼 이벤트 연결 완료, 비활성화(스텁)");
             }
             else
             {

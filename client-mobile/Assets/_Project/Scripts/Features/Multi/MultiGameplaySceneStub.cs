@@ -1,105 +1,260 @@
-﻿using UnityEngine;
-using Shared.Models;
+using UnityEngine;
+using Features.Multi.UI;
+using Features.Multi.Core;
+using Features.Multi.Net;
 using App.Core;
 using App.UI;
-namespace Features.Multi{
-    /// <summary>
-    /// MultiGameplayScene stub implementation
-    /// Migration Plan: 멀티플레이어 기능은 나중에 구현하되, 스켈레톤만 제공하여 씬 로딩 오류 방지
-    /// </summary>
-    public class MultiGameplaySceneStub : MonoBehaviour
-    {
-        [Header("Stub Configuration")]
-        [SerializeField] private bool showStubMessage = true;
-        [SerializeField] private float autoReturnDelay = 3f;
 
-        private bool hasShownMessage = false;
+namespace Features.Multi
+{
+    /// <summary>
+    /// MultiGameplayScene 컨트롤러
+    /// LobbyPanel과 GameRoomPanel 관리
+    /// </summary>
+    public class MultiGameplaySceneController : MonoBehaviour
+    {
+        [Header("UI Panels")]
+        [SerializeField] private LobbyPanel lobbyPanel;
+        [SerializeField] private GameRoomPanel gameRoomPanel;
+        
+        [Header("Debug")]
+        [SerializeField] private bool debugMode = true;
+
+        // Scene state
+        private MultiCoreBootstrap multiCore;
+        private NetworkManager networkManager;
+        private MultiUserDataCache dataCache;
+        private SceneState currentState = SceneState.Lobby;
+        
+        // Panel state
+        private enum SceneState
+        {
+            Lobby,
+            GameRoom
+        }
 
         void Start()
         {
-            InitializeStub();
+            InitializeScene();
         }
 
         /// <summary>
-        /// 스텁 초기화
+        /// 씬 초기화
         /// </summary>
-        private void InitializeStub()
+        private void InitializeScene()
         {
-            Debug.Log("[MultiGameplaySceneStub] MultiGameplayScene loaded - showing stub message");
+            if (debugMode)
+                Debug.Log("[MultiGameplaySceneController] Initializing MultiGameplayScene");
 
-            if (showStubMessage && !hasShownMessage)
+            FindDependencies();
+            SetupUI();
+            SubscribeToEvents();
+            
+            // 로비 패널로 시작
+            ShowLobbyPanel();
+        }
+
+        /// <summary>
+        /// 의존성 검색
+        /// </summary>
+        private void FindDependencies()
+        {
+            // MultiCore에서 넘어온 NetworkManager 찾기
+            multiCore = MultiCoreBootstrap.Instance;
+            networkManager = NetworkManager.Instance;
+            dataCache = MultiUserDataCache.Instance;
+            
+            // UI 패널 찾기 (Inspector에서 설정되지 않은 경우)
+            if (lobbyPanel == null)
+                lobbyPanel = FindObjectOfType<LobbyPanel>();
+                
+            if (gameRoomPanel == null)
+                gameRoomPanel = FindObjectOfType<GameRoomPanel>();
+                
+            // 유효성 검증
+            if (networkManager == null)
+                Debug.LogError("[MultiGameplaySceneController] NetworkManager not found!");
+                
+            if (dataCache == null)
+                Debug.LogError("[MultiGameplaySceneController] MultiUserDataCache not found!");
+        }
+
+        /// <summary>
+        /// UI 설정
+        /// </summary>
+        private void SetupUI()
+        {
+            // 모든 패널 비활성화로 시작
+            if (lobbyPanel != null)
+                lobbyPanel.gameObject.SetActive(false);
+                
+            if (gameRoomPanel != null)
+                gameRoomPanel.gameObject.SetActive(false);
+        }
+        
+        /// <summary>
+        /// 이벤트 구독
+        /// </summary>
+        private void SubscribeToEvents()
+        {
+            if (networkManager != null)
             {
-                ShowStubMessage();
-                hasShownMessage = true;
-
-                // 자동으로 메인 씬으로 돌아가기
-                if (autoReturnDelay > 0)
-                {
-                    Invoke(nameof(ReturnToMainScene), autoReturnDelay);
-                }
+                networkManager.OnRoomJoined += OnRoomJoined;
+                networkManager.OnRoomLeft += OnRoomLeft;
+                networkManager.OnErrorReceived += OnNetworkError;
+            }
+            
+            if (lobbyPanel != null)
+            {
+                // 로비 패널 이벤트 구독 (구현 시)
+            }
+            
+            if (gameRoomPanel != null)
+            {
+                // 게임룸 패널 이벤트 구독 (구현 시)
             }
         }
 
         /// <summary>
-        /// 스텁 메시지 표시
+        /// 로비 패널 표시
         /// </summary>
-        private void ShowStubMessage()
+        public void ShowLobbyPanel()
         {
-            if (SystemMessageManager.Instance != null)
+            currentState = SceneState.Lobby;
+            
+            if (lobbyPanel != null)
             {
-                SystemMessageManager.ShowToast("멀티플레이어 기능은 현재 개발 중입니다.");
+                lobbyPanel.gameObject.SetActive(true);
+                if (debugMode)
+                    Debug.Log("[MultiGameplaySceneController] Lobby panel activated");
             }
-            else
+            
+            if (gameRoomPanel != null)
             {
-                Debug.Log("[MultiGameplaySceneStub] 멀티플레이어 기능은 현재 개발 중입니다.");
+                gameRoomPanel.gameObject.SetActive(false);
             }
         }
-
+        
         /// <summary>
-        /// 메인 씬으로 돌아가기 (5-Scene 아키텍처 지원)
+        /// 게임룸 패널 표시
         /// </summary>
-        private void ReturnToMainScene()
+        public void ShowGameRoomPanel()
         {
-            Debug.Log("[MultiGameplaySceneStub] Returning to MainScene");
-
-            // 🔥 수정: SceneFlowController를 통한 proper Scene 전환
-            if (SceneFlowController.Instance != null)
+            currentState = SceneState.GameRoom;
+            
+            if (gameRoomPanel != null)
             {
-                Debug.Log("[MultiGameplaySceneStub] SceneFlowController를 통해 MainScene으로 전환");
-                SceneFlowController.Instance.StartExitMultiToMain();
+                gameRoomPanel.gameObject.SetActive(true);
+                if (debugMode)
+                    Debug.Log("[MultiGameplaySceneController] GameRoom panel activated");
             }
-            else
+            
+            if (lobbyPanel != null)
             {
-                Debug.LogError("[MultiGameplaySceneStub] SceneFlowController가 없습니다! 레거시 방식으로 전환");
-                UnityEngine.SceneManagement.SceneManager.LoadScene("MainScene");
+                lobbyPanel.gameObject.SetActive(false);
             }
-        }
-
-        /// <summary>
-        /// 수동으로 메인 씬으로 돌아가기 (UI 버튼용)
-        /// </summary>
-        public void OnReturnButtonClicked()
-        {
-            CancelInvoke(nameof(ReturnToMainScene)); // 자동 돌아가기 취소
-            ReturnToMainScene();
         }
 
         void OnDestroy()
         {
-            CancelInvoke(); // 모든 Invoke 정리
+            UnsubscribeFromEvents();
+        }
+        
+        /// <summary>
+        /// 이벤트 구독 해제
+        /// </summary>
+        private void UnsubscribeFromEvents()
+        {
+            if (networkManager != null)
+            {
+                networkManager.OnRoomJoined -= OnRoomJoined;
+                networkManager.OnRoomLeft -= OnRoomLeft;
+                networkManager.OnErrorReceived -= OnNetworkError;
+            }
+        }
+        
+        // ========================================
+        // Event Handlers
+        // ========================================
+        
+        private void OnRoomJoined()
+        {
+            if (debugMode)
+                Debug.Log("[MultiGameplaySceneController] Joined room");
+                
+            ShowGameRoomPanel();
+        }
+        
+        private void OnRoomLeft()
+        {
+            if (debugMode)
+                Debug.Log("[MultiGameplaySceneController] Left room");
+                
+            ShowLobbyPanel();
+        }
+        
+        private void OnNetworkError(string error)
+        {
+            if (debugMode)
+                Debug.LogError($"[MultiGameplaySceneController] Network error: {error}");
+                
+            // 에러 시 메인 씬으로 돌아가기
+            ReturnToMainScene();
+        }
+        
+        /// <summary>
+        /// 로비로 돌아가기 (방에서 나갈 때)
+        /// </summary>
+        public void ShowLobby()
+        {
+            if (debugMode)
+                Debug.Log("[MultiGameplaySceneController] Switching to Lobby");
+                
+            // 게임방에서 로비로 전환
+            if (gameRoomPanel != null)
+                gameRoomPanel.gameObject.SetActive(false);
+                
+            if (lobbyPanel != null)
+                lobbyPanel.gameObject.SetActive(true);
+                
+            currentState = SceneState.Lobby;
+            
+            if (debugMode)
+                Debug.Log("[MultiGameplaySceneController] Switched to Lobby successfully");
+        }
+        
+        /// <summary>
+        /// 메인 씬으로 돌아가기
+        /// </summary>
+        public void ReturnToMainScene()
+        {
+            if (debugMode)
+                Debug.Log("[MultiGameplaySceneController] Returning to MainScene");
+
+            if (SceneFlowController.Instance != null)
+            {
+                SceneFlowController.Instance.StartExitMultiToMain();
+            }
+            else
+            {
+                UnityEngine.SceneManagement.SceneManager.LoadScene("MainScene");
+            }
         }
 
 #if UNITY_EDITOR
-        /// <summary>
-        /// 에디터에서 스텁 테스트
-        /// </summary>
-        [ContextMenu("Test Stub Message")]
-        private void TestStubMessage()
+        [ContextMenu("Show Lobby Panel")]
+        private void TestShowLobbyPanel()
         {
-            ShowStubMessage();
+            ShowLobbyPanel();
         }
 
-        [ContextMenu("Test Return to Main")]
+        [ContextMenu("Show GameRoom Panel")]
+        private void TestShowGameRoomPanel()
+        {
+            ShowGameRoomPanel();
+        }
+        
+        [ContextMenu("Return to Main Scene")]
         private void TestReturnToMain()
         {
             ReturnToMainScene();

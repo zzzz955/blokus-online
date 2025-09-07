@@ -20,6 +20,7 @@ namespace App.Core
         private const string MainScene = "MainScene";
         private const string SingleCoreScene = "SingleCore";
         private const string SingleGameplayScene = "SingleGameplayScene";
+        private const string MultiCoreScene = "MultiCore";
         private const string MultiGameplayScene = "MultiGameplayScene";
 
         // Singleton pattern
@@ -38,6 +39,9 @@ namespace App.Core
         }
 
         public static AutoLoginState CurrentAutoLoginState { get; private set; } = AutoLoginState.NotChecked;
+        
+        // 중복 실행 방지 플래그
+        private static bool isGoMultiInProgress = false;
 
         void Awake()
         {
@@ -465,10 +469,35 @@ namespace App.Core
             // SingleCore 언로드 (멀티에서는 필요 없음)
             yield return UnloadIfLoaded(SingleCoreScene);
 
+            // MultiCore 로드 및 활성 (데이터 로딩 전용)
+            yield return LoadAdditive(MultiCoreScene, setActive: true);
+            
+            // MultiCore에서 데이터 로딩 완료까지 대기
+            // MultiCoreBootstrap에서 데이터 로딩 완료 후 MultiGameplayScene으로 전환할 것임
+            
+            callback(true, "");
+        }
+
+        /// <summary>
+        /// GoMultiGameplay: MultiCore 언로드 → MultiGameplayScene 로드/활성
+        /// </summary>
+        public IEnumerator GoMultiGameplay()
+        {
+            if (debugMode)
+                Debug.Log("[SceneFlowController] GoMultiGameplay() started");
+
+            LoadingOverlay.Show("게임 로딩 중...");
+            
+            // MultiCore 언로드 (데이터 로딩 완료)
+            yield return UnloadIfLoaded(MultiCoreScene);
+
             // MultiGameplayScene 로드 및 활성
             yield return LoadAdditive(MultiGameplayScene, setActive: true);
 
-            callback(true, "");
+            LoadingOverlay.Hide();
+            
+            if (debugMode)
+                Debug.Log("[SceneFlowController] GoMultiGameplay() completed successfully");
         }
 
         /// <summary>
@@ -726,16 +755,48 @@ namespace App.Core
         /// </summary>
         public void StartGoMulti()
         {
-            StartCoroutine(GoMulti());
+            if (isGoMultiInProgress)
+            {
+                if (debugMode)
+                    Debug.LogWarning("[SceneFlowController] GoMulti already in progress, ignoring duplicate call");
+                return;
+            }
+            
+            StartCoroutine(GoMultiWithFlag());
+        }
+        
+        /// <summary>
+        /// GoMulti wrapper with progress flag management
+        /// </summary>
+        private System.Collections.IEnumerator GoMultiWithFlag()
+        {
+            isGoMultiInProgress = true;
+            try
+            {
+                yield return StartCoroutine(GoMulti());
+            }
+            finally
+            {
+                isGoMultiInProgress = false;
+            }
         }
 
         /// <summary>
-        /// Exit multiplayer mode to main
+        /// MultiCore에서 MultiGameplayScene으로 전환
+        /// </summary>
+        public void StartGoMultiGameplay()
+        {
+            StartCoroutine(GoMultiGameplay());
+        }
+        
+        /// <summary>
+        /// Multi → Main 씬 전환 시작 (로그아웃)
         /// </summary>
         public void StartExitMultiToMain()
         {
             StartCoroutine(ExitMultiToMain());
         }
+        
 
         /// <summary>
         /// Check if scene is currently loaded
