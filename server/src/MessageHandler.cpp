@@ -165,7 +165,7 @@ namespace Blokus::Server
         // room:xxx, game:xxx 형태 처리
         if (parts.size() >= 2)
         {
-            if (commandStr == "room" || commandStr == "game" || commandStr == "lobby" || commandStr == "user" || commandStr == "version")
+            if (commandStr == "room" || commandStr == "game" || commandStr == "lobby" || commandStr == "user" || commandStr == "version" || commandStr == "auth")
             {
                 commandStr += ":" + parts[1];
                 // 파라미터는 2번째 인덱스부터
