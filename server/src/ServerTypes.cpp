@@ -38,7 +38,11 @@ namespace Blokus
 
                 // ����
                 {"auth", MessageType::Auth},
-                {"auth_request", MessageType::Auth},  // 모바일 클라이언트 호환
+                {"auth:jwt", MessageType::Auth},  // JWT 토큰 인증
+                {"auth:login", MessageType::Auth},  // 사용자명/비밀번호 인증
+                {"auth:register", MessageType::Register},  // 회원가입
+                {"auth:guest", MessageType::Guest},  // 게스트 인증
+                {"auth:mobile_jwt", MessageType::Auth},  // 모바일 JWT 인증
                 {"register", MessageType::Register},
                 {"guest", MessageType::Guest},
                 {"logout", MessageType::Logout},
