@@ -163,6 +163,15 @@ namespace Blokus::Server
         // 첫 번째 부분으로 MessageType 결정
         std::string commandStr = parts[0];
         
+        // UTF-8 BOM 제거 (EF BB BF)
+        if (commandStr.length() >= 3 && 
+            (unsigned char)commandStr[0] == 0xEF && 
+            (unsigned char)commandStr[1] == 0xBB && 
+            (unsigned char)commandStr[2] == 0xBF) {
+            commandStr = commandStr.substr(3);
+            spdlog::warn("DEBUG: UTF-8 BOM removed from commandStr");
+        }
+        
         // 강화된 trim 처리 - 모든 제어 문자와 공백 제거
         commandStr.erase(0, commandStr.find_first_not_of(" \t\r\n\v\f\0"));
         commandStr.erase(commandStr.find_last_not_of(" \t\r\n\v\f\0") + 1);
