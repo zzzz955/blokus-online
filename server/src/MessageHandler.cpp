@@ -240,21 +240,21 @@ namespace Blokus::Server
 
         if (params.size() < 1)
         {
-            sendError("사용법: auth:사용자명:비밀번호 또는 auth:JWT_토큰");
+            sendError("사용법: auth:사용자명:비밀번호 또는 auth:jwt:토큰");
             return;
         }
 
         AuthResult result;
 
-        // 모바일 클라이언트 전용 JWT 인증 (MOBILE_JWT)
-        if (params.size() == 2 && params[0] == "MOBILE_JWT")
+        // 모바일 클라이언트 전용 JWT 인증 (mobile_jwt)  
+        if (params.size() == 2 && params[0] == "mobile_jwt")
         {
             std::string accessToken = params[1];
             result = authService_->authenticateMobileClient(accessToken);
             spdlog::info("모바일 클라이언트 JWT 인증 시도: {}", accessToken.substr(0, 20) + "...");
         }
-        // 기존 클라이언트 JWT 인증 (JWT)
-        else if (params.size() == 2 && params[0] == "JWT")
+        // 표준 JWT 인증 (jwt) - 모바일 및 기존 클라이언트 공통
+        else if (params.size() == 2 && params[0] == "jwt")
         {
             std::string jwtToken = params[1];
             result = authService_->loginWithJwt(jwtToken);
@@ -268,7 +268,7 @@ namespace Blokus::Server
             result = authService_->loginWithJwt(jwtToken);
             spdlog::info("데스크톱 클라이언트 JWT 토큰 인증 시도: {}", jwtToken.substr(0, 20) + "...");
         }
-        else if (params.size() >= 2 && params[0] != "MOBILE_JWT")
+        else if (params.size() >= 2 && params[0] != "mobile_jwt" && params[0] != "jwt")
         {
             // 기존 username/password 인증
             std::string username = params[0];
@@ -278,7 +278,7 @@ namespace Blokus::Server
         }
         else
         {
-            sendError("사용법: auth:사용자명:비밀번호, auth:JWT_토큰, 또는 auth:MOBILE_JWT:access_token");
+            sendError("사용법: auth:사용자명:비밀번호, auth:jwt:토큰, 또는 auth:mobile_jwt:access_token");
             return;
         }
 
