@@ -23,7 +23,6 @@ namespace Features.Multi
         // Scene state
         private MultiCoreBootstrap multiCore;
         private NetworkManager networkManager;
-        private MultiUserDataCache dataCache;
         private SceneState currentState = SceneState.Lobby;
         
         // Panel state
@@ -62,7 +61,6 @@ namespace Features.Multi
             // MultiCore에서 넘어온 NetworkManager 찾기
             multiCore = MultiCoreBootstrap.Instance;
             networkManager = NetworkManager.Instance;
-            dataCache = MultiUserDataCache.Instance;
             
             // UI 패널 찾기 (Inspector에서 설정되지 않은 경우)
             if (lobbyPanel == null)
@@ -75,8 +73,7 @@ namespace Features.Multi
             if (networkManager == null)
                 Debug.LogError("[MultiGameplaySceneController] NetworkManager not found!");
                 
-            if (dataCache == null)
-                Debug.LogError("[MultiGameplaySceneController] MultiUserDataCache not found!");
+            // MultiUserDataCache 제거됨 - NetworkManager 직접 사용
         }
 
         /// <summary>

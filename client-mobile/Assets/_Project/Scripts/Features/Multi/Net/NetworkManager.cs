@@ -83,6 +83,12 @@ namespace Features.Multi.Net
             add { if (messageHandler != null) messageHandler.OnJoinRoomResponse += value; }
             remove { if (messageHandler != null) messageHandler.OnJoinRoomResponse -= value; }
         }
+
+        public event System.Action OnRoomJoined
+        {
+            add { if (messageHandler != null) messageHandler.OnRoomJoined += value; }
+            remove { if (messageHandler != null) messageHandler.OnRoomJoined -= value; }
+        }
         
         // 게임 관련 이벤트
         public event System.Action<MultiModels.BlockPlacement> OnBlockPlaced
@@ -108,6 +114,18 @@ namespace Features.Multi.Net
         {
             add { if (messageHandler != null) messageHandler.OnErrorReceived += value; }
             remove { if (messageHandler != null) messageHandler.OnErrorReceived -= value; }
+        }
+
+        public event System.Action<string, string, string> OnChatMessageReceived
+        {
+            add { if (messageHandler != null) messageHandler.OnChatMessageReceived += value; }
+            remove { if (messageHandler != null) messageHandler.OnChatMessageReceived -= value; }
+        }
+
+        public event System.Action<System.Collections.Generic.List<UserInfo>> OnUserListUpdated
+        {
+            add { if (messageHandler != null) messageHandler.OnUserListUpdated += value; }
+            remove { if (messageHandler != null) messageHandler.OnUserListUpdated -= value; }
         }
         
         void Awake()
@@ -862,11 +880,8 @@ namespace Features.Multi.Net
         }
         
         // ========================================
-        // Missing Events
+        // Missing Events (Stub) - OnRoomJoined는 위에서 구현됨
         // ========================================
-        
-        public event System.Action<string> OnChatMessage;
-        public event System.Action OnRoomJoined;
         public event System.Action OnRoomLeft;
         public event System.Action<RoomInfo> OnRoomInfoUpdated;
         public event System.Action<UserInfo> OnPlayerJoined;
@@ -892,8 +907,22 @@ namespace Features.Multi.Net
         /// </summary>
         public void RequestOnlineUsers()
         {
-            Debug.Log("[NetworkManager] RequestOnlineUsers - Stub");
-            // Stub: 서버에 온라인 사용자 목록 요청
+            if (networkClient != null && networkClient.IsConnected())
+            {
+                bool success = networkClient.SendMessage("lobby:list");
+                if (success)
+                {
+                    Debug.Log("[NetworkManager] 온라인 사용자 목록 요청 전송");
+                }
+                else
+                {
+                    Debug.LogError("[NetworkManager] 온라인 사용자 목록 요청 실패");
+                }
+            }
+            else
+            {
+                Debug.LogError("[NetworkManager] RequestOnlineUsers: 서버에 연결되지 않음");
+            }
         }
         
         /// <summary>
@@ -910,8 +939,28 @@ namespace Features.Multi.Net
         /// </summary>
         public void SendChatMessage(string message)
         {
-            Debug.Log($"[NetworkManager] SendChatMessage: {message} - Stub");
-            // Stub: 서버에 채팅 메시지 전송
+            if (string.IsNullOrEmpty(message?.Trim()))
+            {
+                Debug.LogWarning("[NetworkManager] SendChatMessage: 빈 메시지는 전송할 수 없습니다.");
+                return;
+            }
+
+            if (networkClient != null && networkClient.IsConnected())
+            {
+                bool success = networkClient.SendChatMessage(message);
+                if (success)
+                {
+                    Debug.Log($"[NetworkManager] SendChatMessage: {message}");
+                }
+                else
+                {
+                    Debug.LogError($"[NetworkManager] SendChatMessage 실패: {message}");
+                }
+            }
+            else
+            {
+                Debug.LogError("[NetworkManager] SendChatMessage: 서버에 연결되지 않음");
+            }
         }
         
         /// <summary>

@@ -52,7 +52,7 @@ namespace Features.Multi.UI
 
         // Dependencies
         private NetworkManager networkManager;
-        private MultiUserDataCache dataCache;
+        // MultiUserDataCache 제거됨 - NetworkManager 직접 사용
         private GameLogic gameLogic;
 
         // Game State
@@ -119,13 +119,11 @@ namespace Features.Multi.UI
         private void FindDependencies()
         {
             networkManager = NetworkManager.Instance;
-            dataCache = MultiUserDataCache.Instance;
 
             if (networkManager == null)
                 Debug.LogError("[GameRoomPanel] NetworkManager not found!");
 
-            if (dataCache == null)
-                Debug.LogError("[GameRoomPanel] MultiUserDataCache not found!");
+            // MultiUserDataCache 제거됨 - NetworkManager 직접 사용
         }
 
         private void SetupUI()
@@ -193,7 +191,7 @@ namespace Features.Multi.UI
                 networkManager.OnTurnChanged += OnTurnChanged;
                 networkManager.OnBlockPlaced += OnBlockPlaced;
                 networkManager.OnGameEnded += OnGameEnded;
-                networkManager.OnChatMessage += OnChatMessageReceived;
+                networkManager.OnChatMessageReceived += OnChatMessageReceived;
                 networkManager.OnErrorReceived += OnErrorReceived;
             }
 
@@ -223,7 +221,7 @@ namespace Features.Multi.UI
                 networkManager.OnTurnChanged -= OnTurnChanged;
                 networkManager.OnBlockPlaced -= OnBlockPlaced;
                 networkManager.OnGameEnded -= OnGameEnded;
-                networkManager.OnChatMessage -= OnChatMessageReceived;
+                networkManager.OnChatMessageReceived -= OnChatMessageReceived;
                 networkManager.OnErrorReceived -= OnErrorReceived;
             }
 
@@ -580,11 +578,12 @@ namespace Features.Multi.UI
             ShowMessage($"게임이 종료되었습니다. 승자: {winner}");
         }
 
-        private void OnChatMessageReceived(string message)
+        private void OnChatMessageReceived(string username, string displayName, string message)
         {
-            // Convert string to ChatMessage object
-            ChatMessage chatMsg = new ChatMessage("Unknown", message, "Unknown");
+            // Convert to ChatMessage object
+            ChatMessage chatMsg = new ChatMessage(username, message, displayName);
             chatHistory.Add(chatMsg);
+            Debug.Log($"[GameRoomPanel] 채팅 메시지 수신: {displayName} [{username}]: {message}");
             UpdateChatDisplay();
         }
 
@@ -773,12 +772,8 @@ namespace Features.Multi.UI
             isReady = false;
             myPlayerColor = PlayerColor.None;
             
-            // 데이터 정리
-            if (dataCache != null)
-            {
-                // 방 관련 데이터만 정리 (로그아웃이 아니므로)
-                Debug.Log("[GameRoomPanel] 방 데이터 정리 완료");
-            }
+            // 데이터 정리 - MultiUserDataCache 제거로 더 이상 필요 없음
+            Debug.Log("[GameRoomPanel] 방 데이터 정리 완료 - NetworkManager 이벤트 기반으로 관리됨");
             
             // MultiGameplaySceneController를 통해 로비로 전환
             var sceneController = GetComponentInParent<MultiGameplaySceneController>();

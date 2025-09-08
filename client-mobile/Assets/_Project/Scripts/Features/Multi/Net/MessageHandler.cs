@@ -27,6 +27,7 @@ namespace Features.Multi.Net
         public event System.Action<List<UserInfo>> OnUserListUpdated; // 사용자 목록 업데이트
         public event System.Action<RoomInfo> OnRoomCreated; // 방 생성됨
         public event System.Action<bool, string> OnJoinRoomResponse; // 방 참가 응답
+        public event System.Action OnRoomJoined; // 방 참가됨 (GameRoomPanel로 전환용)
         
         // 게임 관련
         // public event System.Action<GameState> OnGameStateUpdated; // 멀티플레이어에서 사용 예정
@@ -38,6 +39,9 @@ namespace Features.Multi.Net
         // 연결 관련
         public event System.Action<string> OnErrorReceived; // 에러 메시지
         public event System.Action OnHeartbeatReceived; // 하트비트 응답
+        
+        // 채팅 관련
+        public event System.Action<string, string, string> OnChatMessageReceived; // username, displayName, message
         
         // 싱글플레이어 관련 (현재 HTTP API로 대체됨)
         // public event System.Action<StageData> OnStageDataReceived; // TCP에서 HTTP API로 이동
@@ -233,6 +237,9 @@ namespace Features.Multi.Net
                     // 채팅 관련
                     case "CHAT":
                         HandleChat(parts);
+                        break;
+                    case "CHAT_SUCCESS":
+                        HandleChatSuccess(parts);
                         break;
                     case "SYSTEM":
                         HandleSystemMessage(parts);
@@ -576,6 +583,7 @@ namespace Features.Multi.Net
                 
                 Debug.Log($"[MessageHandler] 방 생성됨: {room.roomName} (ID: {room.roomId})");
                 OnRoomCreated?.Invoke(room);
+                OnRoomJoined?.Invoke(); // 방 생성자는 자동으로 방에 입장함
             }
             catch (Exception ex)
             {
@@ -601,6 +609,7 @@ namespace Features.Multi.Net
                 
                 Debug.Log($"[MessageHandler] 방 참가 성공: {roomName} (ID: {roomId})");
                 OnJoinRoomResponse?.Invoke(true, $"방 '{roomName}'에 참가했습니다.");
+                OnRoomJoined?.Invoke(); // GameRoomPanel로 전환 트리거
             }
             catch (Exception ex)
             {
@@ -811,21 +820,26 @@ namespace Features.Multi.Net
             if (parts.Length >= 3)
             {
                 string username = parts[1];
+                string displayName = "";
                 string message;
                 
                 if (parts.Length >= 4)
                 {
                     // 새로운 형식: CHAT:username:displayName:message
-                    string displayName = parts[2];
+                    displayName = parts[2];
                     message = string.Join(":", parts, 3, parts.Length - 3);
                     Debug.Log($"[MessageHandler] 채팅 메시지 (새 형식): {displayName} [{username}]: {message}");
                 }
                 else
                 {
                     // 기존 형식: CHAT:username:message
+                    displayName = username; // displayName이 없으면 username 사용
                     message = string.Join(":", parts, 2, parts.Length - 2);
                     Debug.Log($"[MessageHandler] 채팅 메시지: {username}: {message}");
                 }
+
+                // 채팅 메시지 이벤트 발생
+                OnChatMessageReceived?.Invoke(username, displayName, message);
             }
         }
         
@@ -944,6 +958,15 @@ namespace Features.Multi.Net
         {
             Debug.Log("[MessageHandler] Pong 응답 수신");
             OnHeartbeatReceived?.Invoke();
+        }
+
+        /// <summary>
+        /// 채팅 성공 응답 - "CHAT_SUCCESS"
+        /// </summary>
+        private void HandleChatSuccess(string[] parts)
+        {
+            Debug.Log("[MessageHandler] 채팅 메시지 전송 성공");
+            // 채팅 성공은 단순히 로그만 출력하고 특별한 처리는 하지 않음
         }
         
         // ========================================

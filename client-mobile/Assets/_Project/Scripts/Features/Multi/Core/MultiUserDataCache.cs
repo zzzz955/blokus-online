@@ -5,6 +5,9 @@ using Shared.Models;
 namespace Features.Multi.Core
 {
     /// <summary>
+    /// ⚠️ DEPRECATED: 이 클래스는 더 이상 사용되지 않습니다.
+    /// TCP 실시간 통신에서는 캐시 레이어가 불필요하며, NetworkManager에서 직접 UI 업데이트를 처리합니다.
+    /// 
     /// 멀티플레이 전용 사용자 데이터 캐시
     /// 서버로부터 받은 멀티플레이 관련 데이터를 캐싱
     /// </summary>
@@ -37,8 +40,9 @@ namespace Features.Multi.Core
             if (Instance == null)
             {
                 Instance = this;
+                DontDestroyOnLoad(gameObject);
                 if (debugMode)
-                    Debug.Log("[MultiUserDataCache] Instance created");
+                    Debug.Log("[MultiUserDataCache] Instance created with DontDestroyOnLoad");
             }
             else
             {

@@ -57,7 +57,6 @@ namespace Features.Multi.UI
 
         // Dependencies
         private NetworkManager networkManager;
-        private MultiUserDataCache dataCache;
 
         // Data
         private List<NetUserInfo> onlineUsers = new List<NetUserInfo>();
@@ -65,6 +64,7 @@ namespace Features.Multi.UI
         // 모바일 최적화: rankingData 제거
         private List<ChatMessage> chatHistory = new List<ChatMessage>();
         private List<GameObject> chatItemInstances = new List<GameObject>();
+        private NetUserInfo myUserInfo; // 내 사용자 정보
         
         // 채팅 설정
         private const int MAX_CHAT_MESSAGES = 100;
@@ -107,23 +107,14 @@ namespace Features.Multi.UI
         private void FindDependencies()
         {
             networkManager = NetworkManager.Instance;
-            dataCache = MultiUserDataCache.Instance;
 
             if (networkManager == null)
                 Debug.LogError("[LobbyPanel] NetworkManager not found!");
-
-            if (dataCache == null)
-                Debug.LogError("[LobbyPanel] MultiUserDataCache not found!");
         }
 
         private void SetupUI()
         {
-            // CreateRoomPanel 이벤트 연결
-            if (createRoomPanel != null)
-            {
-                createRoomPanel.OnRoomCreated += OnRoomCreated;
-                createRoomPanel.OnCancelled += OnRoomCreationCancelled;
-            }
+            // CreateRoomPanel 이벤트는 아래에서 한 번만 연결
 
             // 버튼 이벤트 연결
             if (createRoomButton != null)
@@ -164,19 +155,15 @@ namespace Features.Multi.UI
             if (networkManager != null)
             {
                 networkManager.OnConnectionChanged += OnConnectionChanged;
+                networkManager.OnMyStatsUpdated += OnMyStatsUpdated;
                 networkManager.OnRoomListUpdated += OnRoomListUpdated;
+                networkManager.OnUserListUpdated += OnUserListUpdated;
                 networkManager.OnRoomCreated += OnRoomCreated;
                 networkManager.OnJoinRoomResponse += OnJoinRoomResponse;
-                networkManager.OnChatMessage += OnChatMessageReceived;
+                networkManager.OnChatMessageReceived += OnChatMessageReceived;
                 networkManager.OnErrorReceived += OnErrorReceived;
             }
 
-            if (dataCache != null)
-            {
-                dataCache.OnOnlineUsersUpdated += OnOnlineUsersUpdated;
-                // 모바일 최적화: OnRankingUpdated 제거
-                dataCache.OnUserDataUpdated += OnUserDataUpdated;
-            }
         }
 
         private void Cleanup()
@@ -184,19 +171,15 @@ namespace Features.Multi.UI
             if (networkManager != null)
             {
                 networkManager.OnConnectionChanged -= OnConnectionChanged;
+                networkManager.OnMyStatsUpdated -= OnMyStatsUpdated;
                 networkManager.OnRoomListUpdated -= OnRoomListUpdated;
+                networkManager.OnUserListUpdated -= OnUserListUpdated;
                 networkManager.OnRoomCreated -= OnRoomCreated;
                 networkManager.OnJoinRoomResponse -= OnJoinRoomResponse;
-                networkManager.OnChatMessage -= OnChatMessageReceived;
+                networkManager.OnChatMessageReceived -= OnChatMessageReceived;
                 networkManager.OnErrorReceived -= OnErrorReceived;
             }
 
-            if (dataCache != null)
-            {
-                dataCache.OnOnlineUsersUpdated -= OnOnlineUsersUpdated;
-                // 모바일 최적화: OnRankingUpdated 제거
-                dataCache.OnUserDataUpdated -= OnUserDataUpdated;
-            }
         }
 
         // ========================================
@@ -235,20 +218,35 @@ namespace Features.Multi.UI
 
         private void UpdateUserStatsDisplay()
         {
-            if (dataCache == null) return;
-
-            SharedUserInfo myInfo = dataCache.GetMyUserInfo();
-            if (myInfo != null)
+            if (myUserInfo != null)
             {
+                // 실제 사용자 정보 표시
                 if (welcomeLabel != null)
-                    welcomeLabel.text = $"🎮 {myInfo.display_name}님, 환영합니다!";
+                    welcomeLabel.text = $"🎮 {myUserInfo.displayName}님, 환영합니다!";
 
                 if (userStatsLabel != null)
                 {
-                    userStatsLabel.text = $"레벨 {myInfo.level} | {myInfo.wins}승 {myInfo.losses}패 | " +
-                                        $"승률 {myInfo.GetWinRate():F1}% | 게임 {myInfo.totalGames}회";
+                    string stats = $"레벨 {myUserInfo.level} | 승률 {GetWinRate():F1}% | 총 {myUserInfo.totalGames}게임";
+                    userStatsLabel.text = stats;
                 }
             }
+            else
+            {
+                // 기본값으로 설정
+                if (welcomeLabel != null)
+                    welcomeLabel.text = "🎮 로비에 오신 것을 환영합니다!";
+
+                if (userStatsLabel != null)
+                    userStatsLabel.text = "사용자 정보 로딩 중...";
+            }
+        }
+
+        private float GetWinRate()
+        {
+            if (myUserInfo == null || myUserInfo.totalGames == 0)
+                return 0f;
+            
+            return ((float)myUserInfo.wins / myUserInfo.totalGames) * 100f;
         }
 
         private void UpdateOnlineUsersList()
@@ -261,31 +259,8 @@ namespace Features.Multi.UI
                 Destroy(child.gameObject);
             }
 
-            // 새 아이템 생성
-            var users = dataCache?.GetOnlineUsers();
-            if (users != null)
-            {
-                onlineUsers = new List<NetUserInfo>();
-                // Shared.Models.UserInfo를 Features.Multi.Net.UserInfo로 변환
-                foreach (var user in users)
-                {
-                    var netUser = new NetUserInfo
-                    {
-                        username = user.username,
-                        displayName = user.display_name,
-                        level = user.level,
-                        wins = user.wins,
-                        losses = user.losses,
-                        totalGames = user.totalGames,
-                        isOnline = true
-                    };
-                    onlineUsers.Add(netUser);
-                }
-            }
-            else
-            {
-                onlineUsers = new List<NetUserInfo>();
-            }
+            // TODO: onlineUsers 리스트는 NetworkManager 이벤트를 통해 업데이트됨
+            // 현재 저장된 데이터 사용
             foreach (NetUserInfo user in onlineUsers)
             {
                 GameObject userItem = Instantiate(userItemPrefab, userListContent);
@@ -315,20 +290,16 @@ namespace Features.Multi.UI
                 Destroy(child.gameObject);
             }
 
-            // 새 아이템 생성
-            var rooms = dataCache?.GetRoomList();
-            if (rooms != null)
+            // 새 아이템 생성 - NetworkManager 이벤트를 통해 업데이트된 roomList 사용
+            foreach (NetRoomInfo room in roomList)
             {
-                foreach (var room in rooms)
+                GameObject roomItem = Instantiate(roomItemPrefab, roomListContent);
+                
+                // RoomItemUI 컴포넌트에 데이터 설정 (구현 필요)
+                var roomItemUI = roomItem.GetComponent<RoomItemUI>();
+                if (roomItemUI != null)
                 {
-                    GameObject roomItem = Instantiate(roomItemPrefab, roomListContent);
-                    
-                    // RoomItemUI 컴포넌트에 데이터 설정 (구현 필요)
-                    var roomItemUI = roomItem.GetComponent<RoomItemUI>();
-                    if (roomItemUI != null)
-                    {
-                        roomItemUI.SetupRoom(room);
-                    }
+                    roomItemUI.SetupRoom(room);
                 }
             }
         }
@@ -468,9 +439,27 @@ namespace Features.Multi.UI
             }
         }
 
+        private void OnMyStatsUpdated(NetUserInfo userInfo)
+        {
+            myUserInfo = userInfo;
+            Debug.Log($"[LobbyPanel] 내 사용자 정보 업데이트: {userInfo.displayName} [{userInfo.username}]");
+            UpdateUserStatsDisplay();
+        }
+
         private void OnRoomListUpdated(List<NetRoomInfo> rooms)
         {
+            roomList.Clear();
+            roomList.AddRange(rooms);
+            Debug.Log($"[LobbyPanel] 방 목록 업데이트: {rooms.Count}개");
             UpdateRoomList();
+        }
+
+        private void OnUserListUpdated(List<NetUserInfo> users)
+        {
+            onlineUsers.Clear();
+            onlineUsers.AddRange(users);
+            Debug.Log($"[LobbyPanel] 온라인 사용자 목록 업데이트: {users.Count}명");
+            UpdateOnlineUsersList();
         }
 
         private void OnRoomCreated(NetRoomInfo room)
@@ -491,10 +480,10 @@ namespace Features.Multi.UI
             }
         }
 
-        private void OnChatMessageReceived(string message)
+        private void OnChatMessageReceived(string username, string displayName, string message)
         {
             // 메시지를 ChatMessage 객체로 변환
-            ChatMessage chatMsg = new ChatMessage("Unknown", message, "Unknown");
+            ChatMessage chatMsg = new ChatMessage(username, message, displayName);
             
             // 채팅 히스토리에 추가 (100개 제한)
             chatHistory.Add(chatMsg);
@@ -503,6 +492,7 @@ namespace Features.Multi.UI
                 chatHistory.RemoveAt(0);
             }
             
+            Debug.Log($"[LobbyPanel] 채팅 메시지 수신: {displayName} [{username}]: {message}");
             UpdateChatDisplay();
         }
 
@@ -511,17 +501,19 @@ namespace Features.Multi.UI
             ShowMessage($"오류: {error}");
         }
 
+        // 기존 MultiUserDataCache 이벤트 핸들러들 - 더 이상 사용되지 않음
+        // TODO: NetworkManager 이벤트로 대체 필요
+        /*
         private void OnOnlineUsersUpdated()
         {
             UpdateOnlineUsersList();
         }
 
-        // 모바일 최적화: OnRankingUpdated 제거
-
         private void OnUserDataUpdated()
         {
             UpdateUserStatsDisplay();
         }
+        */
 
         // ========================================
         // Helper Methods
@@ -549,7 +541,15 @@ namespace Features.Multi.UI
                 CreateChatItem(latestMessage);
             }
 
-            // 스크롤을 맨 아래로
+            // 스크롤을 맨 아래로 (다음 프레임에서 실행하여 레이아웃 업데이트 보장)
+            StartCoroutine(ScrollToBottomNextFrame());
+        }
+
+        private System.Collections.IEnumerator ScrollToBottomNextFrame()
+        {
+            // 한 프레임 대기하여 레이아웃이 완전히 업데이트되도록 함
+            yield return new WaitForEndOfFrame();
+            
             if (chatScrollRect != null)
             {
                 Canvas.ForceUpdateCanvases();
@@ -567,8 +567,8 @@ namespace Features.Multi.UI
             var chatItemUI = chatItem.GetComponent<ChatItemUI>();
             if (chatItemUI != null)
             {
-                // 내 메시지인지 확인 (TODO: 실제 사용자 이름과 비교)
-                bool isMyMessage = false; // 추후 실제 구현 필요
+                // 내 메시지인지 확인 (내 사용자 정보와 비교)
+                bool isMyMessage = (myUserInfo != null && message.username == myUserInfo.username);
                 chatItemUI.SetupMessage(message.displayName, message.message, isMyMessage);
             }
             
@@ -626,24 +626,7 @@ namespace Features.Multi.UI
         // CreateRoomPanel Event Handlers
         // ========================================
 
-        /// <summary>
-        /// 방 생성 요청 처리
-        /// </summary>
-        private void OnRoomCreated(RoomCreationInfo roomInfo)
-        {
-            Debug.Log($"[LobbyPanel] 방 생성 요청: {roomInfo.roomName}");
-            
-            if (networkManager != null)
-            {
-                // TCP 프로토콜을 통해 방 생성 요청
-                networkManager.CreateRoom(roomInfo.roomName, roomInfo.isPrivate, roomInfo.password);
-            }
-            else
-            {
-                Debug.LogError("[LobbyPanel] NetworkManager not available for room creation");
-                ShowMessage("네트워크 연결이 필요합니다.");
-            }
-        }
+        // 중복된 OnRoomCreated 핸들러 제거됨 - OnRoomCreatedFromPanel 사용
 
         /// <summary>
         /// 방 생성 취소 처리

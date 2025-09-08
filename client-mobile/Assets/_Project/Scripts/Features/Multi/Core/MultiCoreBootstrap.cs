@@ -15,7 +15,7 @@ namespace Features.Multi.Core
     public class MultiCoreBootstrap : MonoBehaviour
     {
         [Header("Managers")]
-        [SerializeField] private MultiUserDataCache multiUserDataCache;
+        // MultiUserDataCache 제거됨 - 더 이상 사용되지 않음
         
         // NetworkManager는 DontDestroyOnLoad로 인해 Instance를 통해 접근
         
@@ -123,8 +123,7 @@ namespace Features.Multi.Core
 
         private void FindManagers()
         {
-            if (multiUserDataCache == null)
-                multiUserDataCache = FindObjectOfType<MultiUserDataCache>();
+            // MultiUserDataCache 제거됨
 
             if (loadingOverlay == null)
                 loadingOverlay = FindObjectOfType<LoadingOverlay>();
@@ -163,13 +162,7 @@ namespace Features.Multi.Core
                     Debug.Log("[MultiCoreBootstrap] NetworkManager initialized");
             }
 
-            // MultiUserDataCache 초기화 (만약 필요하다면)
-            if (multiUserDataCache != null)
-            {
-                multiUserDataCache.Initialize();
-                if (debugMode)
-                    Debug.Log("[MultiCoreBootstrap] MultiUserDataCache initialized");
-            }
+            // MultiUserDataCache 제거됨
         }
 
         private void CleanupLocalManagers()
@@ -181,8 +174,7 @@ namespace Features.Multi.Core
             // if (NetworkManager.Instance != null)
             //     NetworkManager.Instance.Cleanup();
 
-            if (multiUserDataCache != null)
-                multiUserDataCache.Cleanup();
+            // MultiUserDataCache 제거됨
         }
 
         // ========================================
