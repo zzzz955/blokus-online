@@ -42,6 +42,7 @@ namespace App.Core
         
         // 중복 실행 방지 플래그
         private static bool isGoMultiInProgress = false;
+        private static bool isGoMultiGameplayInProgress = false;
 
         void Awake()
         {
@@ -786,7 +787,30 @@ namespace App.Core
         /// </summary>
         public void StartGoMultiGameplay()
         {
-            StartCoroutine(GoMultiGameplay());
+            if (isGoMultiGameplayInProgress)
+            {
+                if (debugMode)
+                    Debug.LogWarning("[SceneFlowController] GoMultiGameplay already in progress, ignoring duplicate call");
+                return;
+            }
+            
+            StartCoroutine(GoMultiGameplayWithFlag());
+        }
+        
+        /// <summary>
+        /// GoMultiGameplay wrapper with progress flag management
+        /// </summary>
+        private System.Collections.IEnumerator GoMultiGameplayWithFlag()
+        {
+            isGoMultiGameplayInProgress = true;
+            try
+            {
+                yield return StartCoroutine(GoMultiGameplay());
+            }
+            finally
+            {
+                isGoMultiGameplayInProgress = false;
+            }
         }
         
         /// <summary>

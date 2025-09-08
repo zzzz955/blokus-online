@@ -445,7 +445,7 @@ namespace Features.Multi.UI
 
             if (networkManager != null)
             {
-                networkManager.CreateRoom(roomInfo.roomName, roomInfo.maxPlayers);
+                networkManager.CreateRoom(roomInfo.roomName, roomInfo.isPrivate, roomInfo.password);
             }
         }
 
@@ -636,7 +636,7 @@ namespace Features.Multi.UI
             if (networkManager != null)
             {
                 // TCP 프로토콜을 통해 방 생성 요청
-                networkManager.CreateRoom(roomInfo.roomName, roomInfo.maxPlayers);
+                networkManager.CreateRoom(roomInfo.roomName, roomInfo.isPrivate, roomInfo.password);
             }
             else
             {

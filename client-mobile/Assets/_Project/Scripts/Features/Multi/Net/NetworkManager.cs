@@ -22,7 +22,7 @@ namespace Features.Multi.Net
         [SerializeField] private int maxReconnectAttempts = 3;
         
         [Header("하트비트 설정")]
-        [SerializeField] private bool enableHeartbeat = true;
+        [SerializeField] private bool enableHeartbeat = false; // 모바일 클라이언트는 하트비트 불필요
         [SerializeField] private float heartbeatInterval = 30.0f;
         
         // 컴포넌트 참조
@@ -34,6 +34,8 @@ namespace Features.Multi.Net
         private bool isInitialized;
         private int reconnectAttempts;
         private Coroutine heartbeatCoroutine;
+        private bool isAuthenticated = false;
+        private string lastUsedToken = null;
         
         // 싱글톤 패턴
         public static NetworkManager Instance { get; private set; }
@@ -206,7 +208,11 @@ namespace Features.Multi.Net
             StopHeartbeat();
             networkClient?.DisconnectFromServer();
             
-            Debug.Log("[NetworkManager] 서버 연결 해제됨");
+            // 인증 상태 초기화
+            isAuthenticated = false;
+            lastUsedToken = null;
+            
+            Debug.Log("[NetworkManager] 서버 연결 해제됨 (인증 상태 초기화)");
         }
         
         /// <summary>
@@ -215,6 +221,14 @@ namespace Features.Multi.Net
         public bool IsConnected()
         {
             return isInitialized && networkClient != null && networkClient.IsConnected();
+        }
+        
+        /// <summary>
+        /// 인증 상태 확인
+        /// </summary>
+        public bool IsAuthenticated()
+        {
+            return isAuthenticated && IsConnected();
         }
         
         /// <summary>
@@ -326,8 +340,16 @@ namespace Features.Multi.Net
 
                 Debug.Log("[NetworkManager] TCP 서버 연결 성공");
 
-                // Step 3: 모바일 클라이언트 인증 (간소화된 JWT 전송)
+                // Step 3: 모바일 클라이언트 인증 (중복 방지)
                 Debug.Log("[NetworkManager] Step 3: 모바일 클라이언트 인증 중...");
+                
+                // 이미 같은 토큰으로 인증된 경우 건너뛰기
+                if (isAuthenticated && validToken == lastUsedToken)
+                {
+                    Debug.Log("[NetworkManager] 이미 인증됨 - 중복 인증 방지");
+                    return true;
+                }
+                
                 bool authSuccess = await SendMobileJwtLoginAsync(validToken);
                 
                 if (!authSuccess)
@@ -338,6 +360,10 @@ namespace Features.Multi.Net
                     return false;
                 }
 
+                // 인증 성공 시 상태 업데이트
+                isAuthenticated = true;
+                lastUsedToken = validToken;
+                
                 Debug.Log("[NetworkManager] 모바일 멀티플레이어 연결 완료!");
                 return true;
 
@@ -365,17 +391,28 @@ namespace Features.Multi.Net
             // 인증 결과를 기다리기 위한 TaskCompletionSource
             var authCompletionSource = new TaskCompletionSource<bool>();
             System.Action<string> tempErrorHandler = null;
+            System.Action<bool, string> tempAuthHandler = null;
             bool authCompleted = false;
 
             try
             {
+                // 인증 성공/실패 응답 핸들러 등록
+                tempAuthHandler = (success, message) => {
+                    if (authCompleted) return; // 이미 완료된 경우 무시
+                    
+                    authCompleted = true;
+                    Debug.Log($"[NetworkManager] 인증 응답 수신: {success} - {message}");
+                    authCompletionSource.TrySetResult(success);
+                };
+
                 // 에러 응답 핸들러 등록 (인증 관련 에러만 처리)
                 tempErrorHandler = (errorMessage) => {
                     if (authCompleted) return; // 이미 완료된 경우 무시
                     
                     if (errorMessage.Contains("인증 토큰이 유효하지 않습니다") || 
                         errorMessage.Contains("authentication") ||
-                        errorMessage.Contains("토큰"))
+                        errorMessage.Contains("토큰") ||
+                        errorMessage.Contains("AUTH"))
                     {
                         authCompleted = true;
                         Debug.Log($"[NetworkManager] 인증 실패 감지: {errorMessage}");
@@ -383,7 +420,8 @@ namespace Features.Multi.Net
                     }
                 };
 
-                // 에러 이벤트 구독
+                // 이벤트 구독
+                OnAuthResponse += tempAuthHandler;
                 OnErrorReceived += tempErrorHandler;
 
                 // 모바일 클라이언트 전용 인증 요청 전송
@@ -394,26 +432,32 @@ namespace Features.Multi.Net
                     return false;
                 }
 
-                // 서버 응답 대기 (최대 5초)
-                var timeoutTask = Task.Delay(5000);
+                Debug.Log("[NetworkManager] JWT 인증 요청 전송됨, 응답 대기 중...");
+
+                // 서버 응답 대기 (최대 10초로 증가)
+                var timeoutTask = Task.Delay(10000);
                 var completedTask = await Task.WhenAny(authCompletionSource.Task, timeoutTask);
 
                 if (completedTask == timeoutTask)
                 {
-                    // 타임아웃 - 에러가 발생하지 않았으므로 성공으로 간주
+                    // 타임아웃 - 실제 응답을 받지 못함
                     authCompleted = true;
-                    Debug.Log("[NetworkManager] 인증 응답 타임아웃 - 성공으로 간주");
-                    return true;
+                    Debug.LogWarning("[NetworkManager] 인증 응답 타임아웃 - 네트워크 문제 가능성");
+                    return false; // 타임아웃을 실패로 처리
                 }
 
                 // 실제 서버 응답 결과 반환
                 bool result = authCompletionSource.Task.Result;
-                Debug.Log($"[NetworkManager] 인증 결과: {result}");
+                Debug.Log($"[NetworkManager] 인증 최종 결과: {result}");
                 return result;
             }
             finally
             {
                 // 이벤트 핸들러 해제
+                if (tempAuthHandler != null)
+                {
+                    OnAuthResponse -= tempAuthHandler;
+                }
                 if (tempErrorHandler != null)
                 {
                     OnErrorReceived -= tempErrorHandler;
@@ -517,7 +561,7 @@ namespace Features.Multi.Net
         /// <summary>
         /// 방 생성 요청
         /// </summary>
-        public bool CreateRoom(string roomName, int maxPlayers = 4)
+        public bool CreateRoom(string roomName, bool isPrivate = false, string password = "")
         {
             if (!IsConnected())
             {
@@ -525,7 +569,7 @@ namespace Features.Multi.Net
                 return false;
             }
             
-            return networkClient.SendCreateRoomRequest(roomName, maxPlayers);
+            return networkClient.SendCreateRoomRequest(roomName, isPrivate, password);
         }
         
         /// <summary>
@@ -886,6 +930,115 @@ namespace Features.Multi.Net
         {
             Debug.Log($"[NetworkManager] KickPlayer: {playerId} - Stub");
             // Stub: 서버에 플레이어 추방 요청
+        }
+        
+        // ========================================
+        // 테스트 및 검증 메서드
+        // ========================================
+        
+        /// <summary>
+        /// 기본 통신 테스트 (연결, 인증, 로비 입장)
+        /// </summary>
+        public async Task<bool> TestBasicCommunication(string testToken = null)
+        {
+            Debug.Log("[NetworkManager] === 기본 통신 테스트 시작 ===");
+            
+            try
+            {
+                // Step 1: 연결 테스트
+                Debug.Log("[NetworkManager] 1단계: 서버 연결 테스트");
+                if (!IsConnected())
+                {
+                    await networkClient.ConnectToServerAsync();
+                    await Task.Delay(1000); // 연결 대기
+                }
+                
+                if (!IsConnected())
+                {
+                    Debug.LogError("[NetworkManager] 연결 테스트 실패");
+                    return false;
+                }
+                Debug.Log("[NetworkManager] ✅ 서버 연결 성공");
+                
+                // Step 2: 인증 테스트 (JWT 토큰이 있는 경우)
+                if (!string.IsNullOrEmpty(testToken))
+                {
+                    Debug.Log("[NetworkManager] 2단계: JWT 인증 테스트");
+                    bool authResult = await SendMobileJwtLoginAsync(testToken);
+                    if (!authResult)
+                    {
+                        Debug.LogWarning("[NetworkManager] ⚠️ JWT 인증 테스트 실패 (계속 진행)");
+                    }
+                    else
+                    {
+                        Debug.Log("[NetworkManager] ✅ JWT 인증 성공");
+                    }
+                }
+                
+                // Step 3: 게스트 로그인 테스트
+                Debug.Log("[NetworkManager] 3단계: 게스트 로그인 테스트");
+                bool guestResult = GuestLogin();
+                if (!guestResult)
+                {
+                    Debug.LogWarning("[NetworkManager] ⚠️ 게스트 로그인 전송 실패");
+                }
+                else
+                {
+                    Debug.Log("[NetworkManager] ✅ 게스트 로그인 요청 전송됨");
+                }
+                
+                await Task.Delay(2000); // 응답 대기
+                
+                // Step 4: 로비 입장 테스트
+                Debug.Log("[NetworkManager] 4단계: 로비 입장 테스트");
+                bool lobbyResult = EnterLobby();
+                if (!lobbyResult)
+                {
+                    Debug.LogWarning("[NetworkManager] ⚠️ 로비 입장 요청 실패");
+                }
+                else
+                {
+                    Debug.Log("[NetworkManager] ✅ 로비 입장 요청 전송됨");
+                }
+                
+                await Task.Delay(2000); // 응답 대기
+                
+                Debug.Log("[NetworkManager] === 기본 통신 테스트 완료 ===");
+                
+                return true;
+                
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[NetworkManager] 통신 테스트 중 예외: {ex.Message}");
+                return false;
+            }
+        }
+        
+        /// <summary>
+        /// 메시지 프로토콜 테스트 (서버 프로토콜 형식 확인)
+        /// </summary>
+        public void TestMessageProtocols()
+        {
+            Debug.Log("[NetworkManager] === 메시지 프로토콜 테스트 시작 ===");
+            
+            if (!IsConnected())
+            {
+                Debug.LogError("[NetworkManager] 서버에 연결되지 않았습니다.");
+                return;
+            }
+            
+            // 다양한 프로토콜 메시지 테스트
+            Debug.Log("[NetworkManager] 하트비트 테스트...");
+            networkClient.SendHeartbeat();
+            
+            Debug.Log("[NetworkManager] 로비 목록 요청 테스트...");
+            networkClient.SendCleanTCPMessage("lobby", "list");
+            
+            Debug.Log("[NetworkManager] 방 목록 요청 테스트...");
+            networkClient.SendCleanTCPMessage("room", "list");
+            
+            Debug.Log("[NetworkManager] === 메시지 프로토콜 테스트 완료 ===");
         }
     }
 }

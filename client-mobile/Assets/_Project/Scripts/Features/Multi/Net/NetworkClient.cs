@@ -63,7 +63,7 @@ namespace Features.Multi.Net
         }
         
         void Start()
-        {
+        {            
             // 자동 연결은 하지 않음 - 명시적으로 ConnectToServer() 호출 필요
             // UnityMainThreadDispatcher가 없으면 생성
             if (UnityMainThreadDispatcher.Instance == null)
@@ -477,100 +477,170 @@ namespace Features.Multi.Net
         // ========================================
         
         /// <summary>
-        /// JWT 로그인 요청
+        /// JWT 로그인 요청 (서버 프로토콜에 맞춤)
         /// </summary>
         public bool SendJwtLoginRequest(string token)
         {
-            return SendCleanTCPMessage("auth", "jwt", token);
+            // 서버에서 예상하는 형식: auth:JWT토큰
+            return SendCleanTCPMessage("auth", token);
         }
         
         /// <summary>
-        /// 로그인 요청
+        /// 로그인 요청 (서버 프로토콜에 맞춤)
         /// </summary>
         public bool SendLoginRequest(string username, string password)
         {
-            return SendProtocolMessage("auth", "login", username, password);
+            // 서버에서 예상하는 형식: auth:username:password
+            return SendCleanTCPMessage("auth", username, password);
         }
         
         /// <summary>
-        /// 회원가입 요청
+        /// 회원가입 요청 (서버 프로토콜에 맞춤)
         /// </summary>
         public bool SendRegisterRequest(string username, string password)
         {
-            return SendProtocolMessage("auth", "register", username, password);
+            // 서버에서 예상하는 형식: register:username:email:password (이메일은 빈값)
+            return SendCleanTCPMessage("register", username, "", password);
         }
         
         /// <summary>
-        /// 게스트 로그인 요청
+        /// 게스트 로그인 요청 (서버 프로토콜에 맞춤)
         /// </summary>
         public bool SendGuestLoginRequest()
         {
-            string guestName = $"Guest_{UnityEngine.Random.Range(1000, 9999)}";
-            return SendProtocolMessage("auth", "guest", guestName);
+            // 서버에서 예상하는 형식: guest
+            return SendCleanTCPMessage("guest");
         }
         
         /// <summary>
-        /// 사용자 통계 정보 요청
+        /// 버전 체크 요청 (서버 프로토콜에 맞춤)
+        /// </summary>
+        public bool SendVersionCheckRequest(string clientVersion)
+        {
+            // 서버에서 예상하는 형식: version:check:clientVersion
+            return SendCleanTCPMessage("version", "check", clientVersion);
+        }
+        
+        /// <summary>
+        /// 사용자 통계 정보 요청 (서버 프로토콜에 맞춤)
         /// </summary>
         public bool SendGetUserStatsRequest(string username)
         {
-            return SendProtocolMessage("GET_USER_STATS_REQUEST", username);
+            // 서버에서 예상하는 형식: user:stats:username
+            return SendCleanTCPMessage("user", "stats", username);
         }
         
         /// <summary>
-        /// 로비 입장 요청
+        /// 로비 입장 요청 (서버 프로토콜에 맞춤)
         /// </summary>
         public bool SendLobbyEnterRequest()
         {
-            return SendProtocolMessage("LOBBY_ENTER_REQUEST");
+            // 서버에서 예상하는 형식: lobby:enter
+            return SendCleanTCPMessage("lobby", "enter");
         }
         
         /// <summary>
-        /// 로비 나가기 요청
+        /// 로비 나가기 요청 (서버 프로토콜에 맞춤)
         /// </summary>
         public bool SendLobbyLeaveRequest()
         {
-            return SendProtocolMessage("LOBBY_LEAVE_REQUEST");
+            // 서버에서 예상하는 형식: lobby:leave
+            return SendCleanTCPMessage("lobby", "leave");
         }
         
         /// <summary>
-        /// 방 생성 요청
+        /// 로비 사용자 목록 요청 (서버 프로토콜에 맞춤)
         /// </summary>
-        public bool SendCreateRoomRequest(string roomName, int maxPlayers = 4)
+        public bool SendLobbyListRequest()
         {
-            return SendProtocolMessage("CREATE_ROOM_REQUEST", roomName, maxPlayers.ToString());
+            // 서버에서 예상하는 형식: lobby:list
+            return SendCleanTCPMessage("lobby", "list");
         }
         
         /// <summary>
-        /// 방 참가 요청
+        /// 방 목록 요청 (서버 프로토콜에 맞춤)
         /// </summary>
-        public bool SendJoinRoomRequest(int roomId)
+        public bool SendRoomListRequest()
         {
-            return SendProtocolMessage("JOIN_ROOM_REQUEST", roomId.ToString());
+            // 서버에서 예상하는 형식: room:list
+            return SendCleanTCPMessage("room", "list");
         }
         
         /// <summary>
-        /// 방 나가기 요청
+        /// 방 생성 요청 (서버 프로토콜에 맞춤)
+        /// </summary>
+        public bool SendCreateRoomRequest(string roomName, bool isPrivate = false, string password = "")
+        {
+            // 서버에서 예상하는 형식: room:create:name:private[:password]
+            if (isPrivate && !string.IsNullOrEmpty(password))
+            {
+                return SendCleanTCPMessage("room", "create", roomName, "1", password);
+            }
+            else
+            {
+                return SendCleanTCPMessage("room", "create", roomName, isPrivate ? "1" : "0");
+            }
+        }
+        
+        /// <summary>
+        /// 방 참가 요청 (서버 프로토콜에 맞춤)
+        /// </summary>
+        public bool SendJoinRoomRequest(int roomId, string password = "")
+        {
+            // 서버에서 예상하는 형식: room:join:roomId[:password]
+            if (!string.IsNullOrEmpty(password))
+            {
+                return SendCleanTCPMessage("room", "join", roomId.ToString(), password);
+            }
+            else
+            {
+                return SendCleanTCPMessage("room", "join", roomId.ToString());
+            }
+        }
+        
+        /// <summary>
+        /// 방 나가기 요청 (서버 프로토콜에 맞춤)
         /// </summary>
         public bool SendLeaveRoomRequest()
         {
-            return SendProtocolMessage("LEAVE_ROOM_REQUEST");
+            // 서버에서 예상하는 형식: room:leave
+            return SendCleanTCPMessage("room", "leave");
         }
         
         /// <summary>
-        /// 플레이어 준비 상태 설정
+        /// 플레이어 준비 상태 설정 (서버 프로토콜에 맞춤)
         /// </summary>
         public bool SendPlayerReadyRequest(bool isReady)
         {
-            return SendProtocolMessage("PLAYER_READY_REQUEST", isReady.ToString());
+            // 서버에서 예상하는 형식: room:ready:0/1
+            return SendCleanTCPMessage("room", "ready", isReady ? "1" : "0");
         }
         
         /// <summary>
-        /// 게임 시작 요청
+        /// 게임 시작 요청 (서버 프로토콜에 맞춤)
         /// </summary>
         public bool SendStartGameRequest()
         {
-            return SendProtocolMessage("START_GAME_REQUEST");
+            // 서버에서 예상하는 형식: room:start
+            return SendCleanTCPMessage("room", "start");
+        }
+        
+        /// <summary>
+        /// 채팅 메시지 전송 (서버 프로토콜에 맞춤)
+        /// </summary>
+        public bool SendChatMessage(string message)
+        {
+            // 서버에서 예상하는 형식: chat:message
+            return SendCleanTCPMessage("chat", message);
+        }
+        
+        /// <summary>
+        /// 핑 메시지 전송 (서버 프로토콜에 맞춤)
+        /// </summary>
+        public bool SendPing()
+        {
+            // 서버에서 예상하는 형식: ping
+            return SendCleanTCPMessage("ping");
         }
         
         /// <summary>

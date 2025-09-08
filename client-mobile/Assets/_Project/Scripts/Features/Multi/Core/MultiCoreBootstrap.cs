@@ -73,13 +73,24 @@ namespace Features.Multi.Core
             if (debugMode)
                 Debug.Log("[MultiCoreBootstrap] OnDestroy - Cleaning up MultiCore");
 
-            // NetworkManager 에러 이벤트 구독 해제
+            // 모든 코루틴 중지
+            StopAllCoroutines();
+
+            // NetworkManager 이벤트 구독 해제 (연결은 끊지 않음)
             if (NetworkManager.Instance != null)
             {
                 NetworkManager.Instance.OnErrorReceived -= OnNetworkError;
             }
 
-            CleanupManagers();
+            // NetworkManager는 싱글톤이므로 씬 전환 시 연결을 끊지 않음
+            CleanupLocalManagers();
+            
+            // 상태 초기화
+            isDataLoading = false;
+            isDataLoaded = false;
+            isNetworkConnected = false;
+            isAuthenticated = false;
+            
             Instance = null;
         }
 
@@ -161,13 +172,14 @@ namespace Features.Multi.Core
             }
         }
 
-        private void CleanupManagers()
+        private void CleanupLocalManagers()
         {
             if (debugMode)
-                Debug.Log("[MultiCoreBootstrap] Cleaning up managers...");
+                Debug.Log("[MultiCoreBootstrap] Cleaning up local managers...");
 
-            if (NetworkManager.Instance != null)
-                NetworkManager.Instance.Cleanup();
+            // NetworkManager는 싱글톤이므로 여기서 정리하지 않음 (연결 유지)
+            // if (NetworkManager.Instance != null)
+            //     NetworkManager.Instance.Cleanup();
 
             if (multiUserDataCache != null)
                 multiUserDataCache.Cleanup();
@@ -219,6 +231,14 @@ namespace Features.Multi.Core
             }
 
             var networkManager = NetworkManager.Instance;
+
+            // 이미 연결되어 있는지 확인
+            if (networkManager.IsConnected())
+            {
+                Debug.Log("[MultiCoreBootstrap] 이미 TCP 서버에 연결되어 있음");
+                isNetworkConnected = true;
+                yield break;
+            }
 
             // LoadingOverlay 표시 (정적 메소드 사용)
             LoadingOverlay.Show("TCP 서버 연결 중...");
@@ -276,6 +296,22 @@ namespace Features.Multi.Core
 
         private IEnumerator AuthenticateWithTokenCoroutine()
         {
+            // NetworkManager 인스턴스 가져오기
+            var networkManager = NetworkManager.Instance;
+            if (networkManager == null)
+            {
+                Debug.LogError("[MultiCoreBootstrap] NetworkManager Instance가 없습니다.");
+                yield break;
+            }
+            
+            // 이미 인증된 상태인지 확인
+            if (networkManager.IsAuthenticated())
+            {
+                Debug.Log("[MultiCoreBootstrap] 이미 사용자 인증 완료됨");
+                isAuthenticated = true;
+                yield break;
+            }
+
             if (loadingOverlay != null)
                 LoadingOverlay.Show("사용자 인증 중...");
 
@@ -289,14 +325,6 @@ namespace Features.Multi.Core
             // accessToken 가져오기 (만료된 경우 자동 갱신됨)
             string accessToken = GetAccessTokenFromSession();
             string clientId = "unity-mobile-client"; // OIDC 클라이언트 ID
-            
-            // NetworkManager 인스턴스 가져오기
-            var networkManager = NetworkManager.Instance;
-            if (networkManager == null)
-            {
-                Debug.LogError("[MultiCoreBootstrap] NetworkManager Instance가 없습니다.");
-                yield break;
-            }
 
             // 고급 연결/인증 방식 사용 (토큰 자동 갱신 포함)
             bool connectionResult = false;

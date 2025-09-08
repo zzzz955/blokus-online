@@ -25,7 +25,7 @@ Unity 기반 모바일 클라이언트에서 stub으로 구현된 멀티플레�
 **목표**: TCP 소켓 연결과 기본 메시지 핸들링 구현
 
 #### 1.1 NetworkClient 구현 복구 및 수정
-- [ ] **NetworkClient.cs 주석 해제 및 Unity 호환성 수정**
+- [✔️] **NetworkClient.cs 주석 해제 및 Unity 호환성 수정**
   - `System.Net.Sockets.TcpClient` 사용
   - UTF-8 + 개행문자(\n) 프레이밍 구현
   - Thread 기반 수신처리를 Unity 메인스레드 디스패처로 수정
@@ -39,7 +39,7 @@ Unity 기반 모바일 클라이언트에서 stub으로 구현된 멀티플레�
   - JSON 페이로드 처리 (GAME_STATE_UPDATE, BLOCK_PLACED 등)
 
 #### 1.3 NetworkManager 파사드 패턴 구현
-- [ ] **NetworkManager.cs 통합 관리 클래스 구현**
+- [✔️] **NetworkManager.cs 통합 관리 클래스 구현**
   - NetworkClient와 MessageHandler 통합 관리
   - UI 레이어에서 쉽게 사용할 수 있는 API 제공
   - 자동 재연결 및 하트비트 시스템
@@ -49,12 +49,12 @@ Unity 기반 모바일 클라이언트에서 stub으로 구현된 멀티플레�
 **목표**: OIDC 인증과 TCP 서버 연결 연동
 
 #### 2.1 멀티플레이 버튼 활성화 및 연결 플로우
-- [ ] **ModeSelectionPanel.cs 수정**
+- [✔️] **ModeSelectionPanel.cs 수정**
   - `multiPlayerButton.interactable = true`로 변경
   - 멀티플레이 버튼 클릭 시 TCP 서버 연결 시도
 
 #### 2.2 토큰 기반 인증 구현
-- [ ] **TCP 인증 연동 구현**
+- [✔️] **TCP 인증 연동 구현**
   - `SessionManager`에서 refreshToken 획득
   - refreshToken을 JWT로 서버에 전송: `auth:<JWT>`
   - fallback: ID/PW 기반 인증 `auth:<username>:<password>`

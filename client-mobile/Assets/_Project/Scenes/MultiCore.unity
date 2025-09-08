@@ -199,7 +199,7 @@ MonoBehaviour:
   autoReconnect: 1
   reconnectDelay: 1
   maxReconnectAttempts: 3
-  enableHeartbeat: 1
+  enableHeartbeat: 0
   heartbeatInterval: 30
 --- !u!4 &372329648
 Transform:
