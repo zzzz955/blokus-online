@@ -321,6 +321,20 @@ class DatabaseService {
     return result.rows[0] || null
   }
 
+  // 사용자의 활성 Refresh Token 조회
+  async getActiveRefreshTokens(userId, clientId) {
+    const query = `
+      SELECT rt.*, rtf.user_id, rtf.client_id, rtf.device_fingerprint
+      FROM refresh_tokens rt
+      JOIN refresh_token_families rtf ON rt.family_id = rtf.family_id
+      WHERE rtf.user_id = $1 AND rtf.client_id = $2 AND rt.status = 'active'
+      ORDER BY rt.created_at DESC
+    `
+
+    const result = await this.query(query, [userId, clientId])
+    return result.rows
+  }
+
   // Refresh Token 사용 (rotation with sliding window)
   async rotateRefreshToken(oldJti, newJti, expiresAt) {
     return await this.transaction(async (client) => {

@@ -278,7 +278,10 @@ namespace Features.Multi.Net
             
             try
             {
-                streamWriter.WriteLine(message);
+                // UTF-8 BOM 없이 메시지 전송 (서버 파싱 에러 방지)
+                byte[] messageBytes = System.Text.Encoding.UTF8.GetBytes(message + "\n");
+                networkStream.Write(messageBytes, 0, messageBytes.Length);
+                networkStream.Flush();
                 Debug.Log($"[NetworkClient] 메시지 전송: {message}");
                 return true;
             }

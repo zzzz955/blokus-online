@@ -47,12 +47,12 @@ namespace Blokus {
                 dbPoolSize = getEnvInt("DB_POOL_SIZE", 10);
 
                 // 보안 설정
-                jwtSecret = getEnvString("JWT_SECRET", "dev_secret_change_in_production");
+                jwtSecret = getEnvString("JWT_SECRET", "thissecretisonlyusedfordevelopmentenviromenttest");
                 sessionTimeoutHours = getEnvInt("SESSION_TIMEOUT_HOURS", 24);
                 passwordSaltRounds = getEnvInt("PASSWORD_SALT_ROUNDS", 12);
 
                 // 로깅 설정
-                logLevel = getEnvString("LOG_LEVEL", "warn");
+                logLevel = getEnvString("LOG_LEVEL", "info");
                 logDirectory = getEnvString("LOG_DIRECTORY", "logs");
 
                 // 개발 설정
@@ -65,7 +65,7 @@ namespace Blokus {
                 gitCommit = getEnvString("BLOKUS_GIT_COMMIT", "unknown");
                 gitBranch = getEnvString("BLOKUS_GIT_BRANCH", "main");
                 isProduction = getEnvBool("BLOKUS_PRODUCTION", false);
-                downloadUrl = getEnvString("BLOKUS_DOWNLOAD_URL", "https://blokus-online.mooo.com/download");
+                downloadUrl = getEnvString("BLOKUS_DOWNLOAD_URL", "http://localhost:3000/download");
 
                 // PostgreSQL 연결 문자열 생성
                 dbConnectionString = "host=" + dbHost + " port=" + dbPort +

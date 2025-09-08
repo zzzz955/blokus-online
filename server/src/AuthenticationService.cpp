@@ -58,8 +58,8 @@ namespace Blokus
                 // JWT 검증기 초기화 (환경변수 우선, fallback으로 컨테이너 이름)
                 const char *envJwks = std::getenv("OIDC_JWKS_URI");
                 const char *envIss = std::getenv("OIDC_ISSUER");
-                std::string jwksUrl = envJwks && *envJwks ? envJwks : "https://blokus-online.mooo.com/oidc/jwks.json";
-                std::string issuer = envIss && *envIss ? envIss : "https://blokus-online.mooo.com/oidc";
+                std::string jwksUrl = envJwks && *envJwks ? envJwks : "http://localhost:9000/jwks.json";
+                std::string issuer = envIss && *envIss ? envIss : "http://localhost:9000";
 
                 // 허용 audience를 환경변수로 받기(예: OIDC_ALLOWED_AUDIENCES="unity-mobile-client,web-client")
                 std::vector<std::string> audiences;

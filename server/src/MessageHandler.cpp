@@ -171,37 +171,14 @@ namespace Blokus::Server
             commandStr = commandStr.substr(3);
             spdlog::warn("DEBUG: UTF-8 BOM removed from commandStr");
         }
-        
-        // 강화된 trim 처리 - 모든 제어 문자와 공백 제거
-        commandStr.erase(0, commandStr.find_first_not_of(" \t\r\n\v\f\0"));
-        commandStr.erase(commandStr.find_last_not_of(" \t\r\n\v\f\0") + 1);
-        
-        // 추가 안전장치: ASCII 제어 문자(0-31) 모두 제거
-        commandStr.erase(std::remove_if(commandStr.begin(), commandStr.end(), 
-            [](unsigned char c) { return c < 32; }), commandStr.end());
-        
-        spdlog::warn("DEBUG: parts.size()={}, commandStr='{}' (len={})", parts.size(), commandStr, commandStr.length());
-        
-        // 각 바이트 값 출력
-        std::string hexDump = "";
-        for(size_t i = 0; i < commandStr.length(); ++i) {
-            char buffer[10];
-            sprintf(buffer, "%02X ", (unsigned char)commandStr[i]);
-            hexDump += buffer;
-        }
-        spdlog::warn("DEBUG: commandStr hex bytes: [{}]", hexDump);
 
         // room:xxx, game:xxx 형태 처리
         if (parts.size() >= 2)
         {
-            spdlog::warn("DEBUG: commandStr='{}', parts[1]='{}', checking composite...", commandStr, parts[1]);
-            bool isAuthMatch = (commandStr == "auth");
-            spdlog::warn("DEBUG: (commandStr == \"auth\") = {}", isAuthMatch);
             
             if (commandStr == "room" || commandStr == "game" || commandStr == "lobby" || commandStr == "user" || commandStr == "version" || commandStr == "auth")
             {
                 commandStr += ":" + parts[1];
-                spdlog::warn("DEBUG: Composite command created: '{}'", commandStr);
                 // 파라미터는 2번째 인덱스부터
                 std::vector<std::string> params(parts.begin() + 2, parts.end());
                 return {parseMessageType(commandStr), params};
@@ -282,12 +259,12 @@ namespace Blokus::Server
             result = authService_->authenticateMobileClient(accessToken);
             spdlog::info("모바일 클라이언트 JWT 인증 시도: {}", accessToken.substr(0, 20) + "...");
         }
-        // 표준 JWT 인증 (jwt) - 모바일 및 기존 클라이언트 공통
+        // 표준 JWT 인증 (jwt) - 모바일 클라이언트용 (mobile_jwt와 동일한 로직 사용)
         else if (params.size() == 2 && params[0] == "jwt")
         {
-            std::string jwtToken = params[1];
-            result = authService_->loginWithJwt(jwtToken);
-            spdlog::info("클라이언트 JWT 토큰 인증 시도: {}", jwtToken.substr(0, 20) + "...");
+            std::string accessToken = params[1];
+            result = authService_->authenticateMobileClient(accessToken);
+            spdlog::info("모바일 클라이언트 JWT 인증 시도 (jwt): {}", accessToken.substr(0, 20) + "...");
         }
         // 기존 JWT 토큰인지 확인 (JWT는 '.'로 구분된 3개 부분으로 구성)
         else if (params.size() == 1 && std::count(params[0].begin(), params[0].end(), '.') == 2)

@@ -19,7 +19,18 @@ namespace App.Network
         
         public TokenVerificationService(string authServerBaseUrl)
         {
-            baseUrl = authServerBaseUrl?.TrimEnd('/') ?? "https://blokus-online.mooo.com";
+            // EnvironmentModeManager를 통한 동적 URL 설정
+            if (App.Config.EnvironmentModeManager.Instance != null)
+            {
+                baseUrl = App.Config.EnvironmentModeManager.Instance.GetAuthServerUrl();
+                Debug.Log($"[TokenVerificationService] Environment-based URL: {baseUrl}");
+            }
+            else
+            {
+                // Fallback: 전달받은 URL 또는 배포 서버 URL 사용
+                baseUrl = authServerBaseUrl?.TrimEnd('/') ?? "https://blokus-online.mooo.com";
+                Debug.LogWarning($"[TokenVerificationService] EnvironmentModeManager not found, using fallback URL: {baseUrl}");
+            }
         }
         
         /// <summary>
