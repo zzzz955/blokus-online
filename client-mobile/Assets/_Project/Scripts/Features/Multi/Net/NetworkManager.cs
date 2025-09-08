@@ -328,13 +328,13 @@ namespace Features.Multi.Net
 
                 // Step 3: 모바일 클라이언트 인증 (간소화된 JWT 전송)
                 Debug.Log("[NetworkManager] Step 3: 모바일 클라이언트 인증 중...");
-                bool authSuccess = SendMobileJwtLogin(validToken);
+                bool authSuccess = await SendMobileJwtLoginAsync(validToken);
                 
                 if (!authSuccess)
                 {
                     Debug.LogError("[NetworkManager] 모바일 클라이언트 인증 실패");
                     DisconnectFromServer();
-                    OnNetworkError("인증 요청 전송에 실패했습니다.");
+                    OnNetworkError("모바일 클라이언트 인증에 실패했습니다.");
                     return false;
                 }
 
@@ -352,7 +352,77 @@ namespace Features.Multi.Net
         }
 
         /// <summary>
-        /// 모바일 클라이언트 전용 JWT 로그인 (TCP 서버 간소화 인증)
+        /// 모바일 클라이언트 전용 JWT 로그인 (TCP 서버 간소화 인증) - 서버 응답 대기
+        /// </summary>
+        private async Task<bool> SendMobileJwtLoginAsync(string validatedToken)
+        {
+            if (!IsConnected())
+            {
+                Debug.LogWarning("[NetworkManager] TCP 서버에 연결되지 않았습니다.");
+                return false;
+            }
+            
+            // 인증 결과를 기다리기 위한 TaskCompletionSource
+            var authCompletionSource = new TaskCompletionSource<bool>();
+            System.Action<string> tempErrorHandler = null;
+            bool authCompleted = false;
+
+            try
+            {
+                // 에러 응답 핸들러 등록 (인증 관련 에러만 처리)
+                tempErrorHandler = (errorMessage) => {
+                    if (authCompleted) return; // 이미 완료된 경우 무시
+                    
+                    if (errorMessage.Contains("인증 토큰이 유효하지 않습니다") || 
+                        errorMessage.Contains("authentication") ||
+                        errorMessage.Contains("토큰"))
+                    {
+                        authCompleted = true;
+                        Debug.Log($"[NetworkManager] 인증 실패 감지: {errorMessage}");
+                        authCompletionSource.TrySetResult(false);
+                    }
+                };
+
+                // 에러 이벤트 구독
+                OnErrorReceived += tempErrorHandler;
+
+                // 모바일 클라이언트 전용 인증 요청 전송
+                bool sent = networkClient.SendProtocolMessage("auth", "mobile_jwt", validatedToken);
+                
+                if (!sent)
+                {
+                    return false;
+                }
+
+                // 서버 응답 대기 (최대 5초)
+                var timeoutTask = Task.Delay(5000);
+                var completedTask = await Task.WhenAny(authCompletionSource.Task, timeoutTask);
+
+                if (completedTask == timeoutTask)
+                {
+                    // 타임아웃 - 에러가 발생하지 않았으므로 성공으로 간주
+                    authCompleted = true;
+                    Debug.Log("[NetworkManager] 인증 응답 타임아웃 - 성공으로 간주");
+                    return true;
+                }
+
+                // 실제 서버 응답 결과 반환
+                bool result = authCompletionSource.Task.Result;
+                Debug.Log($"[NetworkManager] 인증 결과: {result}");
+                return result;
+            }
+            finally
+            {
+                // 이벤트 핸들러 해제
+                if (tempErrorHandler != null)
+                {
+                    OnErrorReceived -= tempErrorHandler;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 모바일 클라이언트 전용 JWT 로그인 (TCP 서버 간소화 인증) - 동기 버전
         /// </summary>
         private bool SendMobileJwtLogin(string validatedToken)
         {

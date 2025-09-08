@@ -57,6 +57,12 @@ namespace Features.Multi.Core
             // Audio Listener 중복 문제 해결
             Utilities.AudioListenerManager.FixDuplicateAudioListeners();
 
+            // NetworkManager 에러 이벤트 구독 (인증 실패 감지용)
+            if (NetworkManager.Instance != null)
+            {
+                NetworkManager.Instance.OnErrorReceived += OnNetworkError;
+            }
+
             ShowLoadingUI();
             InitializeManagers();
             StartCoroutine(InitializeMulticoreDataCoroutine());
@@ -67,8 +73,37 @@ namespace Features.Multi.Core
             if (debugMode)
                 Debug.Log("[MultiCoreBootstrap] OnDestroy - Cleaning up MultiCore");
 
+            // NetworkManager 에러 이벤트 구독 해제
+            if (NetworkManager.Instance != null)
+            {
+                NetworkManager.Instance.OnErrorReceived -= OnNetworkError;
+            }
+
             CleanupManagers();
             Instance = null;
+        }
+
+        /// <summary>
+        /// NetworkManager 에러 이벤트 핸들러 (인증 실패 감지)
+        /// </summary>
+        private void OnNetworkError(string errorMessage)
+        {
+            if (debugMode)
+                Debug.Log($"[MultiCoreBootstrap] 네트워크 에러 감지: {errorMessage}");
+
+            // 인증 관련 에러인지 확인
+            if (errorMessage.Contains("인증 토큰이 유효하지 않습니다") ||
+                errorMessage.Contains("authentication") ||
+                errorMessage.Contains("토큰"))
+            {
+                Debug.LogError($"[MultiCoreBootstrap] 인증 실패 감지: {errorMessage}");
+                
+                // 인증 실패 상태로 설정
+                isAuthenticated = false;
+                
+                // MainScene으로 복귀 (MultiGameplayScene으로 가지 않음)
+                HandleConnectionFailure("인증에 실패하여 메인 화면으로 돌아갑니다.");
+            }
         }
 
         // ========================================
