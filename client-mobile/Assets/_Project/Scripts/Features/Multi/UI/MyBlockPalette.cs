@@ -1,242 +1,488 @@
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using System.Collections.Generic;
+using Shared.Models;
+using Features.Single.Gameplay;
 
 namespace Features.Multi.UI
 {
     /// <summary>
-    /// 내 블록 팔레트 (Stub 구현)
-    /// 플레이어가 사용할 수 있는 블록들을 표시
+    /// 멀티플레이어 블록 팔레트 - Single 버전 기반으로 멀티플레이어 기능 추가
+    /// 턴 기반 상호작용, 사용 블록 추적, 서버 동기화
     /// </summary>
     public class MyBlockPalette : MonoBehaviour
     {
-        [Header("UI 컴포넌트")]
-        [SerializeField] private ScrollRect scrollRect;
-        [SerializeField] private Transform blockContainer;
-        [SerializeField] private GameObject blockItemPrefab;
-        
-        [Header("플레이어 설정")]
-        [SerializeField] private int playerId = 0;
-        [SerializeField] private Color playerColor = Color.blue;
-        
-        // 블록 데이터
-        private List<BlockItem> availableBlocks = new List<BlockItem>();
-        private BlockItem selectedBlock = null;
-        
-        // 이벤트
-        public event System.Action<BlockItem> OnBlockSelected;
-        public event System.Action<BlockItem> OnBlockUsed;
-        
-        private void Start()
+        [Header("Refs")]
+        [SerializeField] private RectTransform blockContainer; // ScrollView/Viewport/Content
+        [SerializeField] private GameObject blockButtonPrefab; // 선택: 없으면 코드로 기본 생성
+
+        [Header("Cell Sprite System")]
+        [SerializeField] private CellSpriteProvider cellSpriteProvider; // 셀 스프라이트 제공자
+
+        // 멀티플레이어 전용
+        [Header("Multiplayer Settings")]
+        [SerializeField] private PlayerColor myPlayerColor = PlayerColor.Blue;
+        [SerializeField] private bool isInteractable = false; // 턴 기반 상호작용
+
+        public event Action<Block> OnBlockSelected;
+
+        private readonly Dictionary<BlockType, BlockButton> _buttons = new();
+        private PlayerColor _player = PlayerColor.Blue;
+
+        private BlockType? _selectedType;
+        private Block _selectedBlock;
+        private BlockButton _currentSelectedButton; // 현재 선택된 버튼 참조
+
+        // 멀티플레이어 상태
+        private bool isMyTurn = false;
+        private readonly HashSet<BlockType> usedBlocks = new(); // 사용된 블록 추적
+
+        private void Awake()
         {
-            InitializeBlocks();
-        }
-        
-        /// <summary>
-        /// 블록 팔레트 초기화
-        /// </summary>
-        private void InitializeBlocks()
-        {
-            Debug.Log("[MyBlockPalette] 블록 팔레트 초기화 (Stub)");
-            
-            // Stub: 간단한 블록들만 생성
-            CreateStubBlocks();
-            
-            // UI 업데이트
-            UpdateBlockPaletteUI();
-        }
-        
-        /// <summary>
-        /// Stub 블록들 생성
-        /// </summary>
-        private void CreateStubBlocks()
-        {
-            // 실제 블로커스 블록 대신 간단한 Stub 블록들
-            var blocks = new[]
+            if (blockContainer == null)
             {
-                new BlockItem { id = 1, name = "1x1", size = new Vector2Int(1, 1), isUsed = false },
-                new BlockItem { id = 2, name = "2x1", size = new Vector2Int(2, 1), isUsed = false },
-                new BlockItem { id = 3, name = "L자", size = new Vector2Int(2, 2), isUsed = false },
-                new BlockItem { id = 4, name = "T자", size = new Vector2Int(3, 2), isUsed = false },
-                new BlockItem { id = 5, name = "십자", size = new Vector2Int(3, 3), isUsed = false }
-            };
-            
-            availableBlocks.AddRange(blocks);
-        }
-        
-        /// <summary>
-        /// 블록 팔레트 UI 업데이트
-        /// </summary>
-        private void UpdateBlockPaletteUI()
-        {
-            if (blockContainer == null) return;
-            
-            // 기존 UI 정리
-            for (int i = blockContainer.childCount - 1; i >= 0; i--)
-            {
-                DestroyImmediate(blockContainer.GetChild(i).gameObject);
+                Debug.LogError("[MultiBlockPalette] blockContainer(Content)가 연결되지 않았습니다.");
+                return;
             }
-            
-            // 새 블록 UI 생성
-            foreach (var block in availableBlocks)
+
+            // 이미 GridLayoutGroup이 있으면, 아무 레이아웃도 추가/수정하지 않는다.
+            var grid = blockContainer.GetComponent<GridLayoutGroup>();
+            if (grid != null)
             {
-                CreateBlockUI(block);
+                Debug.Log("[MultiBlockPalette] GridLayoutGroup 감지됨 → 자동 레이아웃 보정 생략");
+                return;
+            }
+
+            // Grid가 없을 때만, 기존 방식(Horizontal + Fitter) 보정 수행
+            var hl = blockContainer.GetComponent<HorizontalLayoutGroup>();
+            if (hl == null) hl = blockContainer.gameObject.AddComponent<HorizontalLayoutGroup>();
+            hl.childAlignment = TextAnchor.UpperLeft;
+            hl.spacing = 8f;
+            hl.childControlWidth = true;
+            hl.childControlHeight = true;
+            hl.childForceExpandWidth = false;
+            hl.childForceExpandHeight = false;
+
+            var fitter = blockContainer.GetComponent<ContentSizeFitter>();
+            if (fitter == null) fitter = blockContainer.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            fitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
+        }
+
+        /// <summary>
+        /// 멀티플레이어 팔레트 초기화
+        /// </summary>
+        public void InitializePalette(PlayerColor player)
+        {
+            _player = player;
+            myPlayerColor = player;
+            Debug.Log($"[MultiBlockPalette] InitializePalette - Player: {player}, CellSpriteProvider: {cellSpriteProvider != null}");
+            
+            Clear();
+            
+            // 모든 21개 블록 타입으로 초기화
+            List<BlockType> allBlockTypes = BlockFactory.GetAllBlockTypes();
+            
+            foreach (var type in allBlockTypes)
+            {
+                var btn = CreateButton(type, player);
+                _buttons[type] = btn;
+            }
+
+            // 초기 프레임 레이아웃 타이밍 이슈 방지
+            LayoutRebuilder.ForceRebuildLayoutImmediate(blockContainer);
+
+            Debug.Log($"[MultiBlockPalette] 초기화 완료: {allBlockTypes.Count}개 블록, Player={player}");
+        }
+
+        /// <summary>
+        /// 블록을 사용됨으로 표시 (서버에서 확정된 후 호출)
+        /// </summary>
+        public void MarkBlockAsUsed(BlockType type)
+        {
+            if (_buttons.TryGetValue(type, out var btn) && btn != null)
+            {
+                // 완전히 숨기기 (딕셔너리에서는 제거하지 않음)
+                btn.gameObject.SetActive(false);
+                usedBlocks.Add(type);
+
+                // 레이아웃 갱신
+                if (blockContainer != null)
+                    LayoutRebuilder.ForceRebuildLayoutImmediate(blockContainer);
+            }
+
+            // 선택된 블록이 사용된 경우 선택 상태 해제
+            if (_selectedType.HasValue && _selectedType.Value.Equals(type))
+            {
+                ClearSelection();
+                Debug.Log($"[MultiBlockPalette] 블록 {type} 사용됨 - 선택 상태 해제");
             }
         }
-        
+
         /// <summary>
-        /// 블록 UI 생성
+        /// 사용된 블록을 다시 사용 가능하게 복원 (Undo용)
         /// </summary>
-        private void CreateBlockUI(BlockItem block)
+        public void RestoreBlock(BlockType type)
         {
-            if (blockItemPrefab == null) return;
-            
-            GameObject blockUI = Instantiate(blockItemPrefab, blockContainer);
-            blockUI.name = $"Block_{block.id}_{block.name}";
-            
-            // 블록 이미지 설정 (Stub)
-            Image blockImage = blockUI.GetComponent<Image>();
-            if (blockImage != null)
+            if (_buttons.ContainsKey(type))
             {
-                blockImage.color = block.isUsed ? Color.gray : playerColor;
-            }
-            
-            // 블록 이름 표시
-            Text nameText = blockUI.GetComponentInChildren<Text>();
-            if (nameText != null)
-            {
-                nameText.text = block.name;
-            }
-            
-            // 클릭 이벤트 연결
-            Button blockButton = blockUI.GetComponent<Button>();
-            if (blockButton != null)
-            {
-                blockButton.onClick.AddListener(() => OnBlockClicked(block));
-                blockButton.interactable = !block.isUsed;
-            }
-        }
-        
-        /// <summary>
-        /// 블록 클릭 처리
-        /// </summary>
-        private void OnBlockClicked(BlockItem block)
-        {
-            if (block.isUsed) return;
-            
-            Debug.Log($"[MyBlockPalette] 블록 선택: {block.name}");
-            
-            selectedBlock = block;
-            OnBlockSelected?.Invoke(block);
-            
-            // 선택된 블록 하이라이트 (Stub)
-            UpdateBlockSelection();
-        }
-        
-        /// <summary>
-        /// 블록 선택 UI 업데이트
-        /// </summary>
-        private void UpdateBlockSelection()
-        {
-            // Stub: 실제 구현에서는 선택된 블록을 하이라이트
-            Debug.Log($"[MyBlockPalette] 블록 선택 상태 업데이트: {selectedBlock?.name ?? "None"}");
-        }
-        
-        /// <summary>
-        /// 블록 사용 처리
-        /// </summary>
-        public void UseBlock(BlockItem block)
-        {
-            var targetBlock = availableBlocks.Find(b => b.id == block.id);
-            if (targetBlock != null)
-            {
-                targetBlock.isUsed = true;
-                OnBlockUsed?.Invoke(targetBlock);
+                var btn = _buttons[type];
+                btn.gameObject.SetActive(true);
+                usedBlocks.Remove(type);
                 
-                Debug.Log($"[MyBlockPalette] 블록 사용: {block.name}");
-                
-                // UI 업데이트
-                UpdateBlockPaletteUI();
+                // 복원된 블록이 이전에 선택된 상태였다면 선택 상태 유지
+                if (_selectedType.HasValue && _selectedType.Value.Equals(type))
+                {
+                    btn.SetSelected(true);
+                    _currentSelectedButton = btn;
+                    Debug.Log($"[MultiBlockPalette] 복원된 블록 {type} 선택 상태 유지");
+                }
+                return;
             }
+
+            // 프리팹으로 복원 (일반적으로는 발생하지 않음)
+            Debug.LogWarning($"[MultiBlockPalette] 블록 {type}이 딕셔너리에 없어서 새로 생성");
+            var blockButton = CreateButton(type, _player);
+            _buttons[type] = blockButton;
+            usedBlocks.Remove(type);
+
+            LayoutRebuilder.ForceRebuildLayoutImmediate(blockContainer);
         }
-        
+
         /// <summary>
-        /// 선택된 블록 가져오기
+        /// 블록 버튼 클릭 처리 (내부 호출)
         /// </summary>
-        public BlockItem GetSelectedBlock()
+        internal void NotifyButtonClicked(BlockType type, PlayerColor player)
         {
-            return selectedBlock;
+            OnBlockButtonClicked(type);
         }
-        
+
         /// <summary>
-        /// 플레이어 색상 설정
+        /// 블록 선택 처리 (내 턴에만 가능)
         /// </summary>
-        public void SetPlayerColor(Color color)
+        public void OnBlockButtonClicked(BlockType blockType)
         {
-            playerColor = color;
-            UpdateBlockPaletteUI();
+            if (!isMyTurn || !isInteractable)
+            {
+                Debug.Log($"[MultiBlockPalette] 블록 선택 무시 - 내 턴이 아님 (isMyTurn: {isMyTurn}, isInteractable: {isInteractable})");
+                return;
+            }
+
+            if (usedBlocks.Contains(blockType))
+            {
+                Debug.Log($"[MultiBlockPalette] 블록 선택 무시 - 이미 사용됨: {blockType}");
+                return;
+            }
+
+            // 이전 선택 블록 해제
+            if (_currentSelectedButton != null)
+            {
+                _currentSelectedButton.SetSelected(false);
+            }
+            
+            // 새로운 블록 선택
+            _selectedType = blockType;
+            _selectedBlock = new Block(blockType, _player);
+            
+            // 선택된 버튼에 시각적 피드백 적용
+            if (_buttons.TryGetValue(blockType, out var selectedButton))
+            {
+                selectedButton.SetSelected(true);
+                _currentSelectedButton = selectedButton;
+            }
+            
+            Debug.Log($"[MultiBlockPalette] 블록 선택: {blockType}");
+            OnBlockSelected?.Invoke(_selectedBlock);
         }
-        
+
         /// <summary>
-        /// 사용 가능한 블록 개수
+        /// 선택 상태 해제
+        /// </summary>
+        public void ClearSelection()
+        {
+            if (_currentSelectedButton != null)
+            {
+                _currentSelectedButton.SetSelected(false);
+                _currentSelectedButton = null;
+            }
+            _selectedType = null;
+            _selectedBlock = null;
+        }
+
+        /// <summary>
+        /// 선택된 블록 회전 (내 턴에만 가능)
+        /// </summary>
+        public void RotateSelectedBlock(bool clockwise)
+        {
+            if (!isMyTurn || _selectedBlock == null) return;
+            
+            if (clockwise) _selectedBlock.RotateClockwise();
+            else _selectedBlock.RotateCounterClockwise();
+            
+            Debug.Log($"[MultiBlockPalette] 선택된 블록 {_selectedType} 회전 - {(clockwise ? "시계방향" : "반시계방향")}");
+            OnBlockSelected?.Invoke(_selectedBlock);
+        }
+
+        /// <summary>
+        /// 선택된 블록 뒤집기 (내 턴에만 가능)
+        /// </summary>
+        public void FlipSelectedBlock(bool vertical)
+        {
+            if (!isMyTurn || _selectedBlock == null) return;
+            
+            if (vertical) _selectedBlock.FlipVertical();
+            else _selectedBlock.FlipHorizontal();
+            
+            Debug.Log($"[MultiBlockPalette] 선택된 블록 {_selectedType} 플립 - {(vertical ? "수직" : "수평")}");
+            OnBlockSelected?.Invoke(_selectedBlock);
+        }
+
+        /// <summary>
+        /// 사용 가능한 블록 리스트 반환 (게임 종료 조건 체크용)
+        /// </summary>
+        public List<BlockType> GetAvailableBlocks()
+        {
+            var availableBlocks = new List<BlockType>();
+            foreach (var kvp in _buttons)
+            {
+                if (kvp.Value != null && kvp.Value.gameObject.activeInHierarchy && !usedBlocks.Contains(kvp.Key))
+                {
+                    availableBlocks.Add(kvp.Key);
+                }
+            }
+            return availableBlocks;
+        }
+
+        /// <summary>
+        /// 사용 가능한 블록이 있는지 확인 (게임 종료 조건 체크용)
+        /// </summary>
+        public bool HasAvailableBlocks()
+        {
+            foreach (var kvp in _buttons)
+            {
+                if (kvp.Value != null && kvp.Value.gameObject.activeInHierarchy && !usedBlocks.Contains(kvp.Key))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 사용 가능한 블록 개수 반환 (디버그용)
         /// </summary>
         public int GetAvailableBlockCount()
         {
-            return availableBlocks.FindAll(b => !b.isUsed).Count;
-        }
-        
-        /// <summary>
-        /// 팔레트 초기화
-        /// </summary>
-        public void ResetPalette()
-        {
-            Debug.Log("[MyBlockPalette] 팔레트 리셋");
-            
-            foreach (var block in availableBlocks)
+            int count = 0;
+            foreach (var kvp in _buttons)
             {
-                block.isUsed = false;
+                if (kvp.Value != null && kvp.Value.gameObject.activeInHierarchy && !usedBlocks.Contains(kvp.Key))
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        /// <summary>
+        /// 현재 선택된 블록 반환
+        /// </summary>
+        public Block GetSelectedBlock()
+        {
+            return _selectedBlock;
+        }
+
+        private void Clear()
+        {
+            // 선택 상태 초기화
+            ClearSelection();
+            
+            _buttons.Clear();
+            usedBlocks.Clear();
+
+            if (blockContainer == null) return;
+            for (int i = blockContainer.childCount - 1; i >= 0; i--)
+                Destroy(blockContainer.GetChild(i).gameObject);
+        }
+
+        private BlockButton CreateButton(BlockType type, PlayerColor player)
+        {
+            GameObject go;
+            if (blockButtonPrefab != null)
+            {
+                go = Instantiate(blockButtonPrefab, blockContainer);
+                if (go.GetComponent<BlockButton>() == null) go.AddComponent<BlockButton>();
+                if (go.GetComponent<Button>() == null) go.AddComponent<Button>();
+                if (go.GetComponent<Image>() == null) go.AddComponent<Image>();
+            }
+            else
+            {
+                go = new GameObject($"Block_{type}", typeof(RectTransform), typeof(Image), typeof(Button), typeof(BlockButton));
+                var rt = (RectTransform)go.transform;
+                rt.SetParent(blockContainer, false);
+                rt.sizeDelta = new Vector2(160f, 160f);
+
+                var img = go.GetComponent<Image>();
+                img.sprite = Resources.FindObjectsOfTypeAll<Sprite>()?.Length > 0 ? img.sprite : null;
+                img.color = Color.white;
+                img.raycastTarget = true;
+
+                var btn = go.GetComponent<Button>();
+                btn.targetGraphic = img;
+                btn.transition = Selectable.Transition.ColorTint;
+                btn.interactable = true;
+            }
+
+            var bb = go.GetComponent<BlockButton>();
+            
+            // CellSpriteProvider 설정 (있는 경우)
+            if (cellSpriteProvider != null)
+            {
+                bb.SetCellSpriteProvider(cellSpriteProvider);
+                Debug.Log($"[MultiBlockPalette] BlockButton({type})에 CellSpriteProvider 설정 완료");
+            }
+            else
+            {
+                Debug.LogWarning($"[MultiBlockPalette] cellSpriteProvider가 null - BlockButton({type})에 설정하지 못함");
             }
             
-            selectedBlock = null;
-            UpdateBlockPaletteUI();
+            // BlockButton을 위한 더미 BlockPalette를 임시로 생성하지 않고
+            // BlockButton의 private 필드들을 reflection으로 직접 설정
+            var typeField = typeof(Features.Single.Gameplay.BlockButton).GetProperty("Type", 
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+            var playerField = typeof(Features.Single.Gameplay.BlockButton).GetProperty("Player", 
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+            
+            // reflection이 실패할 수 있으므로 try-catch로 감싸기
+            try
+            {
+                // 더미 BlockPalette로 Init 호출
+                var tempPalette = go.AddComponent<Features.Single.Gameplay.BlockPalette>();
+                bb.Init(tempPalette, type, player, Color.white, type.ToString());
+                DestroyImmediate(tempPalette);
+                
+                Debug.Log($"[MyBlockPalette] BlockButton({type}) 초기화 완료");
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[MyBlockPalette] BlockButton 초기화 실패: {ex.Message}");
+            }
+            
+            // 클릭 이벤트를 우리 메서드로 리디렉트
+            var button = bb.GetComponent<Button>();
+            if (button != null)
+            {
+                button.onClick.RemoveAllListeners();
+                button.onClick.AddListener(() => NotifyButtonClicked(type, player));
+            }
+
+            var le = go.GetComponent<LayoutElement>();
+            if (le == null) le = go.AddComponent<LayoutElement>();
+            le.preferredWidth = 160f;
+            le.preferredHeight = 160f;
+            le.flexibleWidth = 0f;
+            le.flexibleHeight = 0f;
+
+            return bb;
         }
-        
+
+        // ========================================
+        // Public API (멀티플레이어 전용)
+        // ========================================
+
         /// <summary>
-        /// 팔레트 상호작용 설정
+        /// 상호작용 설정 (턴 기반)
         /// </summary>
         public void SetInteractable(bool interactable)
         {
-            Debug.Log($"[MyBlockPalette] 상호작용 설정: {interactable}");
+            isInteractable = interactable;
+            Debug.Log($"[MultiBlockPalette] 상호작용 설정: {interactable}");
             
-            if (blockContainer == null) return;
-            
-            for (int i = 0; i < blockContainer.childCount; i++)
+            // 모든 버튼의 상호작용 상태 업데이트
+            foreach (var kvp in _buttons)
             {
-                Transform child = blockContainer.GetChild(i);
-                Button blockButton = child.GetComponent<Button>();
-                if (blockButton != null)
+                if (kvp.Value != null && kvp.Value.gameObject.activeInHierarchy)
                 {
-                    blockButton.interactable = interactable && !availableBlocks[i].isUsed;
+                    var button = kvp.Value.GetComponent<Button>();
+                    if (button != null)
+                    {
+                        button.interactable = interactable && !usedBlocks.Contains(kvp.Key);
+                    }
                 }
             }
         }
-    }
-    
-    /// <summary>
-    /// 블록 아이템 구조체
-    /// </summary>
-    [System.Serializable]
-    public class BlockItem
-    {
-        public int id;
-        public string name;
-        public Vector2Int size;
-        public bool isUsed;
-        public List<Vector2Int> shape = new List<Vector2Int>(); // 블록의 실제 모양 (상대 좌표)
-        
-        public BlockItem()
+
+        /// <summary>
+        /// 내 턴 설정
+        /// </summary>
+        public void SetMyTurn(bool isMyTurn, PlayerColor myColor)
         {
-            shape = new List<Vector2Int>();
+            this.isMyTurn = isMyTurn;
+            this.myPlayerColor = myColor;
+            
+            if (!isMyTurn)
+            {
+                ClearSelection(); // 내 턴이 아닐 때 선택 해제
+            }
+            
+            Debug.Log($"[MultiBlockPalette] 턴 상태 변경: {(isMyTurn ? "내 턴" : "상대 턴")}, 내 색상: {myColor}");
+        }
+
+        /// <summary>
+        /// 팔레트 리셋
+        /// </summary>
+        public void ResetPalette()
+        {
+            Debug.Log("[MultiBlockPalette] 팔레트 리셋");
+            
+            usedBlocks.Clear();
+            
+            // 모든 블록을 사용 가능한 상태로 복원
+            foreach (var kvp in _buttons)
+            {
+                if (kvp.Value != null)
+                {
+                    kvp.Value.gameObject.SetActive(true);
+                }
+            }
+            
+            ClearSelection();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(blockContainer);
+        }
+
+        /// <summary>
+        /// 플레이어 색상 설정
+        /// </summary>
+        public void SetPlayerColor(PlayerColor color)
+        {
+            _player = color;
+            myPlayerColor = color;
+            
+            Debug.Log($"[MultiBlockPalette] 플레이어 색상 변경: {color}");
+            // 버튼들은 이미 생성 시 색상이 설정되므로 여기서는 재생성이 필요할 수 있음
+            // 필요시 InitializePalette를 다시 호출하여 색상 업데이트
+        }
+
+        /// <summary>
+        /// 블록 사용 상태를 서버 상태와 동기화
+        /// </summary>
+        public void SyncUsedBlocks(List<BlockType> serverUsedBlocks)
+        {
+            Debug.Log($"[MultiBlockPalette] 서버와 블록 사용 상태 동기화: {serverUsedBlocks.Count}개");
+            
+            usedBlocks.Clear();
+            
+            foreach (var blockType in serverUsedBlocks)
+            {
+                usedBlocks.Add(blockType);
+                if (_buttons.TryGetValue(blockType, out var btn) && btn != null)
+                {
+                    btn.gameObject.SetActive(false);
+                }
+            }
+            
+            LayoutRebuilder.ForceRebuildLayoutImmediate(blockContainer);
         }
     }
 }

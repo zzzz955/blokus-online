@@ -4,10 +4,21 @@ using System.Collections.Generic;
 using Features.Multi.Net;
 using Features.Multi.Core;
 using GameResult = Features.Multi.Core.GameResult;
-using Features.Multi.Models;
 using NetRoomInfo = Features.Multi.Net.RoomInfo;
 using TMPro;
 using Shared.UI;
+using Shared.Models;
+using SharedPlayerColor = Shared.Models.PlayerColor;
+using SharedPosition = Shared.Models.Position;
+using SharedBlock = Shared.Models.Block;
+using SharedUserInfo = Shared.Models.UserInfo;
+using SharedBlockPlacement = Shared.Models.BlockPlacement;
+using MultiPlayerColor = Features.Multi.Models.PlayerColor;
+using MultiBlockPlacement = Features.Multi.Models.BlockPlacement;
+using MultiChatMessage = Features.Multi.Models.ChatMessage;
+using SharedGameLogic = App.Core.GameLogic;
+using SharedFlipState = Shared.Models.FlipState;
+using NetUserInfo = Features.Multi.Net.UserInfo;
 
 namespace Features.Multi.UI
 {
@@ -53,7 +64,7 @@ namespace Features.Multi.UI
         // Dependencies
         private NetworkManager networkManager;
         // MultiUserDataCache 제거됨 - NetworkManager 직접 사용
-        private GameLogic gameLogic;
+        private SharedGameLogic gameLogic;
 
         // Game State
         private NetRoomInfo currentRoom;
@@ -61,11 +72,12 @@ namespace Features.Multi.UI
         private bool isGameStarted = false;
         private bool isMyTurn = false;
         private bool isReady = false;
-        private PlayerColor myPlayerColor = PlayerColor.None;
+        private MultiPlayerColor myPlayerColor = MultiPlayerColor.None;
+        private SharedPlayerColor mySharedPlayerColor = SharedPlayerColor.None; // Shared.Models 버전
         private int currentTurnPlayerId = -1;
         
         // Chat
-        private List<ChatMessage> chatHistory = new List<ChatMessage>();
+        private List<MultiChatMessage> chatHistory = new List<MultiChatMessage>();
         
         // Timer
         private float turnTimeLimit = 60f;
@@ -126,7 +138,9 @@ namespace Features.Multi.UI
             if (networkManager == null)
                 Debug.LogError("[GameRoomPanel] NetworkManager not found!");
 
-            // MultiUserDataCache 제거됨 - NetworkManager 직접 사용
+            // GameLogic 초기화
+            if (gameLogic == null)
+                gameLogic = new SharedGameLogic();
         }
 
         private void SetupUI()
@@ -151,15 +165,19 @@ namespace Features.Multi.UI
             if (chatInput != null)
                 chatInput.onEndEdit.AddListener(OnChatInputEndEdit);
 
-            // 게임보드 초기 비활성화
+            // 게임보드와 블록 팔레트 초기화 및 이벤트 연결
             if (gameBoard != null)
             {
                 gameBoard.SetInteractable(false);
+                gameBoard.SetGameLogic(gameLogic);
+                gameBoard.OnCellClicked += OnGameBoardCellClicked;
+                gameBoard.OnBlockPlaced += OnGameBoardBlockPlaced;
             }
 
             if (blockPalette != null)
             {
                 blockPalette.SetInteractable(false);
+                blockPalette.OnBlockSelected += OnBlockSelected;
             }
 
             UpdateGameControlsState();
@@ -198,18 +216,7 @@ namespace Features.Multi.UI
                 networkManager.OnErrorReceived += OnErrorReceived;
             }
 
-            // 게임보드 이벤트
-            if (gameBoard != null)
-            {
-                gameBoard.OnCellClicked += OnGameBoardCellClicked;
-                gameBoard.OnBlockPlaced += OnGameBoardBlockPlaced;
-            }
-
-            // 블록 팔레트 이벤트
-            if (blockPalette != null)
-            {
-                blockPalette.OnBlockSelected += OnBlockSelected;
-            }
+            // 게임보드와 블록 팔레트 이벤트는 SetupUI에서 연결됨
         }
 
         private void Cleanup()
@@ -249,7 +256,7 @@ namespace Features.Multi.UI
             if (currentRoom == null) return;
 
             if (roomNameLabel != null)
-                roomNameLabel.text = $"🏠 {currentRoom.roomName}";
+                roomNameLabel.text = $"{currentRoom.roomName}";
 
             if (roomStatusLabel != null)
             {
@@ -546,7 +553,7 @@ namespace Features.Multi.UI
             }
         }
 
-        private void OnPlayerJoined(UserInfo player)
+        private void OnPlayerJoined(NetUserInfo player)
         {
             // UserInfo를 PlayerSlot으로 변환 (Stub 구현)
             Debug.Log($"[GameRoomPanel] 플레이어 참가: {player.displayName}");
@@ -621,35 +628,72 @@ namespace Features.Multi.UI
 
             // 게임보드 활성화
             if (gameBoard != null)
+            {
                 gameBoard.SetInteractable(true);
+                gameBoard.ResetBoard(); // 게임 시작 시 보드 리셋
+            }
+
+            // 블록 팔레트 초기화 (내 플레이어 색상으로)
+            if (blockPalette != null)
+            {
+                blockPalette.InitializePalette(mySharedPlayerColor);
+                blockPalette.SetInteractable(false); // 첫 턴이 아니면 비활성화
+            }
 
             UpdateGameControlsState();
             ShowMessage("게임이 시작되었습니다!");
         }
 
-        private void OnTurnChanged(PlayerColor currentPlayer)
+        private void OnTurnChanged(MultiPlayerColor currentPlayer)
         {
             currentTurnPlayerId = (int)currentPlayer;
             turnTimeLimit = 30.0f; // Default turn time limit
             remainingTime = turnTimeLimit;
             
-            isMyTurn = (currentPlayer == myPlayerColor);
+            // MultiPlayerColor를 SharedPlayerColor로 변환
+            SharedPlayerColor sharedCurrentPlayer = ConvertToSharedPlayerColor(currentPlayer);
+            isMyTurn = (sharedCurrentPlayer == mySharedPlayerColor);
             isTimerActive = true;
 
-            // 내 턴일 때만 블록 팔레트 활성화
+            // 게임보드와 블록 팔레트 턴 상태 업데이트
+            if (gameBoard != null)
+                gameBoard.SetMyTurn(isMyTurn, mySharedPlayerColor);
+
             if (blockPalette != null)
+            {
+                blockPalette.SetMyTurn(isMyTurn, mySharedPlayerColor);
                 blockPalette.SetInteractable(isMyTurn);
+            }
 
             UpdateCurrentTurnDisplay();
             UpdatePlayerSlotHighlight();
+            
+            Debug.Log($"[GameRoomPanel] 턴 변경: Current={currentPlayer}, isMyTurn={isMyTurn}, myColor={mySharedPlayerColor}");
         }
 
-        private void OnBlockPlaced(BlockPlacement placement)
+        private void OnBlockPlaced(MultiBlockPlacement placement)
         {
-            // 게임보드에 블록 배치 반영
+            // TODO: BlockPlacement를 Shared.Models 구조로 변환 필요
+            // 현재는 Features.Multi.Models.BlockPlacement를 사용하고 있음
+            
+            // 게임보드에 블록 배치 반영 - 임시 구현
             if (gameBoard != null)
             {
-                gameBoard.PlaceBlock(placement.position, placement.playerId, placement.occupiedCells);
+                var position = new SharedPosition(placement.position.x, placement.position.y);
+                var occupiedCells = new List<SharedPosition>();
+                
+                foreach (var cell in placement.occupiedCells)
+                {
+                    occupiedCells.Add(new SharedPosition(cell.x, cell.y));
+                }
+                
+                gameBoard.PlaceBlock(position, placement.playerId, occupiedCells);
+            }
+
+            // 블록 팔레트에서 사용된 블록 표시 (내 플레이어인 경우)
+            if (blockPalette != null && placement.playerId == (int)mySharedPlayerColor)
+            {
+                blockPalette.MarkBlockAsUsed(ConvertToSharedBlockType(placement.blockType));
             }
 
             // 플레이어 점수 및 블록 수 업데이트
@@ -667,7 +711,7 @@ namespace Features.Multi.UI
             }
         }
 
-        private void OnGameEnded(PlayerColor winner)
+        private void OnGameEnded(MultiPlayerColor winner)
         {
             isGameStarted = false;
             isTimerActive = false;
@@ -692,7 +736,7 @@ namespace Features.Multi.UI
         private void OnChatMessageReceived(string username, string displayName, string message)
         {
             // Convert to ChatMessage object
-            ChatMessage chatMsg = new ChatMessage(username, message, displayName);
+            MultiChatMessage chatMsg = new MultiChatMessage(username, message, displayName);
             chatHistory.Add(chatMsg);
             Debug.Log($"[GameRoomPanel] 채팅 메시지 수신: {displayName} [{username}]: {message}");
             UpdateChatDisplay();
@@ -707,28 +751,47 @@ namespace Features.Multi.UI
         // Game Event Handlers
         // ========================================
 
-        private void OnGameBoardCellClicked(Vector2Int position)
+        private void OnGameBoardCellClicked(SharedPosition position)
         {
             if (coordinateLabel != null)
-                coordinateLabel.text = $"위치: ({position.x}, {position.y})";
+                coordinateLabel.text = $"위치: ({position.row}, {position.col})";
+
+            // 블록이 선택된 상태에서 보드 클릭 시 미리보기 표시
+            if (blockPalette != null && gameBoard != null)
+            {
+                var selectedBlock = blockPalette.GetSelectedBlock();
+                if (selectedBlock != null && isMyTurn)
+                {
+                    gameBoard.SetTouchPreview(selectedBlock, position);
+                }
+            }
         }
 
-        private void OnGameBoardBlockPlaced(BlockPlacement placement)
+        private void OnGameBoardBlockPlaced(SharedBlock block, SharedPosition position)
         {
-            // 서버에 블록 배치 전송
-            if (networkManager != null)
+            // 서버에 블록 배치 전송 - Shared.Models를 Features.Multi.Models로 변환 필요
+            if (networkManager != null && isMyTurn)
             {
+                Debug.Log($"[GameRoomPanel] 블록 배치 시도: {block.Type} at ({position.row}, {position.col})");
+                
+                // TODO: Shared.Models → Features.Multi.Models 변환 로직 구현
+                // 현재는 간단한 구현으로 대체
+                var placement = new MultiBlockPlacement(
+                    (int)mySharedPlayerColor,
+                    ConvertToMultiBlockType(block.Type),
+                    new Vector2Int(position.row, position.col),
+                    (int)block.CurrentRotation,
+                    block.CurrentFlipState == SharedFlipState.Horizontal
+                );
+                
                 networkManager.PlaceBlock(placement);
             }
         }
 
-        private void OnBlockSelected(BlockItem blockItem)
+        private void OnBlockSelected(SharedBlock block)
         {
-            // 선택된 블록을 게임보드에 표시
-            if (gameBoard != null)
-            {
-                gameBoard.SetSelectedBlock((BlockType)blockItem.id);
-            }
+            Debug.Log($"[GameRoomPanel] 블록 선택됨: {block.Type}");
+            // 선택된 블록을 게임보드에 알림 - 추가 처리는 OnGameBoardCellClicked에서 수행
         }
 
         private void OnTurnTimeout()
@@ -766,7 +829,7 @@ namespace Features.Multi.UI
             if (chatDisplay == null) return;
 
             System.Text.StringBuilder sb = new System.Text.StringBuilder();
-            foreach (ChatMessage msg in chatHistory)
+            foreach (MultiChatMessage msg in chatHistory)
             {
                 string timestamp = msg.timestamp.ToString("HH:mm");
                 sb.AppendLine($"[{timestamp}] {msg.displayName}: {msg.message}");
@@ -790,7 +853,7 @@ namespace Features.Multi.UI
 
         private bool IsHost()
         {
-            if (myPlayerColor == PlayerColor.None) return false;
+            if (myPlayerColor.Equals(SharedPlayerColor.None)) return false;
             
             int mySlotIndex = (int)myPlayerColor;
             if (mySlotIndex >= 0 && mySlotIndex < 4)
@@ -837,7 +900,7 @@ namespace Features.Multi.UI
         // Public API (for PlayerSlotWidget)
         // ========================================
 
-        public void KickPlayer(PlayerColor color)
+        public void KickPlayer(MultiPlayerColor color)
         {
             if (IsHost() && networkManager != null)
             {
@@ -881,7 +944,21 @@ namespace Features.Multi.UI
             isGameStarted = false;
             isMyTurn = false;
             isReady = false;
-            myPlayerColor = PlayerColor.None;
+            myPlayerColor = MultiPlayerColor.None;
+            mySharedPlayerColor = SharedPlayerColor.None;
+            
+            // 게임보드와 블록 팔레트 정리
+            if (gameBoard != null)
+            {
+                gameBoard.ResetBoard();
+                gameBoard.SetInteractable(false);
+            }
+            
+            if (blockPalette != null)
+            {
+                blockPalette.ResetPalette();
+                blockPalette.SetInteractable(false);
+            }
             
             // 데이터 정리 - MultiUserDataCache 제거로 더 이상 필요 없음
             Debug.Log("[GameRoomPanel] 방 데이터 정리 완료 - NetworkManager 이벤트 기반으로 관리됨");
@@ -897,6 +974,57 @@ namespace Features.Multi.UI
             {
                 Debug.LogError("[GameRoomPanel] SceneController를 찾을 수 없습니다!");
             }
+        }
+
+        // ========================================
+        // Helper Methods - 타입 변환 유틸리티
+        // ========================================
+
+        /// <summary>
+        /// Features.Multi.Models.PlayerColor → Shared.Models.PlayerColor 변환
+        /// </summary>
+        private SharedPlayerColor ConvertToSharedPlayerColor(MultiPlayerColor multiColor)
+        {
+            return multiColor switch
+            {
+                MultiPlayerColor.Red => SharedPlayerColor.Red,
+                MultiPlayerColor.Blue => SharedPlayerColor.Blue,
+                MultiPlayerColor.Yellow => SharedPlayerColor.Yellow,
+                MultiPlayerColor.Green => SharedPlayerColor.Green,
+                _ => SharedPlayerColor.None
+            };
+        }
+
+        /// <summary>
+        /// Shared.Models.BlockType → Features.Multi.Models.BlockType 변환 (임시)
+        /// </summary>
+        private Features.Multi.Models.BlockType ConvertToMultiBlockType(Shared.Models.BlockType sharedType)
+        {
+            // TODO: 실제 매핑 구현 - 현재는 이름 기반으로 변환
+            return sharedType.ToString() switch
+            {
+                "Single" => Features.Multi.Models.BlockType.Single,
+                "Domino" => Features.Multi.Models.BlockType.Domino,
+                "TriominoI" => Features.Multi.Models.BlockType.TriominoI,
+                "TriominoL" => Features.Multi.Models.BlockType.TriominoL,
+                _ => Features.Multi.Models.BlockType.Single
+            };
+        }
+
+        /// <summary>
+        /// Features.Multi.Models.BlockType → Shared.Models.BlockType 변환 (임시)
+        /// </summary>
+        private Shared.Models.BlockType ConvertToSharedBlockType(Features.Multi.Models.BlockType multiType)
+        {
+            // TODO: 실제 매핑 구현 - 현재는 이름 기반으로 변환
+            return multiType.ToString() switch
+            {
+                "Single" => Shared.Models.BlockType.Single,
+                "Domino" => Shared.Models.BlockType.Domino,
+                "TriominoI" => Shared.Models.BlockType.TrioLine,
+                "TriominoL" => Shared.Models.BlockType.TrioAngle,
+                _ => Shared.Models.BlockType.Single
+            };
         }
         
     }

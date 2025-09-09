@@ -245,7 +245,7 @@ namespace Features.Multi.UI
             {
                 // 기본값으로 설정
                 if (welcomeLabel != null)
-                    welcomeLabel.text = "🎮 로비에 오신 것을 환영합니다!";
+                    welcomeLabel.text = "로비에 오신 것을 환영합니다!";
 
                 if (userStatsLabel != null)
                     userStatsLabel.text = "사용자 정보 로딩 중...";
