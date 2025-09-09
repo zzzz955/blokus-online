@@ -37,8 +37,20 @@ namespace Features.Multi.Net
         private bool isAuthenticated = false;
         private string lastUsedToken = null;
         
+        // 현재 사용자 정보 (LobbyPanel에서 접근 가능)
+        private UserInfo currentUserInfo = null;
+        
+        // 현재 방 정보 (GameRoomPanel에서 접근 가능)
+        private RoomInfo currentRoomInfo = null;
+        
         // 싱글톤 패턴
         public static NetworkManager Instance { get; private set; }
+        
+        // 현재 사용자 정보 접근 프로퍼티
+        public UserInfo CurrentUserInfo => currentUserInfo;
+        
+        // 현재 방 정보 접근 프로퍼티
+        public RoomInfo CurrentRoomInfo => currentRoomInfo;
         
         // 이벤트 (MessageHandler 이벤트를 래핑)
         public event System.Action<bool> OnConnectionChanged
@@ -185,6 +197,14 @@ namespace Features.Multi.Net
             // 연결 상태 변경 이벤트 구독
             networkClient.OnConnectionChanged += OnConnectionStatusChanged;
             networkClient.OnError += OnNetworkError;
+            
+            // 사용자 정보 업데이트 이벤트 구독
+            if (messageHandler != null)
+            {
+                messageHandler.OnMyStatsUpdated += OnMyStatsUpdatedHandler;
+                messageHandler.OnRoomCreated += OnRoomCreatedHandler;
+                messageHandler.OnRoomJoined += OnRoomJoinedHandler;
+            }
             
             isInitialized = true;
             Debug.Log("[NetworkManager] 초기화 완료 (토큰 검증 서비스 포함)");
@@ -872,11 +892,49 @@ namespace Features.Multi.Net
         }
         
         /// <summary>
+        /// 사용자 정보 업데이트 핸들러 (내부용)
+        /// </summary>
+        private void OnMyStatsUpdatedHandler(UserInfo userInfo)
+        {
+            currentUserInfo = userInfo;
+            Debug.Log($"[NetworkManager] 현재 사용자 정보 저장됨: {userInfo.displayName} [{userInfo.username}]");
+        }
+
+        /// <summary>
+        /// 방 생성 핸들러 (내부용)
+        /// </summary>
+        private void OnRoomCreatedHandler(RoomInfo roomInfo)
+        {
+            currentRoomInfo = roomInfo;
+            Debug.Log($"[NetworkManager] 현재 방 정보 저장됨 (생성): {roomInfo.roomName} [ID: {roomInfo.roomId}]");
+        }
+
+        /// <summary>
+        /// 방 입장 핸들러 (내부용)
+        /// </summary>
+        private void OnRoomJoinedHandler()
+        {
+            // 방 입장 시 추가 방 정보를 서버에서 받을 수 있도록 요청
+            Debug.Log($"[NetworkManager] 방 입장됨 - 방 정보 요청 필요");
+            // TODO: 서버에서 방 정보를 받는 메시지 처리 추가 필요
+        }
+
+        /// <summary>
         /// NetworkManager 정리 (MultiCoreBootstrap에서 사용)
         /// </summary>
         public void Cleanup()
         {
+            // 이벤트 구독 해제
+            if (messageHandler != null)
+            {
+                messageHandler.OnMyStatsUpdated -= OnMyStatsUpdatedHandler;
+                messageHandler.OnRoomCreated -= OnRoomCreatedHandler;
+                messageHandler.OnRoomJoined -= OnRoomJoinedHandler;
+            }
+            
             DisconnectFromServer();
+            currentUserInfo = null;
+            currentRoomInfo = null;
         }
         
         // ========================================

@@ -100,6 +100,9 @@ namespace Features.Multi.UI
             // 초기 데이터 로드
             RefreshAllData();
             
+            // NetworkManager에서 현재 사용자 정보 로드 (이미 인증된 경우)
+            LoadCurrentUserInfo();
+            
             isInitialized = true;
             Debug.Log("[LobbyPanel] Initialized successfully");
         }
@@ -444,6 +447,19 @@ namespace Features.Multi.UI
             myUserInfo = userInfo;
             Debug.Log($"[LobbyPanel] 내 사용자 정보 업데이트: {userInfo.displayName} [{userInfo.username}]");
             UpdateUserStatsDisplay();
+        }
+
+        /// <summary>
+        /// NetworkManager에서 현재 사용자 정보를 가져와서 UI 업데이트
+        /// </summary>
+        private void LoadCurrentUserInfo()
+        {
+            if (networkManager?.CurrentUserInfo != null)
+            {
+                myUserInfo = networkManager.CurrentUserInfo;
+                Debug.Log($"[LobbyPanel] NetworkManager에서 사용자 정보 로드: {myUserInfo.displayName} [{myUserInfo.username}]");
+                UpdateUserStatsDisplay();
+            }
         }
 
         private void OnRoomListUpdated(List<NetRoomInfo> rooms)

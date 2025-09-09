@@ -113,6 +113,9 @@ namespace Features.Multi.UI
             SubscribeToEvents();
             InitializePlayerSlots();
             
+            // 현재 방 정보 로드 (방에 이미 입장한 상태에서 패널이 활성화되는 경우)
+            LoadCurrentRoomInfo();
+            
             Debug.Log("[GameRoomPanel] Initialized successfully");
         }
 
@@ -347,6 +350,92 @@ namespace Features.Multi.UI
             }
         }
 
+        /// <summary>
+        /// 플레이어 슬롯 UI 업데이트 (NetworkManager 데이터 기반)
+        /// </summary>
+        private void UpdatePlayerSlots()
+        {
+            Debug.Log("[GameRoomPanel] 플레이어 슬롯 업데이트 시작");
+            
+            // 현재 방 정보 가져오기
+            if (networkManager?.CurrentRoomInfo != null)
+            {
+                var roomInfo = networkManager.CurrentRoomInfo;
+                var currentUser = networkManager.CurrentUserInfo;
+                
+                Debug.Log($"[GameRoomPanel] 방 정보: {roomInfo.roomName}, 플레이어 수: {roomInfo.currentPlayers}/{roomInfo.maxPlayers}");
+                
+                // 기존 슬롯을 모두 빈 슬롯으로 초기화
+                for (int i = 0; i < 4; i++)
+                {
+                    PlayerSlot emptySlot = PlayerSlot.Empty;
+                    playerData[i] = emptySlot;
+                    if (playerSlots[i] != null)
+                    {
+                        playerSlots[i].UpdateSlot(emptySlot);
+                    }
+                }
+                
+                // 현재 사용자 정보로 첫 번째 슬롯 설정 (임시 구현)
+                if (currentUser != null)
+                {
+                    PlayerSlot userSlot = new PlayerSlot
+                    {
+                        playerId = 1, // 임시 ID
+                        playerName = currentUser.displayName,
+                        isReady = false,
+                        isHost = true, // 현재 사용자를 호스트로 가정
+                        colorIndex = 0,
+                        currentScore = 0,
+                        remainingBlocks = 21
+                    };
+                    
+                    playerData[0] = userSlot;
+                    if (playerSlots[0] != null)
+                    {
+                        playerSlots[0].SetPlayerData(userSlot, true);
+                        Debug.Log($"[GameRoomPanel] 슬롯 0 업데이트: {userSlot.playerName} (Host: {userSlot.isHost})");
+                    }
+                    
+                    // 호스트 이름 업데이트
+                    if (roomInfo.hostName != currentUser.displayName)
+                    {
+                        roomInfo.hostName = currentUser.displayName;
+                    }
+                }
+                
+                // TODO: 실제 서버에서 플레이어 목록을 받아오면 여기서 처리
+                // 현재는 방 정보에 플레이어 목록이 없으므로 임시로 현재 사용자만 표시
+                
+                Debug.Log($"[GameRoomPanel] 플레이어 슬롯 업데이트 완료 - 임시로 현재 사용자만 표시");
+            }
+            else
+            {
+                Debug.LogWarning("[GameRoomPanel] NetworkManager 방 정보가 null입니다.");
+                
+                // 폴백: 모든 슬롯을 빈 상태로 설정
+                for (int i = 0; i < 4; i++)
+                {
+                    PlayerSlot emptySlot = PlayerSlot.Empty;
+                    playerData[i] = emptySlot;
+                    if (playerSlots[i] != null)
+                    {
+                        playerSlots[i].UpdateSlot(emptySlot);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// 현재 사용자가 호스트인지 확인 (임시 구현)
+        /// </summary>
+        private bool IsCurrentUserHost()
+        {
+            // TODO: 실제 호스트 여부 확인 로직 구현
+            // 현재는 방에 들어온 사용자를 호스트로 간주
+            return true;
+        }
+
         private void UpdatePlayerSlotHighlight()
         {
             for (int i = 0; i < 4; i++)
@@ -366,6 +455,7 @@ namespace Features.Multi.UI
         private void OnLeaveRoomButtonClicked()
         {
             Debug.Log("[GameRoomPanel] Leave room button clicked");
+            Debug.Log($"[GameRoomPanel] leaveRoomConfirmModal null 여부: {leaveRoomConfirmModal == null}");
             
             // 방 나가기 확인 모달 표시
             if (leaveRoomConfirmModal != null)
@@ -374,16 +464,19 @@ namespace Features.Multi.UI
                     ? "게임이 진행 중입니다.\n정말로 방에서 나가시겠습니까?\n게임이 중단될 수 있습니다."
                     : "정말로 방에서 나가시겠습니까?";
                     
+                Debug.Log($"[GameRoomPanel] 모달 표시 시도: {message}");
                 leaveRoomConfirmModal.ShowModal(
                     "방 나가기",
                     message,
                     OnLeaveRoomConfirmed,
                     null
                 );
+                Debug.Log("[GameRoomPanel] ShowModal 호출 완료");
             }
             else
             {
                 Debug.LogError("[GameRoomPanel] leaveRoomConfirmModal이 설정되지 않았습니다!");
+                Debug.LogError("[GameRoomPanel] Inspector에서 Leave Room Confirm Modal을 할당해주세요.");
                 OnLeaveRoomConfirmed(); // 폴백: 바로 방 나가기
             }
         }
@@ -433,6 +526,24 @@ namespace Features.Multi.UI
         {
             currentRoom = roomInfo;
             UpdateRoomInfo();
+        }
+
+        /// <summary>
+        /// NetworkManager에서 현재 방 정보를 가져와서 UI 업데이트
+        /// </summary>
+        private void LoadCurrentRoomInfo()
+        {
+            if (networkManager?.CurrentRoomInfo != null)
+            {
+                currentRoom = networkManager.CurrentRoomInfo;
+                Debug.Log($"[GameRoomPanel] NetworkManager에서 방 정보 로드: {currentRoom.roomName} [ID: {currentRoom.roomId}]");
+                UpdateRoomInfo();
+                UpdatePlayerSlots(); // 플레이어 슬롯도 업데이트
+            }
+            else
+            {
+                Debug.LogWarning("[GameRoomPanel] NetworkManager에서 방 정보를 찾을 수 없습니다.");
+            }
         }
 
         private void OnPlayerJoined(UserInfo player)
