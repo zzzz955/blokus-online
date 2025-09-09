@@ -183,7 +183,7 @@ namespace Blokus {
             return;
         }
         
-        QString message = QString("auth:%1:%2").arg(username, password);
+        QString message = QString("auth:login:%1:%2").arg(username, password);
         sendMessage(message);
         qDebug() << QString::fromUtf8("로그인 요청 전송: %1").arg(username);
     }
@@ -195,7 +195,7 @@ namespace Blokus {
             return;
         }
         
-        QString message = QString("auth:%1").arg(jwtToken);
+        QString message = QString("auth:jwt:%1").arg(jwtToken);
         sendMessage(message);
         qDebug() << QString::fromUtf8("JWT 토큰 로그인 요청 전송: %1...").arg(jwtToken.left(20));
     }
