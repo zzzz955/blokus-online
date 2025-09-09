@@ -254,6 +254,47 @@ namespace Features.Multi.Net
         }
         
         /// <summary>
+        /// 로그아웃 - 재연결 없이 서버 연결 해제
+        /// </summary>
+        public void LogoutFromServer()
+        {
+            if (!isInitialized)
+                return;
+                
+            Debug.Log("[NetworkManager] 로그아웃 시작 - 자동 재연결 비활성화");
+            
+            // 자동 재연결 임시 비활성화
+            bool originalAutoReconnect = autoReconnect;
+            autoReconnect = false;
+            reconnectAttempts = maxReconnectAttempts; // 재연결 시도 횟수를 최대로 설정
+            
+            StopHeartbeat();
+            networkClient?.DisconnectFromServer();
+            
+            // 인증 상태 및 사용자 정보 초기화
+            isAuthenticated = false;
+            lastUsedToken = null;
+            currentUserInfo = null;
+            currentRoomInfo = null;
+            
+            Debug.Log("[NetworkManager] 로그아웃 완료 - 모든 세션 정보 정리됨");
+            
+            // 1초 후 자동 재연결 설정을 원래대로 복구 (다음 연결을 위해)
+            StartCoroutine(RestoreAutoReconnectAfterLogout(originalAutoReconnect));
+        }
+        
+        /// <summary>
+        /// 로그아웃 후 자동 재연결 설정 복구
+        /// </summary>
+        private System.Collections.IEnumerator RestoreAutoReconnectAfterLogout(bool originalSetting)
+        {
+            yield return new UnityEngine.WaitForSeconds(2f);
+            autoReconnect = originalSetting;
+            reconnectAttempts = 0; // 재연결 시도 횟수 리셋
+            Debug.Log($"[NetworkManager] 자동 재연결 설정 복구: {autoReconnect}");
+        }
+        
+        /// <summary>
         /// 연결 상태 확인
         /// </summary>
         public bool IsConnected()

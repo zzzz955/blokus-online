@@ -5,6 +5,7 @@ using Features.Multi.Net;
 using Features.Multi.Core;
 using Features.Multi.Models;
 using App.UI;
+using App.Core;
 using TMPro;
 using Shared.UI;
 using NetRoomInfo = Features.Multi.Net.RoomInfo;
@@ -372,27 +373,38 @@ namespace Features.Multi.UI
         {
             Debug.Log("[LobbyPanel] 로그아웃 확인됨 - 세션 정리 시작");
             
-            // 1. TCP 연결 해제 및 세션 정리
+            // 1. 로그아웃 처리 (재연결 비활성화 포함)
             if (networkManager != null)
             {
-                networkManager.DisconnectFromServer();
-                Debug.Log("[LobbyPanel] TCP 연결 해제 완료");
+                networkManager.LogoutFromServer();
+                Debug.Log("[LobbyPanel] 로그아웃 처리 완료 (재연결 비활성화됨)");
             }
             
-            // 2. 데이터 캐시 정리 (로그아웃 시 자동으로 정리됨)
-            Debug.Log("[LobbyPanel] 데이터 캐시는 연결 해제 시 자동 정리됨");
+            // 2. 데이터 캐시 정리
+            Debug.Log("[LobbyPanel] 멀티플레이 데이터 캐시 정리");
             
-            // 3. 씬 정리 및 메인으로 복귀
-            var sceneController = GetComponentInParent<MultiGameplaySceneController>();
-            if (sceneController != null)
+            // 3. ModeSelection으로 복귀 (SceneFlowController 사용)
+            if (SceneFlowController.Instance != null)
             {
-                sceneController.ReturnToMainScene();
+                Debug.Log("[LobbyPanel] SceneFlowController를 통해 ModeSelection으로 복귀");
+                SceneFlowController.Instance.StartExitMultiToMain();
             }
             else
             {
-                Debug.LogError("[LobbyPanel] SceneController를 찾을 수 없음 - 직접 씬 전환");
-                // 폴백: 직접 씬 전환
-                UnityEngine.SceneManagement.SceneManager.LoadScene("MainScene");
+                Debug.LogError("[LobbyPanel] SceneFlowController를 찾을 수 없음 - MultiGameplaySceneController 사용");
+                
+                // 폴백 1: MultiGameplaySceneController 사용
+                var sceneController = GetComponentInParent<MultiGameplaySceneController>();
+                if (sceneController != null)
+                {
+                    sceneController.ReturnToMainScene();
+                }
+                else
+                {
+                    Debug.LogError("[LobbyPanel] MultiGameplaySceneController도 찾을 수 없음 - 직접 씬 전환");
+                    // 폴백 2: 직접 씬 전환
+                    UnityEngine.SceneManagement.SceneManager.LoadScene("MainScene");
+                }
             }
         }
 
