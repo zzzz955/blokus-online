@@ -158,8 +158,9 @@ namespace Shared.UI{
                 Debug.Log("[ConfirmModal] 모달 숨김");
             }
             
-            // ConfirmModal GameObject도 비활성화 (선택사항 - 필요에 따라)
-            // gameObject.SetActive(false);
+            // ConfirmModal GameObject도 비활성화하여 BackgroundButton 등 완전히 제거
+            gameObject.SetActive(false);
+            Debug.Log("[ConfirmModal] ConfirmModal GameObject 비활성화");
             
             // 콜백 초기화
             onAcceptCallback = null;

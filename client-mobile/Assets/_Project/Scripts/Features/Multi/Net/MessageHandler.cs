@@ -28,6 +28,7 @@ namespace Features.Multi.Net
         public event System.Action<RoomInfo> OnRoomCreated; // 방 생성됨
         public event System.Action<bool, string> OnJoinRoomResponse; // 방 참가 응답
         public event System.Action OnRoomJoined; // 방 참가됨 (GameRoomPanel로 전환용)
+        public event System.Action OnRoomLeft; // 방 나가기 완료 (LobbyPanel로 전환용)
         
         // 게임 관련
         // public event System.Action<GameState> OnGameStateUpdated; // 멀티플레이어에서 사용 예정
@@ -624,7 +625,10 @@ namespace Features.Multi.Net
         private void HandleRoomLeft(string[] parts)
         {
             Debug.Log("[MessageHandler] 방 나가기 성공");
+            
             // 로비로 돌아가는 이벤트 발생
+            OnRoomLeft?.Invoke();
+            Debug.Log("[MessageHandler] OnRoomLeft 이벤트 발생");
         }
         
         /// <summary>

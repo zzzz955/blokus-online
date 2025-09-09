@@ -102,6 +102,12 @@ namespace Features.Multi.Net
             remove { if (messageHandler != null) messageHandler.OnRoomJoined -= value; }
         }
         
+        public event System.Action OnRoomLeft
+        {
+            add { if (messageHandler != null) messageHandler.OnRoomLeft += value; }
+            remove { if (messageHandler != null) messageHandler.OnRoomLeft -= value; }
+        }
+        
         // 게임 관련 이벤트
         public event System.Action<MultiModels.BlockPlacement> OnBlockPlaced
         {
@@ -979,9 +985,8 @@ namespace Features.Multi.Net
         }
         
         // ========================================
-        // Missing Events (Stub) - OnRoomJoined는 위에서 구현됨
+        // Missing Events (Stub) - OnRoomJoined, OnRoomLeft는 위에서 구현됨
         // ========================================
-        public event System.Action OnRoomLeft;
         public event System.Action<RoomInfo> OnRoomInfoUpdated;
         public event System.Action<UserInfo> OnPlayerJoined;
         public event System.Action<int> OnPlayerLeft;
