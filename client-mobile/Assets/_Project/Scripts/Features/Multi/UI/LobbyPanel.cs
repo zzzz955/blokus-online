@@ -114,6 +114,13 @@ namespace Features.Multi.UI
 
             if (networkManager == null)
                 Debug.LogError("[LobbyPanel] NetworkManager not found!");
+            
+            // CreateRoomPanel이 Inspector에서 할당되지 않은 경우 자동으로 찾기
+            if (createRoomPanel == null)
+            {
+                createRoomPanel = FindObjectOfType<CreateRoomPanel>();
+                Debug.Log($"[LobbyPanel] CreateRoomPanel 자동 검색: {(createRoomPanel != null ? "찾음" : "못 찾음")}");
+            }
         }
 
         private void SetupUI()
@@ -226,7 +233,7 @@ namespace Features.Multi.UI
             {
                 // 실제 사용자 정보 표시
                 if (welcomeLabel != null)
-                    welcomeLabel.text = $"🎮 {myUserInfo.displayName}님, 환영합니다!";
+                    welcomeLabel.text = $"{myUserInfo.displayName}님, 환영합니다!";
 
                 if (userStatsLabel != null)
                 {
@@ -316,13 +323,27 @@ namespace Features.Multi.UI
         {
             Debug.Log("[LobbyPanel] 방 생성 버튼 클릭");
             
+            // createRoomPanel이 null인 경우 다시 찾아보기
+            if (createRoomPanel == null)
+            {
+                createRoomPanel = FindObjectOfType<CreateRoomPanel>();
+                Debug.Log($"[LobbyPanel] CreateRoomPanel 다시 검색: {(createRoomPanel != null ? "찾음" : "못 찾음")}");
+            }
+            
             if (createRoomPanel != null)
             {
+                // CreateRoomPanel GameObject가 비활성화되어 있으면 Show() 메서드가 실행되지 않으므로 먼저 활성화
+                if (!createRoomPanel.gameObject.activeInHierarchy)
+                {
+                    createRoomPanel.gameObject.SetActive(true);
+                    Debug.Log("[LobbyPanel] CreateRoomPanel GameObject 먼저 활성화");
+                }
+                
                 createRoomPanel.Show();
             }
             else
             {
-                Debug.LogError("[LobbyPanel] CreateRoomPanel이 할당되지 않았습니다.");
+                Debug.LogError("[LobbyPanel] CreateRoomPanel을 찾을 수 없습니다. Inspector에서 할당하거나 씬에 CreateRoomPanel이 있는지 확인하세요.");
             }
         }
 

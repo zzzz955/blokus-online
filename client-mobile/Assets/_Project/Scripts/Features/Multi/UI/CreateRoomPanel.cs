@@ -33,7 +33,7 @@ namespace Features.Multi.UI
         {
             InitializeUI();
             SetupEventHandlers();
-            Hide(); // 시작 시 숨김
+            // Hide() 제거 - 초기 상태는 GameObject 비활성화로 관리
         }
 
         /// <summary>
