@@ -60,6 +60,8 @@ namespace Features.Multi.UI
         /// </summary>
         public void SetPlayerData(PlayerSlot data, bool isCurrentUserHost = false)
         {
+            Debug.Log($"[PlayerSlotWidget] SetPlayerData 호출: {data.playerName} (Host: {data.isHost}, Ready: {data.isReady}, isCurrentUserHost: {isCurrentUserHost})");
+            
             playerData = data;
             isHost = isCurrentUserHost;
             
@@ -109,21 +111,36 @@ namespace Features.Multi.UI
         /// </summary>
         private void UpdateUI()
         {
+            Debug.Log($"[PlayerSlotWidget] UpdateUI 시작: {playerData.playerName} (isEmpty: {playerData.isEmpty})");
+            
             if (playerData.isEmpty)
             {
+                Debug.Log($"[PlayerSlotWidget] 빈 슬롯으로 설정");
                 SetEmptySlot();
                 return;
             }
             
             // 플레이어 이름
             if (playerNameText != null)
+            {
                 playerNameText.text = playerData.playerName;
+                Debug.Log($"[PlayerSlotWidget] 플레이어 이름 설정: {playerData.playerName}");
+            }
+            else
+            {
+                Debug.LogError($"[PlayerSlotWidget] playerNameText가 null입니다!");
+            }
             
             // 준비 상태 표시 (스프라이트 기반)
             if (readyIndicator != null)
             {
                 readyIndicator.gameObject.SetActive(true);
                 readyIndicator.sprite = playerData.isReady ? readySprite : notReadySprite;
+                Debug.Log($"[PlayerSlotWidget] 준비 상태 설정: {playerData.isReady}");
+            }
+            else
+            {
+                Debug.LogError($"[PlayerSlotWidget] readyIndicator가 null입니다!");
             }
             
             // 호스트 표시
@@ -134,6 +151,11 @@ namespace Features.Multi.UI
                 {
                     hostIndicator.sprite = hostCrownSprite;
                 }
+                Debug.Log($"[PlayerSlotWidget] 호스트 표시 설정: {playerData.isHost}");
+            }
+            else if (playerData.isHost)
+            {
+                Debug.LogError($"[PlayerSlotWidget] hostIndicator가 null인데 플레이어가 호스트입니다!");
             }
             
             // 점수 표시

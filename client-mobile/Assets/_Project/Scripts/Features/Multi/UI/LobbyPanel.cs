@@ -306,11 +306,15 @@ namespace Features.Multi.UI
             {
                 GameObject roomItem = Instantiate(roomItemPrefab, roomListContent);
                 
-                // RoomItemUI 컴포넌트에 데이터 설정 (구현 필요)
+                // RoomItemUI 컴포넌트에 데이터 설정 및 이벤트 연결
                 var roomItemUI = roomItem.GetComponent<RoomItemUI>();
                 if (roomItemUI != null)
                 {
                     roomItemUI.SetupRoom(room);
+                    
+                    // 이벤트 연결
+                    roomItemUI.OnRoomSelected += OnRoomItemSelected;
+                    roomItemUI.OnRoomDoubleClicked += OnRoomItemDoubleClicked;
                 }
             }
         }

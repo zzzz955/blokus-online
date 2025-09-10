@@ -97,28 +97,15 @@ namespace Features.Multi.UI
         }
         
         /// <summary>
-        /// 참가 버튼 클릭 (싱글클릭/더블클릭 구분)
+        /// 참가 버튼 클릭 - 즉시 방 참가
         /// </summary>
         private void OnJoinButtonClicked()
         {
             if (roomInfo == null) return;
             
-            float currentTime = Time.time;
-            
-            if (currentTime - lastClickTime < DOUBLE_CLICK_TIME)
-            {
-                // 더블클릭 - 방 참가
-                Debug.Log($"[RoomItemUI] 방 더블클릭 참가: {roomInfo.roomName}");
-                OnRoomDoubleClicked?.Invoke(roomInfo);
-            }
-            else
-            {
-                // 싱글클릭 - 방 선택
-                Debug.Log($"[RoomItemUI] 방 선택: {roomInfo.roomName}");
-                OnRoomSelected?.Invoke(roomInfo);
-            }
-            
-            lastClickTime = currentTime;
+            // 참가 버튼 클릭 시 바로 방 참가 처리
+            Debug.Log($"[RoomItemUI] 방 참가 버튼 클릭: {roomInfo.roomName}");
+            OnRoomDoubleClicked?.Invoke(roomInfo);
         }
         
         /// <summary>

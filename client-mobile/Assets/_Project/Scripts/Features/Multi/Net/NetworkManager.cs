@@ -43,6 +43,9 @@ namespace Features.Multi.Net
         // 현재 방 정보 (GameRoomPanel에서 접근 가능)
         private RoomInfo currentRoomInfo = null;
         
+        // 방 생성자 여부 플래그 (타이밍 이슈 해결용)
+        private bool isCurrentUserRoomCreator = false;
+        
         // 싱글톤 패턴
         public static NetworkManager Instance { get; private set; }
         
@@ -51,6 +54,9 @@ namespace Features.Multi.Net
         
         // 현재 방 정보 접근 프로퍼티
         public RoomInfo CurrentRoomInfo => currentRoomInfo;
+        
+        // 방 생성자 여부 접근 프로퍼티 (타이밍 이슈 해결용)
+        public bool IsCurrentUserRoomCreator => isCurrentUserRoomCreator;
         
         // 이벤트 (MessageHandler 이벤트를 래핑)
         public event System.Action<bool> OnConnectionChanged
@@ -210,6 +216,7 @@ namespace Features.Multi.Net
                 messageHandler.OnMyStatsUpdated += OnMyStatsUpdatedHandler;
                 messageHandler.OnRoomCreated += OnRoomCreatedHandler;
                 messageHandler.OnRoomJoined += OnRoomJoinedHandler;
+                messageHandler.OnRoomInfoUpdated += OnRoomInfoUpdatedHandler;
             }
             
             isInitialized = true;
@@ -282,6 +289,7 @@ namespace Features.Multi.Net
             lastUsedToken = null;
             currentUserInfo = null;
             currentRoomInfo = null;
+            isCurrentUserRoomCreator = false; // 방 생성자 플래그 리셋
             
             Debug.Log("[NetworkManager] 로그아웃 완료 - 모든 세션 정보 정리됨");
             
@@ -953,7 +961,9 @@ namespace Features.Multi.Net
         private void OnRoomCreatedHandler(RoomInfo roomInfo)
         {
             currentRoomInfo = roomInfo;
+            isCurrentUserRoomCreator = true; // 방 생성자 플래그 설정
             Debug.Log($"[NetworkManager] 현재 방 정보 저장됨 (생성): {roomInfo.roomName} [ID: {roomInfo.roomId}]");
+            Debug.Log($"[NetworkManager] 방 생성자 플래그 설정: {isCurrentUserRoomCreator}");
         }
 
         /// <summary>
@@ -962,8 +972,51 @@ namespace Features.Multi.Net
         private void OnRoomJoinedHandler()
         {
             // 방 입장 시 추가 방 정보를 서버에서 받을 수 있도록 요청
-            Debug.Log($"[NetworkManager] 방 입장됨 - 방 정보 요청 필요");
-            // TODO: 서버에서 방 정보를 받는 메시지 처리 추가 필요
+            Debug.Log($"[NetworkManager] 방 입장됨");
+            
+            // 주기적 방 정보 업데이트는 서버에서 지원하지 않는 명령어이므로 비활성화
+            // TODO: 서버 측에서 플레이어 변경 시 자동 ROOM_INFO 브로드캐스트 구현 필요
+        }
+        
+        /// <summary>
+        /// 주기적으로 방 정보 업데이트 요청 (비활성화됨)
+        /// 서버에서 room:info 명령어를 지원하지 않아서 주석 처리
+        /// </summary>
+        /*
+        private System.Collections.IEnumerator RequestRoomInfoPeriodically()
+        {
+            while (currentRoomInfo != null && IsConnected())
+            {
+                yield return new WaitForSeconds(5f); // 5초마다
+                
+                if (currentRoomInfo != null)
+                {
+                    // 서버에 현재 방 정보 요청 - 서버에서 지원하지 않는 명령어
+                    networkClient?.SendCleanTCPMessage("room", "info", currentRoomInfo.roomId.ToString());
+                    Debug.Log($"[NetworkManager] 방 정보 업데이트 요청: {currentRoomInfo.roomId}");
+                }
+            }
+        }
+        */
+
+        private void OnRoomInfoUpdatedHandler(RoomInfo roomInfo, System.Collections.Generic.List<PlayerData> playerDataList)
+        {
+            // 방 정보 업데이트
+            UpdateCurrentRoomInfo(roomInfo);
+            
+            // 실제 서버 데이터 수신 시 방 생성자 플래그 리셋 (타이밍 이슈 해결 역할 완료)
+            if (isCurrentUserRoomCreator)
+            {
+                isCurrentUserRoomCreator = false;
+                Debug.Log("[NetworkManager] 방 생성자 플래그 리셋 - 실제 서버 데이터 수신됨");
+            }
+            
+            // GameRoomPanel에 플레이어 정보 전달
+            var gameRoomPanel = FindObjectOfType<Features.Multi.UI.GameRoomPanel>();
+            if (gameRoomPanel != null)
+            {
+                gameRoomPanel.UpdatePlayerData(playerDataList);
+            }
         }
 
         /// <summary>
@@ -977,11 +1030,13 @@ namespace Features.Multi.Net
                 messageHandler.OnMyStatsUpdated -= OnMyStatsUpdatedHandler;
                 messageHandler.OnRoomCreated -= OnRoomCreatedHandler;
                 messageHandler.OnRoomJoined -= OnRoomJoinedHandler;
+                messageHandler.OnRoomInfoUpdated -= OnRoomInfoUpdatedHandler;
             }
             
             DisconnectFromServer();
             currentUserInfo = null;
             currentRoomInfo = null;
+            isCurrentUserRoomCreator = false; // 방 생성자 플래그 리셋
         }
         
         // ========================================
@@ -993,6 +1048,22 @@ namespace Features.Multi.Net
         public event System.Action<int, bool> OnPlayerReadyChanged;
         public event System.Action OnGameStarted;
         
+        // ========================================
+        // Room Info Management
+        // ========================================
+        
+        /// <summary>
+        /// 현재 방 정보 업데이트 (MessageHandler에서 호출)
+        /// </summary>
+        public void UpdateCurrentRoomInfo(RoomInfo roomInfo)
+        {
+            currentRoomInfo = roomInfo;
+            Debug.Log($"[NetworkManager] 방 정보 업데이트됨: {roomInfo.roomName} (플레이어: {roomInfo.currentPlayers}/{roomInfo.maxPlayers})");
+            
+            // 이벤트 발생
+            OnRoomInfoUpdated?.Invoke(roomInfo);
+        }
+
         // ========================================
         // Missing Request Methods
         // ========================================

@@ -8,6 +8,19 @@ using MultiModels = Features.Multi.Models;
 namespace Features.Multi.Net
 {
     /// <summary>
+    /// 플레이어 데이터 구조체 (ROOM_INFO에서 파싱용)
+    /// </summary>
+    [System.Serializable]
+    public struct PlayerData
+    {
+        public int playerId;
+        public string username;
+        public string displayName;
+        public bool isHost;
+        public bool isReady;
+        public int colorSlot;
+    }
+    /// <summary>
     /// 네트워크 메시지 핸들러
     /// 서버로부터 수신된 메시지를 파싱하고 적절한 이벤트로 변환
     /// </summary>
@@ -29,6 +42,7 @@ namespace Features.Multi.Net
         public event System.Action<bool, string> OnJoinRoomResponse; // 방 참가 응답
         public event System.Action OnRoomJoined; // 방 참가됨 (GameRoomPanel로 전환용)
         public event System.Action OnRoomLeft; // 방 나가기 완료 (LobbyPanel로 전환용)
+        public event System.Action<RoomInfo, List<PlayerData>> OnRoomInfoUpdated; // 방 정보 및 플레이어 데이터 업데이트
         
         // 게임 관련
         // public event System.Action<GameState> OnGameStateUpdated; // 멀티플레이어에서 사용 예정
@@ -636,7 +650,7 @@ namespace Features.Multi.Net
         /// </summary>
         private void HandleRoomInfo(string[] parts)
         {
-            if (parts.Length < 8)
+            if (parts.Length < 9)
             {
                 Debug.LogError("[MessageHandler] ROOM_INFO 메시지 형식 오류");
                 return;
@@ -644,9 +658,71 @@ namespace Features.Multi.Net
             
             try
             {
-                // 방 기본 정보 파싱
                 Debug.Log($"[MessageHandler] 방 정보 수신: {string.Join(":", parts)}");
-                // 필요시 방 상세 정보를 UI에 전달
+                Debug.Log($"[MessageHandler] 총 parts 개수: {parts.Length}");
+                
+                // 방 기본 정보 파싱
+                int roomId = int.Parse(parts[1]);
+                string roomName = parts[2];
+                string hostName = parts[3];
+                int currentPlayers = int.Parse(parts[4]);
+                int maxPlayers = int.Parse(parts[5]);
+                bool isPrivate = parts[6] == "1";
+                bool isGameStarted = parts[7] == "1";
+                string gameMode = parts[8];
+
+                Debug.Log($"[MessageHandler] 로비 사용자 목록 수신: 총 {currentPlayers}명, 파트 개수: {parts.Length}");
+
+                // 방 정보 업데이트
+                var roomInfo = new RoomInfo
+                {
+                    roomId = roomId,
+                    roomName = roomName,
+                    hostName = hostName,
+                    currentPlayers = currentPlayers,
+                    maxPlayers = maxPlayers,
+                    isPrivate = isPrivate,
+                    isGameStarted = isGameStarted,
+                    gameMode = gameMode
+                };
+
+                // 방 정보 업데이트 이벤트 발생 (나중에 플레이어 데이터와 함께 전달)
+
+                // 플레이어 데이터 파싱 (9번째 인덱스부터)
+                var playerDataList = new List<PlayerData>();
+                for (int i = 9; i < parts.Length; i++)
+                {
+                    string playerData = parts[i];
+                    Debug.Log($"[MessageHandler] parts[{i}] 플레이어 데이터: '{playerData}'");
+                    var playerParts = playerData.Split(',');
+                    Debug.Log($"[MessageHandler] 플레이어 파트 개수: {playerParts.Length}");
+                    
+                    if (playerParts.Length >= 6)
+                    {
+                        var player = new PlayerData
+                        {
+                            playerId = int.Parse(playerParts[0]),
+                            username = playerParts[1],
+                            displayName = playerParts[2],
+                            isHost = playerParts[3] == "1",
+                            isReady = playerParts[4] == "1",
+                            colorSlot = int.Parse(playerParts[5])
+                        };
+                        playerDataList.Add(player);
+                        Debug.Log($"[MessageHandler] 사용자 추가: {player.displayName} [{player.username}] (레벨: {player.playerId}, 상태: 호스트={player.isHost}, 레디={player.isReady}, 색상슬롯={player.colorSlot})");
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[MessageHandler] 플레이어 데이터 파트 부족: {playerParts.Length}개 (최소 6개 필요)");
+                    }
+                }
+
+                Debug.Log($"[MessageHandler] 최종 사용자 목록: {playerDataList.Count}명");
+                
+                // 방 정보 및 플레이어 데이터 업데이트 이벤트 발생
+                OnRoomInfoUpdated?.Invoke(roomInfo, playerDataList);
+
+                Debug.Log($"[MessageHandler] 방 정보 파싱 완료: {roomName}, 플레이어 {playerDataList.Count}명");
             }
             catch (Exception ex)
             {
