@@ -380,6 +380,8 @@ namespace Features.Multi.Core
             // 서버 연결과 인증이 모두 성공했을 때만 MultiGameplayScene으로 전환
             if (isNetworkConnected && isAuthenticated)
             {
+                // 성공 시 멀티플레이 버튼 재활성화 (나중에 다시 사용할 수 있도록)
+                EnableMultiplayerButton();
                 TransitionToGameplayScene();
             }
             else
@@ -485,6 +487,9 @@ namespace Features.Multi.Core
         {
             Debug.LogError($"[MultiCoreBootstrap] 연결 실패: {errorMessage}");
             
+            // 멀티플레이 버튼 재활성화
+            EnableMultiplayerButton();
+            
             // SystemMessageManager로 토스트 메시지 표시
             if (SystemMessageManager.Instance != null)
             {
@@ -547,6 +552,23 @@ namespace Features.Multi.Core
         public NetworkManager GetNetworkManager()
         {
             return NetworkManager.Instance;
+        }
+        
+        /// <summary>
+        /// 멀티플레이 버튼 재활성화 (연결 실패 시)
+        /// </summary>
+        private void EnableMultiplayerButton()
+        {
+            var uiManager = UIManager.GetInstanceSafe();
+            if (uiManager != null)
+            {
+                uiManager.EnableMultiplayerButton();
+                Debug.Log("[MultiCoreBootstrap] 멀티플레이 버튼 재활성화 요청");
+            }
+            else
+            {
+                Debug.LogWarning("[MultiCoreBootstrap] UIManager를 찾을 수 없어 버튼 재활성화 실패");
+            }
         }
     }
 }

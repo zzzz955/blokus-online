@@ -745,14 +745,25 @@ namespace Features.Multi.Net
         /// </summary>
         private void HandlePlayerJoined(string[] parts)
         {
+            Debug.Log($"[MessageHandler] HandlePlayerJoined 호출됨 - parts 개수: {parts.Length}");
+            for (int i = 0; i < parts.Length; i++)
+            {
+                Debug.Log($"[MessageHandler] parts[{i}]: '{parts[i]}'");
+            }
+            
             if (parts.Length >= 2)
             {
                 string username = parts[1];
                 string displayName = parts.Length >= 3 ? parts[2] : username;
-                Debug.Log($"[MessageHandler] 플레이어 입장: {displayName} [{username}]");
+                Debug.Log($"[MessageHandler] 플레이어 입장 처리: {displayName} [{username}]");
                 
                 // 이벤트 발생
                 OnPlayerJoined?.Invoke(username);
+                Debug.Log($"[MessageHandler] OnPlayerJoined 이벤트 발생: {username}");
+            }
+            else
+            {
+                Debug.LogWarning($"[MessageHandler] PLAYER_JOINED 메시지 형식 오류 - parts 개수: {parts.Length}");
             }
         }
         

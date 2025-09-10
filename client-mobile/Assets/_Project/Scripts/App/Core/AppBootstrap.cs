@@ -23,12 +23,13 @@ namespace App.Core
         
         // Global services
         private OidcAuthenticator _oidcAuthenticator;
-        
+
         void Start()
         {
+            Application.runInBackground = true;
             if (debugMode)
                 Debug.Log("[AppBootstrap] Starting application bootstrap");
-            
+
             StartCoroutine(BootSequence());
         }
         
