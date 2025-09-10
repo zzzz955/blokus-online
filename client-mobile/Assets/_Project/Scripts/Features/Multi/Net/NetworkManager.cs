@@ -6,6 +6,7 @@ using Shared.Models;
 using Features.Multi.Net;
 using App.Network;
 using MultiModels = Features.Multi.Models;
+using TurnChangeInfo = Features.Multi.Net.TurnChangeInfo;
 
 namespace Features.Multi.Net
 {
@@ -124,7 +125,7 @@ namespace Features.Multi.Net
             remove { if (messageHandler != null) messageHandler.OnBlockPlaced -= value; }
         }
         
-        public event System.Action<MultiModels.PlayerColor> OnTurnChanged
+        public event System.Action<TurnChangeInfo> OnTurnChanged
         {
             add { if (messageHandler != null) messageHandler.OnTurnChanged += value; }
             remove { if (messageHandler != null) messageHandler.OnTurnChanged -= value; }

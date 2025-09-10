@@ -129,6 +129,9 @@ namespace Features.Multi.UI
             SubscribeToEvents();
             InitializePlayerSlots();
             
+            // 방 입장 시 게임 보드 및 팔레트 초기 설정
+            InitializeGameComponents();
+            
             // 현재 방 정보 로드 (방에 이미 입장한 상태에서 패널이 활성화되는 경우)
             LoadCurrentRoomInfo();
             
@@ -149,10 +152,6 @@ namespace Features.Multi.UI
 
         private void SetupUI()
         {
-            // 타이머 패널 초기 비활성화
-            if (timerPanel != null)
-                timerPanel.SetActive(false);
-
             // 버튼 이벤트 연결
             if (leaveRoomButton != null)
                 leaveRoomButton.onClick.AddListener(OnLeaveRoomButtonClicked);
@@ -169,18 +168,15 @@ namespace Features.Multi.UI
             if (chatInput != null)
                 chatInput.onEndEdit.AddListener(OnChatInputEndEdit);
 
-            // 게임보드와 블록 팔레트 초기화 및 이벤트 연결
+            // 게임보드와 블록 팔레트 이벤트 연결 (초기화는 InitializeGameComponents에서 처리)
             if (gameBoard != null)
             {
-                gameBoard.SetInteractable(false);
-                gameBoard.SetGameLogic(gameLogic);
                 gameBoard.OnCellClicked += OnGameBoardCellClicked;
                 gameBoard.OnBlockPlaced += OnGameBoardBlockPlaced;
             }
 
             if (blockPalette != null)
             {
-                blockPalette.SetInteractable(false);
                 blockPalette.OnBlockSelected += OnBlockSelected;
             }
 
@@ -257,6 +253,49 @@ namespace Features.Multi.UI
             {
                 blockPalette.OnBlockSelected -= OnBlockSelected;
             }
+        }
+
+        /// <summary>
+        /// 방 입장 시 게임 컴포넌트 초기화 (1회)
+        /// 게임 로직 설정, 보드 초기 상태 설정, 팔레트 초기화
+        /// </summary>
+        private void InitializeGameComponents()
+        {
+            Debug.Log("[GameRoomPanel] 게임 컴포넌트 초기화 시작 (방 입장)");
+            
+            // 게임보드 초기 설정
+            if (gameBoard != null)
+            {
+                gameBoard.SetGameLogic(gameLogic);
+                gameBoard.ResetBoard(); // 빈 보드로 초기화
+                gameBoard.SetInteractable(false); // 게임 시작 전에는 비활성화
+                Debug.Log("[GameRoomPanel] 게임보드 초기화 완료");
+            }
+            else
+            {
+                Debug.LogError("[GameRoomPanel] GameBoard가 할당되지 않았습니다!");
+            }
+
+            // 블록 팔레트 초기 설정 (색상 미정 상태)
+            if (blockPalette != null)
+            {
+                blockPalette.SetInteractable(false); // 게임 시작 전에는 비활성화
+                Debug.Log("[GameRoomPanel] 블록 팔레트 초기화 완료");
+            }
+            else
+            {
+                Debug.LogError("[GameRoomPanel] BlockPalette가 할당되지 않았습니다!");
+            }
+
+            // 타이머 패널 초기 상태
+            if (timerPanel != null)
+            {
+                timerPanel.SetActive(false);
+                isTimerActive = false;
+                Debug.Log("[GameRoomPanel] 타이머 패널 초기화 완료");
+            }
+
+            Debug.Log("[GameRoomPanel] 게임 컴포넌트 초기화 완료");
         }
 
         // ========================================
@@ -722,28 +761,125 @@ namespace Features.Multi.UI
 
         private void OnGameStarted()
         {
+            Debug.Log("[GameRoomPanel] 게임 시작됨 - 게임 컴포넌트 재초기화");
             isGameStarted = true;
             
-            // 타이머 패널 활성화
-            if (timerPanel != null)
-                timerPanel.SetActive(true);
-
-            // 게임보드 활성화
-            if (gameBoard != null)
-            {
-                gameBoard.SetInteractable(true);
-                gameBoard.ResetBoard(); // 게임 시작 시 보드 리셋
-            }
-
-            // 블록 팔레트 초기화 (내 플레이어 색상으로)
-            if (blockPalette != null)
-            {
-                blockPalette.InitializePalette(mySharedPlayerColor);
-                blockPalette.SetInteractable(false); // 첫 턴이 아니면 비활성화
-            }
-
+            // 게임 시작 시 이전 상태 완전 클리어 및 재초기화
+            ResetGameComponentsForNewGame();
+            
             UpdateGameControlsState();
             ShowMessage("게임이 시작되었습니다!");
+        }
+
+        /// <summary>
+        /// 게임 시작 시 모든 게임 컴포넌트를 새 게임에 맞게 재초기화
+        /// 이전 게임 상태 완전 클리어, 서버 동기화 준비
+        /// </summary>
+        private void ResetGameComponentsForNewGame()
+        {
+            Debug.Log("[GameRoomPanel] 새 게임을 위한 컴포넌트 재초기화 시작");
+
+            // 게임 로직 완전 리셋
+            if (gameLogic != null)
+            {
+                gameLogic.ClearBoard();
+                Debug.Log("[GameRoomPanel] 게임 로직 클리어 완료");
+            }
+
+            // 게임보드 완전 리셋 및 활성화
+            if (gameBoard != null)
+            {
+                gameBoard.ResetBoard(); // 이전 게임의 모든 블록 제거
+                gameBoard.SetInteractable(true); // 게임 중에는 활성화
+                gameBoard.SetMyTurn(false, mySharedPlayerColor); // 첫 턴이 아닐 수 있으므로 비활성화 상태로 시작
+                Debug.Log("[GameRoomPanel] 게임보드 재초기화 완료");
+            }
+
+            // 블록 팔레트 재초기화 (내 색상 확정 후)
+            if (blockPalette != null && mySharedPlayerColor != SharedPlayerColor.None)
+            {
+                blockPalette.InitializePalette(mySharedPlayerColor);
+                blockPalette.SetInteractable(false); // 첫 턴까지는 비활성화
+                Debug.Log($"[GameRoomPanel] 블록 팔레트 재초기화 완료 - 색상: {mySharedPlayerColor}");
+            }
+            else if (mySharedPlayerColor == SharedPlayerColor.None)
+            {
+                Debug.LogWarning("[GameRoomPanel] 내 플레이어 색상이 설정되지 않아 팔레트 초기화 연기");
+            }
+
+            // 타이머 시스템 리셋 및 활성화
+            if (timerPanel != null)
+            {
+                timerPanel.SetActive(true);
+                isTimerActive = false; // 첫 턴 시작까지는 비활성화
+                remainingTime = 0f;
+                
+                // 타이머 UI 초기화
+                if (timerLabel != null)
+                    timerLabel.text = "대기 중...";
+                if (timerProgressBar != null)
+                    timerProgressBar.value = 1f;
+                    
+                Debug.Log("[GameRoomPanel] 타이머 시스템 재초기화 완료");
+            }
+
+            // 게임 상태 변수 리셋
+            isMyTurn = false;
+            currentTurnPlayerId = -1;
+            
+            Debug.Log("[GameRoomPanel] 새 게임을 위한 컴포넌트 재초기화 완료");
+        }
+
+        /// <summary>
+        /// 로비 복귀 시 게임 컴포넌트 완전 정리
+        /// 모든 게임 상태 리셋, 메모리 정리
+        /// </summary>
+        private void CleanupGameComponents()
+        {
+            Debug.Log("[GameRoomPanel] 게임 컴포넌트 정리 시작 (로비 복귀)");
+
+            // 게임 로직 완전 정리
+            if (gameLogic != null)
+            {
+                gameLogic.ClearBoard();
+                // 새 게임을 위해 새 인스턴스로 교체
+                gameLogic = new SharedGameLogic();
+                Debug.Log("[GameRoomPanel] 게임 로직 정리 및 재생성 완료");
+            }
+
+            // 게임보드 완전 정리
+            if (gameBoard != null)
+            {
+                gameBoard.ResetBoard();
+                gameBoard.SetInteractable(false);
+                gameBoard.SetMyTurn(false, SharedPlayerColor.None);
+                Debug.Log("[GameRoomPanel] 게임보드 정리 완료");
+            }
+
+            // 블록 팔레트 완전 정리
+            if (blockPalette != null)
+            {
+                blockPalette.ResetPalette();
+                blockPalette.SetInteractable(false);
+                Debug.Log("[GameRoomPanel] 블록 팔레트 정리 완료");
+            }
+
+            // 타이머 시스템 완전 정리
+            if (timerPanel != null)
+            {
+                timerPanel.SetActive(false);
+                isTimerActive = false;
+                remainingTime = 0f;
+                turnTimeLimit = 0f;
+                Debug.Log("[GameRoomPanel] 타이머 시스템 정리 완료");
+            }
+
+            // 게임 상태 변수 완전 초기화
+            isGameStarted = false;
+            isMyTurn = false;
+            currentTurnPlayerId = -1;
+
+            Debug.Log("[GameRoomPanel] 게임 컴포넌트 정리 완료");
         }
 
         private void OnTurnChanged(TurnChangeInfo turnInfo)
@@ -1174,18 +1310,8 @@ namespace Features.Multi.UI
             myPlayerColor = MultiPlayerColor.None;
             mySharedPlayerColor = SharedPlayerColor.None;
             
-            // 게임보드와 블록 팔레트 정리
-            if (gameBoard != null)
-            {
-                gameBoard.ResetBoard();
-                gameBoard.SetInteractable(false);
-            }
-            
-            if (blockPalette != null)
-            {
-                blockPalette.ResetPalette();
-                blockPalette.SetInteractable(false);
-            }
+            // 게임 컴포넌트 완전 정리
+            CleanupGameComponents();
             
             // 데이터 정리 - MultiUserDataCache 제거로 더 이상 필요 없음
             Debug.Log("[GameRoomPanel] 방 데이터 정리 완료 - NetworkManager 이벤트 기반으로 관리됨");

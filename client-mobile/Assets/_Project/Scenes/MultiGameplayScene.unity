@@ -10517,8 +10517,8 @@ MonoBehaviour:
   - {fileID: 1840191861}
   - {fileID: 900611502}
   - {fileID: 242752576}
-  gameBoard: {fileID: 0}
-  blockPalette: {fileID: 0}
+  gameBoard: {fileID: 279458851}
+  blockPalette: {fileID: 1652251036}
   chatScrollRect: {fileID: 0}
   chatDisplay: {fileID: 0}
   chatInput: {fileID: 0}
