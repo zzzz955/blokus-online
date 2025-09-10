@@ -739,8 +739,31 @@ namespace Features.Multi.Net
 
                 Debug.Log($"[MessageHandler] 최종 사용자 목록: {playerDataList.Count}명");
                 
+                // 현재 사용자가 방에 있는지 확인 (방 입장 시 GameRoomPanel 활성화용)
+                bool currentUserInRoom = false;
+                var networkManager = FindObjectOfType<Features.Multi.Net.NetworkManager>();
+                string currentUsername = networkManager?.CurrentUserInfo?.username;
+                if (!string.IsNullOrEmpty(currentUsername))
+                {
+                    foreach (var player in playerDataList)
+                    {
+                        if (player.username == currentUsername)
+                        {
+                            currentUserInRoom = true;
+                            break;
+                        }
+                    }
+                }
+                
                 // 방 정보 및 플레이어 데이터 업데이트 이벤트 발생
                 OnRoomInfoUpdated?.Invoke(roomInfo, playerDataList);
+                
+                // 현재 사용자가 방에 있다면 GameRoomPanel 활성화 (ROOM_JOIN_SUCCESS 없이도)
+                if (currentUserInRoom)
+                {
+                    Debug.Log($"[MessageHandler] ROOM_INFO에서 현재 사용자 확인됨 - GameRoomPanel 활성화 트리거");
+                    OnRoomJoined?.Invoke();
+                }
 
                 Debug.Log($"[MessageHandler] 방 정보 파싱 완료: {roomName}, 플레이어 {playerDataList.Count}명");
             }

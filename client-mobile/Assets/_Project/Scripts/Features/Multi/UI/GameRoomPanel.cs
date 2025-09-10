@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Features.Multi.Net;
 using Features.Multi.Core;
 using TurnChangeInfo = Features.Multi.Net.TurnChangeInfo;
+using PlayerData = Features.Multi.Net.PlayerData;
 using GameResult = Features.Multi.Core.GameResult;
 using NetRoomInfo = Features.Multi.Net.RoomInfo;
 using TMPro;
@@ -79,6 +80,9 @@ namespace Features.Multi.UI
         
         // Host Status Tracking
         private bool isCurrentUserRoomHost = false; // 방 생성 시 true, ROOM_INFO 수신 시 정확한 서버 데이터로 업데이트
+        
+        // Event Subscription Tracking (중복 구독 방지)
+        private bool isEventsSubscribed = false;
         
         // Chat
         private List<MultiChatMessage> chatHistory = new List<MultiChatMessage>();
@@ -202,7 +206,7 @@ namespace Features.Multi.UI
 
         private void SubscribeToEvents()
         {
-            if (networkManager != null)
+            if (networkManager != null && !isEventsSubscribed)
             {
                 networkManager.OnRoomCreated += OnRoomCreated; // 방 생성 시 호스트 상태 설정
                 networkManager.OnRoomInfoUpdated += OnRoomInfoUpdated;
@@ -215,6 +219,13 @@ namespace Features.Multi.UI
                 networkManager.OnGameEnded += OnGameEnded;
                 networkManager.OnChatMessageReceived += OnChatMessageReceived;
                 networkManager.OnErrorReceived += OnErrorReceived;
+                
+                isEventsSubscribed = true;
+                Debug.Log("[GameRoomPanel] 이벤트 구독 완료 (중복 방지)");
+            }
+            else if (isEventsSubscribed)
+            {
+                Debug.Log("[GameRoomPanel] 이미 이벤트 구독됨 - 중복 방지");
             }
 
             // 게임보드와 블록 팔레트 이벤트는 SetupUI에서 연결됨
@@ -227,6 +238,7 @@ namespace Features.Multi.UI
             myPlayerColor = MultiPlayerColor.None;
             mySharedPlayerColor = SharedPlayerColor.None;
             isReady = false;
+            isEventsSubscribed = false; // 이벤트 구독 상태 리셋
             
             if (networkManager != null)
             {
@@ -655,10 +667,105 @@ namespace Features.Multi.UI
             UpdateGameControlsState(); // GameStart 버튼 상태 업데이트
         }
 
-        private void OnRoomInfoUpdated(NetRoomInfo roomInfo)
+        private void OnRoomInfoUpdated(NetRoomInfo roomInfo, System.Collections.Generic.List<PlayerData> playerDataList)
         {
+            Debug.Log($"[GameRoomPanel] 방 정보 업데이트 수신: {roomInfo.roomName}, 플레이어 {playerDataList?.Count ?? 0}명");
+            
             currentRoom = roomInfo;
             UpdateRoomInfo();
+            
+            // 플레이어 슬롯 업데이트 (PlayerData 리스트 사용)
+            UpdatePlayerSlotsWithServerData(playerDataList);
+        }
+
+        /// <summary>
+        /// 서버에서 받은 PlayerData로 플레이어 슬롯 업데이트
+        /// </summary>
+        private void UpdatePlayerSlotsWithServerData(System.Collections.Generic.List<PlayerData> playerDataList)
+        {
+            if (playerDataList == null)
+            {
+                Debug.LogWarning("[GameRoomPanel] 플레이어 데이터 리스트가 null입니다.");
+                return;
+            }
+
+            Debug.Log($"[GameRoomPanel] 플레이어 슬롯 업데이트 시작 - 총 {playerDataList.Count}명");
+
+            // 모든 슬롯 초기화 (빈 슬롯으로 설정)
+            for (int i = 0; i < 4; i++)
+            {
+                if (playerSlots[i] != null)
+                {
+                    var emptySlot = PlayerSlot.Empty;
+                    this.playerData[i] = emptySlot;
+                    playerSlots[i].SetPlayerData(emptySlot);
+                }
+            }
+
+            // 서버 데이터로 슬롯 업데이트
+            foreach (var playerData in playerDataList)
+            {
+                // 서버의 colorSlot이 1-4이면 0-3으로 변환
+                int slotIndex = ConvertServerColorSlotToClientIndex(playerData.colorSlot);
+                
+                if (slotIndex >= 0 && slotIndex < 4 && playerSlots[slotIndex] != null)
+                {
+                    // PlayerData를 PlayerSlot으로 변환
+                    PlayerSlot slot = new PlayerSlot
+                    {
+                        playerId = playerData.playerId,
+                        playerName = playerData.displayName,
+                        isReady = playerData.isReady,
+                        isHost = playerData.isHost,
+                        colorIndex = slotIndex,
+                        currentScore = 0,
+                        remainingBlocks = 21
+                    };
+                    
+                    // PlayerData 배열 업데이트
+                    this.playerData[slotIndex] = slot;
+                    
+                    // UI 위젯 업데이트
+                    var currentUser = networkManager?.CurrentUserInfo;
+                    bool isCurrentUser = currentUser != null && playerData.username == currentUser.username;
+                    
+                    playerSlots[slotIndex].SetPlayerData(slot, playerData.isHost);
+                    playerSlots[slotIndex].SetAsMySlot(isCurrentUser);
+                    
+                    // 내 플레이어 정보 업데이트 (색상, 준비 상태, 호스트 상태)
+                    if (isCurrentUser)
+                    {
+                        myPlayerColor = (MultiPlayerColor)slotIndex;
+                        mySharedPlayerColor = ConvertToSharedPlayerColor(myPlayerColor);
+                        isReady = playerData.isReady;
+                        
+                        // 호스트 상태 업데이트 (중요: 서버 데이터가 최우선)
+                        bool wasHost = isCurrentUserRoomHost;
+                        isCurrentUserRoomHost = playerData.isHost;
+                        
+                        // 호스트 변경 감지 및 로깅
+                        if (wasHost != isCurrentUserRoomHost)
+                        {
+                            Debug.Log($"[GameRoomPanel] 호스트 상태 변경 감지: {wasHost} → {isCurrentUserRoomHost}");
+                            if (isCurrentUserRoomHost)
+                            {
+                                Debug.Log("[GameRoomPanel] 내가 새 호스트가 됨 - UI 강제 업데이트");
+                            }
+                        }
+                        
+                        Debug.Log($"[GameRoomPanel] 내 플레이어 정보 업데이트: 색상={myPlayerColor}→{mySharedPlayerColor}, 호스트={isCurrentUserRoomHost}, 준비={isReady}");
+                    }
+                    
+                    Debug.Log($"[GameRoomPanel] 슬롯 {slotIndex} 업데이트: {playerData.displayName} [{playerData.username}] - 호스트={playerData.isHost}, 준비={playerData.isReady}");
+                }
+                else
+                {
+                    Debug.LogWarning($"[GameRoomPanel] 잘못된 슬롯 인덱스: {slotIndex} (서버 colorSlot: {playerData.colorSlot})");
+                }
+            }
+
+            UpdateGameControlsState(); // 게임 시작 버튼 등 상태 업데이트
+            Debug.Log($"[GameRoomPanel] 플레이어 슬롯 업데이트 완료");
         }
 
         /// <summary>
@@ -673,20 +780,17 @@ namespace Features.Multi.UI
                 UpdateRoomInfo();
                 
                 // 방 생성자 확인 및 자동 할당 (타이밍 이슈 해결)
-                // 단, 플레이어 데이터가 비어있는 경우에만 수행 (방 재입장 시 방지)
-                if (networkManager.IsCurrentUserRoomCreator && AllPlayerSlotsEmpty())
+                // NetworkManager에서 ROOM_INFO를 통해 처리하므로 여기서는 호스트 상태만 설정
+                if (networkManager.IsCurrentUserRoomCreator)
                 {
-                    Debug.Log("[GameRoomPanel] 방 생성자 확인됨 - 첫 번째 슬롯 자동 할당 시작");
+                    Debug.Log("[GameRoomPanel] 방 생성자 확인됨 - 호스트 상태 설정");
                     isCurrentUserRoomHost = true;
-                    AssignRoomCreatorToFirstSlot();
                     UpdateGameControlsState();
                 }
-                else if (networkManager.IsCurrentUserRoomCreator)
-                {
-                    Debug.Log("[GameRoomPanel] 방 생성자이지만 플레이어 슬롯이 이미 있어 자동 할당 생략 (방 재입장)");
-                }
                 
-                // UpdatePlayerSlots() 제거: ROOM_INFO 메시지 수신 시에만 UpdatePlayerData() 호출
+                // 즉시 마지막 ROOM_INFO 데이터 요청 (이벤트 구독 전에 도착한 메시지 처리)
+                Debug.Log("[GameRoomPanel] 마지막 ROOM_INFO 데이터 요청");
+                networkManager.RequestLastRoomInfo();
             }
             else
             {
@@ -727,9 +831,17 @@ namespace Features.Multi.UI
 
         private void OnPlayerLeft(int playerId)
         {
+            Debug.Log($"[GameRoomPanel] OnPlayerLeft 호출: playerId={playerId}");
+            
             int slotIndex = playerId - 1;
             if (slotIndex >= 0 && slotIndex < 4)
             {
+                // 나간 플레이어가 호스트였는지 확인
+                bool wasHost = playerData[slotIndex].isHost;
+                string leavingPlayerName = playerData[slotIndex].playerName;
+                
+                Debug.Log($"[GameRoomPanel] 플레이어 {leavingPlayerName} 퇴장 - 호스트 여부: {wasHost}");
+                
                 // 빈 슬롯으로 설정 (Empty 사용)
                 PlayerSlot emptySlot = PlayerSlot.Empty;
                 playerData[slotIndex] = emptySlot;
@@ -739,9 +851,32 @@ namespace Features.Multi.UI
                     playerSlots[slotIndex].UpdateSlot(emptySlot);
                     playerSlots[slotIndex].SetAsMySlot(false);
                 }
+                
+                // 호스트가 나간 경우 - 호스트 변경 처리를 위해 ROOM_INFO 재요청
+                if (wasHost)
+                {
+                    Debug.Log("[GameRoomPanel] 호스트가 퇴장함 - ROOM_INFO 재동기화 시작");
+                    StartCoroutine(RequestRoomInfoAfterHostLeft());
+                }
             }
 
             UpdateGameControlsState();
+        }
+        
+        /// <summary>
+        /// 호스트 퇴장 후 ROOM_INFO 재동기화 (약간의 지연 후 요청)
+        /// </summary>
+        private System.Collections.IEnumerator RequestRoomInfoAfterHostLeft()
+        {
+            // 서버에서 호스트 변경 처리 시간 대기
+            yield return new WaitForSeconds(0.5f);
+            
+            if (networkManager != null)
+            {
+                Debug.Log("[GameRoomPanel] 호스트 변경 후 ROOM_INFO 재요청");
+                // NetworkManager에 ROOM_INFO 재요청 (서버 동기화)
+                networkManager.RequestRoomInfoSync();
+            }
         }
 
         private void OnPlayerReadyChanged(int playerId, bool isReady)
@@ -1240,20 +1375,6 @@ namespace Features.Multi.UI
             Debug.Log($"[GameRoomPanel] 방 생성자 색상 설정: myPlayerColor={myPlayerColor}, mySharedPlayerColor={mySharedPlayerColor}");
         }
 
-        /// <summary>
-        /// 모든 플레이어 슬롯이 비어있는지 확인 (방 생성 직후 판별용)
-        /// </summary>
-        private bool AllPlayerSlotsEmpty()
-        {
-            for (int i = 0; i < 4; i++)
-            {
-                if (!playerData[i].isEmpty)
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
 
         // ========================================
         // Public API (for PlayerSlotWidget)

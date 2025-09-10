@@ -50,6 +50,9 @@ namespace Features.Multi.Net
         // 현재 방 플레이어 데이터 목록 (플레이어 찾기용)
         private System.Collections.Generic.List<PlayerData> currentPlayerDataList;
         
+        // 마지막 ROOM_INFO 데이터 저장 (이벤트 구독 타이밍 이슈 해결용)
+        private System.Collections.Generic.List<PlayerData> lastRoomInfoData = null;
+        
         // 싱글톤 패턴
         public static NetworkManager Instance { get; private set; }
         
@@ -982,26 +985,9 @@ namespace Features.Multi.Net
         {
             Debug.Log($"[NetworkManager] 방 입장됨");
             
-            // 방 입장 후 ROOM_INFO 메시지를 받기 위한 workaround
-            // 서버에서 방 입장 후 자동으로 ROOM_INFO를 보내지 않는 문제가 있어
-            // room:ready:0 메시지를 보내서 ROOM_INFO 전송을 트리거
-            StartCoroutine(TriggerRoomInfoAfterJoin());
+            // ROOM_INFO는 서버에서 자동으로 전송되므로 별도 트리거 불필요
         }
 
-        /// <summary>
-        /// 방 입장 후 ROOM_INFO 메시지 수신을 위한 트리거 (workaround)
-        /// </summary>
-        private System.Collections.IEnumerator TriggerRoomInfoAfterJoin()
-        {
-            // 0.5초 대기 후 ready 상태를 false로 설정하여 ROOM_INFO 트리거
-            yield return new WaitForSeconds(0.5f);
-            
-            if (IsConnected() && networkClient != null)
-            {
-                Debug.Log("[NetworkManager] ROOM_INFO 트리거를 위해 room:ready:0 전송");
-                networkClient.SendPlayerReadyRequest(false);
-            }
-        }
 
         /// <summary>
         /// 방 나가기 핸들러 (내부용) - 호스트 관련 플래그 리셋
@@ -1024,29 +1010,9 @@ namespace Features.Multi.Net
         {
             Debug.Log($"[NetworkManager] 플레이어 입장 처리: {username}");
             
-            // 플레이어 입장 시 ROOM_INFO 재요청하여 즉시 동기화
-            // 서버에서 자동으로 ROOM_INFO를 보내지 않는 경우가 있어서 명시적으로 요청
-            if (IsConnected() && networkClient != null)
-            {
-                Debug.Log("[NetworkManager] 플레이어 입장으로 인한 ROOM_INFO 트리거를 위해 room:ready:0 전송");
-                // 0.1초 대기 후 트리거 (즉시 처리)
-                StartCoroutine(TriggerRoomInfoAfterPlayerJoined());
-            }
+            // 플레이어 입장 시 서버에서 자동으로 ROOM_INFO를 전송하므로 별도 요청 불필요
         }
         
-        /// <summary>
-        /// 플레이어 입장 후 ROOM_INFO 메시지 수신을 위한 트리거
-        /// </summary>
-        private System.Collections.IEnumerator TriggerRoomInfoAfterPlayerJoined()
-        {
-            // 0.1초 대기 후 ready 상태를 false로 설정하여 ROOM_INFO 트리거
-            yield return new WaitForSeconds(0.1f);
-            
-            if (IsConnected() && networkClient != null)
-            {
-                networkClient.SendPlayerReadyRequest(false);
-            }
-        }
         
         /// <summary>
         /// 시스템 메시지 기반 플레이어 입장 핸들러 - MessageHandler로부터 이벤트 수신
@@ -1055,28 +1021,9 @@ namespace Features.Multi.Net
         {
             Debug.Log($"[NetworkManager] 시스템 메시지 기반 플레이어 입장 감지 - 즉시 동기화 트리거");
             
-            // 플레이어 입장 시 ROOM_INFO 재요청하여 즉시 동기화
-            if (IsConnected() && networkClient != null)
-            {
-                Debug.Log("[NetworkManager] 시스템 메시지 기반 ROOM_INFO 트리거를 위해 room:ready:0 전송");
-                // 즉시 트리거 (0.1초 대기)
-                StartCoroutine(TriggerRoomInfoAfterSystemPlayerJoined());
-            }
+            // 시스템 메시지 기반 플레이어 입장 시에도 서버에서 자동으로 ROOM_INFO 전송
         }
         
-        /// <summary>
-        /// 시스템 메시지 기반 플레이어 입장 후 ROOM_INFO 트리거
-        /// </summary>
-        private System.Collections.IEnumerator TriggerRoomInfoAfterSystemPlayerJoined()
-        {
-            // 0.1초 대기 후 ready 상태를 false로 설정하여 ROOM_INFO 트리거
-            yield return new WaitForSeconds(0.1f);
-            
-            if (IsConnected() && networkClient != null)
-            {
-                networkClient.SendPlayerReadyRequest(false);
-            }
-        }
 
         /// <summary>
         /// 플레이어 퇴장 핸들러 - MessageHandler로부터 이벤트 수신
@@ -1151,8 +1098,8 @@ namespace Features.Multi.Net
 
         private void OnRoomInfoUpdatedHandler(RoomInfo roomInfo, System.Collections.Generic.List<PlayerData> playerDataList)
         {
-            // 방 정보 업데이트
-            UpdateCurrentRoomInfo(roomInfo);
+            // 방 정보 업데이트 - playerDataList 함께 전달
+            UpdateCurrentRoomInfo(roomInfo, playerDataList);
             
             // 플레이어 데이터 목록 저장 (플레이어 찾기용)
             currentPlayerDataList = playerDataList;
@@ -1200,7 +1147,7 @@ namespace Features.Multi.Net
         // ========================================
         // Missing Events (Stub) - OnRoomJoined, OnRoomLeft는 위에서 구현됨
         // ========================================
-        public event System.Action<RoomInfo> OnRoomInfoUpdated;
+        public event System.Action<RoomInfo, System.Collections.Generic.List<PlayerData>> OnRoomInfoUpdated;
         public event System.Action<UserInfo> OnPlayerJoined;
         public event System.Action<int> OnPlayerLeft;
         public event System.Action<int, bool> OnPlayerReadyChanged;
@@ -1213,13 +1160,56 @@ namespace Features.Multi.Net
         /// <summary>
         /// 현재 방 정보 업데이트 (MessageHandler에서 호출)
         /// </summary>
-        public void UpdateCurrentRoomInfo(RoomInfo roomInfo)
+        public void UpdateCurrentRoomInfo(RoomInfo roomInfo, System.Collections.Generic.List<PlayerData> playerDataList = null)
         {
             currentRoomInfo = roomInfo;
             Debug.Log($"[NetworkManager] 방 정보 업데이트됨: {roomInfo.roomName} (플레이어: {roomInfo.currentPlayers}/{roomInfo.maxPlayers})");
             
-            // 이벤트 발생
-            OnRoomInfoUpdated?.Invoke(roomInfo);
+            // 마지막 ROOM_INFO 데이터 저장 (이벤트 구독 타이밍 이슈 해결용)
+            if (playerDataList != null)
+            {
+                lastRoomInfoData = new System.Collections.Generic.List<PlayerData>(playerDataList);
+                Debug.Log($"[NetworkManager] 마지막 ROOM_INFO 데이터 저장됨: {playerDataList.Count}명");
+            }
+            
+            // 이벤트 발생 - playerDataList가 제공된 경우 함께 전달
+            if (playerDataList != null)
+            {
+                OnRoomInfoUpdated?.Invoke(roomInfo, playerDataList);
+            }
+            else
+            {
+                OnRoomInfoUpdated?.Invoke(roomInfo, new System.Collections.Generic.List<PlayerData>());
+            }
+        }
+
+        /// <summary>
+        /// 마지막 ROOM_INFO 데이터 즉시 전달 (이벤트 구독 타이밍 이슈 해결)
+        /// GameRoomPanel 활성화 시 호출하여 이미 도착한 ROOM_INFO 데이터를 즉시 처리
+        /// </summary>
+        public void RequestLastRoomInfo()
+        {
+            if (lastRoomInfoData != null && currentRoomInfo != null)
+            {
+                Debug.Log($"[NetworkManager] 마지막 ROOM_INFO 데이터 즉시 전달: {lastRoomInfoData.Count}명");
+                OnRoomInfoUpdated?.Invoke(currentRoomInfo, lastRoomInfoData);
+            }
+            else
+            {
+                Debug.Log("[NetworkManager] 저장된 ROOM_INFO 데이터가 없음");
+            }
+        }
+        
+        /// <summary>
+        /// 서버 동기화 대기 (호스트 변경 등 서버 자동 응답 대기)
+        /// 실제로는 서버가 HOST_CHANGED + ROOM_INFO를 자동으로 보내므로 별도 요청 불필요
+        /// </summary>
+        public void RequestRoomInfoSync()
+        {
+            Debug.Log($"[NetworkManager] 서버 동기화 대기 중 - HOST_CHANGED 및 ROOM_INFO 자동 수신 예정");
+            // 서버가 자동으로 HOST_CHANGED와 새로운 ROOM_INFO를 전송하므로
+            // 클라이언트에서 추가 요청을 보낼 필요가 없음
+            // 단순히 로깅만 하고 서버 응답을 기다림
         }
 
         // ========================================
@@ -1421,6 +1411,14 @@ namespace Features.Multi.Net
             networkClient.SendCleanTCPMessage("room", "list");
             
             Debug.Log("[NetworkManager] === 메시지 프로토콜 테스트 완료 ===");
+        }
+
+        /// <summary>
+        /// NetworkClient 인스턴스 반환 (직접 메시지 전송용)
+        /// </summary>
+        public NetworkClient GetNetworkClient()
+        {
+            return networkClient;
         }
     }
 }

@@ -138,12 +138,13 @@ namespace Features.Multi.UI
                 Debug.LogError($"[PlayerSlotWidget] playerNameText가 null입니다!");
             }
             
-            // 준비 상태 표시 (스프라이트 기반)
+            // 준비 상태 표시 (스프라이트 기반) - 호스트는 항상 Ready 상태로 표시
             if (readyIndicator != null)
             {
                 readyIndicator.gameObject.SetActive(true);
-                readyIndicator.sprite = playerData.isReady ? readySprite : notReadySprite;
-                Debug.Log($"[PlayerSlotWidget] 준비 상태 설정: {playerData.isReady}");
+                bool displayReady = playerData.isHost || playerData.isReady; // 호스트는 항상 Ready로 표시
+                readyIndicator.sprite = displayReady ? readySprite : notReadySprite;
+                Debug.Log($"[PlayerSlotWidget] 준비 상태 설정: 실제={playerData.isReady}, 호스트={playerData.isHost}, 표시={displayReady}");
             }
             else
             {

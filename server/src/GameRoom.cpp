@@ -99,6 +99,9 @@ namespace Blokus {
             spdlog::debug("방 {} 플레이어 추가: '{}' (현재: {}/{})",
                 m_roomId, username, m_players.size(), m_maxPlayers);
 
+            // 플레이어 추가 후 방 정보 브로드캐스트
+            broadcastRoomInfoLocked();
+
             return true;
         }
 
