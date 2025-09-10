@@ -20,6 +20,20 @@ namespace Features.Multi.Net
         public bool isReady;
         public int colorSlot;
     }
+
+    /// <summary>
+    /// 턴 변경 정보 구조체 (TURN_CHANGED JSON에서 파싱용)
+    /// </summary>
+    [System.Serializable]
+    public struct TurnChangeInfo
+    {
+        public string newPlayer;
+        public int playerColor;
+        public int turnNumber;
+        public int turnTimeSeconds;
+        public int remainingTimeSeconds;
+        public bool previousTurnTimedOut;
+    }
     /// <summary>
     /// 네트워크 메시지 핸들러
     /// 서버로부터 수신된 메시지를 파싱하고 적절한 이벤트로 변환
@@ -47,7 +61,7 @@ namespace Features.Multi.Net
         // 게임 관련
         // public event System.Action<GameState> OnGameStateUpdated; // 멀티플레이어에서 사용 예정
         public event System.Action<MultiModels.BlockPlacement> OnBlockPlaced; // 블록 배치됨
-        public event System.Action<MultiModels.PlayerColor> OnTurnChanged; // 턴 변경
+        public event System.Action<TurnChangeInfo> OnTurnChanged; // 턴 변경 (상세 정보)
         public event System.Action<Dictionary<MultiModels.PlayerColor, int>> OnScoresUpdated; // 점수 업데이트
         public event System.Action<MultiModels.PlayerColor> OnGameEnded; // 게임 종료
         
@@ -865,15 +879,40 @@ namespace Features.Multi.Net
         
         /// <summary>
         /// 턴 변경 - "TURN_CHANGED:jsonData"
+        /// 서버 형식: TURN_CHANGED:{"newPlayer":"username","playerColor":int,"turnNumber":int,"turnTimeSeconds":int,"remainingTimeSeconds":int,"previousTurnTimedOut":boolean}
         /// </summary>
         private void HandleTurnChanged(string[] parts)
         {
             if (parts.Length >= 2)
             {
                 string jsonData = string.Join(":", parts, 1, parts.Length - 1);
-                Debug.Log($"[MessageHandler] 턴 변경: {jsonData}");
-                // JSON 파싱하여 턴 정보 처리
-                // TODO: JSON 파싱 후 OnTurnChanged 이벤트 발생
+                Debug.Log($"[MessageHandler] 턴 변경 JSON 수신: {jsonData}");
+                
+                try
+                {
+                    // Unity JsonUtility를 사용한 JSON 파싱
+                    TurnChangeInfo turnInfo = JsonUtility.FromJson<TurnChangeInfo>(jsonData);
+                    
+                    Debug.Log($"[MessageHandler] 턴 변경 파싱 완료: 플레이어={turnInfo.newPlayer}, " +
+                             $"색상={turnInfo.playerColor}, 턴={turnInfo.turnNumber}, " +
+                             $"제한시간={turnInfo.turnTimeSeconds}초, 남은시간={turnInfo.remainingTimeSeconds}초, " +
+                             $"이전턴타임아웃={turnInfo.previousTurnTimedOut}");
+                    
+                    // 상세 정보를 포함한 이벤트 발생
+                    OnTurnChanged?.Invoke(turnInfo);
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogError($"[MessageHandler] TURN_CHANGED JSON 파싱 실패: {ex.Message}");
+                    Debug.LogError($"[MessageHandler] 문제가 된 JSON: {jsonData}");
+                    
+                    // 파싱 실패 시 기본값으로 폴백하지 않고 에러 로그만 출력
+                    // UI에서는 이전 상태를 유지하도록 함
+                }
+            }
+            else
+            {
+                Debug.LogWarning("[MessageHandler] TURN_CHANGED 메시지에 JSON 데이터가 없습니다.");
             }
         }
         

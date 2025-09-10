@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using System.Collections.Generic;
 using Features.Multi.Net;
 using Features.Multi.Core;
+using TurnChangeInfo = Features.Multi.Net.TurnChangeInfo;
 using GameResult = Features.Multi.Core.GameResult;
 using NetRoomInfo = Features.Multi.Net.RoomInfo;
 using TMPro;
@@ -745,15 +746,25 @@ namespace Features.Multi.UI
             ShowMessage("게임이 시작되었습니다!");
         }
 
-        private void OnTurnChanged(MultiPlayerColor currentPlayer)
+        private void OnTurnChanged(TurnChangeInfo turnInfo)
         {
-            currentTurnPlayerId = (int)currentPlayer;
-            turnTimeLimit = 30.0f; // Default turn time limit
-            remainingTime = turnTimeLimit;
+            // 서버 색상을 클라이언트 색상으로 변환 (1-4 → 0-3)
+            int clientColorIndex = ConvertServerColorSlotToClientIndex(turnInfo.playerColor);
+            if (clientColorIndex < 0)
+            {
+                Debug.LogError($"[GameRoomPanel] 잘못된 서버 색상 값: {turnInfo.playerColor}");
+                return;
+            }
             
-            // MultiPlayerColor를 SharedPlayerColor로 변환
-            SharedPlayerColor sharedCurrentPlayer = ConvertToSharedPlayerColor(currentPlayer);
-            isMyTurn = (sharedCurrentPlayer == mySharedPlayerColor);
+            currentTurnPlayerId = clientColorIndex;
+            
+            // 서버에서 받은 타이머 정보 사용
+            turnTimeLimit = turnInfo.turnTimeSeconds;
+            remainingTime = turnInfo.remainingTimeSeconds;
+            
+            // 내 턴인지 확인 (사용자명으로 비교)
+            var currentUser = networkManager?.CurrentUserInfo;
+            isMyTurn = currentUser != null && turnInfo.newPlayer == currentUser.username;
             isTimerActive = true;
 
             // 게임보드와 블록 팔레트 턴 상태 업데이트
@@ -766,10 +777,19 @@ namespace Features.Multi.UI
                 blockPalette.SetInteractable(isMyTurn);
             }
 
+            // 이전 턴 타임아웃 알림 처리
+            if (turnInfo.previousTurnTimedOut)
+            {
+                ShowMessage("이전 플레이어의 시간이 초과되어 턴이 넘어왔습니다.");
+                Debug.Log("[GameRoomPanel] 이전 턴 타임아웃 알림 표시됨");
+            }
+
             UpdateCurrentTurnDisplay();
             UpdatePlayerSlotHighlight();
             
-            Debug.Log($"[GameRoomPanel] 턴 변경: Current={currentPlayer}, isMyTurn={isMyTurn}, myColor={mySharedPlayerColor}");
+            Debug.Log($"[GameRoomPanel] 턴 변경 완료: 플레이어={turnInfo.newPlayer}, " +
+                     $"색상={turnInfo.playerColor}→{clientColorIndex}, 턴={turnInfo.turnNumber}, " +
+                     $"내턴={isMyTurn}, 제한시간={turnTimeLimit}초, 남은시간={remainingTime}초");
         }
 
         private void OnBlockPlaced(MultiBlockPlacement placement)

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using TMPro;
 using App.Services;
 using Shared.Models;
+using Features.Single.Gameplay;
 using SharedGameLogic = App.Core.GameLogic;
 
 namespace Features.Multi.UI
@@ -46,6 +47,12 @@ namespace Features.Multi.UI
         [Header("Action Button Sprites")]
         [SerializeField] private Sprite placeButtonEnabledSprite;
         [SerializeField] private Sprite placeButtonDisabledSprite;
+
+        [Header("스킨")]
+        [SerializeField] private Features.Single.Gameplay.Skins.BlockSkin skin;
+
+        [Header("셀 스프라이트 시스템")]
+        [SerializeField] private Features.Single.Gameplay.CellSpriteProvider cellSpriteProvider;
 
         // 내부 상태
         private SharedGameLogic gameLogic;
@@ -322,15 +329,18 @@ namespace Features.Multi.UI
             var img = cellImages[row, col];
             if (img == null) return;
 
-            img.color = color switch
+            // 스킨 또는 CellSpriteProvider를 통한 스프라이트 설정
+            if (cellSpriteProvider != null)
             {
-                PlayerColor.Blue => blueColor,
-                PlayerColor.Yellow => yellowColor,
-                PlayerColor.Red => redColor,
-                PlayerColor.Green => greenColor,
-                PlayerColor.Obstacle => obstacleColor,
-                _ => emptyColor
-            };
+                var sprite = cellSpriteProvider.GetSprite(color);
+                if (sprite != null)
+                {
+                    img.sprite = sprite;
+                }
+            }
+
+            // 색상 설정 (스킨 우선)
+            img.color = GetPlayerColor(color);
         }
 
         /// <summary>
@@ -600,6 +610,30 @@ namespace Features.Multi.UI
         public int GetBoardSize() => boardSize;
         public float CellSize => cellSize;
         public RectTransform CellParent => cellParent;
+
+        /// <summary>
+        /// 플레이어 색상 반환 (BlockButton과 색상 통일을 위함)
+        /// 블록 스킨이 설정되어 있으면 스킨 색상을 우선 사용
+        /// </summary>
+        public Color GetPlayerColor(PlayerColor player)
+        {
+            // 스킨이 설정되어 있으면 스킨 색상 사용
+            if (skin != null)
+            {
+                return skin.GetTint(player);
+            }
+
+            // 기본 색상 사용
+            return player switch
+            {
+                PlayerColor.Blue => blueColor,
+                PlayerColor.Yellow => yellowColor,
+                PlayerColor.Red => redColor,
+                PlayerColor.Green => greenColor,
+                PlayerColor.Obstacle => obstacleColor,
+                _ => emptyColor
+            };
+        }
 
         /// <summary>
         /// 보드 셀 설정 (내부용)
