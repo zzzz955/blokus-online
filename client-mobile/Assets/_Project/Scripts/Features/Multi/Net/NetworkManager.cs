@@ -46,6 +46,9 @@ namespace Features.Multi.Net
         // 방 생성자 여부 플래그 (타이밍 이슈 해결용)
         private bool isCurrentUserRoomCreator = false;
         
+        // 현재 방 플레이어 데이터 목록 (플레이어 찾기용)
+        private System.Collections.Generic.List<PlayerData> currentPlayerDataList;
+        
         // 싱글톤 패턴
         public static NetworkManager Instance { get; private set; }
         
@@ -218,6 +221,8 @@ namespace Features.Multi.Net
                 messageHandler.OnRoomJoined += OnRoomJoinedHandler;
                 messageHandler.OnRoomLeft += OnRoomLeftHandler;
                 messageHandler.OnRoomInfoUpdated += OnRoomInfoUpdatedHandler;
+                messageHandler.OnPlayerLeft += OnPlayerLeftHandler;
+                messageHandler.OnPlayerReadyChanged += OnPlayerReadyChangedHandler;
             }
             
             isInitialized = true;
@@ -1002,10 +1007,61 @@ namespace Features.Multi.Net
         {
             // 방 나가기 시 모든 방 관련 상태 리셋
             currentRoomInfo = null;
+            currentPlayerDataList = null;
             isCurrentUserRoomCreator = false;
             
             Debug.Log($"[NetworkManager] 방 나가기 완료 - 모든 방 관련 상태 리셋");
             Debug.Log($"[NetworkManager] 방 생성자 플래그 리셋: {isCurrentUserRoomCreator}");
+        }
+
+        /// <summary>
+        /// 플레이어 퇴장 핸들러 - MessageHandler로부터 이벤트 수신
+        /// </summary>
+        private void OnPlayerLeftHandler(string username)
+        {
+            Debug.Log($"[NetworkManager] 플레이어 퇴장 처리: {username}");
+            
+            // currentPlayerDataList에서 username으로 플레이어를 찾아 colorSlot 전달
+            if (currentPlayerDataList != null)
+            {
+                for (int i = 0; i < currentPlayerDataList.Count; i++)
+                {
+                    var player = currentPlayerDataList[i];
+                    if (player.username == username)
+                    {
+                        Debug.Log($"[NetworkManager] 플레이어 {username} → colorSlot: {player.colorSlot}");
+                        
+                        // GameRoomPanel의 OnPlayerLeft는 colorSlot을 기준으로 작동
+                        OnPlayerLeft?.Invoke(player.colorSlot);
+                        break;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// 플레이어 준비 상태 변경 핸들러 - MessageHandler로부터 이벤트 수신
+        /// </summary>
+        private void OnPlayerReadyChangedHandler(string username, bool isReady)
+        {
+            Debug.Log($"[NetworkManager] 플레이어 준비 상태 변경: {username} → {(isReady ? "준비완료" : "대기중")}");
+            
+            // currentPlayerDataList에서 username으로 플레이어를 찾아 colorSlot 전달
+            if (currentPlayerDataList != null)
+            {
+                for (int i = 0; i < currentPlayerDataList.Count; i++)
+                {
+                    var player = currentPlayerDataList[i];
+                    if (player.username == username)
+                    {
+                        Debug.Log($"[NetworkManager] 플레이어 {username} → colorSlot: {player.colorSlot}");
+                        
+                        // GameRoomPanel의 OnPlayerReadyChanged는 colorSlot을 기준으로 작동
+                        OnPlayerReadyChanged?.Invoke(player.colorSlot, isReady);
+                        break;
+                    }
+                }
+            }
         }
         
         /// <summary>
@@ -1033,6 +1089,9 @@ namespace Features.Multi.Net
         {
             // 방 정보 업데이트
             UpdateCurrentRoomInfo(roomInfo);
+            
+            // 플레이어 데이터 목록 저장 (플레이어 찾기용)
+            currentPlayerDataList = playerDataList;
             
             // 실제 서버 데이터 수신 시 방 생성자 플래그 리셋 (타이밍 이슈 해결 역할 완료)
             if (isCurrentUserRoomCreator)
@@ -1062,6 +1121,8 @@ namespace Features.Multi.Net
                 messageHandler.OnRoomJoined -= OnRoomJoinedHandler;
                 messageHandler.OnRoomLeft -= OnRoomLeftHandler;
                 messageHandler.OnRoomInfoUpdated -= OnRoomInfoUpdatedHandler;
+                messageHandler.OnPlayerLeft -= OnPlayerLeftHandler;
+                messageHandler.OnPlayerReadyChanged -= OnPlayerReadyChangedHandler;
             }
             
             DisconnectFromServer();

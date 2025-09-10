@@ -1014,7 +1014,9 @@ private slots:
         qDebug() << QString::fromUtf8("방장 변경: %1").arg(newHost);
         if (m_gameRoomWindow)
         {
-            m_gameRoomWindow->addSystemMessage(QString::fromUtf8("%1님이 새로운 방장이 되었습니다.").arg(newHost));
+            // display_name으로 변환하여 시스템 메시지 표시
+            QString displayName = m_gameRoomWindow->getDisplayNameFromUsername(newHost);
+            m_gameRoomWindow->addSystemMessage(QString::fromUtf8("%1님이 새로운 방장이 되었습니다.").arg(displayName));
         }
     }
 
@@ -1048,10 +1050,9 @@ private slots:
         qDebug() << QString::fromUtf8("방장 변경 (displayName 포함): %1 (%2)").arg(username).arg(displayName);
         if (m_gameRoomWindow)
         {
-            // displayName 캐시 업데이트 (새 방장의 displayName)
+            // displayName 캐시 업데이트 및 시스템 메시지는 GameRoomWindow에서 처리
             m_gameRoomWindow->onHostChangedWithDisplayName(username, displayName);
-            // 시스템 메시지는 displayName으로 표시
-            m_gameRoomWindow->addSystemMessage(QString::fromUtf8("%1님이 새로운 방장이 되었습니다.").arg(displayName));
+            // 중복 메시지 제거: onHostChangedWithDisplayName() 내부에서 이미 시스템 메시지 처리함
         }
     }
 
@@ -1716,6 +1717,13 @@ int main(int argc, char *argv[])
     app.setApplicationName(QString::fromUtf8("블로커스 온라인"));
     app.setApplicationVersion("1.2.0");
     app.setOrganizationName("Blokus Online");
+
+    // Qt Meta Type 등록 (Signal-Slot에서 사용자 정의 타입 전달을 위해 필요)
+    qRegisterMetaType<UserInfo>("UserInfo");
+    qRegisterMetaType<QList<UserInfo>>("QList<UserInfo>");
+    qRegisterMetaType<RoomInfo>("RoomInfo");
+    qRegisterMetaType<QList<RoomInfo>>("QList<RoomInfo>");
+    qRegisterMetaType<ChatMessage>("ChatMessage");
 
     // 설정 시스템 초기화
     auto& config = ClientConfigManager::instance();

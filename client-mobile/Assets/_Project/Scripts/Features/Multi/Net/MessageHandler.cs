@@ -58,6 +58,10 @@ namespace Features.Multi.Net
         // 채팅 관련
         public event System.Action<string, string, string> OnChatMessageReceived; // username, displayName, message
         
+        // 플레이어 상태 관련
+        public event System.Action<string> OnPlayerLeft; // 플레이어 퇴장 (username)
+        public event System.Action<string, bool> OnPlayerReadyChanged; // 플레이어 준비 상태 (username, isReady)
+        
         // 싱글플레이어 관련 (현재 HTTP API로 대체됨)
         // public event System.Action<StageData> OnStageDataReceived; // TCP에서 HTTP API로 이동
         // public event System.Action<UserStageProgress> OnStageProgressReceived; // TCP에서 HTTP API로 이동
@@ -758,21 +762,35 @@ namespace Features.Multi.Net
                 string username = parts[1];
                 string displayName = parts.Length >= 3 ? parts[2] : username;
                 Debug.Log($"[MessageHandler] 플레이어 퇴장: {displayName} [{username}]");
-                // 필요시 UI에서 플레이어 제거
+                
+                // 이벤트 발생
+                OnPlayerLeft?.Invoke(username);
             }
         }
         
         /// <summary>
-        /// 플레이어 준비 상태 - "PLAYER_READY:username:ready"
+        /// 플레이어 준비 상태 - "PLAYER_READY:username:ready" 또는 "PLAYER_READY:ready"
         /// </summary>
         private void HandlePlayerReady(string[] parts)
         {
-            if (parts.Length >= 3)
+            if (parts.Length >= 2)
             {
-                string username = parts[1];
-                bool ready = parts[2] == "1" || parts[2].ToLower() == "true";
-                Debug.Log($"[MessageHandler] 플레이어 준비 상태: {username} - {(ready ? "준비완료" : "대기중")}");
-                // 필요시 UI에 준비 상태 표시
+                if (parts.Length >= 3)
+                {
+                    // "PLAYER_READY:username:ready" 형태
+                    string username = parts[1];
+                    bool ready = parts[2] == "1" || parts[2].ToLower() == "true";
+                    Debug.Log($"[MessageHandler] 플레이어 준비 상태: {username} - {(ready ? "준비완료" : "대기중")}");
+                    
+                    // 이벤트 발생
+                    OnPlayerReadyChanged?.Invoke(username, ready);
+                }
+                else
+                {
+                    // "PLAYER_READY:ready" 형태 (본인 상태)
+                    bool ready = parts[1] == "1" || parts[1].ToLower() == "true";
+                    Debug.Log($"[MessageHandler] 내 준비 상태 확인: {(ready ? "준비완료" : "대기중")}");
+                }
             }
         }
         
