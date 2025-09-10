@@ -372,7 +372,20 @@ namespace Blokus::Server {
                 disconnectCallback_(sessionId_);
             }
             catch (const std::exception& e) {
-                spdlog::error("❌ 연결 해제 콜백 오류 ({}): {}", sessionId_, e.what());
+                std::string errorMsg = e.what();
+                
+                // 🔥 데드락 에러 구체적 처리
+                if (errorMsg.find("resource deadlock would occur") != std::string::npos ||
+                    errorMsg.find("deadlock") != std::string::npos) {
+                    spdlog::error("🚨 데드락 감지로 콜백 실패 ({}): {}", sessionId_, errorMsg);
+                    spdlog::warn("⚠️ 세션 {} 정리가 불완전할 수 있음. 수동 정리 또는 서버 재시작 권장", sessionId_);
+                    
+                    // TODO: 추후 지연된 콜백 큐 또는 재시도 메커니즘 추가 고려
+                    // 현재는 로그만 남기고 세션은 계속 진행
+                }
+                else {
+                    spdlog::error("❌ 연결 해제 콜백 오류 ({}): {}", sessionId_, errorMsg);
+                }
             }
         }
     }

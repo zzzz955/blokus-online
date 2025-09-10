@@ -32,6 +32,9 @@ namespace Features.Multi.UI
         [Header("호스트 표시")]
         [SerializeField] private Sprite hostCrownSprite; // 호스트 표시용 왕관 스프라이트
         
+        [Header("본인 식별 표시")]
+        [SerializeField] private Image currentPlayerIndicator; // 본인 식별용 이미지 (나일 경우에만 표시)
+        
         // 플레이어 데이터
         private PlayerSlot playerData;
         private bool isHost = false;
@@ -104,6 +107,10 @@ namespace Features.Multi.UI
             
             if (kickButton != null)
                 kickButton.gameObject.SetActive(false);
+                
+            // 본인 식별 표시도 해제
+            if (currentPlayerIndicator != null)
+                currentPlayerIndicator.gameObject.SetActive(false);
         }
         
         /// <summary>
@@ -258,11 +265,20 @@ namespace Features.Multi.UI
         /// </summary>
         public void SetAsMySlot(bool isMySlot)
         {
-            // Stub: 내 슬롯 강조 표시 (추후 구현)
-            if (playerNameText != null)
+            Debug.Log($"[PlayerSlotWidget] SetAsMySlot 호출: {isMySlot} for {playerData.playerName}");
+            
+            // 인스펙터 Bold 설정을 보존하고 본인일 때는 추가 강조 효과만 적용
+            // fontStyle 변경하지 않음 - 인스펙터 설정 유지
+            
+            // 본인 식별 이미지 표시/숨김
+            if (currentPlayerIndicator != null)
             {
-                playerNameText.fontStyle = isMySlot ? FontStyles.Bold : FontStyles.Normal;
+                currentPlayerIndicator.gameObject.SetActive(isMySlot);
+                Debug.Log($"[PlayerSlotWidget] 본인 식별 이미지 {(isMySlot ? "표시" : "숨김")}: {playerData.playerName}");
             }
+            
+            // 추가적인 본인 강조 효과 (색상 변경 등)는 여기서 구현 가능
+            // 예: 텍스트 색상 변경 등
         }
         
         /// <summary>

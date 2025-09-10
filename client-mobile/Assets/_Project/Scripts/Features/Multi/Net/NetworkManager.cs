@@ -221,8 +221,10 @@ namespace Features.Multi.Net
                 messageHandler.OnRoomJoined += OnRoomJoinedHandler;
                 messageHandler.OnRoomLeft += OnRoomLeftHandler;
                 messageHandler.OnRoomInfoUpdated += OnRoomInfoUpdatedHandler;
+                messageHandler.OnPlayerJoined += OnPlayerJoinedHandler;
                 messageHandler.OnPlayerLeft += OnPlayerLeftHandler;
                 messageHandler.OnPlayerReadyChanged += OnPlayerReadyChangedHandler;
+                messageHandler.OnPlayerSystemJoined += OnPlayerSystemJoinedHandler;
             }
             
             isInitialized = true;
@@ -1013,6 +1015,67 @@ namespace Features.Multi.Net
             Debug.Log($"[NetworkManager] 방 나가기 완료 - 모든 방 관련 상태 리셋");
             Debug.Log($"[NetworkManager] 방 생성자 플래그 리셋: {isCurrentUserRoomCreator}");
         }
+        
+        /// <summary>
+        /// 플레이어 입장 핸들러 - MessageHandler로부터 이벤트 수신
+        /// </summary>
+        private void OnPlayerJoinedHandler(string username)
+        {
+            Debug.Log($"[NetworkManager] 플레이어 입장 처리: {username}");
+            
+            // 플레이어 입장 시 ROOM_INFO 재요청하여 즉시 동기화
+            // 서버에서 자동으로 ROOM_INFO를 보내지 않는 경우가 있어서 명시적으로 요청
+            if (IsConnected() && networkClient != null)
+            {
+                Debug.Log("[NetworkManager] 플레이어 입장으로 인한 ROOM_INFO 트리거를 위해 room:ready:0 전송");
+                // 0.1초 대기 후 트리거 (즉시 처리)
+                StartCoroutine(TriggerRoomInfoAfterPlayerJoined());
+            }
+        }
+        
+        /// <summary>
+        /// 플레이어 입장 후 ROOM_INFO 메시지 수신을 위한 트리거
+        /// </summary>
+        private System.Collections.IEnumerator TriggerRoomInfoAfterPlayerJoined()
+        {
+            // 0.1초 대기 후 ready 상태를 false로 설정하여 ROOM_INFO 트리거
+            yield return new WaitForSeconds(0.1f);
+            
+            if (IsConnected() && networkClient != null)
+            {
+                networkClient.SendPlayerReadyRequest(false);
+            }
+        }
+        
+        /// <summary>
+        /// 시스템 메시지 기반 플레이어 입장 핸들러 - MessageHandler로부터 이벤트 수신
+        /// </summary>
+        private void OnPlayerSystemJoinedHandler()
+        {
+            Debug.Log($"[NetworkManager] 시스템 메시지 기반 플레이어 입장 감지 - 즉시 동기화 트리거");
+            
+            // 플레이어 입장 시 ROOM_INFO 재요청하여 즉시 동기화
+            if (IsConnected() && networkClient != null)
+            {
+                Debug.Log("[NetworkManager] 시스템 메시지 기반 ROOM_INFO 트리거를 위해 room:ready:0 전송");
+                // 즉시 트리거 (0.1초 대기)
+                StartCoroutine(TriggerRoomInfoAfterSystemPlayerJoined());
+            }
+        }
+        
+        /// <summary>
+        /// 시스템 메시지 기반 플레이어 입장 후 ROOM_INFO 트리거
+        /// </summary>
+        private System.Collections.IEnumerator TriggerRoomInfoAfterSystemPlayerJoined()
+        {
+            // 0.1초 대기 후 ready 상태를 false로 설정하여 ROOM_INFO 트리거
+            yield return new WaitForSeconds(0.1f);
+            
+            if (IsConnected() && networkClient != null)
+            {
+                networkClient.SendPlayerReadyRequest(false);
+            }
+        }
 
         /// <summary>
         /// 플레이어 퇴장 핸들러 - MessageHandler로부터 이벤트 수신
@@ -1121,8 +1184,10 @@ namespace Features.Multi.Net
                 messageHandler.OnRoomJoined -= OnRoomJoinedHandler;
                 messageHandler.OnRoomLeft -= OnRoomLeftHandler;
                 messageHandler.OnRoomInfoUpdated -= OnRoomInfoUpdatedHandler;
+                messageHandler.OnPlayerJoined -= OnPlayerJoinedHandler;
                 messageHandler.OnPlayerLeft -= OnPlayerLeftHandler;
                 messageHandler.OnPlayerReadyChanged -= OnPlayerReadyChangedHandler;
+                messageHandler.OnPlayerSystemJoined -= OnPlayerSystemJoinedHandler;
             }
             
             DisconnectFromServer();

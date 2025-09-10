@@ -276,6 +276,7 @@ namespace Blokus {
         // 유틸리티 함수들
         void scrollChatToBottom();
         QString formatChatMessage(const QString& username, const QString& message, bool isSystem = false);
+        QString convertSystemMessageToDisplayNames(const QString& message);
         PlayerSlot* findPlayerSlot(PlayerColor color);
         PlayerSlot* findPlayerSlot(const QString& username);
         PlayerColor getNextAvailableColor() const;

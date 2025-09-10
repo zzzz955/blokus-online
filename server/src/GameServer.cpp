@@ -597,7 +597,7 @@ namespace Blokus::Server {
     void GameServer::onSessionDisconnect(const std::string& sessionId) {
         spdlog::info("세션 연결 해제: {}", sessionId);
         
-        // 세션 제거 전에 사용자 정보 저장 (로비 사용자 제거 브로드캐스트 및 방 나가기용)
+        // 🔥 데드락 방지: 세션 정보만 추출, 즉시 잠금 해제
         std::string username;
         std::string userId;
         bool wasInLobby = false;
@@ -619,21 +619,32 @@ namespace Blokus::Server {
             }
         }
         
-        // 방에 있던 사용자가 연결 해제된 경우 자동으로 방에서 나가기
+        // 🔥 데드락 방지: 잠금 해제 후 방 정리 (데드락 위험 제거)
         if ((wasInRoom || wasInGame) && !userId.empty() && roomManager_) {
-            if (wasInGame) {
-                spdlog::warn("🎮 게임 중 세션 강제 종료로 인한 방 {} 나가기: {} (좀비방 방지)", roomId, username);
-            } else {
-                spdlog::info("🏠 방 대기 중 세션 연결 해제로 인한 방 {} 나가기: {}", roomId, username);
+            try {
+                if (wasInGame) {
+                    spdlog::warn("🎮 게임 중 세션 강제 종료로 인한 방 {} 나가기: {} (좀비방 방지)", roomId, username);
+                } else {
+                    spdlog::info("🏠 방 대기 중 세션 연결 해제로 인한 방 {} 나가기: {}", roomId, username);
+                }
+                roomManager_->leaveRoom(userId);
             }
-            roomManager_->leaveRoom(userId);
+            catch (const std::exception& e) {
+                spdlog::error("❌ 방 나가기 처리 중 오류 ({}): {}", sessionId, e.what());
+            }
         }
         
+        // 세션 제거 (별도 잠금, 데드락 위험 최소화)
         removeSession(sessionId);
         
-        // 로비에 있던 사용자가 연결 해제된 경우 다른 로비 사용자들에게 브로드캐스트
+        // 로비 브로드캐스트 (잠금 없는 작업)
         if (wasInLobby && !username.empty()) {
-            broadcastLobbyUserLeft(username);
+            try {
+                broadcastLobbyUserLeft(username);
+            }
+            catch (const std::exception& e) {
+                spdlog::error("❌ 로비 브로드캐스트 중 오류 ({}): {}", sessionId, e.what());
+            }
         }
     }
 
@@ -773,48 +784,15 @@ namespace Blokus::Server {
     }
 
     void GameServer::cleanupSessions() {
-        std::lock_guard<std::mutex> lock(sessionsMutex_);
-
-        auto it = sessions_.begin();
-        while (it != sessions_.end()) {
-            if (!it->second || !it->second->isActive()) {
-                spdlog::debug("비활성 세션 정리: {}", it->first);
-                it = sessions_.erase(it);
-
-                // 통계 업데이트
-                {
-                    std::lock_guard<std::mutex> statsLock(statsMutex_);
-                    if (stats_.currentConnections > 0) {
-                        stats_.currentConnections--;
-                    }
-                }
-            }
-            else {
-                // 타임아웃 체크 - 게임 중인 세션은 더 짧은 타임아웃 적용
-                std::chrono::seconds timeoutDuration = std::chrono::seconds(300); // 기본 5분
-                if (it->second->isInGame()) {
-                    timeoutDuration = std::chrono::seconds(120); // 게임 중은 2분으로 단축
-                }
-                
-                if (it->second->isTimedOut(timeoutDuration)) {
-                    std::string sessionId = it->first;
-                    
-                    if (it->second->isInGame()) {
-                        spdlog::warn("🎮 게임 중 세션 타임아웃 (좀비방 방지): {} ({}분)", sessionId, timeoutDuration.count() / 60);
-                    } else {
-                        spdlog::info("세션 타임아웃: {} ({}분)", sessionId, timeoutDuration.count() / 60);
-                    }
-                    
-                    // 🔥 개선: Session::stop() 호출로 기존 세션 정리 플로우 재사용
-                    // Session::stop()은 내부에서 notifyDisconnect()를 호출하고
-                    // 이는 onSessionDisconnect() 콜백을 실행하여 다음을 모두 처리함:
-                    // 1. 세션 정보 추출
-                    // 2. 방 나가기 처리 (roomManager_->leaveRoom())  
-                    // 3. 세션 제거 (removeSession())
-                    // 4. 로비 브로드캐스트
-                    spdlog::debug("🔄 [TIMEOUT_CLEANUP] 타임아웃 세션 {} stop() 호출로 정리", sessionId);
-                    
-                    it->second->stop();
+        std::vector<std::pair<std::string, std::shared_ptr<Session>>> timeoutSessions;
+        
+        // 🔥 데드락 방지: 1단계 - 타임아웃된 세션 식별 (잠금 보유 시간 최소화)
+        {
+            std::lock_guard<std::mutex> lock(sessionsMutex_);
+            auto it = sessions_.begin();
+            while (it != sessions_.end()) {
+                if (!it->second || !it->second->isActive()) {
+                    spdlog::debug("비활성 세션 정리: {}", it->first);
                     it = sessions_.erase(it);
 
                     // 통계 업데이트
@@ -826,9 +804,55 @@ namespace Blokus::Server {
                     }
                 }
                 else {
-                    ++it;
+                    // 타임아웃 체크 - 게임 중인 세션은 더 짧은 타임아웃 적용
+                    std::chrono::seconds timeoutDuration = std::chrono::seconds(300); // 기본 5분
+                    if (it->second->isInGame()) {
+                        timeoutDuration = std::chrono::seconds(120); // 게임 중은 2분으로 단축
+                    }
+                    
+                    if (it->second->isTimedOut(timeoutDuration)) {
+                        std::string sessionId = it->first;
+                        
+                        if (it->second->isInGame()) {
+                            spdlog::warn("🎮 게임 중 세션 타임아웃 (좀비방 방지): {} ({}분)", sessionId, timeoutDuration.count() / 60);
+                        } else {
+                            spdlog::info("세션 타임아웃: {} ({}분)", sessionId, timeoutDuration.count() / 60);
+                        }
+                        
+                        // 🔥 데드락 방지: 타임아웃된 세션 저장 (콜백은 나중에 실행)
+                        timeoutSessions.emplace_back(sessionId, it->second);
+                        it = sessions_.erase(it);
+
+                        // 통계 업데이트
+                        {
+                            std::lock_guard<std::mutex> statsLock(statsMutex_);
+                            if (stats_.currentConnections > 0) {
+                                stats_.currentConnections--;
+                            }
+                        }
+                        
+                        spdlog::debug("🔄 [ASYNC_CLEANUP] 타임아웃 세션 {} 비동기 정리 예약", sessionId);
+                    }
+                    else {
+                        ++it;
+                    }
                 }
             }
+        }
+        
+        // 🔥 데드락 방지: 2단계 - 잠금 해제 후 비동기로 세션 정리
+        for (auto& [sessionId, session] : timeoutSessions) {
+            boost::asio::post(ioContext_, [this, sessionId, session]() {
+                spdlog::debug("🔄 [ASYNC_CLEANUP] 비동기 타임아웃 정리 실행: {}", sessionId);
+                
+                try {
+                    // 이제 안전하게 콜백 실행 가능 (sessionsMutex_ 해제됨)
+                    session->stop();
+                }
+                catch (const std::exception& e) {
+                    spdlog::error("❌ 비동기 세션 정리 중 오류 ({}): {}", sessionId, e.what());
+                }
+            });
         }
     }
 

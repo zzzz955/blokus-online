@@ -59,8 +59,10 @@ namespace Features.Multi.Net
         public event System.Action<string, string, string> OnChatMessageReceived; // username, displayName, message
         
         // 플레이어 상태 관련
+        public event System.Action<string> OnPlayerJoined; // 플레이어 입장 (username)
         public event System.Action<string> OnPlayerLeft; // 플레이어 퇴장 (username)
         public event System.Action<string, bool> OnPlayerReadyChanged; // 플레이어 준비 상태 (username, isReady)
+        public event System.Action OnPlayerSystemJoined; // 시스템 메시지 기반 플레이어 입장 감지
         
         // 싱글플레이어 관련 (현재 HTTP API로 대체됨)
         // public event System.Action<StageData> OnStageDataReceived; // TCP에서 HTTP API로 이동
@@ -748,7 +750,9 @@ namespace Features.Multi.Net
                 string username = parts[1];
                 string displayName = parts.Length >= 3 ? parts[2] : username;
                 Debug.Log($"[MessageHandler] 플레이어 입장: {displayName} [{username}]");
-                // 필요시 UI에 플레이어 추가
+                
+                // 이벤트 발생
+                OnPlayerJoined?.Invoke(username);
             }
         }
         
@@ -950,6 +954,13 @@ namespace Features.Multi.Net
             {
                 string systemMessage = string.Join(":", parts, 1, parts.Length - 1);
                 Debug.Log($"[MessageHandler] 시스템 메시지: {systemMessage}");
+                
+                // 플레이어 입장 메시지 감지하여 이벤트 발생
+                if (systemMessage.Contains("입장하셨습니다"))
+                {
+                    Debug.Log($"[MessageHandler] 플레이어 입장 시스템 메시지 감지 - ROOM_INFO 트리거 필요");
+                    OnPlayerSystemJoined?.Invoke();
+                }
             }
         }
         

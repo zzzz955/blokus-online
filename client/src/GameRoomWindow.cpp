@@ -239,22 +239,37 @@ namespace Blokus {
             
         m_currentSlot = slot;
 
-        // 사용자명 업데이트
-        QString displayName = slot.getDisplayName();
-        if (displayName.length() > 12) {
-            displayName = displayName.left(10) + "...";
+        if (slot.isEmpty()) {
+            // 빈 슬롯 처리
+            m_usernameLabel->setText(QString::fromUtf8("빈 슬롯"));
+            m_usernameLabel->setStyleSheet("color: #999999; font-style: italic;");
+            
+            // 호스트, 준비 상태, 점수, 남은 블록 관련 요소들 숨김
+            m_hostIndicator->setVisible(false);
+            m_readyIndicator->setVisible(false);
+            m_scoreLabel->setVisible(false);
+            m_remainingBlocksLabel->setVisible(false);
+        } else {
+            // 플레이어가 있는 슬롯 처리
+            QString displayName = slot.getDisplayName();
+            if (displayName.length() > 12) {
+                displayName = displayName.left(10) + "...";
+            }
+            m_usernameLabel->setText(displayName);
+            m_usernameLabel->setStyleSheet(""); // 기본 스타일로 복원
+
+            // 호스트 표시 업데이트
+            m_hostIndicator->setVisible(slot.isHost);
+
+            // 준비 상태 업데이트 (별도 메서드로 처리)
+            updateReadyState(slot.isReady);
+
+            // 점수 및 남은 블록 수 표시 및 업데이트
+            m_scoreLabel->setVisible(true);
+            m_remainingBlocksLabel->setVisible(true);
+            m_scoreLabel->setText(QString::fromUtf8("점수: %1").arg(slot.score));
+            m_remainingBlocksLabel->setText(QString::fromUtf8("남은 블록: %1").arg(slot.remainingBlocks));
         }
-        m_usernameLabel->setText(displayName);
-
-        // 호스트 표시 업데이트
-        m_hostIndicator->setVisible(slot.isHost);
-
-        // 준비 상태 업데이트 (별도 메서드로 처리)
-        updateReadyState(slot.isReady);
-
-        // 점수 및 남은 블록 수 업데이트
-        m_scoreLabel->setText(QString::fromUtf8("점수: %1").arg(slot.score));
-        m_remainingBlocksLabel->setText(QString::fromUtf8("남은 블록: %1").arg(slot.remainingBlocks));
 
         // 액션 버튼 업데이트
         updateActionButton();
@@ -1515,7 +1530,14 @@ namespace Blokus {
 
     void GameRoomWindow::addChatMessage(const QString& username, const QString& message, bool isSystem)
     {
-        QString formattedMsg = formatChatMessage(username, message, isSystem);
+        QString processedMessage = message;
+        
+        // 시스템 메시지일 경우 user_name을 display_name으로 변환
+        if (isSystem) {
+            processedMessage = convertSystemMessageToDisplayNames(message);
+        }
+        
+        QString formattedMsg = formatChatMessage(username, processedMessage, isSystem);
         m_chatDisplay->append(formattedMsg);
 
         m_chatHistory.append(formattedMsg);
@@ -1538,6 +1560,33 @@ namespace Blokus {
         QTextCursor cursor = m_chatDisplay->textCursor();
         cursor.movePosition(QTextCursor::End);
         m_chatDisplay->setTextCursor(cursor);
+    }
+
+    QString GameRoomWindow::convertSystemMessageToDisplayNames(const QString& message)
+    {
+        QString result = message;
+        
+        // 현재 방에 있는 모든 플레이어의 username을 displayName으로 변환
+        for (const auto& slot : m_roomInfo.playerSlots) {
+            if (!slot.isEmpty() && !slot.username.isEmpty()) {
+                QString displayName = slot.getDisplayName();
+                if (displayName != slot.username) {
+                    // user_name이 메시지에 포함되어 있으면 display_name으로 교체
+                    result = result.replace(slot.username, displayName);
+                }
+            }
+        }
+        
+        // displayName 캐시에서도 확인하여 변환
+        for (auto it = m_usernameToDisplayName.begin(); it != m_usernameToDisplayName.end(); ++it) {
+            const QString& username = it.key();
+            const QString& displayName = it.value();
+            if (displayName != username && !username.isEmpty()) {
+                result = result.replace(username, displayName);
+            }
+        }
+        
+        return result;
     }
 
     QString GameRoomWindow::formatChatMessage(const QString& username, const QString& message, bool isSystem)

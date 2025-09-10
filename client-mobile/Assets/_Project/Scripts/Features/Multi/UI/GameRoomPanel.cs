@@ -403,6 +403,17 @@ namespace Features.Multi.UI
                 return;
             }
             
+            // 현재 사용자가 호스트인지 확인
+            bool isCurrentUserHost = false;
+            foreach (var player in playerDataList)
+            {
+                if (player.username == currentUser.username)
+                {
+                    isCurrentUserHost = player.isHost;
+                    break;
+                }
+            }
+            
             // 모든 슬롯을 빈 상태로 초기화
             for (int i = 0; i < 4; i++)
             {
@@ -410,6 +421,7 @@ namespace Features.Multi.UI
                 if (playerSlots[i] != null)
                 {
                     playerSlots[i].UpdateSlot(PlayerSlot.Empty);
+                    playerSlots[i].SetAsMySlot(false); // 초기화 시 본인 표시 해제
                 }
                 else
                 {
@@ -441,8 +453,13 @@ namespace Features.Multi.UI
                     playerData[slotIndex] = slot;
                     if (playerSlots[slotIndex] != null)
                     {
+                        bool isCurrentUser = player.username == currentUser.username;
                         Debug.Log($"[GameRoomPanel] PlayerSlotWidget[{slotIndex}].SetPlayerData() 호출");
-                        playerSlots[slotIndex].SetPlayerData(slot, player.username == currentUser.username);
+                        playerSlots[slotIndex].SetPlayerData(slot, isCurrentUserHost);
+                        
+                        // 본인 여부에 따라 Bold 처리 및 식별 이미지 설정
+                        playerSlots[slotIndex].SetAsMySlot(isCurrentUser);
+                        Debug.Log($"[GameRoomPanel] PlayerSlotWidget[{slotIndex}].SetAsMySlot({isCurrentUser}) 호출");
                     }
                     else
                     {
