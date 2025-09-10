@@ -616,12 +616,17 @@ namespace Features.Multi.UI
                 UpdateRoomInfo();
                 
                 // 방 생성자 확인 및 자동 할당 (타이밍 이슈 해결)
-                if (networkManager.IsCurrentUserRoomCreator)
+                // 단, 플레이어 데이터가 비어있는 경우에만 수행 (방 재입장 시 방지)
+                if (networkManager.IsCurrentUserRoomCreator && AllPlayerSlotsEmpty())
                 {
                     Debug.Log("[GameRoomPanel] 방 생성자 확인됨 - 첫 번째 슬롯 자동 할당 시작");
                     isCurrentUserRoomHost = true;
                     AssignRoomCreatorToFirstSlot();
                     UpdateGameControlsState();
+                }
+                else if (networkManager.IsCurrentUserRoomCreator)
+                {
+                    Debug.Log("[GameRoomPanel] 방 생성자이지만 플레이어 슬롯이 이미 있어 자동 할당 생략 (방 재입장)");
                 }
                 
                 // UpdatePlayerSlots() 제거: ROOM_INFO 메시지 수신 시에만 UpdatePlayerData() 호출
@@ -1060,6 +1065,21 @@ namespace Features.Multi.UI
             mySharedPlayerColor = SharedPlayerColor.Blue;
             
             Debug.Log($"[GameRoomPanel] 방 생성자 색상 설정: myPlayerColor={myPlayerColor}, mySharedPlayerColor={mySharedPlayerColor}");
+        }
+
+        /// <summary>
+        /// 모든 플레이어 슬롯이 비어있는지 확인 (방 생성 직후 판별용)
+        /// </summary>
+        private bool AllPlayerSlotsEmpty()
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                if (!playerData[i].isEmpty)
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         // ========================================

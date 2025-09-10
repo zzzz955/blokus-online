@@ -216,6 +216,7 @@ namespace Features.Multi.Net
                 messageHandler.OnMyStatsUpdated += OnMyStatsUpdatedHandler;
                 messageHandler.OnRoomCreated += OnRoomCreatedHandler;
                 messageHandler.OnRoomJoined += OnRoomJoinedHandler;
+                messageHandler.OnRoomLeft += OnRoomLeftHandler;
                 messageHandler.OnRoomInfoUpdated += OnRoomInfoUpdatedHandler;
             }
             
@@ -977,6 +978,19 @@ namespace Features.Multi.Net
             // 주기적 방 정보 업데이트는 서버에서 지원하지 않는 명령어이므로 비활성화
             // TODO: 서버 측에서 플레이어 변경 시 자동 ROOM_INFO 브로드캐스트 구현 필요
         }
+
+        /// <summary>
+        /// 방 나가기 핸들러 (내부용) - 호스트 관련 플래그 리셋
+        /// </summary>
+        private void OnRoomLeftHandler()
+        {
+            // 방 나가기 시 모든 방 관련 상태 리셋
+            currentRoomInfo = null;
+            isCurrentUserRoomCreator = false;
+            
+            Debug.Log($"[NetworkManager] 방 나가기 완료 - 모든 방 관련 상태 리셋");
+            Debug.Log($"[NetworkManager] 방 생성자 플래그 리셋: {isCurrentUserRoomCreator}");
+        }
         
         /// <summary>
         /// 주기적으로 방 정보 업데이트 요청 (비활성화됨)
@@ -1030,6 +1044,7 @@ namespace Features.Multi.Net
                 messageHandler.OnMyStatsUpdated -= OnMyStatsUpdatedHandler;
                 messageHandler.OnRoomCreated -= OnRoomCreatedHandler;
                 messageHandler.OnRoomJoined -= OnRoomJoinedHandler;
+                messageHandler.OnRoomLeft -= OnRoomLeftHandler;
                 messageHandler.OnRoomInfoUpdated -= OnRoomInfoUpdatedHandler;
             }
             
