@@ -539,6 +539,9 @@ namespace App.Core
         {
             // MultiGameplayScene 언로드
             yield return UnloadIfLoaded(MultiGameplayScene);
+            
+            // MultiCore 씬도 언로드 (연결 실패 시를 위해)
+            yield return UnloadIfLoaded(MultiCoreScene);
 
             // MainScene 활성
             SetActive(MainScene);
