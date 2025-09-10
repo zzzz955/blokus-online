@@ -1106,15 +1106,19 @@ namespace Features.Multi.UI
             Debug.Log("[GameRoomPanel] 방 나가기 확인됨 - 방 퇴장 시작");
             
             // TCP 서버로 방 나가기 메시지 전송
-            if (networkManager != null && currentRoom != null)
+            if (networkManager != null)
             {
+                // currentRoom이 null이어도 LeaveRoom 호출 가능 - NetworkManager가 연결 상태 관리
                 networkManager.LeaveRoom();
                 Debug.Log("[GameRoomPanel] 방 나가기 메시지 전송 완료");
+                
+                // 즉시 UI 정리 시작 (서버 응답 대기 안 함)
+                ReturnToLobby();
             }
             else
             {
-                Debug.LogError("[GameRoomPanel] NetworkManager 또는 currentRoom이 null입니다!");
-                // 폴백: 직접 로비로 이동
+                Debug.LogError("[GameRoomPanel] NetworkManager가 null입니다!");
+                // NetworkManager 없어도 UI는 정리
                 ReturnToLobby();
             }
         }
@@ -1158,7 +1162,25 @@ namespace Features.Multi.UI
             }
             else
             {
-                Debug.LogError("[GameRoomPanel] SceneController를 찾을 수 없습니다!");
+                // 상위 컴포넌트에서 찾을 수 없으면 전체 씬에서 검색
+                sceneController = FindObjectOfType<MultiGameplaySceneController>();
+                if (sceneController != null)
+                {
+                    sceneController.ShowLobby();
+                    Debug.Log("[GameRoomPanel] 전체 씬 검색으로 SceneController 찾음 - 로비로 전환 완료");
+                }
+                else
+                {
+                    Debug.LogError("[GameRoomPanel] SceneController를 찾을 수 없습니다!");
+                    Debug.Log("[GameRoomPanel] 수동으로 GameRoom 패널을 비활성화하고 UI 정리");
+                    
+                    // 폴백: 최소한 현재 GameRoom 패널 비활성화
+                    if (gameObject != null)
+                    {
+                        gameObject.SetActive(false);
+                        Debug.Log("[GameRoomPanel] GameRoom 패널 비활성화 완료");
+                    }
+                }
             }
         }
 

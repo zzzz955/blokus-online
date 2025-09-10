@@ -2655,6 +2655,19 @@ namespace Blokus {
         updateDisplayNameCache(username, displayName); // 나가기 전에 마지막으로 캐시 업데이트
         QString displayNameToShow = displayName.isEmpty() ? username : displayName;
         addSystemMessage(QString::fromUtf8("%1님이 퇴장하셨습니다.").arg(displayNameToShow));
+        
+        // 플레이어 슬롯에서 해당 유저를 제거하여 동기화 처리
+        PlayerSlot* leavingSlot = findPlayerSlot(username);
+        if (leavingSlot) {
+            // 빈 슬롯으로 초기화 (색상은 유지)
+            PlayerColor slotColor = leavingSlot->color;
+            PlayerSlot emptySlot;
+            emptySlot.color = slotColor;
+            updatePlayerSlot(slotColor, emptySlot);
+            
+            qDebug() << QString::fromUtf8("플레이어 슬롯 정리 완료: %1 (색상: %2)").arg(username).arg(static_cast<int>(slotColor));
+        }
+        
         removeFromDisplayNameCache(username); // 나간 후 캐시에서 제거
     }
     

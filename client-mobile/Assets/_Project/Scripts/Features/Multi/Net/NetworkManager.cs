@@ -972,11 +972,27 @@ namespace Features.Multi.Net
         /// </summary>
         private void OnRoomJoinedHandler()
         {
-            // 방 입장 시 추가 방 정보를 서버에서 받을 수 있도록 요청
             Debug.Log($"[NetworkManager] 방 입장됨");
             
-            // 주기적 방 정보 업데이트는 서버에서 지원하지 않는 명령어이므로 비활성화
-            // TODO: 서버 측에서 플레이어 변경 시 자동 ROOM_INFO 브로드캐스트 구현 필요
+            // 방 입장 후 ROOM_INFO 메시지를 받기 위한 workaround
+            // 서버에서 방 입장 후 자동으로 ROOM_INFO를 보내지 않는 문제가 있어
+            // room:ready:0 메시지를 보내서 ROOM_INFO 전송을 트리거
+            StartCoroutine(TriggerRoomInfoAfterJoin());
+        }
+
+        /// <summary>
+        /// 방 입장 후 ROOM_INFO 메시지 수신을 위한 트리거 (workaround)
+        /// </summary>
+        private System.Collections.IEnumerator TriggerRoomInfoAfterJoin()
+        {
+            // 0.5초 대기 후 ready 상태를 false로 설정하여 ROOM_INFO 트리거
+            yield return new WaitForSeconds(0.5f);
+            
+            if (IsConnected() && networkClient != null)
+            {
+                Debug.Log("[NetworkManager] ROOM_INFO 트리거를 위해 room:ready:0 전송");
+                networkClient.SendPlayerReadyRequest(false);
+            }
         }
 
         /// <summary>
