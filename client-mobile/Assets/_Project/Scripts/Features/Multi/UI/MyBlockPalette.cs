@@ -82,7 +82,7 @@ namespace Features.Multi.UI
             Clear();
             
             // 모든 21개 블록 타입으로 초기화
-            List<BlockType> allBlockTypes = BlockFactory.GetAllBlockTypes();
+            List<BlockType> allBlockTypes = Shared.Models.BlockFactory.GetAllBlockTypes();
             
             foreach (var type in allBlockTypes)
             {
@@ -347,26 +347,59 @@ namespace Features.Multi.UI
                 Debug.LogWarning($"[MultiBlockPalette] cellSpriteProvider가 null - BlockButton({type})에 설정하지 못함");
             }
             
-            // BlockButton을 위한 더미 BlockPalette를 임시로 생성하지 않고
-            // BlockButton의 private 필드들을 reflection으로 직접 설정
-            var typeField = typeof(Features.Single.Gameplay.BlockButton).GetProperty("Type", 
-                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-            var playerField = typeof(Features.Single.Gameplay.BlockButton).GetProperty("Player", 
-                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-            
-            // reflection이 실패할 수 있으므로 try-catch로 감싸기
+            // BlockButton 초기화 - Init() 대신 필요한 부분만 직접 호출
             try
             {
-                // 더미 BlockPalette로 Init 호출
-                var tempPalette = go.AddComponent<Features.Single.Gameplay.BlockPalette>();
-                bb.Init(tempPalette, type, player, Color.white, type.ToString());
-                DestroyImmediate(tempPalette);
+                // Type과 Player 속성을 reflection으로 설정
+                var typeField = typeof(Features.Single.Gameplay.BlockButton).GetField("<Type>k__BackingField", 
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                var playerField = typeof(Features.Single.Gameplay.BlockButton).GetField("<Player>k__BackingField", 
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
                 
-                Debug.Log($"[MyBlockPalette] BlockButton({type}) 초기화 완료");
+                if (typeField != null) typeField.SetValue(bb, type);
+                if (playerField != null) playerField.SetValue(bb, player);
+                
+                // BlockButton의 기본 이미지 설정 (Init에서 하는 것과 동일)
+                var image = bb.GetComponent<Image>();
+                if (image != null)
+                {
+                    // White1x1 스프라이트 생성 (BlockButton의 private static 메서드와 동일)
+                    var texture = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+                    texture.SetPixel(0, 0, Color.white);
+                    texture.Apply();
+                    var whiteSprite = Sprite.Create(texture, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f), 100f);
+                    
+                    image.sprite = whiteSprite;
+                    image.type = Image.Type.Simple;
+                    image.preserveAspect = true;
+                    image.raycastTarget = true;
+                    image.color = new Color(1, 1, 1, 0); // 투명 배경
+                }
+                
+                // BlockButton의 CreateBlockVisualization 메서드 직접 호출 (private이므로 reflection 사용)
+                var createVisualizationMethod = typeof(Features.Single.Gameplay.BlockButton).GetMethod("CreateBlockVisualization", 
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                
+                if (createVisualizationMethod != null)
+                {
+                    createVisualizationMethod.Invoke(bb, new object[] { type, player });
+                    Debug.Log($"[MyBlockPalette] BlockButton({type}) 시각화 생성 완료");
+                }
+                else
+                {
+                    Debug.LogWarning($"[MyBlockPalette] CreateBlockVisualization 메서드를 찾을 수 없음");
+                }
+                
+                // 고정 버튼 크기 설정 (Init에서 하는 것과 동일)
+                var rectTransform = bb.GetComponent<RectTransform>();
+                if (rectTransform != null)
+                {
+                    rectTransform.sizeDelta = new Vector2(160f, 160f);
+                }
             }
             catch (System.Exception ex)
             {
-                Debug.LogError($"[MyBlockPalette] BlockButton 초기화 실패: {ex.Message}");
+                Debug.LogError($"[MyBlockPalette] BlockButton 시각화 생성 실패: {ex.Message}");
             }
             
             // 클릭 이벤트를 우리 메서드로 리디렉트

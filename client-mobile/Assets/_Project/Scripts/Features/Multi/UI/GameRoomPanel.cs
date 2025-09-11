@@ -528,6 +528,9 @@ namespace Features.Multi.UI
                         
                         Debug.Log($"[GameRoomPanel] 내 정보: 슬롯={slotIndex}, 색상={myPlayerColor}, 호스트={player.isHost}, 레디={player.isReady}");
                         
+                        // 플레이어 색상이 확정되면 바로 블록 팔레트 초기화
+                        TryInitializeBlockPaletteOnRoomJoin();
+                        
                         // ROOM_INFO 데이터가 있으면 서버 데이터를 우선하고 방 생성 플래그는 리셋
                         if (isCurrentUserRoomHost && !player.isHost)
                         {
@@ -736,8 +739,11 @@ namespace Features.Multi.UI
                     if (isCurrentUser)
                     {
                         myPlayerColor = (MultiPlayerColor)slotIndex;
-                        mySharedPlayerColor = ConvertToSharedPlayerColor(myPlayerColor);
+                        mySharedPlayerColor = ConvertServerColorSlotToSharedPlayerColor(playerData.colorSlot);
                         isReady = playerData.isReady;
+                        
+                        // 플레이어 색상이 확정되면 바로 블록 팔레트 초기화
+                        TryInitializeBlockPaletteOnRoomJoin();
                         
                         // 호스트 상태 업데이트 (중요: 서버 데이터가 최우선)
                         bool wasHost = isCurrentUserRoomHost;
@@ -1015,6 +1021,37 @@ namespace Features.Multi.UI
             currentTurnPlayerId = -1;
 
             Debug.Log("[GameRoomPanel] 게임 컴포넌트 정리 완료");
+        }
+
+        /// <summary>
+        /// 플레이어 색상이 확정된 후 블록 팔레트를 초기화
+        /// 방 입장 시점에서 호출되어 21개 블록을 생성
+        /// </summary>
+        private void TryInitializeBlockPaletteOnRoomJoin()
+        {
+            // 블록 팔레트와 플레이어 색상이 모두 준비된 경우에만 초기화
+            if (blockPalette != null && mySharedPlayerColor != SharedPlayerColor.None)
+            {
+                try
+                {
+                    // SharedPlayerColor는 Shared.Models.PlayerColor의 별칭이므로 직접 전달 가능
+                    blockPalette.InitializePalette(mySharedPlayerColor);
+                    blockPalette.SetInteractable(false); // 게임 시작 전에는 비활성화
+                    Debug.Log($"[GameRoomPanel] 방 입장 시 블록 팔레트 초기화 완료 - 색상: {mySharedPlayerColor}");
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogError($"[GameRoomPanel] 블록 팔레트 초기화 중 오류 발생: {ex.Message}");
+                }
+            }
+            else if (blockPalette == null)
+            {
+                Debug.LogWarning("[GameRoomPanel] blockPalette가 null이어서 초기화 연기");
+            }
+            else if (mySharedPlayerColor == SharedPlayerColor.None)
+            {
+                Debug.LogWarning("[GameRoomPanel] 플레이어 색상이 아직 설정되지 않아 팔레트 초기화 연기");
+            }
         }
 
         private void OnTurnChanged(TurnChangeInfo turnInfo)
