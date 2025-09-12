@@ -113,6 +113,11 @@ namespace Features.Multi.Net
         public event System.Action<string, bool> OnPlayerReadyChanged; // 플레이어 준비 상태 (username, isReady)
         public event System.Action OnPlayerSystemJoined; // 시스템 메시지 기반 플레이어 입장 감지
         
+        // AFK 관련 이벤트
+        public event System.Action OnAfkVerifyReceived; // AFK 검증 요청 수신
+        public event System.Action OnAfkUnblockSuccess; // AFK 해제 성공
+        public event System.Action<string> OnAfkStatusReset; // AFK 상태 리셋 (username)
+        
         // 싱글플레이어 관련 (현재 HTTP API로 대체됨)
         // public event System.Action<StageData> OnStageDataReceived; // TCP에서 HTTP API로 이동
         // public event System.Action<UserStageProgress> OnStageProgressReceived; // TCP에서 HTTP API로 이동
@@ -330,6 +335,9 @@ namespace Features.Multi.Net
                         break;
                     
                     // AFK 관련
+                    case "AFK_VERIFY":
+                        HandleAfkVerify(parts);
+                        break;
                     case "AFK_MODE_ACTIVATED":
                         HandleAfkModeActivated(parts);
                         break;
@@ -1349,6 +1357,15 @@ namespace Features.Multi.Net
         }
         
         /// <summary>
+        /// AFK 검증 요청 - "AFK_VERIFY"
+        /// </summary>
+        private void HandleAfkVerify(string[] parts)
+        {
+            Debug.Log("[MessageHandler] AFK 검증 요청 수신");
+            OnAfkVerifyReceived?.Invoke();
+        }
+        
+        /// <summary>
         /// AFK 모드 활성화 - "AFK_MODE_ACTIVATED:jsonData"
         /// </summary>
         private void HandleAfkModeActivated(string[] parts)
@@ -1366,6 +1383,7 @@ namespace Features.Multi.Net
         private void HandleAfkUnblockSuccess(string[] parts)
         {
             Debug.Log("[MessageHandler] AFK 해제 성공");
+            OnAfkUnblockSuccess?.Invoke();
         }
         
         /// <summary>
@@ -1377,6 +1395,7 @@ namespace Features.Multi.Net
             {
                 string username = parts[1];
                 Debug.Log($"[MessageHandler] AFK 상태 리셋: {username}");
+                OnAfkStatusReset?.Invoke(username);
             }
         }
         

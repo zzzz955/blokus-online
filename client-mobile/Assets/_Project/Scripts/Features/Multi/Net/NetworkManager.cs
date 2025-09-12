@@ -160,6 +160,25 @@ namespace Features.Multi.Net
             remove { if (messageHandler != null) messageHandler.OnUserListUpdated -= value; }
         }
         
+        // AFK 관련 이벤트
+        public event System.Action OnAfkVerifyReceived
+        {
+            add { if (messageHandler != null) messageHandler.OnAfkVerifyReceived += value; }
+            remove { if (messageHandler != null) messageHandler.OnAfkVerifyReceived -= value; }
+        }
+        
+        public event System.Action OnAfkUnblockSuccess
+        {
+            add { if (messageHandler != null) messageHandler.OnAfkUnblockSuccess += value; }
+            remove { if (messageHandler != null) messageHandler.OnAfkUnblockSuccess -= value; }
+        }
+        
+        public event System.Action<string> OnAfkStatusReset
+        {
+            add { if (messageHandler != null) messageHandler.OnAfkStatusReset += value; }
+            remove { if (messageHandler != null) messageHandler.OnAfkStatusReset -= value; }
+        }
+        
         void Awake()
         {
             // 싱글톤 패턴
