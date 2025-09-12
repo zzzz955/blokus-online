@@ -617,7 +617,7 @@ namespace Features.Single.UI.StageSelect
             if (cellSpriteProvider != null)
             {
                 btn.SetCellSpriteProvider(cellSpriteProvider);
-                Debug.Log($"[StageInfoModal] BlockButton({blockType})에 CellSpriteProvider 설정 완료");
+                // Debug.Log($"[StageInfoModal] BlockButton({blockType})에 CellSpriteProvider 설정 완료");
             }
             else
             {

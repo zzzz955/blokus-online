@@ -9,10 +9,10 @@ namespace Features.Multi.Models
     public enum PlayerColor
     {
         None = -1,
-        Red = 0,    // 빨강 - Player 1
-        Blue = 1,   // 파랑 - Player 2  
-        Yellow = 2, // 노랑 - Player 3
-        Green = 3   // 초록 - Player 4
+        Blue = 0,   // 파랑 - playerId 0 (서버 playerColor 1)
+        Yellow = 1, // 노랑 - playerId 1 (서버 playerColor 2)
+        Red = 2,    // 빨강 - playerId 2 (서버 playerColor 3)
+        Green = 3   // 초록 - playerId 3 (서버 playerColor 4)
     }
     
     /// <summary>

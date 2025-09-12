@@ -123,6 +123,9 @@ namespace Blokus::Server {
         // 세션 이벤트 핸들러 (콜백으로 호출됨)
         void onSessionDisconnect(const std::string& sessionId);
         void onSessionMessage(const std::string& sessionId, const std::string& message);
+        
+        // 세션 종료 시 공통 처리 로직 (방 퇴장, 로비 브로드캐스트 등)
+        void handleSessionExit(const std::string& sessionId);
 
         // MessageHandler 콜백 처리 함수들
         void handleAuthentication(const std::string& sessionId, const std::string& username, bool success);

@@ -34,6 +34,40 @@ namespace Features.Multi.Net
         public int remainingTimeSeconds;
         public bool previousTurnTimedOut;
     }
+    
+    /// <summary>
+    /// 게임 상태 정보 구조체 (GAME_STATE_UPDATE JSON에서 파싱용)
+    /// </summary>
+    [System.Serializable]
+    public struct GameStateData
+    {
+        public int currentPlayer;
+        public int turnNumber;
+        public int[] boardState; // 1차원 배열로 수신 (400개 요소 = 20x20)
+        public object scores; // 점수 정보 (빈 객체이거나 플레이어별 점수)
+        public object remainingBlocks; // 남은 블록 개수 (플레이어별)
+        
+        /// <summary>
+        /// 1차원 배열을 20x20 2차원 배열로 변환
+        /// </summary>
+        public int[,] GetBoardState2D()
+        {
+            const int BOARD_SIZE = 20;
+            var result = new int[BOARD_SIZE, BOARD_SIZE];
+            
+            if (boardState != null && boardState.Length == BOARD_SIZE * BOARD_SIZE)
+            {
+                for (int i = 0; i < boardState.Length; i++)
+                {
+                    int row = i / BOARD_SIZE;
+                    int col = i % BOARD_SIZE;
+                    result[row, col] = boardState[i];
+                }
+            }
+            
+            return result;
+        }
+    }
     /// <summary>
     /// 네트워크 메시지 핸들러
     /// 서버로부터 수신된 메시지를 파싱하고 적절한 이벤트로 변환
@@ -59,7 +93,8 @@ namespace Features.Multi.Net
         public event System.Action<RoomInfo, List<PlayerData>> OnRoomInfoUpdated; // 방 정보 및 플레이어 데이터 업데이트
         
         // 게임 관련
-        // public event System.Action<GameState> OnGameStateUpdated; // 멀티플레이어에서 사용 예정
+        public event System.Action OnGameStarted; // 게임 시작됨
+        public event System.Action<GameStateData> OnGameStateUpdate; // 게임 상태 업데이트
         public event System.Action<MultiModels.BlockPlacement> OnBlockPlaced; // 블록 배치됨
         public event System.Action<TurnChangeInfo> OnTurnChanged; // 턴 변경 (상세 정보)
         public event System.Action<Dictionary<MultiModels.PlayerColor, int>> OnScoresUpdated; // 점수 업데이트
@@ -247,6 +282,9 @@ namespace Features.Multi.Net
                     case "GAME_STARTED":
                         HandleGameStarted(parts);
                         break;
+                    case "GAME_PLAYER_INFO":
+                        HandleGamePlayerInfo(parts);
+                        break;
                     case "GAME_STATE_UPDATE":
                         HandleGameStateUpdate(parts);
                         break;
@@ -261,6 +299,9 @@ namespace Features.Multi.Net
                         break;
                     case "GAME_ENDED":
                         HandleGameEnded(parts);
+                        break;
+                    case "GAME_MOVE_SUCCESS":
+                        HandleGameMoveSuccess(parts);
                         break;
                     case "GAME_RESULT":
                         HandleGameResult(parts);
@@ -870,7 +911,67 @@ namespace Features.Multi.Net
         private void HandleGameStarted(string[] parts)
         {
             Debug.Log("[MessageHandler] 게임 시작됨");
-            // 게임 UI로 전환
+            
+            // GameRoomPanel에서 게임 시작 상태를 인식할 수 있도록 OnGameStarted 이벤트 발생
+            OnGameStarted?.Invoke();
+        }
+        
+        /// <summary>
+        /// 게임 플레이어 정보 - "GAME_PLAYER_INFO:username1,colorSlot1:username2,colorSlot2..."
+        /// </summary>
+        private void HandleGamePlayerInfo(string[] parts)
+        {
+            try
+            {
+                Debug.Log($"[MessageHandler] 게임 플레이어 정보 수신: {string.Join(":", parts)}");
+                
+                if (parts.Length < 2)
+                {
+                    Debug.LogWarning("[MessageHandler] GAME_PLAYER_INFO 메시지 형식 오류: 플레이어 정보가 없음");
+                    return;
+                }
+                
+                // parts[1] 이후가 "username1,colorSlot1:username2,colorSlot2" 형태
+                for (int i = 1; i < parts.Length; i++)
+                {
+                    string playerInfo = parts[i];
+                    if (string.IsNullOrEmpty(playerInfo)) continue;
+                    
+                    // "username,colorSlot" 형태로 파싱
+                    string[] playerData = playerInfo.Split(',');
+                    if (playerData.Length == 2)
+                    {
+                        string username = playerData[0];
+                        if (int.TryParse(playerData[1], out int colorSlot))
+                        {
+                            Debug.Log($"[MessageHandler] 플레이어 정보 파싱: {username} → 색상 슬롯 {colorSlot}");
+                            
+                            // 현재 사용자와 비교해서 내 색상 슬롯 확인
+                            var networkManager = FindObjectOfType<Features.Multi.Net.NetworkManager>();
+                            var currentUser = networkManager?.CurrentUserInfo;
+                            if (currentUser != null && currentUser.username == username)
+                            {
+                                Debug.Log($"[MessageHandler] 내 색상 슬롯 확인: {colorSlot}");
+                                // 추후 필요시 색상 정보 업데이트 로직 추가 가능
+                            }
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"[MessageHandler] 색상 슬롯 파싱 실패: {playerData[1]}");
+                        }
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[MessageHandler] 플레이어 정보 형식 오류: {playerInfo}");
+                    }
+                }
+                
+                Debug.Log("[MessageHandler] GAME_PLAYER_INFO 처리 완료");
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[MessageHandler] GAME_PLAYER_INFO 처리 중 오류: {ex.Message}");
+            }
         }
         
         /// <summary>
@@ -878,11 +979,71 @@ namespace Features.Multi.Net
         /// </summary>
         private void HandleGameStateUpdate(string[] parts)
         {
-            if (parts.Length >= 2)
+            try
             {
-                string jsonData = string.Join(":", parts, 1, parts.Length - 1);
-                Debug.Log($"[MessageHandler] 게임 상태 업데이트: {jsonData}");
-                // JSON 파싱하여 게임 상태 업데이트
+                if (parts.Length >= 2)
+                {
+                    string jsonData = string.Join(":", parts, 1, parts.Length - 1);
+                    Debug.Log($"[MessageHandler] 게임 상태 업데이트: {jsonData}");
+                    
+                    // JSON 파싱 - Unity JsonUtility로 기본 필드 파싱
+                    GameStateData gameState = JsonUtility.FromJson<GameStateData>(jsonData);
+                    
+                    // Newtonsoft.Json으로 object 필드들을 수동으로 파싱
+                    try
+                    {
+                        var fullData = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonData);
+                        
+                        // scores 필드 파싱
+                        if (fullData.ContainsKey("scores") && fullData["scores"] != null)
+                        {
+                            gameState.scores = fullData["scores"];
+                            Debug.Log($"[MessageHandler] scores 파싱 성공: {Newtonsoft.Json.JsonConvert.SerializeObject(gameState.scores)}");
+                        }
+                        else
+                        {
+                            Debug.Log("[MessageHandler] scores 필드 없음 또는 null");
+                        }
+                        
+                        // remainingBlocks 필드 파싱
+                        if (fullData.ContainsKey("remainingBlocks") && fullData["remainingBlocks"] != null)
+                        {
+                            gameState.remainingBlocks = fullData["remainingBlocks"];
+                            Debug.Log($"[MessageHandler] remainingBlocks 파싱 성공: {Newtonsoft.Json.JsonConvert.SerializeObject(gameState.remainingBlocks)}");
+                        }
+                        else
+                        {
+                            Debug.Log("[MessageHandler] remainingBlocks 필드 없음 또는 null");
+                        }
+                    }
+                    catch (System.Exception ex)
+                    {
+                        Debug.LogWarning($"[MessageHandler] object 필드 파싱 실패: {ex.Message}");
+                    }
+                    
+                    // struct는 null이 될 수 없으므로, 파싱 성공 여부를 다른 방식으로 확인
+                    if (!string.IsNullOrEmpty(jsonData))
+                    {
+                        Debug.Log($"[MessageHandler] 게임 상태 파싱 완료: currentPlayer={gameState.currentPlayer}, turnNumber={gameState.turnNumber}, boardState 크기={gameState.boardState?.Length ?? 0}");
+                        
+                        // boardState 배열 유효성 확인
+                        if (gameState.boardState != null && gameState.boardState.Length > 0)
+                        {
+                            Debug.Log($"[MessageHandler] boardState 1차원 배열 수신: {gameState.boardState.Length}개 요소");
+                        }
+                        
+                        // GameRoomPanel에 게임 상태 업데이트 알림
+                        OnGameStateUpdate?.Invoke(gameState);
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[MessageHandler] GAME_STATE_UPDATE JSON 파싱 실패");
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[MessageHandler] GAME_STATE_UPDATE 처리 중 오류: {ex.Message}");
             }
         }
         
@@ -891,12 +1052,78 @@ namespace Features.Multi.Net
         /// </summary>
         private void HandleBlockPlaced(string[] parts)
         {
-            if (parts.Length >= 2)
+            try
             {
-                string jsonData = string.Join(":", parts, 1, parts.Length - 1);
-                Debug.Log($"[MessageHandler] 블록 배치됨: {jsonData}");
-                // JSON 파싱하여 블록 배치 정보 처리
-                // TODO: JSON 파싱 후 OnBlockPlaced 이벤트 발생
+                if (parts.Length >= 2)
+                {
+                    string jsonData = string.Join(":", parts, 1, parts.Length - 1);
+                    Debug.Log($"[MessageHandler] 블록 배치됨: {jsonData}");
+                    
+                    // 서버 JSON을 파싱
+                    BlockPlacedData placementData = JsonUtility.FromJson<BlockPlacedData>(jsonData);
+                    
+                    if (placementData != null)
+                    {
+                        Debug.Log($"[MessageHandler] 블록 배치 파싱 완료: Player={placementData.player}, " +
+                                  $"BlockType={placementData.blockType}, Position=({placementData.position.row},{placementData.position.col}), " +
+                                  $"PlayerColor={placementData.playerColor}");
+                        
+                        // placedCells가 있는지 확인 (개선된 동기화)
+                        if (placementData.placedCells != null && placementData.placedCells.Length > 0)
+                        {
+                            Debug.Log($"[MessageHandler] 📦 서버에서 배치된 셀 좌표 수신: {placementData.placedCells.Length}개");
+                            
+                            // 서버에서 전송한 실제 배치 좌표를 사용 (정확한 동기화)
+                            var occupiedCells = new List<Vector2Int>();
+                            foreach (var cell in placementData.placedCells)
+                            {
+                                occupiedCells.Add(new Vector2Int(cell.col, cell.row)); // col=x축, row=y축
+                            }
+                            
+                            // 서버 데이터로 직접 생성 (계산 없이)
+                            var multiPlacement = new MultiModels.BlockPlacement(
+                                placementData.playerColor - 1, // 서버는 1-4, 클라이언트는 0-3
+                                (MultiModels.BlockType)placementData.blockType,
+                                new Vector2Int(placementData.position.col, placementData.position.row), // col=x축, row=y축
+                                placementData.rotation,
+                                placementData.flip != 0,
+                                occupiedCells // 서버에서 계산된 정확한 좌표 사용
+                            );
+                            
+                            Debug.Log($"[MessageHandler] ✅ 서버 좌표 직접 사용: {multiPlacement.blockType} at ({multiPlacement.position.x},{multiPlacement.position.y}), 점유셀={multiPlacement.occupiedCells.Count}개");
+                            OnBlockPlaced?.Invoke(multiPlacement);
+                        }
+                        else
+                        {
+                            // 하위 호환성: placedCells가 없으면 기존 방식 사용
+                            Debug.Log($"[MessageHandler] ⚠️ placedCells 없음 - 기존 계산 방식 사용");
+                            
+                            // MultiModels.BlockPlacement 형태로 변환하여 이벤트 발생
+                            // 서버에서 row=y좌표, col=x좌표로 응답하므로 Unity Vector2Int(x,y)로 변환
+                            var multiPlacement = new MultiModels.BlockPlacement(
+                                placementData.playerColor - 1, // 서버는 1-4, 클라이언트는 0-3
+                                (MultiModels.BlockType)placementData.blockType,
+                                new Vector2Int(placementData.position.col, placementData.position.row), // col=x축, row=y축
+                                placementData.rotation,
+                                placementData.flip != 0
+                            );
+                            
+                            // 점유된 셀 자동 계산 - 블록 타입, 위치, 회전, 뒤집기 정보로 계산됨
+                            Debug.Log($"[MessageHandler] 블록 배치 점유셀 계산: {multiPlacement.blockType} at ({multiPlacement.position.x},{multiPlacement.position.y}), 점유셀={multiPlacement.occupiedCells.Count}개");
+                            OnBlockPlaced?.Invoke(multiPlacement);
+                        }
+                        
+                        Debug.Log("[MessageHandler] OnBlockPlaced 이벤트 발생 완료");
+                    }
+                    else
+                    {
+                        Debug.LogError("[MessageHandler] BLOCK_PLACED JSON 파싱 실패");
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[MessageHandler] BLOCK_PLACED 처리 중 오류: {ex.Message}");
             }
         }
         
@@ -957,8 +1184,49 @@ namespace Features.Multi.Net
         /// </summary>
         private void HandleGameEnded(string[] parts)
         {
-            Debug.Log("[MessageHandler] 게임 종료");
-            // OnGameEnded?.Invoke(winner); // TODO: 승자 정보가 있다면 파싱
+            try
+            {
+                Debug.Log("[MessageHandler] 게임 종료 메시지 수신");
+                
+                // 게임 종료 이벤트 발생
+                OnGameEnded?.Invoke(MultiModels.PlayerColor.None); // 승자 정보는 GAME_RESULT에서 처리
+                Debug.Log("[MessageHandler] OnGameEnded 이벤트 발생 완료");
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[MessageHandler] GAME_ENDED 처리 중 오류: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// 게임 이동 성공 - "GAME_MOVE_SUCCESS" 또는 "GAME_MOVE_SUCCESS:jsonData"
+        /// </summary>
+        private void HandleGameMoveSuccess(string[] parts)
+        {
+            try
+            {
+                if (parts.Length >= 2)
+                {
+                    // JSON 데이터가 있는 경우
+                    string jsonData = string.Join(":", parts, 1, parts.Length - 1);
+                    Debug.Log($"[MessageHandler] 게임 이동 성공 (데이터 포함): {jsonData}");
+                    
+                    // TODO: 필요시 JSON 파싱하여 상세 정보 처리
+                    // 현재는 확인용 로그만 출력
+                }
+                else
+                {
+                    // 단순 성공 메시지
+                    Debug.Log("[MessageHandler] 게임 이동 성공");
+                }
+                
+                // 성공 확인 로그 (UI 피드백이 필요하다면 이벤트 추가 가능)
+                Debug.Log("[MessageHandler] 블록 배치 서버 확인 완료");
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[MessageHandler] GAME_MOVE_SUCCESS 처리 중 오류: {ex.Message}");
+            }
         }
         
         /// <summary>
@@ -966,11 +1234,28 @@ namespace Features.Multi.Net
         /// </summary>
         private void HandleGameResult(string[] parts)
         {
-            if (parts.Length >= 2)
+            try
             {
-                string resultJson = string.Join(":", parts, 1, parts.Length - 1);
-                Debug.Log($"[MessageHandler] 게임 결과: {resultJson}");
-                // JSON 파싱하여 결과 처리
+                if (parts.Length >= 2)
+                {
+                    string resultJson = string.Join(":", parts, 1, parts.Length - 1);
+                    Debug.Log($"[MessageHandler] 게임 결과 수신: {resultJson}");
+                    
+                    // TODO: 필요시 게임 결과 JSON 파싱하여 상세 정보 처리
+                    // GameResultData result = JsonUtility.FromJson<GameResultData>(resultJson);
+                    
+                    // 게임 종료 이벤트 발생 (결과와 함께)
+                    Debug.Log("[MessageHandler] 게임 결과로 인한 게임 종료 처리");
+                    OnGameEnded?.Invoke(MultiModels.PlayerColor.None); // 승자 정보는 추후 JSON에서 파싱 가능
+                }
+                else
+                {
+                    Debug.LogWarning("[MessageHandler] GAME_RESULT 메시지에 결과 데이터가 없습니다.");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[MessageHandler] GAME_RESULT 처리 중 오류: {ex.Message}");
             }
         }
         
@@ -1272,5 +1557,31 @@ namespace Features.Multi.Net
         {
             return !IsFull() && !isGameStarted;
         }
+    }
+    
+    /// <summary>
+    /// 서버 BLOCK_PLACED 메시지의 JSON 파싱용 데이터 구조
+    /// </summary>
+    [System.Serializable]
+    public class BlockPlacedData
+    {
+        public string player;           // 플레이어 이름
+        public int blockType;          // 블록 타입 (서버 enum)
+        public BlockPosition position; // 위치 정보
+        public int rotation;           // 회전
+        public int flip;              // 플립 (0 또는 1)
+        public int playerColor;       // 플레이어 색상 (1-4)
+        public int scoreGained;       // 획득 점수
+        public BlockPosition[] placedCells; // 실제 배치된 셀들의 좌표 (개선된 동기화)
+    }
+    
+    /// <summary>
+    /// 블록 위치 정보
+    /// </summary>
+    [System.Serializable]
+    public class BlockPosition
+    {
+        public int row;
+        public int col;
     }
 }

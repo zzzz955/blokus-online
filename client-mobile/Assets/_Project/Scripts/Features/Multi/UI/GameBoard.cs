@@ -6,6 +6,7 @@ using App.Services;
 using Shared.Models;
 using Features.Single.Gameplay;
 using SharedGameLogic = App.Core.GameLogic;
+using SharedPosition = Shared.Models.Position;
 
 namespace Features.Multi.UI
 {
@@ -269,28 +270,66 @@ namespace Features.Multi.UI
         }
 
         /// <summary>
+        /// 개별 셀 업데이트 (GAME_STATE_UPDATE 동기화용)
+        /// </summary>
+        public void UpdateCell(int row, int col, PlayerColor playerColor)
+        {
+            if (row >= 0 && row < boardSize && col >= 0 && col < boardSize)
+            {
+                UpdateCellVisual(row, col, playerColor);
+                SetBoardCell(row, col, playerColor);
+            }
+        }
+
+        /// <summary>
         /// 블록 배치 (서버에서 확정된 배치 적용)
         /// </summary>
         public void PlaceBlock(Position position, int playerId, List<Position> occupiedCells)
         {
-            Debug.Log($"[MultiGameBoard] 서버에서 블록 배치 확정: Player {playerId} at ({position.row}, {position.col})");
-            
             PlayerColor playerColor = (PlayerColor)(playerId + 1);
+            bool isMyBlock = playerId == ((int)myPlayerColor - 1);
+            string playerType = isMyBlock ? "내" : "상대";
             
-            // 실제 점유된 셀들에 색상 적용
-            foreach (var cellPos in occupiedCells)
+            Debug.Log($"[MultiGameBoard] {playerType} 블록 배치 확정: Player {playerId}({playerColor}) at ({position.row}, {position.col}), " +
+                     $"점유셀 {occupiedCells.Count}개");
+            
+            try
             {
-                if (ValidationUtility.IsValidPosition(cellPos) && 
-                    cellPos.row < boardSize && cellPos.col < boardSize)
+                int updatedCells = 0;
+                
+                // 실제 점유된 셀들에 색상 적용
+                foreach (var cellPos in occupiedCells)
                 {
-                    UpdateCellVisual(cellPos.row, cellPos.col, playerColor);
-                    // GameLogic에는 SetBoardCell 메서드가 없으므로 직접 보드 업데이트
-                    SetBoardCell(cellPos.row, cellPos.col, playerColor);
+                    if (ValidationUtility.IsValidPosition(cellPos) && 
+                        cellPos.row < boardSize && cellPos.col < boardSize)
+                    {
+                        UpdateCellVisual(cellPos.row, cellPos.col, playerColor);
+                        SetBoardCell(cellPos.row, cellPos.col, playerColor);
+                        updatedCells++;
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[MultiGameBoard] 범위 밖 셀 위치: ({cellPos.row}, {cellPos.col})");
+                    }
+                }
+                
+                Debug.Log($"[MultiGameBoard] {playerType} 블록 배치 완료: {updatedCells}/{occupiedCells.Count}개 셀 업데이트");
+                
+                // 내 블록이면 미리보기 정리, 상대 블록이면 정리하지 않음
+                if (isMyBlock)
+                {
+                    ClearTouchPreview();
+                    Debug.Log("[MultiGameBoard] 내 블록 배치 완료 - 미리보기 정리");
+                }
+                else
+                {
+                    Debug.Log("[MultiGameBoard] 상대 블록 배치 완료 - 미리보기 유지");
                 }
             }
-            
-            // 미리보기 및 액션 버튼 정리
-            ClearTouchPreview();
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[MultiGameBoard] {playerType} 블록 배치 중 오류 발생: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -329,17 +368,20 @@ namespace Features.Multi.UI
             var img = cellImages[row, col];
             if (img == null) return;
 
-            // 스킨 또는 CellSpriteProvider를 통한 스프라이트 설정
+            // CellSpriteProvider 우선 사용 (스프라이트 기반 렌더링)
             if (cellSpriteProvider != null)
             {
                 var sprite = cellSpriteProvider.GetSprite(color);
                 if (sprite != null)
                 {
                     img.sprite = sprite;
+                    // 스프라이트 사용 시 색상을 흰색으로 설정하여 스프라이트 원본 색상이 보이도록 함
+                    img.color = Color.white;
+                    return;
                 }
             }
 
-            // 색상 설정 (스킨 우선)
+            // CellSpriteProvider가 없거나 스프라이트가 null인 경우 색상 기반 렌더링
             img.color = GetPlayerColor(color);
         }
 
@@ -529,8 +571,15 @@ namespace Features.Multi.UI
 
         private void PositionActionButtonsAtBlock()
         {
-            if (!actionButtonsVisible || actionButtonPanel == null || pendingBlock == null) return;
+            if (!actionButtonsVisible || actionButtonPanel == null || pendingBlock == null)
+            {
+                Debug.LogWarning($"[MultiGameBoard] ActionButtonPanel 위치 설정 실패 - actionButtonsVisible: {actionButtonsVisible}, actionButtonPanel: {actionButtonPanel != null}, pendingBlock: {pendingBlock != null}");
+                return;
+            }
 
+            // Debug.Log($"[MultiGameBoard] ActionButtonPanel 위치 계산 시작 - 블록: {pendingBlock.Type}, 위치: ({pendingPosition.row}, {pendingPosition.col})");
+
+            // 펜딩 블록 경계 계산
             var blockPositions = pendingBlock.GetAbsolutePositions(pendingPosition);
             int minRow = int.MaxValue, maxRow = int.MinValue;
             int minCol = int.MaxValue, maxCol = int.MinValue;
@@ -547,12 +596,117 @@ namespace Features.Multi.UI
             }
             if (minRow == int.MaxValue) return;
 
-            // 간단한 위치 설정 (우상단)
-            Vector2 targetPos = new Vector2(
-                (maxCol - boardSize * 0.5f + 1f) * cellSize,
-                (boardSize * 0.5f - minRow + 1f) * cellSize
+            // Canvas 좌표로 변환/적용
+            Canvas canvas = GetComponentInParent<Canvas>();
+            if (canvas == null) return;
+
+            Camera uiCamera = canvas.worldCamera ?? Camera.main;
+            RectTransform canvasRect = canvas.GetComponent<RectTransform>();
+            RectTransform buttonRect = actionButtonPanel;
+
+            if (buttonRect != null && uiCamera != null)
+            {
+                Vector2 panelSize = buttonRect.sizeDelta;
+                float safeMargin = 20f; // 안전 마진 증가
+
+                // 여러 위치 후보를 시도 (우선순위: 우상 → 좌상 → 우하 → 좌하)
+                Vector3[] candidateWorldPositions = new Vector3[]
+                {
+                    BoardToWorld(new Position(minRow, maxCol)), // 우측 상단
+                    BoardToWorld(new Position(minRow, minCol)), // 좌측 상단  
+                    BoardToWorld(new Position(maxRow, maxCol)), // 우측 하단
+                    BoardToWorld(new Position(maxRow, minCol))  // 좌측 하단
+                };
+
+                Vector2[] offsets = new Vector2[]
+                {
+                    new Vector2(cellSize * 0.5f + panelSize.x * 0.5f + safeMargin, cellSize * 0.5f + panelSize.y * 0.5f + safeMargin),   // 우상
+                    new Vector2(-(cellSize * 0.5f + panelSize.x * 0.5f + safeMargin), cellSize * 0.5f + panelSize.y * 0.5f + safeMargin), // 좌상
+                    new Vector2(cellSize * 0.5f + panelSize.x * 0.5f + safeMargin, -(cellSize * 0.5f + panelSize.y * 0.5f + safeMargin)), // 우하
+                    new Vector2(-(cellSize * 0.5f + panelSize.x * 0.5f + safeMargin), -(cellSize * 0.5f + panelSize.y * 0.5f + safeMargin)) // 좌하
+                };
+
+                Vector2 finalPosition = Vector2.zero;
+                bool positionFound = false;
+
+                // 각 위치 후보를 시도하여 화면 안에 들어오는 첫 번째 위치 사용
+                for (int i = 0; i < candidateWorldPositions.Length; i++)
+                {
+                    Vector2 screenPos = uiCamera.WorldToScreenPoint(candidateWorldPositions[i]);
+                    if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screenPos, uiCamera, out var localPos))
+                    {
+                        Vector2 candidatePosition = localPos + offsets[i];
+
+                        // 화면 경계 체크 (실제 화면 크기 기준)
+                        if (IsPositionWithinScreenBounds(candidatePosition, panelSize, canvasRect, safeMargin))
+                        {
+                            finalPosition = candidatePosition;
+                            positionFound = true;
+                            break;
+                        }
+                    }
+                }
+
+                // 모든 후보가 실패하면 강제 클램핑으로 화면 안에 위치시키기
+                if (!positionFound)
+                {
+                    Vector2 screenPos = uiCamera.WorldToScreenPoint(candidateWorldPositions[0]);
+                    if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screenPos, uiCamera, out var localPos))
+                    {
+                        Vector2 targetPosition = localPos + offsets[0];
+                        finalPosition = ClampPositionToScreenBounds(targetPosition, panelSize, canvasRect, safeMargin);
+                    }
+                }
+
+                // 최종 위치 설정
+                buttonRect.anchoredPosition = finalPosition;
+
+                // Debug.Log($"[MultiGameBoard] ActionButtonPanel 위치 설정 완료 - 최종: {finalPosition}");
+            }
+        }
+
+        /// <summary>
+        /// 주어진 위치가 화면 경계 안에 있는지 확인
+        /// </summary>
+        private bool IsPositionWithinScreenBounds(Vector2 position, Vector2 panelSize, RectTransform canvasRect, float safeMargin)
+        {
+            Vector2 canvasSize = canvasRect.sizeDelta;
+            Vector2 panelHalfSize = panelSize * 0.5f;
+
+            float minX = -canvasSize.x * 0.5f + panelHalfSize.x + safeMargin;
+            float maxX = canvasSize.x * 0.5f - panelHalfSize.x - safeMargin;
+            float minY = -canvasSize.y * 0.5f + panelHalfSize.y + safeMargin;
+            float maxY = canvasSize.y * 0.5f - panelHalfSize.y - safeMargin;
+
+            return position.x >= minX && position.x <= maxX && position.y >= minY && position.y <= maxY;
+        }
+
+        /// <summary>
+        /// 위치를 화면 경계 안으로 강제 클램핑
+        /// </summary>
+        private Vector2 ClampPositionToScreenBounds(Vector2 position, Vector2 panelSize, RectTransform canvasRect, float safeMargin)
+        {
+            Vector2 canvasSize = canvasRect.sizeDelta;
+            Vector2 panelHalfSize = panelSize * 0.5f;
+
+            float minX = -canvasSize.x * 0.5f + panelHalfSize.x + safeMargin;
+            float maxX = canvasSize.x * 0.5f - panelHalfSize.x - safeMargin;
+            float minY = -canvasSize.y * 0.5f + panelHalfSize.y + safeMargin;
+            float maxY = canvasSize.y * 0.5f - panelHalfSize.y - safeMargin;
+
+            return new Vector2(
+                Mathf.Clamp(position.x, minX, maxX),
+                Mathf.Clamp(position.y, minY, maxY)
             );
-            actionButtonPanel.anchoredPosition = targetPos;
+        }
+
+        private Vector3 BoardToWorld(Position p)
+        {
+            // 기본적인 보드 좌표 → 월드 좌표 변환
+            // 보드 중앙을 (0,0)으로 하는 좌표계
+            float worldX = (p.col - boardSize * 0.5f + 0.5f) * cellSize;
+            float worldY = (boardSize * 0.5f - p.row - 0.5f) * cellSize;
+            return transform.TransformPoint(new Vector3(worldX, worldY, 0f));
         }
 
         private void EnsureFallbackSprite()
@@ -633,6 +787,26 @@ namespace Features.Multi.UI
                 PlayerColor.Obstacle => obstacleColor,
                 _ => emptyColor
             };
+        }
+
+        /// <summary>
+        /// 지정된 위치의 셀 색상을 가져옵니다
+        /// </summary>
+        public PlayerColor GetCellColor(int row, int col)
+        {
+            if (gameLogic == null)
+            {
+                Debug.LogWarning("[GameBoard] gameLogic이 null입니다.");
+                return PlayerColor.None;
+            }
+
+            if (row < 0 || row >= boardSize || col < 0 || col >= boardSize)
+            {
+                Debug.LogWarning($"[GameBoard] 잘못된 좌표: ({row}, {col})");
+                return PlayerColor.None;
+            }
+
+            return gameLogic.GetCellColor(new SharedPosition(row, col));
         }
 
         /// <summary>

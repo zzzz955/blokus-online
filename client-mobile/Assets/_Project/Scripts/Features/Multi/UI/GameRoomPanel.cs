@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
 using Features.Multi.Net;
+using GameStateData = Features.Multi.Net.GameStateData;
 using Features.Multi.Core;
 using TurnChangeInfo = Features.Multi.Net.TurnChangeInfo;
 using PlayerData = Features.Multi.Net.PlayerData;
@@ -91,6 +92,9 @@ namespace Features.Multi.UI
         private float turnTimeLimit = 60f;
         private float remainingTime = 0f;
         private bool isTimerActive = false;
+        
+        // Board State Synchronization
+        private int[,] previousBoardState = null;
 
         // ========================================
         // Lifecycle
@@ -214,6 +218,7 @@ namespace Features.Multi.UI
                 networkManager.OnPlayerLeft += OnPlayerLeft;
                 networkManager.OnPlayerReadyChanged += OnPlayerReadyChanged;
                 networkManager.OnGameStarted += OnGameStarted;
+                networkManager.OnGameStateUpdate += OnGameStateUpdate;
                 networkManager.OnTurnChanged += OnTurnChanged;
                 networkManager.OnBlockPlaced += OnBlockPlaced;
                 networkManager.OnGameEnded += OnGameEnded;
@@ -248,6 +253,7 @@ namespace Features.Multi.UI
                 networkManager.OnPlayerLeft -= OnPlayerLeft;
                 networkManager.OnPlayerReadyChanged -= OnPlayerReadyChanged;
                 networkManager.OnGameStarted -= OnGameStarted;
+                networkManager.OnGameStateUpdate -= OnGameStateUpdate;
                 networkManager.OnTurnChanged -= OnTurnChanged;
                 networkManager.OnBlockPlaced -= OnBlockPlaced;
                 networkManager.OnGameEnded -= OnGameEnded;
@@ -908,8 +914,174 @@ namespace Features.Multi.UI
             // 게임 시작 시 이전 상태 완전 클리어 및 재초기화
             ResetGameComponentsForNewGame();
             
+            // 게임 시작 시 상호작용 제어 업데이트 (아직 첫 턴이 오기 전이므로 비활성화 상태)
+            UpdateTurnBasedInteraction();
+            
             UpdateGameControlsState();
             ShowMessage("게임이 시작되었습니다!");
+        }
+
+        /// <summary>
+        /// 게임 상태 업데이트 처리
+        /// 서버로부터 전체 게임 상태를 동기화
+        /// </summary>
+        private void OnGameStateUpdate(GameStateData gameState)
+        {
+            Debug.Log($"[GameRoomPanel] 게임 상태 업데이트 수신: currentPlayer={gameState.currentPlayer}, turnNumber={gameState.turnNumber}");
+            
+            try
+            {
+                // 현재 플레이어 정보 업데이트 (필요시)
+                if (gameState.currentPlayer > 0)
+                {
+                    Debug.Log($"[GameRoomPanel] 현재 플레이어: {gameState.currentPlayer}, 턴 번호: {gameState.turnNumber}");
+                }
+                
+                // 보드 상태 처리 (필요시)
+                if (gameState.boardState != null && gameState.boardState.Length > 0)
+                {
+                    Debug.Log($"[GameRoomPanel] 보드 상태: {(gameState.boardState.Length == 0 ? "빈 상태 (게임 시작 초기)" : $"데이터 {gameState.boardState.Length}개")}");
+                }
+                else
+                {
+                    Debug.Log($"[GameRoomPanel] 보드 상태: 빈 상태 (게임 시작 초기)");
+                }
+                
+                // PlayerSlots 점수 동기화
+                UpdatePlayerSlotScores(gameState.scores);
+                
+                // PlayerSlots 남은 블록 개수 동기화  
+                UpdatePlayerSlotRemainingBlocks(gameState.remainingBlocks);
+                
+                Debug.Log($"[GameRoomPanel] 점수 정보 동기화 완료");
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[GameRoomPanel] 게임 상태 업데이트 처리 중 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 서버 보드 상태와 클라이언트 보드 동기화
+        /// 변경된 셀만 찾아서 업데이트
+        /// </summary>
+        private void SynchronizeBoardState(int[,] serverBoardState)
+        {
+            try
+            {
+                if (gameBoard == null)
+                {
+                    Debug.LogWarning("[GameRoomPanel] GameBoard가 null입니다. 보드 동기화 건너뜀");
+                    return;
+                }
+
+                const int BOARD_SIZE = 20;
+                
+                // 서버 보드 상태 유효성 검사
+                if (serverBoardState.GetLength(0) != BOARD_SIZE || serverBoardState.GetLength(1) != BOARD_SIZE)
+                {
+                    Debug.LogError($"[GameRoomPanel] 잘못된 보드 크기: {serverBoardState.GetLength(0)}x{serverBoardState.GetLength(1)} (예상: {BOARD_SIZE}x{BOARD_SIZE})");
+                    return;
+                }
+
+                List<BoardCellChange> changes = new List<BoardCellChange>();
+
+                // 현재 게임보드 상태를 가져와서 서버 상태와 직접 비교
+                for (int row = 0; row < BOARD_SIZE; row++)
+                {
+                    for (int col = 0; col < BOARD_SIZE; col++)
+                    {
+                        int serverValue = serverBoardState[row, col];
+                        PlayerColor currentBoardValue = gameBoard.GetCellColor(row, col);
+                        int currentValue = ConvertPlayerColorToServerValue(currentBoardValue);
+
+                        if (serverValue != currentValue)
+                        {
+                            changes.Add(new BoardCellChange(row, col, currentValue, serverValue));
+                        }
+                    }
+                }
+
+                Debug.Log($"[GameRoomPanel] 보드 변경사항: {changes.Count}개 셀");
+
+                // 변경된 셀들을 GameBoard에 적용 (변경사항이 없어도 강제 업데이트)
+                UpdateBoardCells(changes);
+
+                // 현재 상태를 이전 상태로 저장 (딥 카피)
+                SaveCurrentBoardState(serverBoardState);
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[GameRoomPanel] 보드 상태 동기화 중 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// PlayerColor를 서버 값으로 변환
+        /// </summary>
+        private int ConvertPlayerColorToServerValue(PlayerColor color)
+        {
+            switch (color)
+            {
+                case PlayerColor.None: return 0;
+                case PlayerColor.Blue: return 1;
+                case PlayerColor.Yellow: return 2;
+                case PlayerColor.Red: return 3;
+                case PlayerColor.Green: return 4;
+                default: return 0;
+            }
+        }
+
+        /// <summary>
+        /// 변경된 셀들을 GameBoard에 업데이트
+        /// </summary>
+        private void UpdateBoardCells(List<BoardCellChange> changes)
+        {
+            foreach (var change in changes)
+            {
+                // 서버 값을 PlayerColor로 변환 (0=빈 셀, 1-4=플레이어 색상)
+                PlayerColor playerColor = ConvertServerValueToPlayerColor(change.newValue);
+                
+                Debug.Log($"[GameRoomPanel] 셀 업데이트: ({change.row},{change.col}) {change.oldValue}→{change.newValue} (PlayerColor: {playerColor})");
+                
+                // GameBoard의 public UpdateCell 메서드 호출로 개별 셀 업데이트
+                gameBoard.UpdateCell(change.row, change.col, playerColor);
+            }
+        }
+
+        /// <summary>
+        /// 서버 값을 PlayerColor로 변환
+        /// </summary>
+        private PlayerColor ConvertServerValueToPlayerColor(int serverValue)
+        {
+            switch (serverValue)
+            {
+                case 0: return PlayerColor.None;
+                case 1: return PlayerColor.Blue;
+                case 2: return PlayerColor.Yellow;
+                case 3: return PlayerColor.Red;
+                case 4: return PlayerColor.Green;
+                default:
+                    Debug.LogWarning($"[GameRoomPanel] 알 수 없는 서버 값: {serverValue}");
+                    return PlayerColor.None;
+            }
+        }
+
+        /// <summary>
+        /// 현재 보드 상태를 이전 상태로 저장 (딥 카피)
+        /// </summary>
+        private void SaveCurrentBoardState(int[,] currentState)
+        {
+            const int BOARD_SIZE = 20;
+            previousBoardState = new int[BOARD_SIZE, BOARD_SIZE];
+            
+            for (int row = 0; row < BOARD_SIZE; row++)
+            {
+                for (int col = 0; col < BOARD_SIZE; col++)
+                {
+                    previousBoardState[row, col] = currentState[row, col];
+                }
+            }
         }
 
         /// <summary>
@@ -927,12 +1099,10 @@ namespace Features.Multi.UI
                 Debug.Log("[GameRoomPanel] 게임 로직 클리어 완료");
             }
 
-            // 게임보드 완전 리셋 및 활성화
+            // 게임보드 완전 리셋
             if (gameBoard != null)
             {
                 gameBoard.ResetBoard(); // 이전 게임의 모든 블록 제거
-                gameBoard.SetInteractable(true); // 게임 중에는 활성화
-                gameBoard.SetMyTurn(false, mySharedPlayerColor); // 첫 턴이 아닐 수 있으므로 비활성화 상태로 시작
                 Debug.Log("[GameRoomPanel] 게임보드 재초기화 완료");
             }
 
@@ -940,7 +1110,6 @@ namespace Features.Multi.UI
             if (blockPalette != null && mySharedPlayerColor != SharedPlayerColor.None)
             {
                 blockPalette.InitializePalette(mySharedPlayerColor);
-                blockPalette.SetInteractable(false); // 첫 턴까지는 비활성화
                 Debug.Log($"[GameRoomPanel] 블록 팔레트 재초기화 완료 - 색상: {mySharedPlayerColor}");
             }
             else if (mySharedPlayerColor == SharedPlayerColor.None)
@@ -967,6 +1136,10 @@ namespace Features.Multi.UI
             // 게임 상태 변수 리셋
             isMyTurn = false;
             currentTurnPlayerId = -1;
+            
+            // 보드 상태 동기화용 이전 상태 리셋
+            previousBoardState = null;
+            Debug.Log("[GameRoomPanel] 이전 보드 상태 리셋 완료");
             
             Debug.Log("[GameRoomPanel] 새 게임을 위한 컴포넌트 재초기화 완료");
         }
@@ -1019,6 +1192,10 @@ namespace Features.Multi.UI
             isGameStarted = false;
             isMyTurn = false;
             currentTurnPlayerId = -1;
+            
+            // 보드 상태 동기화용 이전 상태 완전 리셋
+            previousBoardState = null;
+            Debug.Log("[GameRoomPanel] 이전 보드 상태 완전 리셋 완료");
 
             Debug.Log("[GameRoomPanel] 게임 컴포넌트 정리 완료");
         }
@@ -1072,17 +1249,17 @@ namespace Features.Multi.UI
             
             // 내 턴인지 확인 (사용자명으로 비교)
             var currentUser = networkManager?.CurrentUserInfo;
+            bool previousTurnState = isMyTurn;
             isMyTurn = currentUser != null && turnInfo.newPlayer == currentUser.username;
             isTimerActive = true;
 
-            // 게임보드와 블록 팔레트 턴 상태 업데이트
-            if (gameBoard != null)
-                gameBoard.SetMyTurn(isMyTurn, mySharedPlayerColor);
-
-            if (blockPalette != null)
+            // 턴 기반 상호작용 제어 (게임 시작 후에만)
+            UpdateTurnBasedInteraction();
+            
+            // 턴 변경 로그
+            if (previousTurnState != isMyTurn)
             {
-                blockPalette.SetMyTurn(isMyTurn, mySharedPlayerColor);
-                blockPalette.SetInteractable(isMyTurn);
+                Debug.Log($"[GameRoomPanel] 턴 변경: {(isMyTurn ? "내 턴 시작" : "상대 턴 시작")} - 플레이어: {turnInfo.newPlayer}");
             }
 
             // 이전 턴 타임아웃 알림 처리
@@ -1100,29 +1277,132 @@ namespace Features.Multi.UI
                      $"내턴={isMyTurn}, 제한시간={turnTimeLimit}초, 남은시간={remainingTime}초");
         }
 
-        private void OnBlockPlaced(MultiBlockPlacement placement)
+        /// <summary>
+        /// 게임 상태와 턴 정보에 따른 상호작용 제어
+        /// 요구사항 1,2: 게임 시작 전 & 내 턴이 아닐 때 상호작용 비활성화
+        /// </summary>
+        private void UpdateTurnBasedInteraction()
         {
-            // TODO: BlockPlacement를 Shared.Models 구조로 변환 필요
-            // 현재는 Features.Multi.Models.BlockPlacement를 사용하고 있음
+            // 상호작용 가능 조건: 게임이 시작되었고 && 내 턴일 때
+            bool canInteract = isGameStarted && isMyTurn;
             
-            // 게임보드에 블록 배치 반영 - 임시 구현
+            // 게임보드 상호작용 제어
             if (gameBoard != null)
             {
-                var position = new SharedPosition(placement.position.x, placement.position.y);
-                var occupiedCells = new List<SharedPosition>();
-                
-                foreach (var cell in placement.occupiedCells)
-                {
-                    occupiedCells.Add(new SharedPosition(cell.x, cell.y));
-                }
-                
-                gameBoard.PlaceBlock(position, placement.playerId, occupiedCells);
+                gameBoard.SetInteractable(isGameStarted); // 게임 시작 후에만 보드 활성화
+                gameBoard.SetMyTurn(isMyTurn, mySharedPlayerColor);
+                Debug.Log($"[GameRoomPanel] 게임보드 상호작용 설정: 게임시작={isGameStarted}, 내턴={isMyTurn}");
             }
 
-            // 블록 팔레트에서 사용된 블록 표시 (내 플레이어인 경우)
-            if (blockPalette != null && placement.playerId == (int)mySharedPlayerColor)
+            // 블록 팔레트 상호작용 제어  
+            if (blockPalette != null)
             {
-                blockPalette.MarkBlockAsUsed(ConvertToSharedBlockType(placement.blockType));
+                blockPalette.SetMyTurn(isMyTurn, mySharedPlayerColor);
+                blockPalette.SetInteractable(canInteract); // 게임 시작 && 내 턴일 때만 활성화
+                Debug.Log($"[GameRoomPanel] 블록 팔레트 상호작용 설정: 활성화={canInteract}");
+            }
+
+            // 상태 로그 출력
+            string statusMsg = !isGameStarted ? "게임 시작 대기" : 
+                              (isMyTurn ? "내 턴 - 상호작용 가능" : "상대 턴 - 상호작용 불가");
+            Debug.Log($"[GameRoomPanel] 상호작용 상태: {statusMsg}");
+        }
+
+        private void OnBlockPlaced(MultiBlockPlacement placement)
+        {
+            // 요구사항 6: 상대방 블록 배치 브로드캐스트 및 보드 동기화 처리
+            // placement.playerId는 0-3, mySharedPlayerColor는 1-4이므로 올바른 비교 필요
+            bool isMyPlacement = placement.playerId == ((int)mySharedPlayerColor - 1);
+            string playerType = isMyPlacement ? "본인" : "상대방";
+            
+            Debug.Log($"[GameRoomPanel] 블록 배치 확인: playerId={placement.playerId}, myColor={(int)mySharedPlayerColor-1}, isMyPlacement={isMyPlacement}");
+            for (int i = 0; i < placement.occupiedCells.Count && i < 10; i++)
+            {
+                var cell = placement.occupiedCells[i];
+                Debug.Log($"    [{i}] Vector2Int({cell.x},{cell.y})");
+            }
+
+            try
+            {
+                // 게임보드에 블록 배치 반영 (본인 및 상대방 모두)
+                if (gameBoard != null)
+                {
+                    var position = new SharedPosition(placement.position.y, placement.position.x); // Vector2Int(x,y) → SharedPosition(y,x) 서버 row/col 매핑
+                    var occupiedCells = new List<SharedPosition>();
+                    
+                    foreach (var cell in placement.occupiedCells)
+                    {
+                        // 서버 좌표 매핑 수정: Vector2Int(col,row) → SharedPosition(row,col) 
+                        // cell.x는 서버의 col값, cell.y는 서버의 row값이므로 순서 바꿔야 함
+                        var sharedPos = new SharedPosition(cell.y, cell.x); // row=cell.y, col=cell.x
+                        occupiedCells.Add(sharedPos);
+                    }
+                    
+                    gameBoard.PlaceBlock(position, placement.playerId, occupiedCells);
+                    Debug.Log($"[GameRoomPanel] {playerType} 블록이 게임보드에 성공적으로 배치됨");
+
+                    for (int i = 0; i < occupiedCells.Count && i < 10; i++)
+                    {
+                        var cell = occupiedCells[i];
+                    }
+                    
+                    // 로컬 게임 로직 상태 동기화
+                    if (gameLogic != null)
+                    {
+                        var blockPlacement = new SharedBlockPlacement(
+                            ConvertToSharedBlockType(placement.blockType),
+                            position,
+                            (Shared.Models.Rotation)placement.rotation,
+                            placement.isFlipped ? Shared.Models.FlipState.Horizontal : Shared.Models.FlipState.Normal,
+                            ConvertToSharedPlayerColor(placement.playerColor)
+                        );
+                        
+                        // [DEBUG] 게임 로직 상태 확인
+                        var playerColor = ConvertToSharedPlayerColor(placement.playerColor);
+                        bool hasPlacedFirstBlock = gameLogic.HasPlayerPlacedFirstBlock(playerColor);
+                        Debug.Log($"[GameRoomPanel] 🔍 게임로직 배치 전 상태: {playerColor}, 첫블록배치여부: {hasPlacedFirstBlock}");
+                        
+                        bool placed = gameLogic.PlaceBlock(blockPlacement);
+                        if (placed)
+                        {
+                            bool hasPlacedFirstBlockAfter = gameLogic.HasPlayerPlacedFirstBlock(playerColor);
+                            Debug.Log($"[GameRoomPanel] ✅ 로컬 게임 로직 상태 동기화 완료: {placement.blockType} at ({position.row},{position.col})");
+                            Debug.Log($"[GameRoomPanel] 🔍 게임로직 배치 후 상태: {playerColor}, 첫블록배치여부: {hasPlacedFirstBlockAfter}");
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"[GameRoomPanel] ❌ 로컬 게임 로직 동기화 실패: {placement.blockType} at ({position.row},{position.col})");
+                            Debug.LogWarning($"[GameRoomPanel] 🔍 실패 원인 분석 - 첫블록여부: {hasPlacedFirstBlock}, 플레이어: {playerColor}");
+                            
+                            // 배치 실패 원인 상세 분석
+                            bool canPlace = gameLogic.CanPlaceBlock(blockPlacement);
+                            Debug.LogWarning($"[GameRoomPanel] 🔍 CanPlaceBlock 결과: {canPlace}");
+                        }
+                    }
+                }
+
+                // 블록 팔레트에서 사용된 블록 표시 (본인인 경우만)
+                if (blockPalette != null && isMyPlacement)
+                {
+                    var sharedBlockType = ConvertToSharedBlockType(placement.blockType);
+                    Debug.Log($"[GameRoomPanel] 내 팔레트에서 블록 제거 시도: {placement.blockType} → {sharedBlockType}");
+                    blockPalette.MarkBlockAsUsed(sharedBlockType);
+                    Debug.Log($"[GameRoomPanel] 내 팔레트에서 사용된 블록 {placement.blockType} 제거 완료");
+                }
+                else if (blockPalette == null)
+                {
+                    Debug.LogWarning($"[GameRoomPanel] blockPalette가 null이어서 블록 제거 불가");
+                }
+                else if (!isMyPlacement)
+                {
+                    Debug.Log($"[GameRoomPanel] 상대방 블록 배치 - 내 팔레트는 업데이트하지 않음");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[GameRoomPanel] {playerType} 블록 배치 처리 중 오류 발생: {ex.Message}");
+                ShowMessage($"블록 배치 처리 중 오류가 발생했습니다: {ex.Message}");
+                return;
             }
 
             // 플레이어 점수 및 블록 수 업데이트
@@ -1173,7 +1453,38 @@ namespace Features.Multi.UI
 
         private void OnErrorReceived(string error)
         {
-            ShowMessage($"오류: {error}");
+            // 요구사항 4: 서버 검증 실패에 대한 구체적인 오류 처리
+            Debug.LogError($"[GameRoomPanel] 서버 오류 수신: {error}");
+            
+            // 블록 배치 관련 오류인 경우 미리보기 상태 정리
+            if (error.Contains("placement") || error.Contains("배치") || error.Contains("block"))
+            {
+                if (gameBoard != null)
+                {
+                    gameBoard.ClearTouchPreview();
+                }
+                
+                if (error.Contains("invalid") || error.Contains("불가능"))
+                {
+                    ShowMessage("블록을 해당 위치에 배치할 수 없습니다.");
+                }
+                else if (error.Contains("occupied") || error.Contains("이미"))
+                {
+                    ShowMessage("해당 위치는 이미 사용된 공간입니다.");
+                }
+                else if (error.Contains("turn") || error.Contains("턴"))
+                {
+                    ShowMessage("당신의 턴이 아닙니다.");
+                }
+                else
+                {
+                    ShowMessage($"블록 배치 오류: {error}");
+                }
+            }
+            else
+            {
+                ShowMessage($"오류: {error}");
+            }
         }
 
         // ========================================
@@ -1198,22 +1509,55 @@ namespace Features.Multi.UI
 
         private void OnGameBoardBlockPlaced(SharedBlock block, SharedPosition position)
         {
-            // 서버에 블록 배치 전송 - Shared.Models를 Features.Multi.Models로 변환 필요
-            if (networkManager != null && isMyTurn)
+            // 서버에 블록 배치 전송 - 요구사항 4: 서버 통신 및 검증
+            if (networkManager != null && isMyTurn && isGameStarted)
             {
                 Debug.Log($"[GameRoomPanel] 블록 배치 시도: {block.Type} at ({position.row}, {position.col})");
                 
-                // TODO: Shared.Models → Features.Multi.Models 변환 로직 구현
-                // 현재는 간단한 구현으로 대체
-                var placement = new MultiBlockPlacement(
-                    (int)mySharedPlayerColor,
-                    ConvertToMultiBlockType(block.Type),
-                    new Vector2Int(position.row, position.col),
-                    (int)block.CurrentRotation,
-                    block.CurrentFlipState == SharedFlipState.Horizontal
-                );
-                
-                networkManager.PlaceBlock(placement);
+                try
+                {
+                    // Shared.Models → Features.Multi.Models 변환
+                    var placement = new MultiBlockPlacement(
+                        (int)mySharedPlayerColor,
+                        ConvertToMultiBlockType(block.Type),
+                        new Vector2Int(position.col, position.row), // col=x, row=y로 데스크톱과 통일
+                        (int)block.CurrentRotation,
+                        block.CurrentFlipState == SharedFlipState.Horizontal
+                    );
+                    
+                    // [DEBUG] 블록의 실제 점유 셀 확인
+                    var blockCells = block.GetAbsolutePositions(position);
+                    Debug.Log($"  - 클라이언트 블록 점유셀 ({blockCells.Count}개):");
+                    for (int i = 0; i < blockCells.Count && i < 10; i++)
+                    {
+                        Debug.Log($"    [{i}] SharedPosition({blockCells[i].row},{blockCells[i].col})");
+                    }
+                    
+                    // 서버에 배치 요청 전송 - 서버에서 검증 후 OnBlockPlaced로 응답
+                    networkManager.PlaceBlock(placement);
+                    Debug.Log($"[GameRoomPanel] 서버에 블록 배치 요청 전송: 플레이어={mySharedPlayerColor}, 블록={block.Type}");
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogError($"[GameRoomPanel] 블록 배치 요청 중 오류 발생: {ex.Message}");
+                    ShowMessage("블록 배치 요청 처리 중 오류가 발생했습니다.");
+                    
+                    // 실패 시 게임보드의 미리보기 상태 정리
+                    if (gameBoard != null)
+                    {
+                        gameBoard.ClearTouchPreview();
+                    }
+                }
+            }
+            else if (!isMyTurn)
+            {
+                Debug.LogWarning("[GameRoomPanel] 내 턴이 아닐 때 블록 배치 시도됨");
+                ShowMessage("당신의 턴이 아닙니다.");
+            }
+            else if (!isGameStarted)
+            {
+                Debug.LogWarning("[GameRoomPanel] 게임이 시작되지 않았는데 블록 배치 시도됨");
+                ShowMessage("게임이 아직 시작되지 않았습니다.");
             }
         }
 
@@ -1455,6 +1799,136 @@ namespace Features.Multi.UI
         }
         
         /// <summary>
+        /// PlayerSlots 점수 동기화 (GAME_STATE_UPDATE 기반)
+        /// </summary>
+        private void UpdatePlayerSlotScores(object scoresObj)
+        {
+            if (scoresObj == null)
+            {
+                Debug.Log("[GameRoomPanel] 점수 정보 없음 - 스킵");
+                return;
+            }
+            
+            try
+            {
+                System.Collections.Generic.Dictionary<string, int> scoresDict;
+                
+                // Newtonsoft.Json.Linq.JObject인 경우 처리
+                if (scoresObj is Newtonsoft.Json.Linq.JObject jObj)
+                {
+                    scoresDict = jObj.ToObject<System.Collections.Generic.Dictionary<string, int>>();
+                }
+                else
+                {
+                    // 다른 형태인 경우 JSON 문자열로 변환 후 파싱
+                    var scoresJson = Newtonsoft.Json.JsonConvert.SerializeObject(scoresObj);
+                    scoresDict = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Collections.Generic.Dictionary<string, int>>(scoresJson);
+                }
+                
+                if (scoresDict != null)
+                {
+                    Debug.Log($"[GameRoomPanel] 점수 동기화 시작: {scoresDict.Count}명");
+                    
+                    foreach (var scoreEntry in scoresDict)
+                    {
+                        // 서버 색상 (1-4) → 클라이언트 인덱스 (0-3) 변환
+                        if (int.TryParse(scoreEntry.Key, out int serverColor) && serverColor >= 1 && serverColor <= 4)
+                        {
+                            int clientIndex = serverColor - 1;
+                            int score = scoreEntry.Value;
+                            
+                            // 해당 슬롯이 비어있지 않고 PlayerSlotWidget이 존재하는 경우만 업데이트
+                            if (clientIndex >= 0 && clientIndex < 4 && 
+                                playerSlots[clientIndex] != null && 
+                                !playerData[clientIndex].isEmpty)
+                            {
+                                playerSlots[clientIndex].UpdateScore(score);
+                                Debug.Log($"[GameRoomPanel] 플레이어 슬롯 {clientIndex} 점수 업데이트: {score}점");
+                            }
+                            else if (playerData[clientIndex].isEmpty)
+                            {
+                                Debug.Log($"[GameRoomPanel] 슬롯 {clientIndex} 빈 슬롯이므로 점수 업데이트 스킵");
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning("[GameRoomPanel] 점수 Dictionary 파싱 실패");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[GameRoomPanel] 점수 동기화 중 오류: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// PlayerSlots 남은 블록 개수 동기화 (GAME_STATE_UPDATE 기반)
+        /// </summary>
+        private void UpdatePlayerSlotRemainingBlocks(object remainingBlocksObj)
+        {
+            if (remainingBlocksObj == null)
+            {
+                Debug.Log("[GameRoomPanel] 남은 블록 정보 없음 - 스킵");
+                return;
+            }
+            
+            try
+            {
+                System.Collections.Generic.Dictionary<string, int> blocksDict;
+                
+                // Newtonsoft.Json.Linq.JObject인 경우 처리
+                if (remainingBlocksObj is Newtonsoft.Json.Linq.JObject jObj)
+                {
+                    blocksDict = jObj.ToObject<System.Collections.Generic.Dictionary<string, int>>();
+                }
+                else
+                {
+                    // 다른 형태인 경우 JSON 문자열로 변환 후 파싱
+                    var blocksJson = Newtonsoft.Json.JsonConvert.SerializeObject(remainingBlocksObj);
+                    blocksDict = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Collections.Generic.Dictionary<string, int>>(blocksJson);
+                }
+                
+                if (blocksDict != null)
+                {
+                    Debug.Log($"[GameRoomPanel] 남은 블록 동기화 시작: {blocksDict.Count}명");
+                    
+                    foreach (var blockEntry in blocksDict)
+                    {
+                        // 서버 색상 (1-4) → 클라이언트 인덱스 (0-3) 변환
+                        if (int.TryParse(blockEntry.Key, out int serverColor) && serverColor >= 1 && serverColor <= 4)
+                        {
+                            int clientIndex = serverColor - 1;
+                            int remainingBlocks = blockEntry.Value;
+                            
+                            // 해당 슬롯이 비어있지 않고 PlayerSlotWidget이 존재하는 경우만 업데이트
+                            if (clientIndex >= 0 && clientIndex < 4 && 
+                                playerSlots[clientIndex] != null && 
+                                !playerData[clientIndex].isEmpty)
+                            {
+                                playerSlots[clientIndex].UpdateRemainingBlocks(remainingBlocks);
+                                Debug.Log($"[GameRoomPanel] 플레이어 슬롯 {clientIndex} 남은 블록 업데이트: {remainingBlocks}개");
+                            }
+                            else if (playerData[clientIndex].isEmpty)
+                            {
+                                Debug.Log($"[GameRoomPanel] 슬롯 {clientIndex} 빈 슬롯이므로 남은 블록 업데이트 스킵");
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning("[GameRoomPanel] 남은 블록 Dictionary 파싱 실패");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[GameRoomPanel] 남은 블록 동기화 중 오류: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
         /// 로비로 복귀
         /// </summary>
         private void ReturnToLobby()
@@ -1529,13 +2003,38 @@ namespace Features.Multi.UI
         /// </summary>
         private Features.Multi.Models.BlockType ConvertToMultiBlockType(Shared.Models.BlockType sharedType)
         {
-            // TODO: 실제 매핑 구현 - 현재는 이름 기반으로 변환
-            return sharedType.ToString() switch
+            // 요구사항 5: 완전한 블록 타입 매핑으로 정확한 블록 제거
+            return sharedType switch
             {
-                "Single" => Features.Multi.Models.BlockType.Single,
-                "Domino" => Features.Multi.Models.BlockType.Domino,
-                "TriominoI" => Features.Multi.Models.BlockType.TriominoI,
-                "TriominoL" => Features.Multi.Models.BlockType.TriominoL,
+                // 1-2칸 블록
+                Shared.Models.BlockType.Single => Features.Multi.Models.BlockType.Single,
+                Shared.Models.BlockType.Domino => Features.Multi.Models.BlockType.Domino,
+                
+                // 3칸 블록
+                Shared.Models.BlockType.TrioLine => Features.Multi.Models.BlockType.TrioLine,
+                Shared.Models.BlockType.TrioAngle => Features.Multi.Models.BlockType.TrioAngle,
+                
+                // 4칸 블록 (테트로미노)
+                Shared.Models.BlockType.Tetro_I => Features.Multi.Models.BlockType.Tetro_I,
+                Shared.Models.BlockType.Tetro_O => Features.Multi.Models.BlockType.Tetro_O,
+                Shared.Models.BlockType.Tetro_T => Features.Multi.Models.BlockType.Tetro_T,
+                Shared.Models.BlockType.Tetro_L => Features.Multi.Models.BlockType.Tetro_L,
+                Shared.Models.BlockType.Tetro_S => Features.Multi.Models.BlockType.Tetro_S,
+                
+                // 5칸 블록 (펜토미노)
+                Shared.Models.BlockType.Pento_F => Features.Multi.Models.BlockType.Pento_F,
+                Shared.Models.BlockType.Pento_I => Features.Multi.Models.BlockType.Pento_I,
+                Shared.Models.BlockType.Pento_L => Features.Multi.Models.BlockType.Pento_L,
+                Shared.Models.BlockType.Pento_N => Features.Multi.Models.BlockType.Pento_N,
+                Shared.Models.BlockType.Pento_P => Features.Multi.Models.BlockType.Pento_P,
+                Shared.Models.BlockType.Pento_T => Features.Multi.Models.BlockType.Pento_T,
+                Shared.Models.BlockType.Pento_U => Features.Multi.Models.BlockType.Pento_U,
+                Shared.Models.BlockType.Pento_V => Features.Multi.Models.BlockType.Pento_V,
+                Shared.Models.BlockType.Pento_W => Features.Multi.Models.BlockType.Pento_W,
+                Shared.Models.BlockType.Pento_X => Features.Multi.Models.BlockType.Pento_X,
+                Shared.Models.BlockType.Pento_Y => Features.Multi.Models.BlockType.Pento_Y,
+                Shared.Models.BlockType.Pento_Z => Features.Multi.Models.BlockType.Pento_Z,
+                
                 _ => Features.Multi.Models.BlockType.Single
             };
         }
@@ -1545,16 +2044,60 @@ namespace Features.Multi.UI
         /// </summary>
         private Shared.Models.BlockType ConvertToSharedBlockType(Features.Multi.Models.BlockType multiType)
         {
-            // TODO: 실제 매핑 구현 - 현재는 이름 기반으로 변환
-            return multiType.ToString() switch
+            // 요구사항 5: 완전한 블록 타입 매핑으로 정확한 블록 제거
+            return multiType switch
             {
-                "Single" => Shared.Models.BlockType.Single,
-                "Domino" => Shared.Models.BlockType.Domino,
-                "TriominoI" => Shared.Models.BlockType.TrioLine,
-                "TriominoL" => Shared.Models.BlockType.TrioAngle,
+                // 1-2칸 블록
+                Features.Multi.Models.BlockType.Single => Shared.Models.BlockType.Single,
+                Features.Multi.Models.BlockType.Domino => Shared.Models.BlockType.Domino,
+                
+                // 3칸 블록
+                Features.Multi.Models.BlockType.TrioLine => Shared.Models.BlockType.TrioLine,
+                Features.Multi.Models.BlockType.TrioAngle => Shared.Models.BlockType.TrioAngle,
+                
+                // 4칸 블록 (테트로미노)
+                Features.Multi.Models.BlockType.Tetro_I => Shared.Models.BlockType.Tetro_I,
+                Features.Multi.Models.BlockType.Tetro_O => Shared.Models.BlockType.Tetro_O,
+                Features.Multi.Models.BlockType.Tetro_T => Shared.Models.BlockType.Tetro_T,
+                Features.Multi.Models.BlockType.Tetro_L => Shared.Models.BlockType.Tetro_L,
+                Features.Multi.Models.BlockType.Tetro_S => Shared.Models.BlockType.Tetro_S,
+                
+                // 5칸 블록 (펜토미노)
+                Features.Multi.Models.BlockType.Pento_F => Shared.Models.BlockType.Pento_F,
+                Features.Multi.Models.BlockType.Pento_I => Shared.Models.BlockType.Pento_I,
+                Features.Multi.Models.BlockType.Pento_L => Shared.Models.BlockType.Pento_L,
+                Features.Multi.Models.BlockType.Pento_N => Shared.Models.BlockType.Pento_N,
+                Features.Multi.Models.BlockType.Pento_P => Shared.Models.BlockType.Pento_P,
+                Features.Multi.Models.BlockType.Pento_T => Shared.Models.BlockType.Pento_T,
+                Features.Multi.Models.BlockType.Pento_U => Shared.Models.BlockType.Pento_U,
+                Features.Multi.Models.BlockType.Pento_V => Shared.Models.BlockType.Pento_V,
+                Features.Multi.Models.BlockType.Pento_W => Shared.Models.BlockType.Pento_W,
+                Features.Multi.Models.BlockType.Pento_X => Shared.Models.BlockType.Pento_X,
+                Features.Multi.Models.BlockType.Pento_Y => Shared.Models.BlockType.Pento_Y,
+                Features.Multi.Models.BlockType.Pento_Z => Shared.Models.BlockType.Pento_Z,
+                
                 _ => Shared.Models.BlockType.Single
             };
         }
         
+    }
+
+    /// <summary>
+    /// 보드 셀 변경사항을 나타내는 구조체
+    /// </summary>
+    public struct BoardCellChange
+    {
+        public int row;
+        public int col;
+        public int oldValue;
+        public int newValue;
+
+        public BoardCellChange(int row, int col, int oldValue, int newValue)
+        {
+            this.row = row;
+            this.col = col;
+            this.oldValue = oldValue;
+            this.newValue = newValue;
+        }
     }
 }

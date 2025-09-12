@@ -182,6 +182,12 @@ namespace Features.Multi.Net
                 
                 await connectTask; // 실제 연결 완료 확인
                 
+                // 즉시 메시지 전송을 위한 소켓 최적화 설정
+                tcpClient.NoDelay = true; // TCP Nagle 알고리즘 비활성화
+                tcpClient.ReceiveBufferSize = 4096; // 수신 버퍼 크기 최적화
+                tcpClient.SendBufferSize = 4096; // 전송 버퍼 크기 최적화
+                Debug.Log("[NetworkClient] TCP 소켓 최적화 설정 완료 (NoDelay=true, Buffer=4KB)");
+                
                 // 스트림 설정
                 networkStream = tcpClient.GetStream();
                 streamReader = new StreamReader(networkStream, Encoding.UTF8);
@@ -365,20 +371,37 @@ namespace Features.Multi.Net
             {
                 while (isConnected && !cancellationTokenSource.Token.IsCancellationRequested)
                 {
-                    if (streamReader != null && tcpClient.Available > 0)
+                    try
                     {
-                        string message = streamReader.ReadLine();
-                        if (!string.IsNullOrEmpty(message))
+                        // 블로킹 읽기로 즉시 메시지 처리 (Available 체크 제거)
+                        if (streamReader != null)
                         {
-                            // 메시지를 큐에 추가 (메인 스레드에서 처리)
-                            lock (messageLock)
+                            string message = streamReader.ReadLine();
+                            if (!string.IsNullOrEmpty(message))
                             {
-                                incomingMessages.Enqueue(message);
+                                // 메시지를 큐에 추가 (메인 스레드에서 처리)
+                                lock (messageLock)
+                                {
+                                    incomingMessages.Enqueue(message);
+                                }
+                                
+                                // 즉시 메인 스레드에서 처리하도록 알림
+                                UnityMainThreadDispatcher.Enqueue(ProcessIncomingMessages);
                             }
                         }
                     }
+                    catch (IOException ioEx)
+                    {
+                        // 연결이 끊어진 경우
+                        if (isConnected)
+                        {
+                            Debug.LogWarning($"[NetworkClient] 연결 끊어짐: {ioEx.Message}");
+                            break;
+                        }
+                    }
                     
-                    Thread.Sleep(10); // CPU 사용률 최적화
+                    // CPU 사용률 최적화를 위한 짧은 대기 (1ms로 단축)
+                    Thread.Sleep(1);
                 }
             }
             catch (Exception ex)
@@ -644,17 +667,20 @@ namespace Features.Multi.Net
         }
         
         /// <summary>
-        /// 블록 배치 요청
+        /// 블록 배치 요청 (서버 프로토콜: game:move:blockType:col:row:rotation:flip)
         /// </summary>
         public bool SendPlaceBlockRequest(MultiModels.BlockPlacement placement)
         {
-            return SendProtocolMessage("PLACE_BLOCK_REQUEST", 
+            // 서버가 기대하는 형식: game:move:11:17:0:0:0
+            // blockType:col:row:rotation:flip (flip: 0=Normal, 1=Flipped)
+            int flipValue = placement.isFlipped ? 1 : 0;
+            
+            return SendProtocolMessage("game:move",
                 ((int)placement.blockType).ToString(),
-                placement.position.x.ToString(),
-                placement.position.y.ToString(),
+                placement.position.x.ToString(),        // x좌표 = col (서버에서 열)
+                placement.position.y.ToString(),        // y좌표 = row (서버에서 행)
                 placement.rotation.ToString(),
-                placement.isFlipped.ToString(),
-                placement.playerId.ToString()
+                flipValue.ToString()
             );
         }
         /// <summary>

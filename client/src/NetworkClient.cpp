@@ -869,11 +869,31 @@ namespace Blokus {
             if (playerColorRegex.indexIn(jsonData) != -1) playerColor = playerColorRegex.cap(1);
             if (scoreRegex.indexIn(jsonData) != -1) scoreGained = scoreRegex.cap(1);
             
+            // placedCells 파싱 (새로운 기능 - 개선된 동기화)
+            QVector<QPair<int, int>> placedCells;
+            QRegExp placedCellsRegex("\"placedCells\":\\[([^\\]]*)\\]");
+            if (placedCellsRegex.indexIn(jsonData) != -1) {
+                QString cellsData = placedCellsRegex.cap(1);
+                QRegExp cellRegex("\\{\"row\":(\\d+),\"col\":(\\d+)\\}");
+                int pos = 0;
+                while ((pos = cellRegex.indexIn(cellsData, pos)) != -1) {
+                    int cellRow = cellRegex.cap(1).toInt();
+                    int cellCol = cellRegex.cap(2).toInt();
+                    placedCells.append(QPair<int, int>(cellRow, cellCol));
+                    pos += cellRegex.matchedLength();
+                }
+                qDebug() << QString::fromUtf8("📦 배치된 셀 좌표 수신: %1개").arg(placedCells.size());
+            }
+            
+            // 기존 신호 발생 (하위 호환성 유지)
             emit blockPlaced(playerName, blockType.toInt(), row.toInt(), col.toInt(), 
                            rotation.toInt(), flip.toInt(), playerColor.toInt(), scoreGained.toInt());
             
-            qDebug() << QString::fromUtf8("블록 배치 알림: %1이 블록을 배치함 (점수: +%2)")
-                        .arg(playerName).arg(scoreGained);
+            // 새로운 신호 발생 (placedCells 포함) - 향후 활용 가능
+            // emit blockPlacedWithCells(playerName, blockType.toInt(), playerColor.toInt(), scoreGained.toInt(), placedCells);
+            
+            qDebug() << QString::fromUtf8("블록 배치 알림: %1이 블록을 배치함 (점수: +%2, 셀: %3개)")
+                        .arg(playerName).arg(scoreGained).arg(placedCells.size());
         }
         else if (message.startsWith("TURN_CHANGED:")) {
             QString jsonData = message.mid(13); // "TURN_CHANGED:" 제거

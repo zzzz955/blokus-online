@@ -77,7 +77,7 @@ namespace Features.Multi.UI
         {
             _player = player;
             myPlayerColor = player;
-            Debug.Log($"[MultiBlockPalette] InitializePalette - Player: {player}, CellSpriteProvider: {cellSpriteProvider != null}");
+            // Debug.Log($"[MultiBlockPalette] InitializePalette - Player: {player}, CellSpriteProvider: {cellSpriteProvider != null}");
             
             Clear();
             
@@ -101,15 +101,23 @@ namespace Features.Multi.UI
         /// </summary>
         public void MarkBlockAsUsed(BlockType type)
         {
+            Debug.Log($"[MyBlockPalette] MarkBlockAsUsed 호출: {type}");
+            
             if (_buttons.TryGetValue(type, out var btn) && btn != null)
             {
                 // 완전히 숨기기 (딕셔너리에서는 제거하지 않음)
                 btn.gameObject.SetActive(false);
                 usedBlocks.Add(type);
+                
+                Debug.Log($"[MyBlockPalette] 블록 {type} 사용됨으로 표시 - 버튼 비활성화 완료");
 
                 // 레이아웃 갱신
                 if (blockContainer != null)
                     LayoutRebuilder.ForceRebuildLayoutImmediate(blockContainer);
+            }
+            else
+            {
+                Debug.LogWarning($"[MyBlockPalette] 블록 {type}의 버튼을 찾을 수 없음 - _buttons 딕셔너리에 없음");
             }
 
             // 선택된 블록이 사용된 경우 선택 상태 해제
@@ -191,8 +199,6 @@ namespace Features.Multi.UI
                 selectedButton.SetSelected(true);
                 _currentSelectedButton = selectedButton;
             }
-            
-            Debug.Log($"[MultiBlockPalette] 블록 선택: {blockType}");
             OnBlockSelected?.Invoke(_selectedBlock);
         }
 
@@ -340,7 +346,7 @@ namespace Features.Multi.UI
             if (cellSpriteProvider != null)
             {
                 bb.SetCellSpriteProvider(cellSpriteProvider);
-                Debug.Log($"[MultiBlockPalette] BlockButton({type})에 CellSpriteProvider 설정 완료");
+                // Debug.Log($"[MultiBlockPalette] BlockButton({type})에 CellSpriteProvider 설정 완료");
             }
             else
             {
@@ -383,7 +389,7 @@ namespace Features.Multi.UI
                 if (createVisualizationMethod != null)
                 {
                     createVisualizationMethod.Invoke(bb, new object[] { type, player });
-                    Debug.Log($"[MyBlockPalette] BlockButton({type}) 시각화 생성 완료");
+                    // Debug.Log($"[MyBlockPalette] BlockButton({type}) 시각화 생성 완료");
                 }
                 else
                 {

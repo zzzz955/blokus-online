@@ -245,12 +245,12 @@ namespace Blokus {
             
             // 실제 데이터는 서버에서 받아서 updateUserList(), setMyUserInfo() 호출로 업데이트될 예정
 
-            // 타이머 설정 (30초마다 방 목록 갱신)
-            if (m_refreshTimer) {
-                m_refreshTimer->setInterval(30000);
-                connect(m_refreshTimer, &QTimer::timeout, this, &LobbyWindow::onRefreshTimer);
-                m_refreshTimer->start();
-            }
+            // 타이머 설정 (30초마다 방 목록 갱신) - 제거됨
+            // if (m_refreshTimer) {
+            //     m_refreshTimer->setInterval(30000);
+            //     connect(m_refreshTimer, &QTimer::timeout, this, &LobbyWindow::onRefreshTimer);
+            //     m_refreshTimer->start();
+            // }
 
             // 쿨다운 타이머 설정
             m_buttonCooldownTimer->setSingleShot(false);
@@ -285,9 +285,9 @@ namespace Blokus {
 
     LobbyWindow::~LobbyWindow()
     {
-        if (m_refreshTimer) {
-            m_refreshTimer->stop();
-        }
+        // if (m_refreshTimer) {
+        //     m_refreshTimer->stop();
+        // }
         
         // UserInfoDialog 정리
         if (m_currentUserInfoDialog) {

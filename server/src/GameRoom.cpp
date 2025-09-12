@@ -517,9 +517,9 @@ namespace Blokus {
             }
             broadcastMessageLocked(playerInfoMsg.str());
             
-            // 초기 게임 상태 브로드캐스트 (뮤텍스 내에서 안전하게)
+            // 초기 게임 상태 브로드캐스트 (뮤텍스 내에서 안전하게) - 최적화됨
             if (m_state == RoomState::Playing) {
-                // JSON 형태로 게임 상태 생성
+                // JSON 형태로 게임 상태 생성 (boardState 제거)
                 std::ostringstream gameStateJson;
                 gameStateJson << "GAME_STATE_UPDATE:{";
                 
@@ -528,8 +528,8 @@ namespace Blokus {
                 gameStateJson << "\"currentPlayer\":" << static_cast<int>(currentPlayer) << ",";
                 gameStateJson << "\"turnNumber\":" << m_gameStateManager->getTurnNumber() << ",";
                 
-                // 간단한 보드 상태 (초기는 빈 보드)
-                gameStateJson << "\"boardState\":[], \"scores\":{}}";
+                // 초기 점수 (모든 플레이어 0점)
+                gameStateJson << "\"scores\":{}}";
                 
                 broadcastMessageLocked(gameStateJson.str());
             }
@@ -541,7 +541,9 @@ namespace Blokus {
             }
             
             // 게임 시작 후 첫 번째 플레이어가 블록을 배치할 수 없다면 자동 스킵 체크
+            spdlog::debug("🔍 게임 시작 후 자동 스킵 체크 시작");
             processAutoSkipAfterTurnChange("게임 시작");
+            spdlog::debug("🔍 게임 시작 후 자동 스킵 체크 완료");
             
             // CRITICAL: 게임이 여전히 진행 중인 경우에만 타임아웃 스레드 시작
             if (m_state == RoomState::Playing) {
@@ -551,7 +553,7 @@ namespace Blokus {
                     m_timeoutCheckThread = std::thread(&GameRoom::timeoutCheckLoop, this);
                     spdlog::info("[TIMER_DEBUG] 주기적 타임아웃 체크 스레드 시작 (방 {})", m_roomId);
                     
-                    // 첫 번째 턴 시작 브로드캐스트
+                    // 첫 번째 턴 시작 브로드캐스트 (자동 스킵 후의 최종 플레이어로)
                     Common::PlayerColor firstPlayer = m_gameStateManager->getCurrentPlayer();
                     spdlog::info("[TIMER_DEBUG] 게임 시작 후 첫 번째 턴 브로드캐스트: 플레이어 {}", static_cast<int>(firstPlayer));
                     broadcastTurnChangeLocked(firstPlayer);
@@ -879,7 +881,7 @@ namespace Blokus {
                 return;
             }
 
-            // JSON 형태로 게임 상태 생성
+            // JSON 형태로 게임 상태 생성 (최적화됨 - boardState 제거)
             std::ostringstream gameStateJson;
             gameStateJson << "GAME_STATE_UPDATE:{";
             
@@ -887,20 +889,6 @@ namespace Blokus {
             Common::PlayerColor currentPlayer = m_gameStateManager->getCurrentPlayer();
             gameStateJson << "\"currentPlayer\":" << static_cast<int>(currentPlayer) << ",";
             gameStateJson << "\"turnNumber\":" << m_gameStateManager->getTurnNumber() << ",";
-            
-            // 보드 상태 (간단한 형태로)
-            gameStateJson << "\"boardState\":[";
-            for (int row = 0; row < Common::BOARD_SIZE; ++row) {
-                if (row > 0) gameStateJson << ",";
-                gameStateJson << "[";
-                for (int col = 0; col < Common::BOARD_SIZE; ++col) {
-                    if (col > 0) gameStateJson << ",";
-                    Common::PlayerColor cellOwner = m_gameLogic->getBoardCell(row, col);
-                    gameStateJson << static_cast<int>(cellOwner);
-                }
-                gameStateJson << "]";
-            }
-            gameStateJson << "],";
             
             // 플레이어 점수 정보
             auto scores = m_gameLogic->calculateScores();
@@ -948,7 +936,10 @@ namespace Blokus {
             
             spdlog::debug("📦 블록 배치 브로드캐스트 - 방 {}, 플레이어 수: {}", m_roomId, m_players.size());
             
-            // 블록 배치 알림 메시지 생성
+            // 배치된 셀들의 좌표를 계산
+            auto placedCells = m_gameLogic->getBlockShape(placement);
+            
+            // 블록 배치 알림 메시지 생성 (개선된 버전 - placedCells 포함)
             std::ostringstream blockPlacementMsg;
             blockPlacementMsg << "BLOCK_PLACED:{"
                 << "\"player\":\"" << playerName << "\","
@@ -957,8 +948,16 @@ namespace Blokus {
                 << "\"rotation\":" << static_cast<int>(placement.rotation) << ","
                 << "\"flip\":" << static_cast<int>(placement.flip) << ","
                 << "\"playerColor\":" << static_cast<int>(placement.player) << ","
-                << "\"scoreGained\":" << scoreGained
-                << "}";
+                << "\"scoreGained\":" << scoreGained << ","
+                << "\"placedCells\":[";
+            
+            // 배치된 셀들 좌표 추가
+            for (size_t i = 0; i < placedCells.size(); ++i) {
+                if (i > 0) blockPlacementMsg << ",";
+                blockPlacementMsg << "{\"row\":" << placedCells[i].first << ",\"col\":" << placedCells[i].second << "}";
+            }
+            
+            blockPlacementMsg << "]}";
             
             broadcastMessageLocked(blockPlacementMsg.str());
             
@@ -969,8 +968,8 @@ namespace Blokus {
             // systemMsg << "SYSTEM:" << playerName << "님이 " << blockName << " 블록을 배치했습니다. (점수: +" << scoreGained << ")";
             // broadcastMessageLocked(systemMsg.str());
             
-            spdlog::debug("📦 블록 배치 브로드캐스트: 방 {}, 플레이어 {}, 블록 타입 {}", 
-                m_roomId, playerName, static_cast<int>(placement.type));
+            spdlog::debug("📦 블록 배치 브로드캐스트: 방 {}, 플레이어 {}, 블록 타입 {}, 점유셀 {}개", 
+                m_roomId, playerName, static_cast<int>(placement.type), placedCells.size());
         }
 
         void GameRoom::broadcastTurnChange(Common::PlayerColor newPlayer) {
@@ -1372,38 +1371,41 @@ namespace Blokus {
             Common::PlayerColor newPlayer = m_gameStateManager->getCurrentPlayer();
             spdlog::debug("턴 전환 완료: {} -> {}", static_cast<int>(previousPlayer), static_cast<int>(newPlayer));
 
-            // 턴 변경 알림 브로드캐스트 (뮤텍스 내에서 안전하게)
-            if (newPlayer != previousPlayer) {
-                spdlog::debug("턴 변경 브로드캐스트 시작");
+            // 새 플레이어가 블록을 배치할 수 없다면 자동 턴 스킵 체크 (턴 변경 브로드캐스트 전에 실행)
+            spdlog::debug("🔍 자동 스킵 체크 시작: {}", static_cast<int>(newPlayer));
+            processAutoSkipAfterTurnChange("블록 배치");
+            
+            // 자동 스킵 후의 실제 현재 플레이어 확인
+            Common::PlayerColor finalPlayer = m_gameStateManager->getCurrentPlayer();
+            spdlog::debug("🔍 자동 스킵 체크 완료: {} -> {}", static_cast<int>(newPlayer), static_cast<int>(finalPlayer));
+
+            // 턴 변경 알림 브로드캐스트 (자동 스킵을 고려한 최종 플레이어로)
+            if (finalPlayer != previousPlayer) {
+                spdlog::info("🔄 턴 변경 브로드캐스트 시작: {} -> {}", static_cast<int>(previousPlayer), static_cast<int>(finalPlayer));
                 
-                // 새 플레이어 이름 찾기
-                std::string newPlayerName = "";
+                // 최종 플레이어 이름 찾기
+                std::string finalPlayerName = "";
                 for (const auto& p : m_players) {
-                    if (p.getColor() == newPlayer) {
-                        newPlayerName = p.getUsername();
+                    if (p.getColor() == finalPlayer) {
+                        finalPlayerName = p.getUsername();
                         break;
                     }
                 }
                 
                 // 플레이어를 찾지 못한 경우 오류 로깅 후 스킵
-                if (newPlayerName.empty()) {
-                    spdlog::warn("턴 변경 실패: 플레이어 색상 {}에 해당하는 플레이어를 찾을 수 없음", static_cast<int>(newPlayer));
+                if (finalPlayerName.empty()) {
+                    spdlog::warn("❌ 턴 변경 실패: 플레이어 색상 {}에 해당하는 플레이어를 찾을 수 없음", static_cast<int>(finalPlayer));
                 } else {
-                    broadcastTurnChangeLocked(newPlayer);
-                    
-                    // 시스템 메시지
-                    // 250804 : 시스템 메시지가 너무 많아서 주석 처리
-                    // std::ostringstream turnSystemMsg;
-                    // turnSystemMsg << "SYSTEM:" << newPlayerName << "님의 턴입니다.";
-                    // broadcastMessageLocked(turnSystemMsg.str());
+                    spdlog::info("📤 TURN_CHANGED 브로드캐스트: {} (색상 {})", finalPlayerName, static_cast<int>(finalPlayer));
+                    broadcastTurnChangeLocked(finalPlayer);
+                    spdlog::info("✅ TURN_CHANGED 브로드캐스트 완료");
                 }
+            } else {
+                spdlog::warn("⚠️ 턴 변경 없음: previousPlayer={}, finalPlayer={} (동일함)", static_cast<int>(previousPlayer), static_cast<int>(finalPlayer));
             }
 
             // 전체 게임 상태 브로드캐스트 (뮤텍스 내에서 안전하게)
             broadcastGameStateLocked();
-
-            // 새 플레이어가 블록을 배치할 수 없다면 자동 턴 스킵 체크
-            processAutoSkipAfterTurnChange("블록 배치");
 
             // 게임 종료 조건 확인: 모든 플레이어가 더 이상 블록을 배치할 수 없는 경우
             bool gameFinished = m_gameLogic->isGameFinished();
@@ -1477,16 +1479,21 @@ namespace Blokus {
             m_gameStateManager->skipTurn();
             Common::PlayerColor newPlayer = m_gameStateManager->getCurrentPlayer();
             
-            // 턴 변경 브로드캐스트
-            if (newPlayer != previousPlayer) {
-                broadcastTurnChangeLocked(newPlayer);
+            // 자동 턴 스킵 체크 (새로운 플레이어도 블록을 배치할 수 없다면)
+            spdlog::debug("🔍 수동 스킵 후 자동 스킵 체크 시작: {}", static_cast<int>(newPlayer));
+            processAutoSkipAfterTurnChange("수동 스킵");
+            
+            // 자동 스킵 후의 최종 플레이어 확인
+            Common::PlayerColor finalPlayer = m_gameStateManager->getCurrentPlayer();
+            spdlog::debug("🔍 수동 스킵 후 자동 스킵 체크 완료: {} -> {}", static_cast<int>(newPlayer), static_cast<int>(finalPlayer));
+            
+            // 턴 변경 브로드캐스트 (자동 스킵을 고려한 최종 플레이어로)
+            if (finalPlayer != previousPlayer) {
+                broadcastTurnChangeLocked(finalPlayer);
             }
             
             // 게임 상태 브로드캐스트
             broadcastGameStateLocked();
-            
-            // 자동 턴 스킵 체크 (새로운 플레이어도 블록을 배치할 수 없다면)
-            processAutoSkipAfterTurnChange("수동 스킵");
 
             return true;
         }
@@ -1555,12 +1562,8 @@ namespace Blokus {
                     
                     spdlog::debug("자동 턴 전환: {} -> {}", static_cast<int>(prevPlayer), static_cast<int>(nextPlayer));
                     
-                    // 턴 변경 브로드캐스트
-                    if (nextPlayer != prevPlayer) {
-                        broadcastTurnChangeLocked(nextPlayer);
-                    }
-                    
-                    // 게임 상태 브로드캐스트
+                    // NOTE: 턴 변경 브로드캐스트는 호출자(handleBlockPlacement)에서 처리하므로 여기서는 제거
+                    // 대신 게임 상태만 브로드캐스트
                     broadcastGameStateLocked();
                     
                     // 모든 플레이어가 한 번씩 스킵되었으면 게임 종료
@@ -1828,11 +1831,21 @@ namespace Blokus {
             
             if (nextPlayer != currentPlayer) {
                 std::lock_guard<std::mutex> lock(m_playersMutex);
-                broadcastTurnChangeLocked(nextPlayer);
-                broadcastGameStateLocked();
                 
                 // 타임아웃 후 자동 스킵 처리 (새로운 플레이어가 블록을 배치할 수 없다면 계속 스킵)
+                spdlog::debug("🔍 타임아웃 후 자동 스킵 체크 시작: {}", static_cast<int>(nextPlayer));
                 processAutoSkipAfterTurnChange("타임아웃");
+                
+                // 자동 스킵 후의 최종 플레이어 확인
+                Common::PlayerColor finalPlayer = m_gameStateManager->getCurrentPlayer();
+                spdlog::debug("🔍 타임아웃 후 자동 스킵 체크 완료: {} -> {}", static_cast<int>(nextPlayer), static_cast<int>(finalPlayer));
+                
+                // 턴 변경 브로드캐스트 (자동 스킵을 고려한 최종 플레이어로)
+                if (finalPlayer != currentPlayer) {
+                    broadcastTurnChangeLocked(finalPlayer);
+                }
+                
+                broadcastGameStateLocked();
             }
         }
 

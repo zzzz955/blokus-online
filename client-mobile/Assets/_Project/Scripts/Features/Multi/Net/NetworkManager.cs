@@ -7,6 +7,7 @@ using Features.Multi.Net;
 using App.Network;
 using MultiModels = Features.Multi.Models;
 using TurnChangeInfo = Features.Multi.Net.TurnChangeInfo;
+using GameStateData = Features.Multi.Net.GameStateData;
 
 namespace Features.Multi.Net
 {
@@ -1151,7 +1152,17 @@ namespace Features.Multi.Net
         public event System.Action<UserInfo> OnPlayerJoined;
         public event System.Action<int> OnPlayerLeft;
         public event System.Action<int, bool> OnPlayerReadyChanged;
-        public event System.Action OnGameStarted;
+        public event System.Action OnGameStarted
+        {
+            add { if (messageHandler != null) messageHandler.OnGameStarted += value; }
+            remove { if (messageHandler != null) messageHandler.OnGameStarted -= value; }
+        }
+        
+        public event System.Action<GameStateData> OnGameStateUpdate
+        {
+            add { if (messageHandler != null) messageHandler.OnGameStateUpdate += value; }
+            remove { if (messageHandler != null) messageHandler.OnGameStateUpdate -= value; }
+        }
         
         // ========================================
         // Room Info Management

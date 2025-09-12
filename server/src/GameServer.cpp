@@ -594,9 +594,7 @@ namespace Blokus::Server {
     // 세션 이벤트 핸들러
     // ========================================
 
-    void GameServer::onSessionDisconnect(const std::string& sessionId) {
-        spdlog::info("세션 연결 해제: {}", sessionId);
-        
+    void GameServer::handleSessionExit(const std::string& sessionId) {
         // 🔥 데드락 방지: 세션 정보만 추출, 즉시 잠금 해제
         std::string username;
         std::string userId;
@@ -634,9 +632,6 @@ namespace Blokus::Server {
             }
         }
         
-        // 세션 제거 (별도 잠금, 데드락 위험 최소화)
-        removeSession(sessionId);
-        
         // 로비 브로드캐스트 (잠금 없는 작업)
         if (wasInLobby && !username.empty()) {
             try {
@@ -646,6 +641,16 @@ namespace Blokus::Server {
                 spdlog::error("❌ 로비 브로드캐스트 중 오류 ({}): {}", sessionId, e.what());
             }
         }
+    }
+
+    void GameServer::onSessionDisconnect(const std::string& sessionId) {
+        spdlog::info("세션 연결 해제: {}", sessionId);
+        
+        // 공통 세션 종료 처리 로직 실행
+        handleSessionExit(sessionId);
+        
+        // 세션 제거 (별도 잠금, 데드락 위험 최소화)
+        removeSession(sessionId);
     }
 
     void GameServer::onSessionMessage(const std::string& sessionId, const std::string& message) {
@@ -784,9 +789,21 @@ namespace Blokus::Server {
     }
 
     void GameServer::cleanupSessions() {
-        std::vector<std::pair<std::string, std::shared_ptr<Session>>> timeoutSessions;
+        // 🔥 타임아웃된 세션 정보를 담는 구조체 (방 정보 포함)
+        struct TimeoutSessionInfo {
+            std::string sessionId;
+            std::shared_ptr<Session> session;
+            std::string username;
+            std::string userId;
+            bool wasInLobby;
+            bool wasInRoom;
+            bool wasInGame;
+            int roomId;
+        };
         
-        // 🔥 데드락 방지: 1단계 - 타임아웃된 세션 식별 (잠금 보유 시간 최소화)
+        std::vector<TimeoutSessionInfo> timeoutSessions;
+        
+        // 🔥 데드락 방지: 1단계 - 타임아웃된 세션 식별 및 세션 정보 추출 (잠금 보유 시간 최소화)
         {
             std::lock_guard<std::mutex> lock(sessionsMutex_);
             auto it = sessions_.begin();
@@ -819,8 +836,21 @@ namespace Blokus::Server {
                             spdlog::info("세션 타임아웃: {} ({}분)", sessionId, timeoutDuration.count() / 60);
                         }
                         
-                        // 🔥 데드락 방지: 타임아웃된 세션 저장 (콜백은 나중에 실행)
-                        timeoutSessions.emplace_back(sessionId, it->second);
+                        // 🔥 중요: 세션 정보를 미리 추출해서 저장 (맵에서 제거되기 전에)
+                        TimeoutSessionInfo info;
+                        info.sessionId = sessionId;
+                        info.session = it->second;
+                        info.username = it->second->getUsername();
+                        info.userId = it->second->getUserId();
+                        info.wasInLobby = it->second->isInLobby();
+                        info.wasInRoom = it->second->isInRoom();
+                        info.wasInGame = it->second->isInGame();
+                        info.roomId = -1;
+                        if (info.wasInRoom || info.wasInGame) {
+                            info.roomId = it->second->getCurrentRoomId();
+                        }
+                        
+                        timeoutSessions.emplace_back(std::move(info));
                         it = sessions_.erase(it);
 
                         // 통계 업데이트
@@ -840,17 +870,42 @@ namespace Blokus::Server {
             }
         }
         
-        // 🔥 데드락 방지: 2단계 - 잠금 해제 후 비동기로 세션 정리
-        for (auto& [sessionId, session] : timeoutSessions) {
-            boost::asio::post(ioContext_, [this, sessionId, session]() {
-                spdlog::debug("🔄 [ASYNC_CLEANUP] 비동기 타임아웃 정리 실행: {}", sessionId);
+        // 🔥 데드락 방지: 2단계 - 잠금 해제 후 비동기로 세션 정리 (세션 정보를 이미 추출했으므로 안전)
+        for (auto& info : timeoutSessions) {
+            boost::asio::post(ioContext_, [this, info]() {
+                spdlog::debug("🔄 [ASYNC_CLEANUP] 비동기 타임아웃 정리 실행: {}", info.sessionId);
                 
                 try {
-                    // 이제 안전하게 콜백 실행 가능 (sessionsMutex_ 해제됨)
-                    session->stop();
+                    // 🔥 방 퇴장 처리 (미리 추출된 세션 정보 사용)
+                    if ((info.wasInRoom || info.wasInGame) && !info.userId.empty() && roomManager_) {
+                        try {
+                            if (info.wasInGame) {
+                                spdlog::warn("🎮 게임 중 세션 타임아웃으로 인한 방 {} 나가기: {} (좀비방 방지)", info.roomId, info.username);
+                            } else {
+                                spdlog::info("🏠 방 대기 중 세션 타임아웃으로 인한 방 {} 나가기: {}", info.roomId, info.username);
+                            }
+                            roomManager_->leaveRoom(info.userId);
+                        }
+                        catch (const std::exception& e) {
+                            spdlog::error("❌ 방 나가기 처리 중 오류 ({}): {}", info.sessionId, e.what());
+                        }
+                    }
+                    
+                    // 로비 브로드캐스트 (잠금 없는 작업)
+                    if (info.wasInLobby && !info.username.empty()) {
+                        try {
+                            broadcastLobbyUserLeft(info.username);
+                        }
+                        catch (const std::exception& e) {
+                            spdlog::error("❌ 로비 브로드캐스트 중 오류 ({}): {}", info.sessionId, e.what());
+                        }
+                    }
+                    
+                    // 이제 안전하게 세션 중지
+                    info.session->stop();
                 }
                 catch (const std::exception& e) {
-                    spdlog::error("❌ 비동기 세션 정리 중 오류 ({}): {}", sessionId, e.what());
+                    spdlog::error("❌ 비동기 세션 정리 중 오류 ({}): {}", info.sessionId, e.what());
                 }
             });
         }

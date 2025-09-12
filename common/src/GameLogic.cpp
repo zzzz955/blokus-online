@@ -3,6 +3,7 @@
 #include "Utils.h"
 #include <algorithm>
 #include <spdlog/spdlog.h>
+#include <vector>
 
 namespace Blokus
 {
@@ -652,9 +653,21 @@ namespace Blokus
             // m_playerBlockedPermanently는 보드 초기화 시에만 clear
         }
 
-        // getBlockShape�� ���� - Block Ŭ������ ���� ���
-        // applyTransformation�� ���� - Block Ŭ������ ���� ���
-        // normalizeShape�� ���� - Block Ŭ������ ���� ���
+        // ========================================
+        // 블록 형태 계산 (블록 배치 브로드캐스트용)
+        // ========================================
+
+        PositionList GameLogic::getBlockShape(const BlockPlacement& placement) const {
+            // BlockFactory를 사용해 블록 생성
+            Block block = BlockFactory::createBlock(placement.type, placement.player);
+            
+            // 회전과 뒤집기 적용
+            block.setRotation(placement.rotation);
+            block.setFlipState(placement.flip);
+            
+            // 배치 위치에서의 절대 좌표 계산
+            return block.getAbsolutePositions(placement.position);
+        }
 
         // ========================================
         // GameStateManager ����
