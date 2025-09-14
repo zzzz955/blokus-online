@@ -359,11 +359,6 @@ namespace Blokus::Server {
         session->setMessageCallback([this](const std::string& id, const std::string& msg) {
             onSessionMessage(id, msg);
             });
-
-        // 🔥 핵심 변경: MessageHandler 콜백 모두 제거!
-        // MessageHandler가 직접 AuthService, RoomManager와 상호작용하므로
-        // 중간 콜백이 불필요함. 중복 처리 방지!
-
         spdlog::info("✅ [addSession] 세션 설정 완료 (콜백 없음) - SessionId: {}", sessionId);
     }
 

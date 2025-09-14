@@ -1379,29 +1379,25 @@ namespace Blokus {
             Common::PlayerColor finalPlayer = m_gameStateManager->getCurrentPlayer();
             spdlog::debug("🔍 자동 스킵 체크 완료: {} -> {}", static_cast<int>(newPlayer), static_cast<int>(finalPlayer));
 
-            // 턴 변경 알림 브로드캐스트 (자동 스킵을 고려한 최종 플레이어로)
-            if (finalPlayer != previousPlayer) {
-                spdlog::info("🔄 턴 변경 브로드캐스트 시작: {} -> {}", static_cast<int>(previousPlayer), static_cast<int>(finalPlayer));
-                
-                // 최종 플레이어 이름 찾기
-                std::string finalPlayerName = "";
-                for (const auto& p : m_players) {
-                    if (p.getColor() == finalPlayer) {
-                        finalPlayerName = p.getUsername();
-                        break;
-                    }
+            // 턴 브로드캐스트 (자동 스킵을 고려한 최종 플레이어로)
+            spdlog::info("🔄 턴 변경: {} -> {}", static_cast<int>(previousPlayer), static_cast<int>(finalPlayer));
+            
+            // 최종 플레이어 이름 찾기
+            std::string finalPlayerName = "";
+            for (const auto& p : m_players) {
+                if (p.getColor() == finalPlayer) {
+                    finalPlayerName = p.getUsername();
+                    break;
                 }
-                
-                // 플레이어를 찾지 못한 경우 오류 로깅 후 스킵
-                if (finalPlayerName.empty()) {
-                    spdlog::warn("❌ 턴 변경 실패: 플레이어 색상 {}에 해당하는 플레이어를 찾을 수 없음", static_cast<int>(finalPlayer));
-                } else {
-                    spdlog::info("📤 TURN_CHANGED 브로드캐스트: {} (색상 {})", finalPlayerName, static_cast<int>(finalPlayer));
-                    broadcastTurnChangeLocked(finalPlayer);
-                    spdlog::info("✅ TURN_CHANGED 브로드캐스트 완료");
-                }
+            }
+            
+            // 턴 브로드캐스트 실행 (항상)
+            if (finalPlayerName.empty()) {
+                spdlog::warn("❌ 턴 브로드캐스트 실패: 플레이어 색상 {}에 해당하는 플레이어를 찾을 수 없음", static_cast<int>(finalPlayer));
             } else {
-                spdlog::warn("⚠️ 턴 변경 없음: previousPlayer={}, finalPlayer={} (동일함)", static_cast<int>(previousPlayer), static_cast<int>(finalPlayer));
+                spdlog::info("📤 TURN_CHANGED 브로드캐스트: {} (색상 {})", finalPlayerName, static_cast<int>(finalPlayer));
+                broadcastTurnChangeLocked(finalPlayer);
+                spdlog::info("✅ TURN_CHANGED 브로드캐스트 완료");
             }
 
             // 전체 게임 상태 브로드캐스트 (뮤텍스 내에서 안전하게)
