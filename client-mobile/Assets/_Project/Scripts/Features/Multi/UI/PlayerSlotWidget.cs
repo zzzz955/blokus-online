@@ -63,11 +63,8 @@ namespace Features.Multi.UI
         /// </summary>
         public void SetPlayerData(PlayerSlot data, bool isCurrentUserHost = false)
         {
-            Debug.Log($"[PlayerSlotWidget] SetPlayerData 호출: {data.playerName} (Host: {data.isHost}, Ready: {data.isReady}, isCurrentUserHost: {isCurrentUserHost})");
-            
             playerData = data;
             isHost = isCurrentUserHost;
-            
             UpdateUI();
         }
         
@@ -118,11 +115,8 @@ namespace Features.Multi.UI
         /// </summary>
         private void UpdateUI()
         {
-            Debug.Log($"[PlayerSlotWidget] UpdateUI 시작: {playerData.playerName} (isEmpty: {playerData.isEmpty})");
-            
             if (playerData.isEmpty)
             {
-                Debug.Log($"[PlayerSlotWidget] 빈 슬롯으로 설정");
                 SetEmptySlot();
                 return;
             }
@@ -131,7 +125,6 @@ namespace Features.Multi.UI
             if (playerNameText != null)
             {
                 playerNameText.text = playerData.playerName;
-                Debug.Log($"[PlayerSlotWidget] 플레이어 이름 설정: {playerData.playerName}");
             }
             else
             {
@@ -144,7 +137,6 @@ namespace Features.Multi.UI
                 readyIndicator.gameObject.SetActive(true);
                 bool displayReady = playerData.isHost || playerData.isReady; // 호스트는 항상 Ready로 표시
                 readyIndicator.sprite = displayReady ? readySprite : notReadySprite;
-                Debug.Log($"[PlayerSlotWidget] 준비 상태 설정: 실제={playerData.isReady}, 호스트={playerData.isHost}, 표시={displayReady}");
             }
             else
             {
@@ -159,7 +151,6 @@ namespace Features.Multi.UI
                 {
                     hostIndicator.sprite = hostCrownSprite;
                 }
-                Debug.Log($"[PlayerSlotWidget] 호스트 표시 설정: {playerData.isHost}");
             }
             else if (playerData.isHost)
             {
@@ -266,20 +257,11 @@ namespace Features.Multi.UI
         /// </summary>
         public void SetAsMySlot(bool isMySlot)
         {
-            Debug.Log($"[PlayerSlotWidget] SetAsMySlot 호출: {isMySlot} for {playerData.playerName}");
-            
-            // 인스펙터 Bold 설정을 보존하고 본인일 때는 추가 강조 효과만 적용
-            // fontStyle 변경하지 않음 - 인스펙터 설정 유지
-            
             // 본인 식별 이미지 표시/숨김
             if (currentPlayerIndicator != null)
             {
                 currentPlayerIndicator.gameObject.SetActive(isMySlot);
-                Debug.Log($"[PlayerSlotWidget] 본인 식별 이미지 {(isMySlot ? "표시" : "숨김")}: {playerData.playerName}");
             }
-            
-            // 추가적인 본인 강조 효과 (색상 변경 등)는 여기서 구현 가능
-            // 예: 텍스트 색상 변경 등
         }
         
         /// <summary>

@@ -1092,11 +1092,23 @@ namespace Features.Multi.UI
         {
             Debug.Log("[GameRoomPanel] 새 게임을 위한 컴포넌트 재초기화 시작");
 
-            // 게임 로직 완전 리셋
+            // 게임 로직 완전 리셋 - 첫 블록 배치 여부 포함한 모든 상태 초기화
             if (gameLogic != null)
             {
-                gameLogic.ClearBoard();
-                Debug.Log("[GameRoomPanel] 게임 로직 클리어 완료");
+                gameLogic.InitializeBoard();
+                Debug.Log("[GameRoomPanel] 게임 로직 완전 초기화 완료 (hasPlacedFirstBlock 포함)");
+
+                // 초기화 상태 검증 로그
+                for (int i = 1; i <= 4; i++)
+                {
+                    var playerColor = (SharedPlayerColor)i;
+                    bool hasPlaced = gameLogic.HasPlayerPlacedFirstBlock(playerColor);
+                    Debug.Log($"[GameRoomPanel] 🔍 초기화 검증: {playerColor} hasPlacedFirstBlock = {hasPlaced}");
+                    if (hasPlaced)
+                    {
+                        Debug.LogError($"[GameRoomPanel] ❌ 초기화 실패: {playerColor}의 hasPlacedFirstBlock이 여전히 True입니다!");
+                    }
+                }
             }
 
             // 게임보드 완전 리셋
@@ -1106,7 +1118,15 @@ namespace Features.Multi.UI
                 Debug.Log("[GameRoomPanel] 게임보드 재초기화 완료");
             }
 
-            // 블록 팔레트 재초기화 (내 색상 확정 후)
+            // 블록 팔레트 재초기화 - 이전 게임 상태 완전 정리
+            if (blockPalette != null)
+            {
+                blockPalette.ResetPalette(); // 사용된 블록 목록 초기화
+                blockPalette.SetInteractable(false); // 게임 시작 전 비활성화
+                Debug.Log("[GameRoomPanel] 블록 팔레트 초기화 완료 (게임 시작)");
+            }
+
+            // 플레이어 색상 확정 후 팔레트 재초기화 (기존 로직)
             if (blockPalette != null && mySharedPlayerColor != SharedPlayerColor.None)
             {
                 blockPalette.InitializePalette(mySharedPlayerColor);
@@ -1155,8 +1175,7 @@ namespace Features.Multi.UI
             // 게임 로직 완전 정리
             if (gameLogic != null)
             {
-                gameLogic.ClearBoard();
-                // 새 게임을 위해 새 인스턴스로 교체
+                // 새 게임을 위해 새 인스턴스로 교체 (ClearBoard도 완전 초기화되도록 개선됨)
                 gameLogic = new SharedGameLogic();
                 Debug.Log("[GameRoomPanel] 게임 로직 정리 및 재생성 완료");
             }
