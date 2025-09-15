@@ -122,6 +122,45 @@ namespace Blokus {
             bool wasHost = it->isHost();
             Common::PlayerColor playerColor = it->getColor();
             bool wasInGame = (m_state == RoomState::Playing);
+            auto dropoutSession = it->getSession(); // 이탈자 세션 저장
+
+            // 게임 중 이탈자 즉시 패배 처리
+            if (wasInGame) {
+                spdlog::info("🚪 게임 중 플레이어 이탈: {} - 즉시 패배 처리", username);
+
+                // DB에 패배 기록 저장
+                if (m_roomManager && m_roomManager->getDatabaseManager()) {
+                    auto dbManager = m_roomManager->getDatabaseManager();
+                    try {
+                        uint32_t playerId = std::stoul(userId);
+
+                        // 이탈자는 무조건 패배로 처리 (승리=false, 점수=0)
+                        std::vector<uint32_t> dropoutPlayerIds = {playerId};
+                        std::vector<int> dropoutScores = {0}; // 이탈자는 0점
+                        std::vector<bool> dropoutIsWinner = {false}; // 무조건 패배
+                        bool isDraw = false;
+
+                        bool dbSuccess = dbManager->saveGameResults(dropoutPlayerIds, dropoutScores, dropoutIsWinner, isDraw);
+                        if (dbSuccess) {
+                            spdlog::info("💾 이탈자 {} 패배 기록 DB 저장 완료", username);
+
+                            // 세션이 있으면 즉시 동기화
+                            if (dropoutSession) {
+                                auto updatedAccount = dbManager->getUserById(playerId);
+                                if (updatedAccount.has_value()) {
+                                    dropoutSession->updateUserAccount(updatedAccount.value());
+                                    spdlog::debug("🔄 이탈자 {} 세션 동기화 완료 (승:{} 패:{} 무:{})",
+                                               username, updatedAccount->wins, updatedAccount->losses, updatedAccount->draws);
+                                }
+                            }
+                        } else {
+                            spdlog::error("💾 이탈자 {} 패배 기록 DB 저장 실패", username);
+                        }
+                    } catch (const std::exception& e) {
+                        spdlog::error("이탈자 {} 처리 중 오류: {}", username, e.what());
+                    }
+                }
+            }
 
             m_players.erase(it);
             updateActivity();
@@ -1164,7 +1203,23 @@ namespace Blokus {
                 }
                 systemMsg << "SYSTEM:🎉 게임이 종료되었습니다! 승자: " << winnerDisplayName << "님!";
             } else if (winners.size() > 1) {
-                systemMsg << "SYSTEM:🎉 게임이 종료되었습니다! 동점 승부입니다!";
+                // 공동 우승자들의 이름을 수집
+                std::vector<std::string> winnerNames;
+                for (const auto& winnerColor : winners) {
+                    for (const auto& player : m_players) {
+                        if (player.getColor() == winnerColor) {
+                            winnerNames.push_back(player.getDisplayName());
+                            break;
+                        }
+                    }
+                }
+
+                systemMsg << "SYSTEM:🎉 게임이 종료되었습니다! 공동 우승: ";
+                for (size_t i = 0; i < winnerNames.size(); ++i) {
+                    if (i > 0) systemMsg << ", ";
+                    systemMsg << winnerNames[i] << "님";
+                }
+                systemMsg << "!";
             } else {
                 systemMsg << "SYSTEM:🎉 게임이 종료되었습니다!";
             }
@@ -1642,14 +1697,35 @@ namespace Blokus {
                 }
                 
                 if (!playerIds.empty()) {
-                    // 무승부 여부 확인 (승자가 2명 이상인 경우)
-                    bool isDraw = winners.size() > 1;
-                    
+                    // 새로운 로직: 공동 우승자도 승리로 처리, 무승부 개념 제거
+                    bool isDraw = false; // 무승부 개념 제거
+
                     // DB에 게임 결과 저장 (모든 플레이어)
                     bool success = dbManager->saveGameResults(playerIds, scores, isWinner, isDraw);
                     if (success) {
                         spdlog::info("[DB_DEBUG] 방 {} 게임 결과가 DB에 성공적으로 저장되었습니다", m_roomId);
-                        
+
+                        // 모든 남은 플레이어의 세션 정보 동기화 (승/패 통계 즉시 반영)
+                        for (const auto& player : m_players) {
+                            auto session = player.getSession();
+                            if (session) {
+                                try {
+                                    uint32_t playerId = std::stoul(player.getUserId());
+                                    auto updatedAccount = dbManager->getUserById(playerId);
+                                    if (updatedAccount.has_value()) {
+                                        session->updateUserAccount(updatedAccount.value());
+                                        spdlog::debug("🔄 게임 결과 후 세션 동기화: {} (승:{} 패:{} 무:{})",
+                                                   player.getUsername(),
+                                                   updatedAccount->wins,
+                                                   updatedAccount->losses,
+                                                   updatedAccount->draws);
+                                    }
+                                } catch (const std::exception& e) {
+                                    spdlog::error("플레이어 {} 세션 동기화 실패: {}", player.getUsername(), e.what());
+                                }
+                            }
+                        }
+
                         // 게임 완료자에게만 경험치 지급
                         if (!completedPlayerIds.empty()) {
                             for (size_t i = 0; i < completedPlayerIds.size(); ++i) {

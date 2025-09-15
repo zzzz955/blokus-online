@@ -545,8 +545,9 @@ namespace Blokus {
                 
                 // 모든 플레이어의 통계를 업데이트
                 for (size_t i = 0; i < playerIds.size(); ++i) {
-                    bool won = isDraw ? false : isWinner[i]; // 무승부인 경우 승리 처리 안함
-                    bool draw = isDraw; // 무승부 여부 사용
+                    // 새로운 로직: 최고점자는 승리, 나머지는 패배
+                    bool won = isWinner[i]; // 최고점자면 승리
+                    bool draw = false; // 무승부 폐지 (공동 1등도 승리로 처리)
                     int score = scores[i];
                     
                     // 해당 플레이어가 존재하는지 확인
@@ -592,8 +593,8 @@ namespace Blokus {
                         playerIds[i], won, draw, score
                     );
                     
-                    spdlog::info("플레이어 {} 통계 업데이트: 점수={}, 승리={}", 
-                               playerIds[i], score, won);
+                    spdlog::info("플레이어 {} 통계 업데이트: 점수={}, 승리={} (최고점자={})",
+                               playerIds[i], score, won, isWinner[i] ? "YES" : "NO");
                 }
 
                 txn.commit();
