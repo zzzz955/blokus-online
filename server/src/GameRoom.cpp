@@ -1105,23 +1105,24 @@ namespace Blokus {
                 m_roomId, newPlayerName, static_cast<int>(currentPlayer));
         }
 
-        void GameRoom::broadcastGameResultLocked(const std::map<Common::PlayerColor, int>& finalScores, 
+        void GameRoom::broadcastGameResultLocked(const std::map<Common::PlayerColor, int>& finalScores,
                                                const std::vector<Common::PlayerColor>& winners) {
             // 뮤텍스가 이미 잠겨있다고 가정하고 실행 (데드락 방지용)
-            
-            spdlog::debug("게임 결과 JSON 메시지 생성 시작 (방 {})", m_roomId);
-            
-            // 게임 결과 JSON 메시지 생성
-            std::ostringstream gameResultMsg;
-            gameResultMsg << "GAME_RESULT:{";
-            
-            // 점수 정보
-            gameResultMsg << "\"scores\":{";
+
+            spdlog::debug("개인별 게임 결과 메시지 생성 시작 (방 {})", m_roomId);
+
+            // 게임 시간 계산
+            auto gameEndTime = std::chrono::steady_clock::now();
+            auto gameDuration = std::chrono::duration_cast<std::chrono::seconds>(gameEndTime - m_gameStartTime);
+            int gameTimeSeconds = gameDuration.count();
+
+            // 공통 점수 정보 생성 (플레이어 이름 기반)
+            std::ostringstream scoresJson;
+            scoresJson << "{";
             bool firstScore = true;
             for (const auto& score : finalScores) {
-                if (!firstScore) gameResultMsg << ",";
-                
-                // 플레이어 이름 찾기
+                if (!firstScore) scoresJson << ",";
+
                 std::string playerName = "";
                 for (const auto& player : m_players) {
                     if (player.getColor() == score.first) {
@@ -1129,8 +1130,7 @@ namespace Blokus {
                         break;
                     }
                 }
-                
-                // 플레이어 이름을 찾지 못한 경우 색상 이름 사용
+
                 if (playerName.empty()) {
                     switch (score.first) {
                         case Common::PlayerColor::Blue: playerName = "Blue Player"; break;
@@ -1139,21 +1139,20 @@ namespace Blokus {
                         case Common::PlayerColor::Green: playerName = "Green Player"; break;
                         default: playerName = "Unknown Player"; break;
                     }
-                    spdlog::warn("플레이어 이름을 찾지 못해 대체 이름 사용: {} (방 {})", playerName, m_roomId);
                 }
-                
-                gameResultMsg << "\"" << playerName << "\":" << score.second;
+
+                scoresJson << "\"" << playerName << "\":" << score.second;
                 firstScore = false;
             }
-            gameResultMsg << "},";
-            
-            // 승자 정보
-            gameResultMsg << "\"winners\":[";
+            scoresJson << "}";
+
+            // 공통 승자 정보 생성
+            std::ostringstream winnersJson;
+            winnersJson << "[";
             bool firstWinner = true;
             for (const auto& winnerColor : winners) {
-                if (!firstWinner) gameResultMsg << ",";
-                
-                // 승자 이름 찾기
+                if (!firstWinner) winnersJson << ",";
+
                 std::string winnerName = "";
                 for (const auto& player : m_players) {
                     if (player.getColor() == winnerColor) {
@@ -1161,8 +1160,7 @@ namespace Blokus {
                         break;
                     }
                 }
-                
-                // 승자 이름을 찾지 못한 경우 색상 이름 사용
+
                 if (winnerName.empty()) {
                     switch (winnerColor) {
                         case Common::PlayerColor::Blue: winnerName = "Blue Player"; break;
@@ -1171,25 +1169,83 @@ namespace Blokus {
                         case Common::PlayerColor::Green: winnerName = "Green Player"; break;
                         default: winnerName = "Unknown Player"; break;
                     }
-                    spdlog::warn("승자 이름을 찾지 못해 대체 이름 사용: {} (방 {})", winnerName, m_roomId);
                 }
-                
-                gameResultMsg << "\"" << winnerName << "\"";
+
+                winnersJson << "\"" << winnerName << "\"";
                 firstWinner = false;
             }
-            gameResultMsg << "],";
-            
-            // 게임 타입 및 기타 정보
-            gameResultMsg << "\"gameType\":\"블로커스\",";
-            gameResultMsg << "\"roomId\":" << m_roomId << ",";
-            gameResultMsg << "\"timestamp\":\"" << std::time(nullptr) << "\"";
-            gameResultMsg << "}";
-            
-            std::string finalMessage = gameResultMsg.str();
-            spdlog::debug("게임 결과 메시지 완성: {} (방 {})", finalMessage, m_roomId);
-            
-            // 게임 결과 브로드캐스트
-            broadcastMessageLocked(finalMessage);
+            winnersJson << "]";
+
+            // 순위 계산 (점수 순)
+            std::vector<std::pair<Common::PlayerColor, int>> sortedScores(finalScores.begin(), finalScores.end());
+            std::sort(sortedScores.begin(), sortedScores.end(),
+                     [](const auto& a, const auto& b) { return a.second > b.second; });
+
+            // 각 플레이어별 개인화된 메시지 전송
+            for (const auto& player : m_players) {
+                if (!player.isConnected()) continue;
+
+                auto session = player.getSession();
+                if (!session) continue;
+
+                // 개인 정보 계산
+                Common::PlayerColor playerColor = player.getColor();
+                auto scoreIt = finalScores.find(playerColor);
+                int myScore = (scoreIt != finalScores.end()) ? scoreIt->second : 0;
+
+                // 순위 계산
+                int myRank = 1;
+                for (const auto& score : sortedScores) {
+                    if (score.first == playerColor) break;
+                    if (score.second > myScore) myRank++;
+                }
+
+                // 승리 여부
+                bool isWinner = std::find(winners.begin(), winners.end(), playerColor) != winners.end();
+
+                // 경험치 정보 (세션에서 가져오기)
+                int expGained = 0;
+                bool levelUp = false;
+                int newLevel = session->getUserLevel();
+
+                // 최근 DB 저장으로 경험치가 변경되었을 수 있으므로 계산
+                if (m_roomManager && m_roomManager->getDatabaseManager()) {
+                    auto dbManager = m_roomManager->getDatabaseManager();
+                    expGained = dbManager->calculateExperienceGain(isWinner, myScore, true);
+
+                    // 레벨업 확인 (간단한 추정 - 정확한 계산은 클라이언트에서도 가능)
+                    int currentExp = session->getUserExperience();
+                    int expForNextLevel = newLevel * 100; // 예시 공식
+                    if (currentExp >= expForNextLevel) {
+                        levelUp = true;
+                        newLevel++;
+                    }
+                }
+
+                // 개인화된 메시지 생성
+                std::ostringstream personalMsg;
+                personalMsg << "GAME_RESULT:{";
+                personalMsg << "\"scores\":" << scoresJson.str() << ",";
+                personalMsg << "\"winners\":" << winnersJson.str() << ",";
+                personalMsg << "\"myRank\":" << myRank << ",";
+                personalMsg << "\"myScore\":" << myScore << ",";
+                personalMsg << "\"expGained\":" << expGained << ",";
+                personalMsg << "\"levelUp\":" << (levelUp ? "true" : "false") << ",";
+                personalMsg << "\"newLevel\":" << newLevel << ",";
+                personalMsg << "\"gameTime\":" << gameTimeSeconds << ",";
+                personalMsg << "\"gameType\":\"블로커스\",";
+                personalMsg << "\"roomId\":" << m_roomId << ",";
+                personalMsg << "\"timestamp\":\"" << std::time(nullptr) << "\"";
+                personalMsg << "}";
+
+                // 개인별 메시지 전송
+                player.sendMessage(personalMsg.str());
+
+                spdlog::debug("개인화된 게임 결과 전송: {} (순위:{}, 점수:{}, 경험치:+{}, 레벨업:{})",
+                           player.getUsername(), myRank, myScore, expGained, levelUp);
+            }
+
+            spdlog::info("🎮 모든 플레이어에게 개인화된 게임 결과 전송 완료 (방 {}, 게임시간: {}초)", m_roomId, gameTimeSeconds);
             
             // 시스템 메시지로도 결과 알림
             std::ostringstream systemMsg;
@@ -1491,15 +1547,15 @@ namespace Blokus {
                 }
                 
                 spdlog::debug("🏆 승자 결정 완료: {}명의 승자, 최고 점수={} (방 {})", winners.size(), highestScore, m_roomId);
-                
-                // 게임 결과 브로드캐스트
-                broadcastGameResultLocked(finalScores, winners);
-                
-                // 게임 결과를 DB에 저장
-                spdlog::info("💾 [DB_DEBUG] 게임 결과 DB 저장 시작 - 방 {}, 플레이어 {}명, 승자 {}명", 
+
+                // 게임 결과를 DB에 저장 (브로드캐스트 전에 먼저 처리)
+                spdlog::info("💾 [DB_DEBUG] 게임 결과 DB 저장 시작 - 방 {}, 플레이어 {}명, 승자 {}명",
                            m_roomId, finalScores.size(), winners.size());
                 saveGameResultsToDatabase(finalScores, winners);
                 spdlog::info("💾 [DB_DEBUG] 게임 결과 DB 저장 호출 완료 - 방 {}", m_roomId);
+
+                // DB/세션 업데이트 완료 후 게임 결과 브로드캐스트
+                broadcastGameResultLocked(finalScores, winners);
                 
                 // 게임 종료 처리는 플레이어 응답 후에 수행하므로 여기서는 하지 않음
             } else if (m_gameStateManager->getGameState() == Common::GameState::Finished) {
