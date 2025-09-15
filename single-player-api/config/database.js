@@ -307,9 +307,9 @@ class DatabaseService {
   calculateStars (score, optimalScore = 100) {
     const percentage = (score / optimalScore) * 100
 
-    if (percentage >= 90) return 3
-    if (percentage >= 70) return 2
-    if (percentage >= 50) return 1
+    if (percentage >= 100) return 3
+    if (percentage >= 90) return 2
+    if (percentage >= 80) return 1
     return 0
   }
 

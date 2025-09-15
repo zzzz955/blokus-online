@@ -25,8 +25,8 @@ namespace Shared.Models{
 
         // 별점 기준 점수들 (계산된 값)
         public int threeStar => optimal_score; // 100%
-        public int twoStar => Mathf.RoundToInt(optimal_score * 0.7f); // 70%
-        public int oneStar => Mathf.RoundToInt(optimal_score * 0.5f); // 50%
+        public int twoStar => Mathf.RoundToInt(optimal_score * 0.9f); // 70%
+        public int oneStar => Mathf.RoundToInt(optimal_score * 0.8f); // 50%
 
         // 사용 가능한 블록들 (BlockType 리스트로 변환)
         public System.Collections.Generic.List<Shared.Models.BlockType> availableBlocks
@@ -55,9 +55,9 @@ namespace Shared.Models{
         {
             float percentage = (float)playerScore / optimal_score;
 
-            if (percentage >= 0.9f) return 3;      // 90% 이상: 3별
-            if (percentage >= 0.7f) return 2;      // 70% 이상: 2별  
-            if (percentage >= 0.5f) return 1;      // 50% 이상: 1별
+            if (percentage >= 1f) return 3;      // 90% 이상: 3별
+            if (percentage >= 0.9f) return 2;      // 70% 이상: 2별  
+            if (percentage >= 0.8f) return 1;      // 50% 이상: 1별
             return 0;                               // 50% 미만: 0별
         }
 

@@ -296,10 +296,10 @@ router.post('/complete',
 
       // 🔥 수정: 별점 계산을 클라이언트 completed 파라미터와 독립적으로 수행
       let starsEarned = 0
-      if (score >= optimalScore * 0.9) starsEarned = 3 // 90% 이상: 3별
-      else if (score >= optimalScore * 0.7) starsEarned = 2 // 70% 이상: 2별
-      else if (score >= optimalScore * 0.5) starsEarned = 1 // 50% 이상: 1별
-      // 50% 미만: 0별
+      if (score >= optimalScore * 1.0) starsEarned = 3 // 100% 이상: 3별
+      else if (score >= optimalScore * 0.9) starsEarned = 2 // 90% 이상: 2별
+      else if (score >= optimalScore * 0.8) starsEarned = 1 // 80% 이상: 1별
+      // 80% 미만: 0별
       
       // 🔥 핵심: GameEndResult 규칙 적용 - starsEarned >= 1일 때만 실제 완료로 인정
       const isActuallyCompleted = starsEarned >= 1
