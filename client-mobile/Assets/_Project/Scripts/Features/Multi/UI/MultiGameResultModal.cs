@@ -864,11 +864,44 @@ namespace Features.Multi.UI
         private void OnToLobbyClicked()
         {
             Debug.Log("[MultiGameResultModal] 로비로 돌아가기 요청");
-            
+
             // 모달 닫기
             HideModal();
-            
-            // 방 나가기 요청
+
+            // GameRoomPanel을 통해 적절한 정리 과정을 거쳐 방 나가기
+            var gameRoomPanel = FindObjectOfType<GameRoomPanel>();
+            if (gameRoomPanel != null)
+            {
+                Debug.Log("[MultiGameResultModal] GameRoomPanel을 통해 방 나가기 처리");
+                // GameRoomPanel의 비공개 메서드를 호출할 수 없으므로 리플렉션 사용
+                var method = gameRoomPanel.GetType().GetMethod("OnLeaveRoomConfirmed",
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                if (method != null)
+                {
+                    method.Invoke(gameRoomPanel, null);
+                    Debug.Log("[MultiGameResultModal] GameRoomPanel.OnLeaveRoomConfirmed() 호출 완료");
+                }
+                else
+                {
+                    Debug.LogError("[MultiGameResultModal] GameRoomPanel.OnLeaveRoomConfirmed() 메서드를 찾을 수 없습니다");
+                    // 폴백: 직접 방 나가기
+                    FallbackLeaveRoom();
+                }
+            }
+            else
+            {
+                Debug.LogWarning("[MultiGameResultModal] GameRoomPanel을 찾을 수 없습니다. 직접 방 나가기 처리");
+                // 폴백: 직접 방 나가기
+                FallbackLeaveRoom();
+            }
+        }
+
+        /// <summary>
+        /// 폴백: 직접 방 나가기 (GameRoomPanel을 찾을 수 없을 때)
+        /// </summary>
+        private void FallbackLeaveRoom()
+        {
+            Debug.Log("[MultiGameResultModal] 폴백: 직접 방 나가기 처리");
             if (networkManager != null && networkManager.GetNetworkClient() != null)
             {
                 networkManager.GetNetworkClient().SendCleanTCPMessage("room:leave");

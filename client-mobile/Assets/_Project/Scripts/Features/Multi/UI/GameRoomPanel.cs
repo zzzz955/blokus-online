@@ -1114,8 +1114,10 @@ namespace Features.Multi.UI
             // 게임보드 완전 리셋
             if (gameBoard != null)
             {
+                // 중요: 초기화된 SharedGameLogic을 GameBoard와 공유
+                gameBoard.SetGameLogic(gameLogic);
                 gameBoard.ResetBoard(); // 이전 게임의 모든 블록 제거
-                Debug.Log("[GameRoomPanel] 게임보드 재초기화 완료");
+                Debug.Log("[GameRoomPanel] 게임보드 재초기화 완료 (SharedGameLogic 동기화됨)");
             }
 
             // 블록 팔레트 재초기화 - 이전 게임 상태 완전 정리
@@ -1183,10 +1185,12 @@ namespace Features.Multi.UI
             // 게임보드 완전 정리
             if (gameBoard != null)
             {
+                // 중요: 새로 생성된 SharedGameLogic을 GameBoard와 공유
+                gameBoard.SetGameLogic(gameLogic);
                 gameBoard.ResetBoard();
                 gameBoard.SetInteractable(false);
                 gameBoard.SetMyTurn(false, SharedPlayerColor.None);
-                Debug.Log("[GameRoomPanel] 게임보드 정리 완료");
+                Debug.Log("[GameRoomPanel] 게임보드 정리 완료 (새 SharedGameLogic 공유됨)");
             }
 
             // 블록 팔레트 완전 정리
