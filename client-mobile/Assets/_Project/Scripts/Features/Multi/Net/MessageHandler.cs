@@ -1443,7 +1443,42 @@ namespace Features.Multi.Net
             {
                 string statsJson = string.Join(":", parts, 1, parts.Length - 1);
                 Debug.Log($"[MessageHandler] 내 통계 업데이트: {statsJson}");
-                // TODO: JSON 파싱 후 OnMyStatsUpdated 이벤트 발생
+
+                try
+                {
+                    // JSON을 전용 구조체로 파싱
+                    StatsUpdateData statsData = JsonUtility.FromJson<StatsUpdateData>(statsJson);
+                    if (statsData != null)
+                    {
+                        // UserInfo 객체 생성 및 이벤트 발생
+                        UserInfo userInfo = new UserInfo
+                        {
+                            username = statsData.username ?? "",
+                            displayName = statsData.displayName ?? "",
+                            level = statsData.level,
+                            totalGames = statsData.totalGames,
+                            wins = statsData.wins,
+                            losses = statsData.losses,
+                            averageScore = (int)statsData.averageScore, // float를 int로 변환
+                            totalScore = statsData.totalScore,
+                            bestScore = statsData.bestScore,
+                            isOnline = true,
+                            status = statsData.status ?? "로비"
+                        };
+
+                        Debug.Log($"[MessageHandler] 사용자 정보 파싱 완료: {userInfo.displayName} [{userInfo.username}] - 레벨 {userInfo.level}, 총게임 {userInfo.totalGames}, 승률 {statsData.winRate}%");
+                        OnMyStatsUpdated?.Invoke(userInfo);
+                    }
+                    else
+                    {
+                        Debug.LogError("[MessageHandler] JSON 파싱 결과가 null입니다");
+                    }
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogError($"[MessageHandler] 내 통계 업데이트 파싱 오류: {e.Message}");
+                    Debug.LogError($"[MessageHandler] JSON 내용: {statsJson}");
+                }
             }
         }
         
@@ -1691,7 +1726,29 @@ namespace Features.Multi.Net
             return (double)wins / totalGames * 100.0;
         }
     }
-    
+
+    /// <summary>
+    /// MY_STATS_UPDATE JSON 파싱용 구조체
+    /// </summary>
+    [System.Serializable]
+    public class StatsUpdateData
+    {
+        public string username;
+        public string displayName;
+        public int level;
+        public int totalGames;
+        public int wins;
+        public int losses;
+        public int draws;
+        public int currentExp;
+        public int requiredExp;
+        public float winRate;
+        public float averageScore;
+        public int totalScore;
+        public int bestScore;
+        public string status;
+    }
+
     /// <summary>
     /// 방 정보 구조체
     /// </summary>

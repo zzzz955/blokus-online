@@ -248,10 +248,18 @@ namespace Features.Multi.UI
             Debug.Log($"[MultiGameResultModal] 내 통계 업데이트 수신: 레벨 {updatedStats.level}");
 
             myUpdatedStats = updatedStats;
-            isWaitingForStats = false;
 
-            // 모달 표시
-            ShowGameResultModal();
+            // 게임 종료 후 통계 대기 중일 때만 모달 표시
+            if (isWaitingForStats)
+            {
+                isWaitingForStats = false;
+                Debug.Log("[MultiGameResultModal] 게임 종료 후 통계 업데이트 - 결과 모달 표시");
+                ShowGameResultModal();
+            }
+            else
+            {
+                Debug.Log("[MultiGameResultModal] 로비 진입 시 통계 업데이트 - 모달 표시 안함");
+            }
         }
 
         /// <summary>
