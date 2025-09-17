@@ -570,5 +570,52 @@ namespace Features.Multi.Core
                 Debug.LogWarning("[MultiCoreBootstrap] UIManager를 찾을 수 없어 버튼 재활성화 실패");
             }
         }
+
+        // ========================================
+        // DontDestroyOnLoad 객체 정리
+        // ========================================
+
+        /// <summary>
+        /// MultiCore의 DontDestroyOnLoad 객체들을 명시적으로 파괴
+        /// MultiGameplayScene 언로드 시 호출되어 메모리 누수 방지
+        /// 실제 독립적인 GameObject만 정리 (NetworkClient/MessageHandler는 NetworkManager 컴포넌트)
+        /// </summary>
+        public static void DestroyAllDontDestroyOnLoadObjects()
+        {
+            Debug.Log("[MultiCoreBootstrap] MultiCore 전용 DontDestroyOnLoad 객체들 정리 시작");
+            Debug.Log("[MultiCoreBootstrap] NetworkManager는 AppPersistent 관리, NetworkClient/MessageHandler는 컴포넌트이므로 제외");
+
+            // 1. UnityMainThreadDispatcher 정리
+            if (UnityMainThreadDispatcher.Instance != null)
+            {
+                Debug.Log("[MultiCoreBootstrap] UnityMainThreadDispatcher 정리 중...");
+                try
+                {
+                    Destroy(UnityMainThreadDispatcher.Instance.gameObject);
+                    // Instance는 OnDestroy에서 자동으로 null이 됨
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogError($"[MultiCoreBootstrap] UnityMainThreadDispatcher 정리 중 오류: {ex.Message}");
+                }
+            }
+
+            // 2. MultiUserDataCache 정리 (deprecated이지만 혹시 남아있을 수 있음)
+            if (MultiUserDataCache.Instance != null)
+            {
+                Debug.Log("[MultiCoreBootstrap] MultiUserDataCache 정리 중...");
+                try
+                {
+                    Destroy(MultiUserDataCache.Instance.gameObject);
+                    // Instance는 OnDestroy에서 자동으로 null이 됨
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogError($"[MultiCoreBootstrap] MultiUserDataCache 정리 중 오류: {ex.Message}");
+                }
+            }
+
+            Debug.Log("[MultiCoreBootstrap] MultiCore 전용 DontDestroyOnLoad 객체들 정리 완료");
+        }
     }
 }
