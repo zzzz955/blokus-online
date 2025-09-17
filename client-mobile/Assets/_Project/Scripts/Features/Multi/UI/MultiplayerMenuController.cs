@@ -202,7 +202,11 @@ namespace Features.Multi.UI
         /// </summary>
         private void OnErrorReceived(string error)
         {
-            ShowError($"네트워크 에러: {error}");
+            // NetworkClient에서 이미 로그를 출력하므로 UI 토스트만 표시
+            if (SystemMessageManager.Instance != null)
+            {
+                SystemMessageManager.ShowToast($"네트워크 에러: {error}");
+            }
         }
         
         /// <summary>

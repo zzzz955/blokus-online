@@ -5,6 +5,8 @@ using UnityEngine;
 using Shared.Models;
 using Features.Multi.Net;
 using App.Network;
+using App.UI;
+using Shared.UI;
 using MultiModels = Features.Multi.Models;
 using TurnChangeInfo = Features.Multi.Net.TurnChangeInfo;
 using GameStateData = Features.Multi.Net.GameStateData;
@@ -38,6 +40,7 @@ namespace Features.Multi.Net
         private Coroutine heartbeatCoroutine;
         private bool isAuthenticated = false;
         private string lastUsedToken = null;
+        private bool isHandlingDisconnection = false;
         
         // 현재 사용자 정보 (LobbyPanel에서 접근 가능)
         private UserInfo currentUserInfo = null;
@@ -784,24 +787,262 @@ namespace Features.Multi.Net
         private void OnConnectionStatusChanged(bool isConnected)
         {
             Debug.Log($"[NetworkManager] 연결 상태 변경: {(isConnected ? "연결됨" : "연결 해제됨")}");
-            
+
             if (isConnected)
             {
                 // 연결 성공
                 reconnectAttempts = 0;
+                isHandlingDisconnection = false;
                 StartHeartbeat();
             }
             else
             {
-                // 연결 해제
+                // 중복 처리 방지 - 이미 재연결 처리 중이면 스킵
+                if (isHandlingDisconnection)
+                {
+                    Debug.Log("[NetworkManager] 이미 연결 해제 처리 중 - 중복 이벤트 무시");
+                    return;
+                }
+
+                // 연결 해제 처리
                 StopHeartbeat();
-                
-                // 자동 재연결 시도
-                if (autoReconnect && reconnectAttempts < maxReconnectAttempts)
+                HandleDisconnection();
+            }
+        }
+
+        /// <summary>
+        /// 연결 해제 시 상태별 복구 처리
+        /// </summary>
+        private void HandleDisconnection()
+        {
+            Debug.Log($"[NetworkManager] 연결 해제 처리 시작 - autoReconnect: {autoReconnect}, currentRoomInfo: {(currentRoomInfo?.roomName ?? "null")}");
+
+            // 중복 처리 방지 플래그 설정
+            isHandlingDisconnection = true;
+
+            if (!autoReconnect)
+            {
+                // 로그아웃 (의도적 종료)
+                Debug.Log("[NetworkManager] 로그아웃 감지 - DontDestroyOnLoad 객체 정리");
+                Features.Multi.Core.MultiCoreBootstrap.DestroyAllDontDestroyOnLoadObjects();
+                isHandlingDisconnection = false;
+                return;
+            }
+
+            // 서버 세션 제거 상황 처리
+            if (currentRoomInfo != null)
+            {
+                // 방/게임 중이었던 경우 - 서버에서 자동 퇴장 처리됨
+                Debug.Log($"[NetworkManager] 방/게임 중 연결 해제 감지 - 방: {currentRoomInfo.roomName}, 상태 복구 시작");
+                HandleRoomDisconnection();
+            }
+            else
+            {
+                // 로비에 있던 경우 - 단순 재연결
+                Debug.Log("[NetworkManager] 로비에서 연결 해제 - 단순 재연결 시도");
+                if (reconnectAttempts < maxReconnectAttempts)
                 {
                     StartCoroutine(AttemptReconnect());
                 }
+                else
+                {
+                    Debug.LogError($"[NetworkManager] 로비 재연결 최대 시도 횟수 초과 - DontDestroyOnLoad 객체 정리");
+                    HandleReconnectionFailure();
+                }
             }
+        }
+
+        /// <summary>
+        /// 방/게임 중 연결 해제 시 상태 복구
+        /// MultiGameplayScene → MultiCore로 복귀 후 재연결
+        /// </summary>
+        private void HandleRoomDisconnection()
+        {
+            Debug.Log("[NetworkManager] 방/게임 중 연결 해제 - MultiGameplayScene 언로드 및 재연결 처리");
+
+            // LoadingOverlay 표시
+            App.UI.LoadingOverlay.Show("연결 해제 감지 - 상태 복구 중...");
+
+            // 현재 방 정보 초기화 (서버에서 이미 퇴장 처리됨)
+            currentRoomInfo = null;
+            currentPlayerDataList = null;
+            isCurrentUserRoomCreator = false;
+
+            // MultiGameplayScene이 활성화되어 있는지 확인
+            bool isMultiGameplayActive = UnityEngine.SceneManagement.SceneManager.GetSceneByName("MultiGameplayScene").isLoaded;
+
+            if (isMultiGameplayActive)
+            {
+                Debug.Log("[NetworkManager] MultiGameplayScene 활성 - SceneFlowController를 통한 MultiCore 복귀 시작");
+
+                // SceneFlowController를 통해 MultiCore로 복귀
+                if (App.Core.SceneFlowController.Instance != null)
+                {
+                    StartCoroutine(HandleMultiGameplayToMultiCoreRecovery());
+                }
+                else
+                {
+                    Debug.LogError("[NetworkManager] SceneFlowController를 찾을 수 없음 - 수동 재연결 시도");
+                    StartCoroutine(AttemptReconnectWithDelay(2f));
+                }
+            }
+            else
+            {
+                // MultiCore에 있는 경우 단순 재연결
+                Debug.Log("[NetworkManager] MultiCore에서 연결 해제 - 재연결 시도");
+                StartCoroutine(AttemptReconnectWithDelay(1f));
+            }
+        }
+
+        /// <summary>
+        /// MultiGameplayScene → MultiCore 복귀 및 재연결 처리
+        /// </summary>
+        private System.Collections.IEnumerator HandleMultiGameplayToMultiCoreRecovery()
+        {
+            Debug.Log("[NetworkManager] MultiGameplayScene → MultiCore 복귀 프로세스 시작");
+
+            // LoadingOverlay 메시지 업데이트
+            App.UI.LoadingOverlay.Show("로비로 복귀 중...");
+
+            // 1. 사용자에게 알림
+            if (SystemMessageManager.Instance != null)
+            {
+                SystemMessageManager.ShowToast("연결이 끊어져 로비로 복귀합니다.", MessagePriority.Warning);
+            }
+
+            // 2. 약간의 대기 (사용자가 메시지를 볼 수 있도록)
+            yield return new WaitForSeconds(1f);
+
+            // 3. MultiCore로 복귀 (DontDestroyOnLoad 객체는 정리하지 않음)
+            bool recoverySuccess = false;
+
+            // SceneFlowController의 GoMulti 사용 (MultiCore → MultiGameplayScene 로직을 역으로 사용)
+            var sceneFlow = App.Core.SceneFlowController.Instance;
+            if (sceneFlow != null)
+            {
+                // MultiGameplayScene 언로드만 수행 (MultiCore는 유지)
+                yield return StartCoroutine(UnloadMultiGameplaySceneOnly());
+
+                // 성공 여부 확인 - MultiGameplayScene이 언로드되었는지 체크
+                var multiGameplayScene = UnityEngine.SceneManagement.SceneManager.GetSceneByName("MultiGameplayScene");
+                if (!multiGameplayScene.isLoaded)
+                {
+                    recoverySuccess = true;
+                    Debug.Log("[NetworkManager] MultiGameplayScene 언로드 성공");
+                }
+                else
+                {
+                    Debug.LogError("[NetworkManager] MultiGameplayScene 언로드 실패");
+                }
+            }
+            else
+            {
+                Debug.LogError("[NetworkManager] SceneFlowController를 찾을 수 없음");
+            }
+
+            // 4. 재연결 시도
+            if (recoverySuccess)
+            {
+                Debug.Log("[NetworkManager] MultiCore 복귀 완료 - 재연결 시도");
+                yield return new WaitForSeconds(1f);
+
+                if (reconnectAttempts < maxReconnectAttempts)
+                {
+                    StartCoroutine(AttemptReconnect());
+                }
+                else
+                {
+                    Debug.LogError($"[NetworkManager] 방/게임 복구 후 재연결 최대 시도 횟수 초과 - DontDestroyOnLoad 객체 정리");
+                    HandleReconnectionFailure();
+                }
+            }
+            else
+            {
+                App.UI.LoadingOverlay.Hide();
+                Debug.LogError("[NetworkManager] MultiCore 복귀 실패 - MainScene으로 복귀");
+                if (App.Core.SceneFlowController.Instance != null)
+                {
+                    App.Core.SceneFlowController.Instance.StartExitMultiToMain();
+                }
+            }
+        }
+
+        /// <summary>
+        /// MultiGameplayScene만 언로드 (MultiCore는 유지)
+        /// </summary>
+        private System.Collections.IEnumerator UnloadMultiGameplaySceneOnly()
+        {
+            Debug.Log("[NetworkManager] MultiGameplayScene 언로드 시작");
+
+            var multiGameplayScene = UnityEngine.SceneManagement.SceneManager.GetSceneByName("MultiGameplayScene");
+            if (multiGameplayScene.isLoaded)
+            {
+                var unloadOperation = UnityEngine.SceneManagement.SceneManager.UnloadSceneAsync("MultiGameplayScene");
+                yield return unloadOperation;
+
+                if (unloadOperation.isDone)
+                {
+                    Debug.Log("[NetworkManager] MultiGameplayScene 언로드 완료");
+                }
+                else
+                {
+                    Debug.LogError("[NetworkManager] MultiGameplayScene 언로드 실패");
+                }
+            }
+
+            // MultiCore 씬 활성화
+            var multiCoreScene = UnityEngine.SceneManagement.SceneManager.GetSceneByName("MultiCore");
+            if (multiCoreScene.isLoaded)
+            {
+                UnityEngine.SceneManagement.SceneManager.SetActiveScene(multiCoreScene);
+                Debug.Log("[NetworkManager] MultiCore 씬 활성화 완료");
+            }
+        }
+
+        /// <summary>
+        /// 지연된 재연결 시도
+        /// </summary>
+        private System.Collections.IEnumerator AttemptReconnectWithDelay(float delay)
+        {
+            Debug.Log($"[NetworkManager] {delay}초 후 재연결 시도");
+
+            // LoadingOverlay 표시 (지연 시간 포함)
+            App.UI.LoadingOverlay.Show($"서버 연결 대기 중... ({delay:F0}초)");
+
+            yield return new WaitForSeconds(delay);
+
+            if (reconnectAttempts < maxReconnectAttempts)
+            {
+                StartCoroutine(AttemptReconnect());
+            }
+            else
+            {
+                App.UI.LoadingOverlay.Hide();
+                Debug.LogError($"[NetworkManager] 지연 재연결도 최대 시도 횟수 초과 - DontDestroyOnLoad 객체 정리");
+                HandleReconnectionFailure();
+            }
+        }
+
+        /// <summary>
+        /// 재연결 실패 시 처리
+        /// </summary>
+        private void HandleReconnectionFailure()
+        {
+            Debug.Log("[NetworkManager] 재연결 완전 실패 - 시스템 정리 시작");
+
+            // LoadingOverlay 숨김
+            App.UI.LoadingOverlay.Hide();
+
+            // 중복 처리 방지 플래그 해제
+            isHandlingDisconnection = false;
+
+            // autoReconnect를 false로 설정하여 더 이상의 재연결 시도 방지
+            autoReconnect = false;
+
+            // DontDestroyOnLoad 객체들 정리
+            Features.Multi.Core.MultiCoreBootstrap.DestroyAllDontDestroyOnLoadObjects();
+
+            Debug.Log("[NetworkManager] 재연결 실패 처리 완료 - 멀티플레이 모드 종료");
         }
         
         /// <summary>
@@ -809,8 +1050,7 @@ namespace Features.Multi.Net
         /// </summary>
         private void OnNetworkError(string errorMessage)
         {
-            Debug.LogError($"[NetworkManager] 네트워크 에러: {errorMessage}");
-            
+            // NetworkClient에서 이미 로그를 출력하므로 여기서는 로그 생략
             // MessageHandler를 통해 에러 이벤트 발생 (UI에서 구독 가능)
             messageHandler?.TriggerError(errorMessage);
         }
@@ -826,12 +1066,43 @@ namespace Features.Multi.Net
         {
             reconnectAttempts++;
             Debug.Log($"[NetworkManager] 재연결 시도 {reconnectAttempts}/{maxReconnectAttempts} ({reconnectDelay}초 후)");
-            
+
+            // LoadingOverlay 표시
+            App.UI.LoadingOverlay.Show($"서버 재연결 중... ({reconnectAttempts}/{maxReconnectAttempts})");
+
             yield return new WaitForSeconds(reconnectDelay);
-            
+
             if (!IsConnected())
             {
                 ConnectToServer();
+
+                // 연결 시도 후 잠시 대기하여 연결 결과 확인
+                yield return new WaitForSeconds(1f);
+
+                // 연결 성공 시 LoadingOverlay 숨김
+                if (IsConnected())
+                {
+                    App.UI.LoadingOverlay.Hide();
+                    Debug.Log($"[NetworkManager] 재연결 성공 ({reconnectAttempts}/{maxReconnectAttempts})");
+                }
+                // 재연결 실패 시 처리
+                else if (reconnectAttempts >= maxReconnectAttempts)
+                {
+                    App.UI.LoadingOverlay.Hide();
+                    Debug.LogError($"[NetworkManager] 재연결 최대 시도 횟수 초과 ({maxReconnectAttempts}회) - DontDestroyOnLoad 객체 정리");
+                    HandleReconnectionFailure();
+                }
+                else
+                {
+                    // 재연결 실패했지만 최대 시도 횟수에 도달하지 않은 경우 다시 시도
+                    Debug.Log($"[NetworkManager] 재연결 실패 ({reconnectAttempts}/{maxReconnectAttempts}) - 다음 시도 예약");
+                    StartCoroutine(AttemptReconnectWithDelay(reconnectDelay));
+                }
+            }
+            else
+            {
+                // 이미 연결된 상태면 LoadingOverlay 숨김
+                App.UI.LoadingOverlay.Hide();
             }
         }
         

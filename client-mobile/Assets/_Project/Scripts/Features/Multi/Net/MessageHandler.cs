@@ -1690,7 +1690,7 @@ namespace Features.Multi.Net
         /// </summary>
         public void TriggerError(string errorMessage)
         {
-            Debug.LogError($"[MessageHandler] 외부 에러 전달: {errorMessage}");
+            // NetworkClient에서 이미 로그를 출력하므로 여기서는 로그 생략
             OnErrorReceived?.Invoke(errorMessage);
         }
     }

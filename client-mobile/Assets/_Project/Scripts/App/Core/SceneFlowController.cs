@@ -540,22 +540,8 @@ namespace App.Core
             // MultiGameplayScene 언로드
             yield return UnloadIfLoaded(MultiGameplayScene);
 
-            // DontDestroyOnLoad 객체들을 명시적으로 정리 (MultiCore 언로드 전에)
-            if (debugMode)
-                Debug.Log("[SceneFlowController] DontDestroyOnLoad 객체들 정리 중...");
-
-            try
-            {
-                Features.Multi.Core.MultiCoreBootstrap.DestroyAllDontDestroyOnLoadObjects();
-            }
-            catch (System.Exception ex)
-            {
-                Debug.LogError($"[SceneFlowController] DontDestroyOnLoad 객체 정리 중 오류: {ex.Message}");
-                // 오류가 발생해도 계속 진행 (씬 언로드는 해야 함)
-            }
-
-            // 약간의 대기 시간 (객체 파괴 완료 대기)
-            yield return new WaitForSeconds(0.2f);
+            // DontDestroyOnLoad 객체 정리는 NetworkManager.HandleDisconnection()에서 처리됨
+            // (로그아웃 시 autoReconnect = false로 설정되어 자동 정리)
 
             // MultiCore 씬도 언로드 (연결 실패 시를 위해)
             yield return UnloadIfLoaded(MultiCoreScene);

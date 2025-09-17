@@ -136,10 +136,18 @@ namespace Features.Multi.Net
         /// </summary>
         public async Task<bool> ConnectToServerAsync()
         {
-            if (isConnected)
+            // 실제 TCP 연결 상태 확인
+            if (isConnected && tcpClient != null && tcpClient.Connected)
             {
                 Debug.LogWarning("[NetworkClient] 이미 서버에 연결되어 있습니다.");
                 return true;
+            }
+
+            // 연결 상태 플래그가 true이지만 실제 TCP 연결이 끊어진 경우 정리
+            if (isConnected && (tcpClient == null || !tcpClient.Connected))
+            {
+                Debug.LogWarning("[NetworkClient] 연결 상태 불일치 감지 - 연결 정리 후 재시도");
+                CleanupConnection();
             }
             
             if (isConnecting)
@@ -396,6 +404,11 @@ namespace Features.Multi.Net
                         if (isConnected)
                         {
                             Debug.LogWarning($"[NetworkClient] 연결 끊어짐: {ioEx.Message}");
+
+                            // 연결 상태 정리 및 이벤트 발생
+                            CleanupConnection();
+                            UnityMainThreadDispatcher.Enqueue(() => OnConnectionChanged?.Invoke(false));
+
                             break;
                         }
                     }
@@ -409,12 +422,15 @@ namespace Features.Multi.Net
                 if (isConnected) // 정상 종료가 아닌 경우만 에러 로그
                 {
                     Debug.LogError($"[NetworkClient] 메시지 수신 에러: {ex.Message}");
-                    
-                    // 메인 스레드에서 재연결 시도
-                    UnityMainThreadDispatcher.Enqueue(() => 
+
+                    // 연결 상태 정리
+                    CleanupConnection();
+
+                    // 메인 스레드에서 연결 해제 이벤트 및 에러 이벤트 발생
+                    UnityMainThreadDispatcher.Enqueue(() =>
                     {
+                        OnConnectionChanged?.Invoke(false);
                         OnError?.Invoke($"수신 에러: {ex.Message}");
-                        _ = ReconnectAsync();
                     });
                 }
             }

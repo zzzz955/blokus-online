@@ -125,10 +125,8 @@ namespace Features.Multi.Net
         /// </summary>
         private void OnErrorReceived(string error)
         {
-            if (enableDebugLogs)
-            {
-                Debug.LogError($"[NetworkSetup] 네트워크 에러: {error}");
-            }
+            // NetworkClient에서 이미 로그를 출력하므로 여기서는 로그 생략
+            // UI에서 에러 처리가 필요한 경우 이벤트 구독자가 처리
         }
         
         void OnDestroy()
