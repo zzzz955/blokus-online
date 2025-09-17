@@ -173,6 +173,7 @@ namespace Blokus {
         QTcpSocket* m_socket;
         QTimer* m_connectionTimer;
         QTimer* m_reconnectTimer;
+        QTimer* m_pingTimer;
         
         ConnectionState m_state;
         QString m_serverHost;

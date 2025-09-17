@@ -16,6 +16,7 @@ namespace Blokus {
         , m_socket(nullptr)
         , m_connectionTimer(new QTimer(this))
         , m_reconnectTimer(new QTimer(this))
+        , m_pingTimer(new QTimer(this))
         , m_state(ConnectionState::Disconnected)
         , m_currentSessionToken("")
         , m_reconnectAttempts(0)
@@ -55,6 +56,11 @@ namespace Blokus {
                 emit connectionError(QString::fromUtf8("서버에 연결할 수 없습니다."));
             }
         });
+
+        // ping 타이머 설정 (30초 간격으로 ping 메시지 전송)
+        m_pingTimer->setSingleShot(false); // 반복 실행
+        m_pingTimer->setInterval(30000); // 30초 (30,000ms)
+        connect(m_pingTimer, &QTimer::timeout, this, &NetworkClient::sendHeartbeat);
         
         qDebug() << QString::fromUtf8("NetworkClient 초기화 완료");
     }
@@ -416,7 +422,10 @@ namespace Blokus {
         m_connectionTimer->stop();
         m_reconnectAttempts = 0;
         setState(ConnectionState::Connected);
-        
+
+        // ping 타이머 시작
+        m_pingTimer->start();
+
         // 연결 성공 후 즉시 버전 검사 수행
         performVersionCheck();
     }
@@ -425,6 +434,7 @@ namespace Blokus {
     {
         qDebug() << QString::fromUtf8("서버 연결 해제됨");
         m_connectionTimer->stop();
+        m_pingTimer->stop(); // ping 타이머 정지
         
         ConnectionState oldState = m_state;
         setState(ConnectionState::Disconnected);
@@ -511,8 +521,13 @@ namespace Blokus {
 
     void NetworkClient::processMessage(const QString& message)
     {
+        // pong 응답은 무시 (로그도 출력하지 않음)
+        if (message.trimmed() == "pong") {
+            return;
+        }
+
         emit messageReceived(message);
-        
+
         // 기존 텍스트 기반 메시지 처리
         if (message.startsWith("ERROR:")) {
             QString error = message.mid(6); // "ERROR:" 제거
@@ -1115,6 +1130,16 @@ namespace Blokus {
             qWarning() << "Invalid user settings response";
             emit userSettingsUpdateResult(false, "잘못된 서버 응답입니다");
         }
+    }
+
+    void NetworkClient::sendHeartbeat()
+    {
+        if (!isConnected()) {
+            return; // 연결되지 않은 상태에서는 ping을 보내지 않음
+        }
+
+        // ping 메시지 전송 (로그 없이 조용히 전송)
+        sendMessage("ping");
     }
 
 } // namespace Blokus

@@ -276,6 +276,16 @@ private slots:
     void onNetworkDisconnected()
     {
         qDebug() << QString::fromUtf8("서버 연결 해제");
+
+        // 로그인 창이 아닌 다른 창이 열려 있는 경우에만 연결 끊김 알림 표시
+        if (m_lobbyWindow || m_gameRoomWindow) {
+            QMessageBox::warning(nullptr, QString::fromUtf8("연결 끊김"),
+                QString::fromUtf8("서버와의 연결이 끊어졌습니다.\n로그인 화면으로 이동합니다."));
+
+            // 모든 창 정리 후 로그인 창으로 이동
+            cleanupWindows();
+            createLoginWindow();
+        }
     }
 
     void onNetworkError(const QString &error)
