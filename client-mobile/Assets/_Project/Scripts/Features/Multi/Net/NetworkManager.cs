@@ -178,6 +178,13 @@ namespace Features.Multi.Net
             add { if (messageHandler != null) messageHandler.OnAfkStatusReset += value; }
             remove { if (messageHandler != null) messageHandler.OnAfkStatusReset -= value; }
         }
+
+        // 게임 결과 관련 이벤트
+        public event System.Action<GameResultData> OnGameResultReceived
+        {
+            add { if (messageHandler != null) messageHandler.OnGameResultReceived += value; }
+            remove { if (messageHandler != null) messageHandler.OnGameResultReceived -= value; }
+        }
         
         void Awake()
         {
@@ -1118,8 +1125,8 @@ namespace Features.Multi.Net
 
         private void OnRoomInfoUpdatedHandler(RoomInfo roomInfo, System.Collections.Generic.List<PlayerData> playerDataList)
         {
-            // 방 정보 업데이트 - playerDataList 함께 전달
-            UpdateCurrentRoomInfo(roomInfo, playerDataList);
+            // 방 정보 업데이트 - playerDataList 함께 전달, 이벤트는 MessageHandler에서 이미 발생했으므로 중복 방지
+            UpdateCurrentRoomInfo(roomInfo, playerDataList, false);
             
             // 플레이어 데이터 목록 저장 (플레이어 찾기용)
             currentPlayerDataList = playerDataList;
@@ -1190,10 +1197,10 @@ namespace Features.Multi.Net
         /// <summary>
         /// 현재 방 정보 업데이트 (MessageHandler에서 호출)
         /// </summary>
-        public void UpdateCurrentRoomInfo(RoomInfo roomInfo, System.Collections.Generic.List<PlayerData> playerDataList = null)
+        public void UpdateCurrentRoomInfo(RoomInfo roomInfo, System.Collections.Generic.List<PlayerData> playerDataList = null, bool fireEvent = true)
         {
             currentRoomInfo = roomInfo;
-            Debug.Log($"[NetworkManager] 방 정보 업데이트됨: {roomInfo.roomName} (플레이어: {roomInfo.currentPlayers}/{roomInfo.maxPlayers})");
+            Debug.Log($"[NetworkManager] 방 정보 업데이트됨: {roomInfo.roomName} (플레이어: {roomInfo.currentPlayers}/{roomInfo.maxPlayers}) - fireEvent={fireEvent}");
             
             // 마지막 ROOM_INFO 데이터 저장 (이벤트 구독 타이밍 이슈 해결용)
             if (playerDataList != null)
@@ -1202,14 +1209,17 @@ namespace Features.Multi.Net
                 Debug.Log($"[NetworkManager] 마지막 ROOM_INFO 데이터 저장됨: {playerDataList.Count}명");
             }
             
-            // 이벤트 발생 - playerDataList가 제공된 경우 함께 전달
-            if (playerDataList != null)
+            // 이벤트 발생 - playerDataList가 제공된 경우 함께 전달 (fireEvent가 true인 경우에만)
+            if (fireEvent)
             {
-                OnRoomInfoUpdated?.Invoke(roomInfo, playerDataList);
-            }
-            else
-            {
-                OnRoomInfoUpdated?.Invoke(roomInfo, new System.Collections.Generic.List<PlayerData>());
+                if (playerDataList != null)
+                {
+                    OnRoomInfoUpdated?.Invoke(roomInfo, playerDataList);
+                }
+                else
+                {
+                    OnRoomInfoUpdated?.Invoke(roomInfo, new System.Collections.Generic.List<PlayerData>());
+                }
             }
         }
 
@@ -1221,8 +1231,14 @@ namespace Features.Multi.Net
         {
             if (lastRoomInfoData != null && currentRoomInfo != null)
             {
-                Debug.Log($"[NetworkManager] 마지막 ROOM_INFO 데이터 즉시 전달: {lastRoomInfoData.Count}명");
-                OnRoomInfoUpdated?.Invoke(currentRoomInfo, lastRoomInfoData);
+                Debug.Log($"[NetworkManager] 마지막 ROOM_INFO 데이터 즉시 전달: {lastRoomInfoData.Count}명 (중복 이벤트 방지 - 직접 GameRoomPanel 업데이트)");
+
+                // 중복 이벤트 발생 방지 - 직접 GameRoomPanel 업데이트
+                var gameRoomPanel = FindObjectOfType<Features.Multi.UI.GameRoomPanel>();
+                if (gameRoomPanel != null)
+                {
+                    gameRoomPanel.UpdatePlayerData(lastRoomInfoData);
+                }
             }
             else
             {
@@ -1242,10 +1258,67 @@ namespace Features.Multi.Net
             // 단순히 로깅만 하고 서버 응답을 기다림
         }
 
+        /// <summary>
+        /// user_name을 display_name으로 변환 (게임 결과 표시용)
+        /// </summary>
+        /// <param name="username">서버에서 사용하는 user_name</param>
+        /// <returns>UI에 표시할 display_name, 찾지 못하면 원본 반환</returns>
+        public string GetPlayerDisplayName(string username)
+        {
+            if (string.IsNullOrEmpty(username))
+                return username;
+
+            // currentPlayerDataList에서 username으로 검색
+            if (currentPlayerDataList != null)
+            {
+                foreach (var player in currentPlayerDataList)
+                {
+                    if (player.username == username)
+                    {
+                        return player.displayName;
+                    }
+                }
+            }
+
+            // lastRoomInfoData에서 검색 (fallback)
+            if (lastRoomInfoData != null)
+            {
+                foreach (var player in lastRoomInfoData)
+                {
+                    if (player.username == username)
+                    {
+                        return player.displayName;
+                    }
+                }
+            }
+
+            // 찾지 못한 경우 원본 username 반환
+            Debug.LogWarning($"[NetworkManager] username '{username}'에 대한 displayName을 찾을 수 없습니다. 원본 반환");
+            return username;
+        }
+
+        /// <summary>
+        /// username이 빈 슬롯인지 확인 (게임 결과 필터링용)
+        /// </summary>
+        /// <param name="username">확인할 username</param>
+        /// <returns>빈 슬롯이면 true</returns>
+        public bool IsEmptySlotPlayer(string username)
+        {
+            if (string.IsNullOrEmpty(username))
+                return true;
+
+            // 기본 빈 슬롯 이름들
+            return username.Contains("Player") ||
+                   username == "Red Player" ||
+                   username == "Green Player" ||
+                   username == "Blue Player" ||
+                   username == "Yellow Player";
+        }
+
         // ========================================
         // Missing Request Methods
         // ========================================
-        
+
         /// <summary>
         /// 방 목록 요청
         /// </summary>

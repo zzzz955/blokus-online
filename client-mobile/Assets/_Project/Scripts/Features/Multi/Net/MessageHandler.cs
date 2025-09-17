@@ -68,6 +68,44 @@ namespace Features.Multi.Net
             return result;
         }
     }
+
+    /// <summary>
+    /// 게임 결과 데이터 구조체 (새로운 GAME_RESULT 메시지 형식)
+    /// </summary>
+    [System.Serializable]
+    public class GameResultData
+    {
+        // 공통 정보 (모든 클라이언트)
+        public System.Collections.Generic.Dictionary<string, int> scores;
+        public string[] winners;
+        public string gameType;
+        public int roomId;
+        public string timestamp;
+
+        // 개인별 정보 (각 플레이어마다 다름)
+        public int myRank;         // 내 순위
+        public int myScore;        // 내 점수
+        public int expGained;      // 획득 경험치
+        public bool levelUp;       // 레벨업 여부
+        public int newLevel;       // 현재/새 레벨
+        public int gameTime;       // 게임 진행 시간 (초)
+
+        public GameResultData()
+        {
+            scores = new System.Collections.Generic.Dictionary<string, int>();
+            winners = new string[0];
+            gameType = "";
+            roomId = 0;
+            timestamp = "";
+            myRank = 0;
+            myScore = 0;
+            expGained = 0;
+            levelUp = false;
+            newLevel = 1;
+            gameTime = 0;
+        }
+    }
+
     /// <summary>
     /// 네트워크 메시지 핸들러
     /// 서버로부터 수신된 메시지를 파싱하고 적절한 이벤트로 변환
@@ -117,6 +155,9 @@ namespace Features.Multi.Net
         public event System.Action OnAfkVerifyReceived; // AFK 검증 요청 수신
         public event System.Action OnAfkUnblockSuccess; // AFK 해제 성공
         public event System.Action<string> OnAfkStatusReset; // AFK 상태 리셋 (username)
+
+        // 게임 결과 관련 이벤트
+        public event System.Action<GameResultData> OnGameResultReceived; // 새로운 GAME_RESULT 데이터 수신
         
         // 싱글플레이어 관련 (현재 HTTP API로 대체됨)
         // public event System.Action<StageData> OnStageDataReceived; // TCP에서 HTTP API로 이동
@@ -129,6 +170,9 @@ namespace Features.Multi.Net
         
         // 중복 구독 방지
         private bool isSubscribedToNetworkClient = false;
+
+        // 방 입장 상태 추적 (중복 OnRoomJoined 방지)
+        private bool hasJoinedRoom = false;
         
         void Awake()
         {
@@ -667,6 +711,7 @@ namespace Features.Multi.Net
                 
                 Debug.Log($"[MessageHandler] 방 생성됨: {room.roomName} (ID: {room.roomId})");
                 OnRoomCreated?.Invoke(room);
+                hasJoinedRoom = true; // 방 생성 시 자동 입장 상태 설정
                 OnRoomJoined?.Invoke(); // 방 생성자는 자동으로 방에 입장함
             }
             catch (Exception ex)
@@ -693,6 +738,7 @@ namespace Features.Multi.Net
                 
                 Debug.Log($"[MessageHandler] 방 참가 성공: {roomName} (ID: {roomId})");
                 OnJoinRoomResponse?.Invoke(true, $"방 '{roomName}'에 참가했습니다.");
+                hasJoinedRoom = true; // 방 입장 상태 설정
                 OnRoomJoined?.Invoke(); // GameRoomPanel로 전환 트리거
             }
             catch (Exception ex)
@@ -708,7 +754,10 @@ namespace Features.Multi.Net
         private void HandleRoomLeft(string[] parts)
         {
             Debug.Log("[MessageHandler] 방 나가기 성공");
-            
+
+            // 방 입장 상태 초기화
+            hasJoinedRoom = false;
+
             // 로비로 돌아가는 이벤트 발생
             OnRoomLeft?.Invoke();
             Debug.Log("[MessageHandler] OnRoomLeft 이벤트 발생");
@@ -807,11 +856,16 @@ namespace Features.Multi.Net
                 // 방 정보 및 플레이어 데이터 업데이트 이벤트 발생
                 OnRoomInfoUpdated?.Invoke(roomInfo, playerDataList);
                 
-                // 현재 사용자가 방에 있다면 GameRoomPanel 활성화 (ROOM_JOIN_SUCCESS 없이도)
-                if (currentUserInRoom)
+                // 현재 사용자가 방에 있고 아직 입장 상태가 설정되지 않은 경우에만 GameRoomPanel 활성화
+                if (currentUserInRoom && !hasJoinedRoom)
                 {
                     Debug.Log($"[MessageHandler] ROOM_INFO에서 현재 사용자 확인됨 - GameRoomPanel 활성화 트리거");
+                    hasJoinedRoom = true; // 방 입장 상태 설정
                     OnRoomJoined?.Invoke();
+                }
+                else if (currentUserInRoom && hasJoinedRoom)
+                {
+                    Debug.Log($"[MessageHandler] ROOM_INFO에서 현재 사용자 확인됨 - 이미 입장한 상태이므로 OnRoomJoined 중복 호출 방지");
                 }
 
                 Debug.Log($"[MessageHandler] 방 정보 파싱 완료: {roomName}, 플레이어 {playerDataList.Count}명");
@@ -1248,13 +1302,50 @@ namespace Features.Multi.Net
                 {
                     string resultJson = string.Join(":", parts, 1, parts.Length - 1);
                     Debug.Log($"[MessageHandler] 게임 결과 수신: {resultJson}");
-                    
-                    // TODO: 필요시 게임 결과 JSON 파싱하여 상세 정보 처리
-                    // GameResultData result = JsonUtility.FromJson<GameResultData>(resultJson);
-                    
-                    // 게임 종료 이벤트 발생 (결과와 함께)
-                    Debug.Log("[MessageHandler] 게임 결과로 인한 게임 종료 처리");
-                    OnGameEnded?.Invoke(MultiModels.PlayerColor.None); // 승자 정보는 추후 JSON에서 파싱 가능
+
+                    // JSON 파싱하여 GameResultData 생성
+                    try
+                    {
+                        GameResultData gameResult = JsonUtility.FromJson<GameResultData>(resultJson);
+
+                        // 파싱이 성공하면 scores Dictionary 수동 설정
+                        if (gameResult != null)
+                        {
+                            // Unity JsonUtility는 Dictionary를 지원하지 않으므로 수동 파싱
+                            gameResult.scores = ParseScoresDictionary(resultJson);
+
+                            Debug.Log($"[MessageHandler] 새로운 GAME_RESULT 데이터 파싱 성공: 순위={gameResult.myRank}, 점수={gameResult.myScore}, 경험치={gameResult.expGained}");
+                            Debug.Log($"[MessageHandler] scores Dictionary 파싱 완료: {gameResult.scores?.Count ?? 0}개 플레이어");
+
+                            OnGameResultReceived?.Invoke(gameResult);
+                        }
+                        else
+                        {
+                            Debug.LogWarning("[MessageHandler] GAME_RESULT JSON 파싱 결과가 null입니다");
+                        }
+                    }
+                    catch (System.Exception parseEx)
+                    {
+                        // 파싱에 실패하면 명확한 에러 메시지 표시 (fallback 제거)
+                        Debug.LogError($"[MessageHandler] GAME_RESULT JSON 파싱 실패: {parseEx.Message}");
+                        Debug.LogError($"[MessageHandler] 실패한 JSON 데이터: {resultJson}");
+
+                        // 에러 메시지를 표시할 GameResultData 생성
+                        GameResultData errorResult = new GameResultData();
+                        errorResult.scores = new System.Collections.Generic.Dictionary<string, int>();
+                        errorResult.gameType = "파싱 실패";
+                        errorResult.myRank = 0;
+                        errorResult.myScore = 0;
+                        errorResult.expGained = 0;
+                        errorResult.levelUp = false;
+                        errorResult.newLevel = 1;
+
+                        Debug.LogWarning("[MessageHandler] 게임 결과 파싱에 실패했습니다. 빈 결과로 모달을 표시합니다.");
+                        OnGameResultReceived?.Invoke(errorResult);
+                    }
+
+                    // GAME_RESULT 처리 완료 - OnGameEnded는 이미 GAME_ENDED에서 호출되었으므로 중복 호출 제거
+                    Debug.Log("[MessageHandler] GAME_RESULT 처리 완료 (OnGameEnded 중복 호출 방지)");
                 }
                 else
                 {
@@ -1374,6 +1465,16 @@ namespace Features.Multi.Net
             {
                 string jsonData = string.Join(":", parts, 1, parts.Length - 1);
                 Debug.Log($"[MessageHandler] AFK 모드 활성화: {jsonData}");
+
+                // AFK 모달 표시를 위해 AFK_VERIFY 이벤트와 동일하게 처리
+                Debug.Log("[MessageHandler] AFK_MODE_ACTIVATED로 인한 AFK 모달 표시 트리거");
+                OnAfkVerifyReceived?.Invoke();
+            }
+            else
+            {
+                Debug.Log("[MessageHandler] AFK 모드 활성화");
+                // 데이터가 없어도 AFK 모달은 표시해야 함
+                OnAfkVerifyReceived?.Invoke();
             }
         }
         
@@ -1455,10 +1556,100 @@ namespace Features.Multi.Net
             // 채팅 성공은 단순히 로그만 출력하고 특별한 처리는 하지 않음
         }
         
+        /// <summary>
+        /// JSON 문자열에서 scores Dictionary를 수동 파싱 (Unity JsonUtility Dictionary 미지원 해결)
+        /// </summary>
+        /// <param name="jsonString">GAME_RESULT JSON 문자열</param>
+        /// <returns>파싱된 scores Dictionary</returns>
+        private System.Collections.Generic.Dictionary<string, int> ParseScoresDictionary(string jsonString)
+        {
+            var scores = new System.Collections.Generic.Dictionary<string, int>();
+
+            try
+            {
+                // "scores":{...} 부분 찾기
+                int scoresIndex = jsonString.IndexOf("\"scores\":");
+                if (scoresIndex == -1)
+                {
+                    Debug.LogWarning("[MessageHandler] JSON에서 'scores' 필드를 찾을 수 없습니다");
+                    return scores;
+                }
+
+                // scores 객체 시작점 찾기
+                int openBraceIndex = jsonString.IndexOf('{', scoresIndex);
+                if (openBraceIndex == -1)
+                {
+                    Debug.LogWarning("[MessageHandler] scores 객체 시작을 찾을 수 없습니다");
+                    return scores;
+                }
+
+                // scores 객체 끝점 찾기 (중첩된 {} 고려)
+                int braceCount = 0;
+                int closeBraceIndex = -1;
+                for (int i = openBraceIndex; i < jsonString.Length; i++)
+                {
+                    if (jsonString[i] == '{') braceCount++;
+                    else if (jsonString[i] == '}')
+                    {
+                        braceCount--;
+                        if (braceCount == 0)
+                        {
+                            closeBraceIndex = i;
+                            break;
+                        }
+                    }
+                }
+
+                if (closeBraceIndex == -1)
+                {
+                    Debug.LogWarning("[MessageHandler] scores 객체 끝을 찾을 수 없습니다");
+                    return scores;
+                }
+
+                // scores 객체 문자열 추출
+                string scoresJson = jsonString.Substring(openBraceIndex, closeBraceIndex - openBraceIndex + 1);
+
+                // 간단한 파싱: {"key1":value1,"key2":value2,...} 형태
+                scoresJson = scoresJson.Trim('{', '}');
+                if (string.IsNullOrEmpty(scoresJson))
+                {
+                    Debug.Log("[MessageHandler] scores 객체가 비어있습니다");
+                    return scores;
+                }
+
+                // 키-값 쌍 분리
+                string[] pairs = scoresJson.Split(',');
+                foreach (string pair in pairs)
+                {
+                    string[] keyValue = pair.Split(':');
+                    if (keyValue.Length == 2)
+                    {
+                        string key = keyValue[0].Trim().Trim('"');
+                        if (int.TryParse(keyValue[1].Trim(), out int value))
+                        {
+                            scores[key] = value;
+                        }
+                    }
+                }
+
+                Debug.Log($"[MessageHandler] scores Dictionary 파싱 성공: {scores.Count}개 플레이어");
+                foreach (var kvp in scores)
+                {
+                    Debug.Log($"[MessageHandler] - {kvp.Key}: {kvp.Value}점");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[MessageHandler] scores Dictionary 파싱 실패: {ex.Message}");
+            }
+
+            return scores;
+        }
+
         // ========================================
         // Public 메서드들 (외부에서 직접 호출)
         // ========================================
-        
+
         /// <summary>
         /// 외부에서 에러를 직접 전달할 때 사용 (NetworkManager용)
         /// </summary>

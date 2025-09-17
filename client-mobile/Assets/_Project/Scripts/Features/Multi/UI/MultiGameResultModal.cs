@@ -46,6 +46,12 @@ namespace Features.Multi.UI
         private NetModels.UserInfo myUpdatedStats = null;
         private MultiModels.PlayerColor winnerColor = MultiModels.PlayerColor.None;
         private bool isWaitingForStats = false;
+
+        // 새로운 GAME_RESULT 데이터
+        private GameResultData currentGameResult = null;
+
+        // 통계 대기 코루틴 참조 (중복 실행 방지)
+        private Coroutine waitForStatsCoroutine = null;
         
         /// <summary>
         /// 플레이어 게임 결과 데이터
@@ -65,74 +71,137 @@ namespace Features.Multi.UI
         
         private void Awake()
         {
+            Debug.Log("[MultiGameResultModal] ===== Awake() 시작 =====");
+
             // NetworkManager 참조 자동 탐색
             if (networkManager == null)
             {
                 networkManager = FindObjectOfType<NetworkManager>();
             }
-            
+
             // 버튼 이벤트 연결
             if (closeButton != null)
             {
                 closeButton.onClick.AddListener(HideModal);
             }
-            
+
             if (backgroundButton != null)
             {
                 backgroundButton.onClick.AddListener(HideModal);
             }
-            
+
             if (toLobbyButton != null)
             {
                 toLobbyButton.onClick.AddListener(OnToLobbyClicked);
             }
-            
+
             // 초기에는 모달 숨김
             if (modalPanel != null)
             {
                 modalPanel.SetActive(false);
             }
+
+            // ⭐ 이벤트 구독을 Awake()에서 실행 (GameObject가 비활성화되어도 실행됨)
+            SubscribeToEvents();
         }
-        
-        private void OnEnable()
+
+        /// <summary>
+        /// 네트워크 이벤트 구독 (GameObject가 비활성화되어 있어도 실행되도록)
+        /// </summary>
+        private void SubscribeToEvents()
         {
-            // 게임 종료 관련 이벤트 구독
             if (networkManager != null)
             {
                 networkManager.OnGameEnded += OnGameEnded;
                 networkManager.OnMyStatsUpdated += OnMyStatsUpdated;
-                Debug.Log("[MultiGameResultModal] 게임 결과 이벤트 구독 완료");
+                networkManager.OnGameResultReceived += OnGameResultReceived;
+                Debug.Log("[MultiGameResultModal] 게임 결과 이벤트 구독 완료 (Awake)");
             }
             else
             {
                 Debug.LogWarning("[MultiGameResultModal] NetworkManager를 찾을 수 없습니다!");
+
+                // NetworkManager를 다시 찾기 시도 (늦은 초기화 대비)
+                StartCoroutineSafely(RetrySubscribeToEvents());
             }
+        }
+
+        /// <summary>
+        /// GameObject 활성화 상태를 확인하고 안전하게 코루틴 시작
+        /// </summary>
+        private void StartCoroutineSafely(System.Collections.IEnumerator coroutine)
+        {
+            if (!gameObject.activeInHierarchy)
+            {
+                Debug.Log("[MultiGameResultModal] GameObject가 비활성화 상태 - 코루틴 시작을 위해 활성화");
+                gameObject.SetActive(true);
+            }
+
+            StartCoroutine(coroutine);
+        }
+
+        /// <summary>
+        /// NetworkManager가 준비될 때까지 이벤트 구독 재시도
+        /// </summary>
+        private System.Collections.IEnumerator RetrySubscribeToEvents()
+        {
+            float retryTime = 0f;
+            const float maxRetryTime = 5f; // 최대 5초 대기
+
+            while (networkManager == null && retryTime < maxRetryTime)
+            {
+                yield return new WaitForSeconds(0.5f);
+                retryTime += 0.5f;
+
+                networkManager = FindObjectOfType<NetworkManager>();
+                if (networkManager != null)
+                {
+                    Debug.Log("[MultiGameResultModal] NetworkManager 재탐색 성공, 이벤트 구독 중");
+                    SubscribeToEvents();
+                    break;
+                }
+            }
+
+            if (networkManager == null)
+            {
+                Debug.LogError("[MultiGameResultModal] NetworkManager를 찾을 수 없습니다! 이벤트 구독 실패");
+            }
+        }
+        
+        private void OnEnable()
+        {
+            // 이벤트 구독은 이제 Awake()에서 처리됨
+            Debug.Log("[MultiGameResultModal] 컴포넌트 활성화됨");
         }
         
         private void OnDisable()
         {
-            // 이벤트 구독 해제
-            if (networkManager != null)
-            {
-                networkManager.OnGameEnded -= OnGameEnded;
-                networkManager.OnMyStatsUpdated -= OnMyStatsUpdated;
-                Debug.Log("[MultiGameResultModal] 게임 결과 이벤트 구독 해제 완료");
-            }
+            // 이벤트 구독 해제는 OnDestroy에서 처리됨
+            Debug.Log("[MultiGameResultModal] 컴포넌트 비활성화됨");
         }
         
         private void OnDestroy()
         {
+            // 네트워크 이벤트 구독 해제
+            if (networkManager != null)
+            {
+                networkManager.OnGameEnded -= OnGameEnded;
+                networkManager.OnMyStatsUpdated -= OnMyStatsUpdated;
+                networkManager.OnGameResultReceived -= OnGameResultReceived;
+                Debug.Log("[MultiGameResultModal] 게임 결과 이벤트 구독 해제 완료");
+            }
+
             // 버튼 이벤트 해제
             if (closeButton != null)
             {
                 closeButton.onClick.RemoveListener(HideModal);
             }
-            
+
             if (backgroundButton != null)
             {
                 backgroundButton.onClick.RemoveListener(HideModal);
             }
-            
+
             if (toLobbyButton != null)
             {
                 toLobbyButton.onClick.RemoveListener(OnToLobbyClicked);
@@ -144,16 +213,31 @@ namespace Features.Multi.UI
         /// </summary>
         private void OnGameEnded(MultiModels.PlayerColor winner)
         {
-            Debug.Log($"[MultiGameResultModal] 게임 종료 - 승자: {winner}");
-            
+            Debug.Log($"[MultiGameResultModal] ===== OnGameEnded() 호출됨 - 승자: {winner} =====");
+
+            // GameObject가 비활성화되어 있으면 활성화 (코루틴 시작을 위해)
+            if (!gameObject.activeInHierarchy)
+            {
+                Debug.Log("[MultiGameResultModal] GameObject가 비활성화 상태 - 코루틴 시작을 위해 활성화");
+                gameObject.SetActive(true);
+            }
+
+            // 기존 통계 대기 코루틴이 실행 중이면 중지 (중복 실행 방지)
+            if (waitForStatsCoroutine != null)
+            {
+                Debug.Log("[MultiGameResultModal] 기존 통계 대기 코루틴 중지 - 중복 OnGameEnded 호출 감지");
+                StopCoroutine(waitForStatsCoroutine);
+                waitForStatsCoroutine = null;
+            }
+
             winnerColor = winner;
             isWaitingForStats = true;
-            
+
             // 현재 게임 상태에서 결과 데이터 수집
             CollectGameResults();
-            
+
             // 통계 업데이트 대기 (2초 후에도 안 오면 그냥 표시)
-            StartCoroutine(WaitForStatsUpdate());
+            waitForStatsCoroutine = StartCoroutine(WaitForStatsUpdate());
         }
         
         /// <summary>
@@ -162,12 +246,36 @@ namespace Features.Multi.UI
         private void OnMyStatsUpdated(NetModels.UserInfo updatedStats)
         {
             Debug.Log($"[MultiGameResultModal] 내 통계 업데이트 수신: 레벨 {updatedStats.level}");
-            
+
             myUpdatedStats = updatedStats;
             isWaitingForStats = false;
-            
+
             // 모달 표시
             ShowGameResultModal();
+        }
+
+        /// <summary>
+        /// 새로운 GAME_RESULT 데이터 수신 이벤트 처리
+        /// </summary>
+        private void OnGameResultReceived(GameResultData gameResult)
+        {
+            Debug.Log($"[MultiGameResultModal] GAME_RESULT 데이터 수신: 순위={gameResult.myRank}, 점수={gameResult.myScore}, 경험치={gameResult.expGained}, 레벨업={gameResult.levelUp}");
+
+            currentGameResult = gameResult;
+
+            // GAME_RESULT 데이터를 받았으므로 기존 대기 상태 해제 (이중 처리 방지)
+            isWaitingForStats = false;
+
+            // 통계 대기 코루틴이 실행 중이면 중지 (GAME_RESULT 수신됨)
+            if (waitForStatsCoroutine != null)
+            {
+                Debug.Log("[MultiGameResultModal] GAME_RESULT 수신으로 통계 대기 코루틴 중지");
+                StopCoroutine(waitForStatsCoroutine);
+                waitForStatsCoroutine = null;
+            }
+
+            // 새로운 데이터로 결과 모달 직접 표시
+            ShowGameResultWithNewData();
         }
         
         /// <summary>
@@ -187,7 +295,13 @@ namespace Features.Multi.UI
             {
                 Debug.LogWarning("[MultiGameResultModal] 통계 업데이트를 기다렸지만 수신하지 못했습니다. 결과 모달을 표시합니다.");
                 isWaitingForStats = false;
+                waitForStatsCoroutine = null; // 코루틴 참조 초기화
                 ShowGameResultModal();
+            }
+            else
+            {
+                // 정상적으로 GAME_RESULT를 받아서 종료된 경우
+                waitForStatsCoroutine = null; // 코루틴 참조 초기화
             }
         }
         
@@ -267,16 +381,40 @@ namespace Features.Multi.UI
         private void ShowGameResultModal()
         {
             Debug.Log("[MultiGameResultModal] 게임 결과 모달 표시");
-            
+
             // 부모 GameObject 활성화
             if (!gameObject.activeInHierarchy)
             {
                 gameObject.SetActive(true);
             }
-            
+
             // UI 업데이트
             UpdateResultUI();
-            
+
+            // 모달 표시
+            if (modalPanel != null)
+            {
+                modalPanel.SetActive(true);
+                EnsureModalOnTop();
+            }
+        }
+
+        /// <summary>
+        /// 새로운 GAME_RESULT 데이터로 모달 표시
+        /// </summary>
+        private void ShowGameResultWithNewData()
+        {
+            Debug.Log("[MultiGameResultModal] 새로운 GAME_RESULT 데이터로 모달 표시");
+
+            // 부모 GameObject 활성화
+            if (!gameObject.activeInHierarchy)
+            {
+                gameObject.SetActive(true);
+            }
+
+            // 새로운 데이터로 UI 업데이트
+            UpdateResultUIWithNewData();
+
             // 모달 표시
             if (modalPanel != null)
             {
@@ -451,6 +589,226 @@ namespace Features.Multi.UI
         }
         
         /// <summary>
+        /// 새로운 GAME_RESULT 데이터로 결과 UI 업데이트
+        /// </summary>
+        private void UpdateResultUIWithNewData()
+        {
+            if (currentGameResult == null)
+            {
+                Debug.LogWarning("[MultiGameResultModal] currentGameResult가 null입니다. 기존 방식으로 처리");
+                UpdateResultUI();
+                return;
+            }
+
+            Debug.Log("[MultiGameResultModal] 새로운 GAME_RESULT 데이터로 UI 업데이트");
+
+            // 타이틀 설정
+            if (titleText != null)
+            {
+                bool isWinner = currentGameResult.winners != null &&
+                               currentGameResult.winners.Length > 0 &&
+                               currentGameResult.myRank == 1;
+
+                string title = isWinner ? "🏆 승리!" : $"게임 종료 - {currentGameResult.myRank}등";
+                titleText.text = title;
+                titleText.color = isWinner ? Color.yellow : Color.white;
+            }
+
+            // 내 결과 표시 (새로운 데이터 사용)
+            UpdateMyResultsWithNewData();
+
+            // 플레이어 순위 표시 (scores 데이터 사용)
+            UpdatePlayerRankingsWithNewData();
+
+            // 게임 통계 표시 (새로운 데이터 사용)
+            UpdateGameStatsWithNewData();
+        }
+
+        /// <summary>
+        /// 새로운 데이터로 내 결과 정보 업데이트
+        /// </summary>
+        private void UpdateMyResultsWithNewData()
+        {
+            if (currentGameResult == null) return;
+
+            // 내 순위와 점수
+            if (myRankText != null)
+            {
+                myRankText.text = $"{currentGameResult.myRank}등";
+                myRankText.color = currentGameResult.myRank == 1 ? Color.yellow :
+                                  currentGameResult.myRank == 2 ? Color.cyan :
+                                  currentGameResult.myRank == 3 ? Color.green : Color.white;
+            }
+
+            if (myScoreText != null)
+            {
+                myScoreText.text = $"{currentGameResult.myScore}점";
+            }
+
+            // 경험치 및 레벨업 정보
+            if (expGainedText != null)
+            {
+                expGainedText.text = $"+{currentGameResult.expGained} EXP";
+                expGainedText.color = Color.cyan;
+            }
+
+            // 레벨업 확인
+            if (newLevelText != null)
+            {
+                if (currentGameResult.levelUp)
+                {
+                    newLevelText.text = $"Level UP! → {currentGameResult.newLevel}";
+                    newLevelText.gameObject.SetActive(true);
+                    newLevelText.color = Color.yellow;
+                    Debug.Log($"[MultiGameResultModal] 레벨업 표시: {currentGameResult.newLevel}");
+                }
+                else
+                {
+                    newLevelText.text = $"Level {currentGameResult.newLevel}";
+                    newLevelText.gameObject.SetActive(true);
+                    newLevelText.color = Color.white;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 새로운 데이터로 플레이어 순위 목록 업데이트
+        /// </summary>
+        private void UpdatePlayerRankingsWithNewData()
+        {
+            if (currentGameResult == null || currentGameResult.scores == null) return;
+
+            if (playerRankingParent == null || playerRankingItemPrefab == null)
+            {
+                Debug.LogWarning("[MultiGameResultModal] PlayerRanking UI가 설정되지 않았습니다!");
+                return;
+            }
+
+            // 기존 아이템 제거
+            foreach (Transform child in playerRankingParent)
+            {
+                if (child != playerRankingItemPrefab.transform)
+                {
+                    Destroy(child.gameObject);
+                }
+            }
+
+            // scores 딕셔너리에서 빈 슬롯 플레이어 필터링 및 점수 순 정렬
+            var validPlayers = currentGameResult.scores
+                .Where(kvp => !networkManager.IsEmptySlotPlayer(kvp.Key) && kvp.Value > 0) // 빈 슬롯과 0점 플레이어 제외
+                .OrderByDescending(kvp => kvp.Value)
+                .ToList();
+
+            Debug.Log($"[MultiGameResultModal] 유효한 플레이어 수: {validPlayers.Count} (전체: {currentGameResult.scores.Count})");
+
+            // 순위별로 아이템 생성
+            for (int i = 0; i < validPlayers.Count; i++)
+            {
+                var playerScore = validPlayers[i];
+                int rank = i + 1;
+                bool isMe = (rank == currentGameResult.myRank); // 내 순위와 비교
+                bool isWinner = currentGameResult.winners != null &&
+                               currentGameResult.winners.Contains(playerScore.Key);
+
+                // user_name을 display_name으로 변환
+                string displayName = networkManager.GetPlayerDisplayName(playerScore.Key);
+
+                Debug.Log($"[MultiGameResultModal] 플레이어 순위 생성: {rank}등 - {playerScore.Key} → {displayName} ({playerScore.Value}점)");
+
+                CreatePlayerRankingItemWithNewData(rank, displayName, playerScore.Value, isMe, isWinner);
+            }
+        }
+
+        /// <summary>
+        /// 새로운 데이터로 플레이어 순위 아이템 생성
+        /// </summary>
+        private void CreatePlayerRankingItemWithNewData(int rank, string playerName, int score, bool isMe, bool isWinner)
+        {
+            var itemObj = Instantiate(playerRankingItemPrefab, playerRankingParent);
+            itemObj.SetActive(true);
+
+            // 순위 텍스트
+            var rankText = itemObj.transform.Find("RankText")?.GetComponent<TextMeshProUGUI>();
+            if (rankText != null)
+            {
+                rankText.text = $"{rank}";
+                rankText.color = rank == 1 ? Color.yellow :
+                                rank == 2 ? Color.cyan :
+                                rank == 3 ? Color.green : Color.white;
+            }
+
+            // 플레이어 이름
+            var nameText = itemObj.transform.Find("NameText")?.GetComponent<TextMeshProUGUI>();
+            if (nameText != null)
+            {
+                nameText.text = playerName;
+                nameText.color = isMe ? Color.yellow : Color.white;
+                if (isMe)
+                {
+                    nameText.text += " (나)";
+                }
+            }
+
+            // 점수
+            var scoreText = itemObj.transform.Find("ScoreText")?.GetComponent<TextMeshProUGUI>();
+            if (scoreText != null)
+            {
+                scoreText.text = $"{score}점";
+            }
+
+            // 플레이어 색상 표시 (기본 색상으로 설정)
+            var colorImage = itemObj.transform.Find("ColorImage")?.GetComponent<Image>();
+            if (colorImage != null)
+            {
+                // rank에 따라 색상 할당 (임시)
+                MultiModels.PlayerColor playerColor = (MultiModels.PlayerColor)(rank % 4 + 1);
+                colorImage.color = GetPlayerColor(playerColor);
+            }
+        }
+
+        /// <summary>
+        /// 새로운 데이터로 게임 통계 정보 업데이트
+        /// </summary>
+        private void UpdateGameStatsWithNewData()
+        {
+            if (currentGameResult == null) return;
+
+            if (gameDurationText != null)
+            {
+                int minutes = currentGameResult.gameTime / 60;
+                int seconds = currentGameResult.gameTime % 60;
+                gameDurationText.text = $"게임 시간: {minutes:D2}:{seconds:D2}";
+            }
+
+            if (totalBlocksPlacedText != null)
+            {
+                // 유효한 플레이어들의 점수 합계만 계산 (빈 슬롯 제외)
+                int totalScore = 0;
+                if (currentGameResult.scores != null)
+                {
+                    totalScore = currentGameResult.scores
+                        .Where(kvp => !networkManager.IsEmptySlotPlayer(kvp.Key) && kvp.Value > 0)
+                        .Sum(kvp => kvp.Value);
+                }
+                totalBlocksPlacedText.text = $"전체 점수 합계: {totalScore}점";
+            }
+
+            if (gameResultSummaryText != null)
+            {
+                if (currentGameResult.winners != null && currentGameResult.winners.Length > 0)
+                {
+                    string winnerUserName = currentGameResult.winners[0];
+                    string winnerDisplayName = networkManager.GetPlayerDisplayName(winnerUserName);
+                    gameResultSummaryText.text = $"🏆 {winnerDisplayName}님이 승리했습니다!";
+                }
+                else
+                {
+                    gameResultSummaryText.text = "게임이 종료되었습니다.";
+                }
+            }
+        }
+
+        /// <summary>
         /// 게임 통계 정보 업데이트
         /// </summary>
         private void UpdateGameStats()
@@ -460,13 +818,13 @@ namespace Features.Multi.UI
                 // 실제로는 게임 시작 시간을 기록해서 계산해야 함
                 gameDurationText.text = "게임 시간: 15:23";
             }
-            
+
             if (totalBlocksPlacedText != null)
             {
                 int totalBlocks = playerResults.Sum(p => p.blocksPlaced);
                 totalBlocksPlacedText.text = $"총 배치된 블록: {totalBlocks}개";
             }
-            
+
             if (gameResultSummaryText != null)
             {
                 var winner = playerResults.FirstOrDefault(p => p.isWinner);
@@ -497,6 +855,7 @@ namespace Features.Multi.UI
             playerResults.Clear();
             myUpdatedStats = null;
             isWaitingForStats = false;
+            currentGameResult = null;
         }
         
         /// <summary>
