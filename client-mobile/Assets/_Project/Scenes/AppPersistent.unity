@@ -240,7 +240,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c0b6b8e71d4a39947aee0d4376e4a999, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  isDevelopmentMode: 1
+  isDevelopmentMode: 0
   devTcpPort: 9999
   devApiPort: 8080
   devAuthPort: 9000
