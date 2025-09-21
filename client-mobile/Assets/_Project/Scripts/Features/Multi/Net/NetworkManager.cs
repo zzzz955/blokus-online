@@ -829,31 +829,52 @@ namespace Features.Multi.Net
                 return;
             }
 
-            // 서버 세션 제거 상황 처리
-            if (currentRoomInfo != null)
+            // 모든 멀티플레이 연결 해제를 동일하게 처리
+            string locationInfo = currentRoomInfo != null ? $"방: {currentRoomInfo.roomName}" : "로비";
+            Debug.Log($"[NetworkManager] {locationInfo}에서 연결 해제 감지 - MainScene 복귀 처리 시작");
+
+            // 로비든 게임룸이든 모두 동일하게 MainScene 복귀 처리
+            HandleAllDisconnections();
+        }
+
+        /// <summary>
+        /// 모든 멀티플레이 연결 해제 통합 처리
+        /// 로비/게임룸 구분 없이 동일하게 MainScene 복귀 처리
+        /// </summary>
+        private void HandleAllDisconnections()
+        {
+            Debug.Log("[NetworkManager] 멀티플레이 연결 해제 - 통합 복구 처리 시작");
+
+            // LoadingOverlay 표시
+            App.UI.LoadingOverlay.Show("연결 해제 감지 - MainScene으로 복귀 중...");
+
+            // 인증 상태 리셋 (로그아웃, 서버 연결 끊김 등 모든 경우)
+            ResetAuthenticationStateForMainSceneReturn();
+
+            // 현재 방 정보 초기화 (서버에서 이미 퇴장 처리됨)
+            currentRoomInfo = null;
+            currentPlayerDataList = null;
+            lastRoomInfoData = null;
+            isCurrentUserRoomCreator = false;
+
+            // MultiGameplayScene이 활성화되어 있는지 확인
+            bool isMultiGameplayActive = UnityEngine.SceneManagement.SceneManager.GetSceneByName("MultiGameplayScene").isLoaded;
+
+            if (isMultiGameplayActive)
             {
-                // 방/게임 중이었던 경우 - 서버에서 자동 퇴장 처리됨
-                Debug.Log($"[NetworkManager] 방/게임 중 연결 해제 감지 - 방: {currentRoomInfo.roomName}, 상태 복구 시작");
-                HandleRoomDisconnection();
+                Debug.Log("[NetworkManager] MultiGameplayScene 활성 - MainScene 복귀 처리 시작");
+                StartCoroutine(HandleMultiGameplayToMainRecovery());
             }
             else
             {
-                // 로비에 있던 경우 - 단순 재연결
-                Debug.Log("[NetworkManager] 로비에서 연결 해제 - 단순 재연결 시도");
-                if (reconnectAttempts < maxReconnectAttempts)
-                {
-                    StartCoroutine(AttemptReconnect());
-                }
-                else
-                {
-                    Debug.LogError($"[NetworkManager] 로비 재연결 최대 시도 횟수 초과 - DontDestroyOnLoad 객체 정리");
-                    HandleReconnectionFailure();
-                }
+                // MultiCore에만 있는 경우 바로 MainScene 복귀
+                Debug.Log("[NetworkManager] MultiCore에서 연결 해제 - MainScene 복귀 처리");
+                StartCoroutine(HandleMultiCoreToMainRecovery());
             }
         }
 
         /// <summary>
-        /// 방/게임 중 연결 해제 시 상태 복구
+        /// 방/게임 중 연결 해제 시 상태 복구 (기존 메서드 유지)
         /// MultiGameplayScene → MultiCore로 복귀 후 재연결
         /// </summary>
         private void HandleRoomDisconnection()
@@ -940,32 +961,203 @@ namespace Features.Multi.Net
                 Debug.LogError("[NetworkManager] SceneFlowController를 찾을 수 없음");
             }
 
-            // 4. 재연결 시도
+            // 4. MainScene으로 완전 복귀 (서버 인증 상태 재검증을 위해)
             if (recoverySuccess)
             {
-                Debug.Log("[NetworkManager] MultiCore 복귀 완료 - 재연결 시도");
+                Debug.Log("[NetworkManager] MultiCore 복귀 완료 - MainScene으로 이동하여 인증 상태 재검증");
+                App.UI.LoadingOverlay.Hide();
+
                 yield return new WaitForSeconds(1f);
 
-                if (reconnectAttempts < maxReconnectAttempts)
+                // DontDestroyOnLoad 객체들 정리 (MainScene 이동 전)
+                Debug.Log("[NetworkManager] 서버 연결 해제로 인한 MainScene 복귀 - DontDestroyOnLoad 객체 정리");
+                Features.Multi.Core.MultiCoreBootstrap.DestroyAllDontDestroyOnLoadObjects();
+
+                // 중복 처리 방지 플래그 해제
+                isHandlingDisconnection = false;
+
+                // MainScene으로 완전 복귀
+                if (App.Core.SceneFlowController.Instance != null)
                 {
-                    StartCoroutine(AttemptReconnect());
+                    App.Core.SceneFlowController.Instance.StartExitMultiToMain();
+
+                    // MainScene 이동 완료 후 연결 끊김 모달 표시
+                    StartCoroutine(ShowNetworkDisconnectedModalAfterSceneTransition());
                 }
                 else
                 {
-                    Debug.LogError($"[NetworkManager] 방/게임 복구 후 재연결 최대 시도 횟수 초과 - DontDestroyOnLoad 객체 정리");
-                    HandleReconnectionFailure();
+                    Debug.LogError("[NetworkManager] SceneFlowController를 찾을 수 없음");
                 }
             }
             else
             {
                 App.UI.LoadingOverlay.Hide();
                 Debug.LogError("[NetworkManager] MultiCore 복귀 실패 - MainScene으로 복귀");
+
+                // DontDestroyOnLoad 객체들 정리 (복귀 실패 시에도)
+                Debug.Log("[NetworkManager] MultiCore 복귀 실패로 인한 MainScene 복귀 - DontDestroyOnLoad 객체 정리");
+                Features.Multi.Core.MultiCoreBootstrap.DestroyAllDontDestroyOnLoadObjects();
+
+                // 중복 처리 방지 플래그 해제
+                isHandlingDisconnection = false;
+
                 if (App.Core.SceneFlowController.Instance != null)
                 {
                     App.Core.SceneFlowController.Instance.StartExitMultiToMain();
+
+                    // MainScene 이동 완료 후 연결 끊김 모달 표시
+                    StartCoroutine(ShowNetworkDisconnectedModalAfterSceneTransition());
+                }
+                else
+                {
+                    Debug.LogError("[NetworkManager] SceneFlowController를 찾을 수 없음");
                 }
             }
         }
+
+        /// <summary>
+        /// MultiGameplayScene → MainScene 직접 복귀 처리
+        /// </summary>
+        private System.Collections.IEnumerator HandleMultiGameplayToMainRecovery()
+        {
+            Debug.Log("[NetworkManager] MultiGameplayScene → MainScene 직접 복귀 시작");
+
+            // 1. 사용자에게 알림
+            if (SystemMessageManager.Instance != null)
+            {
+                SystemMessageManager.ShowToast("연결이 끊어져 메인 화면으로 복귀합니다.", MessagePriority.Warning);
+            }
+
+            yield return new WaitForSeconds(1f);
+
+            // 2. DontDestroyOnLoad 객체들 정리
+            Debug.Log("[NetworkManager] 서버 연결 해제로 인한 MainScene 복귀 - DontDestroyOnLoad 객체 정리");
+            Features.Multi.Core.MultiCoreBootstrap.DestroyAllDontDestroyOnLoadObjects();
+
+            // 3. 중복 처리 방지 플래그 해제
+            isHandlingDisconnection = false;
+
+            // 4. MainScene으로 직접 복귀
+            if (App.Core.SceneFlowController.Instance != null)
+            {
+                App.Core.SceneFlowController.Instance.StartExitMultiToMain();
+
+                // 씬 전환 후 모달 표시
+                StartCoroutine(ShowNetworkDisconnectedModalAfterSceneTransition());
+            }
+            else
+            {
+                App.UI.LoadingOverlay.Hide();
+                Debug.LogError("[NetworkManager] SceneFlowController를 찾을 수 없음");
+            }
+        }
+
+        /// <summary>
+        /// MultiCore → MainScene 직접 복귀 처리
+        /// </summary>
+        private System.Collections.IEnumerator HandleMultiCoreToMainRecovery()
+        {
+            Debug.Log("[NetworkManager] MultiCore → MainScene 직접 복귀 시작");
+
+            // 1. 사용자에게 알림
+            if (SystemMessageManager.Instance != null)
+            {
+                SystemMessageManager.ShowToast("연결이 끊어져 메인 화면으로 복귀합니다.", MessagePriority.Warning);
+            }
+
+            yield return new WaitForSeconds(1f);
+
+            // 2. DontDestroyOnLoad 객체들 정리
+            Debug.Log("[NetworkManager] 로비 연결 해제로 인한 MainScene 복귀 - DontDestroyOnLoad 객체 정리");
+            Features.Multi.Core.MultiCoreBootstrap.DestroyAllDontDestroyOnLoadObjects();
+
+            // 3. 중복 처리 방지 플래그 해제
+            isHandlingDisconnection = false;
+
+            // 4. MainScene으로 직접 복귀 (MultiCore만 언로드)
+            if (App.Core.SceneFlowController.Instance != null)
+            {
+                App.Core.SceneFlowController.Instance.StartExitMultiToMain();
+
+                // 씬 전환 후 모달 표시
+                StartCoroutine(ShowNetworkDisconnectedModalAfterSceneTransition());
+            }
+            else
+            {
+                App.UI.LoadingOverlay.Hide();
+                Debug.LogError("[NetworkManager] SceneFlowController를 찾을 수 없음");
+            }
+        }
+
+        /// <summary>
+        /// MainScene 전환 완료 후 네트워크 연결 끊김 모달 표시
+        /// </summary>
+        private System.Collections.IEnumerator ShowNetworkDisconnectedModalAfterSceneTransition()
+        {
+            Debug.Log("[NetworkManager] MainScene 전환 완료 대기 시작");
+
+            // MainScene 전환 완료까지 최대 5초간 0.1초마다 체크
+            float maxWaitTime = 5f;
+            float checkInterval = 0.1f;
+            float elapsedTime = 0f;
+
+            while (elapsedTime < maxWaitTime)
+            {
+                var mainScene = UnityEngine.SceneManagement.SceneManager.GetSceneByName("MainScene");
+                if (mainScene.isLoaded && mainScene == UnityEngine.SceneManagement.SceneManager.GetActiveScene())
+                {
+                    // LoadingOverlay 숨김
+                    App.UI.LoadingOverlay.Hide();
+
+                    // 추가 안정화 대기 (UI 로딩 완료 보장)
+                    yield return new WaitForSeconds(0.5f);
+
+                    // 연결 끊김 알림 모달 표시
+                    Features.Multi.UI.NetworkDisconnectedModal.Show(
+                        title: "연결 끊김",
+                        message: "서버와의 연결이 끊어졌습니다.\n메인 화면으로 이동했습니다."
+                    );
+
+                    Debug.Log($"[NetworkManager] MainScene 전환 완료 ({elapsedTime:F1}초 후) - 연결 끊김 모달 표시됨");
+                    yield break;
+                }
+
+                yield return new WaitForSeconds(checkInterval);
+                elapsedTime += checkInterval;
+            }
+
+            // 최대 대기 시간 초과 시 강제로 처리
+            App.UI.LoadingOverlay.Hide();
+            Debug.LogWarning($"[NetworkManager] MainScene 전환 대기 시간 초과 ({maxWaitTime}초) - 강제로 알림 모달 표시");
+
+            Features.Multi.UI.NetworkDisconnectedModal.Show(
+                title: "연결 끊김",
+                message: "서버와의 연결이 끊어졌습니다.\n메인 화면으로 이동했습니다."
+            );
+        }
+
+
+        /// <summary>
+        /// MainScene 복귀를 위한 인증 상태 리셋
+        /// 로그아웃, 서버 연결 끊김 등 모든 멀티 모드 종료 시 호출
+        /// </summary>
+        private void ResetAuthenticationStateForMainSceneReturn()
+        {
+            Debug.Log("[NetworkManager] MainScene 복귀를 위한 인증 상태 리셋 시작");
+
+            // 인증 상태 초기화
+            isAuthenticated = false;
+            lastUsedToken = null;
+
+            // TCP 연결 정리
+            if (networkClient != null && networkClient.IsConnected())
+            {
+                networkClient.DisconnectFromServer();
+            }
+
+            Debug.Log("[NetworkManager] 인증 상태 리셋 완료 - 다음 멀티 모드 진입 시 JWT 인증 재수행");
+        }
+
 
         /// <summary>
         /// MultiGameplayScene만 언로드 (MultiCore는 유지)

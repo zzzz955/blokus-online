@@ -297,12 +297,8 @@ namespace Features.Multi.Core
             }
             
             // 이미 인증된 상태인지 확인
-            if (networkManager.IsAuthenticated())
-            {
-                Debug.Log("[MultiCoreBootstrap] 이미 사용자 인증 완료됨");
-                isAuthenticated = true;
-                yield break;
-            }
+            // 매번 JWT 토큰 기반 인증 수행 (캐시된 인증 상태 무시)
+            Debug.Log("[MultiCoreBootstrap] TCP 서버 연결 시도 - 매번 JWT 토큰 기반 인증 수행");
 
             if (loadingOverlay != null)
                 LoadingOverlay.Show("사용자 인증 중...");
