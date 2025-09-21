@@ -2,7 +2,10 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using Shared.Models;
+using Shared.UI;
 using Features.Multi.Net;
+using Features.Multi.UI;
+using App.UI;
 using MultiModels = Features.Multi.Models;
 
 namespace Features.Multi.Net
@@ -1566,11 +1569,140 @@ namespace Features.Multi.Net
                 Debug.LogError("[MessageHandler] ERROR 메시지 형식 오류");
                 return;
             }
-            
+
             string errorMessage = string.Join(":", parts, 1, parts.Length - 1);
             Debug.LogError($"[MessageHandler] 서버 에러: {errorMessage}");
-            
+
+            // 서버 에러를 토스트 메시지로 표시
+            ShowServerErrorToast(errorMessage);
+
             OnErrorReceived?.Invoke(errorMessage);
+        }
+
+        /// <summary>
+        /// 서버 에러를 사용자 친화적 토스트 메시지로 표시
+        /// </summary>
+        private void ShowServerErrorToast(string errorMessage)
+        {
+            if (string.IsNullOrEmpty(errorMessage))
+                return;
+
+            // 에러 메시지 파싱
+            var (errorType, userMessage, priority) = ParseServerErrorForToast(errorMessage);
+
+            // 인증 관련 에러는 더 강조된 메시지로 표시
+            if (IsAuthenticationError(errorType))
+            {
+                SystemMessageManager.ShowToast(userMessage, MessagePriority.Critical, 5f);
+                Debug.Log($"[MessageHandler] 인증 에러 토스트 표시: {userMessage}");
+            }
+            else
+            {
+                SystemMessageManager.ShowToast(userMessage, priority, 4f);
+                Debug.Log($"[MessageHandler] 서버 에러 토스트 표시: {userMessage}");
+            }
+        }
+
+        /// <summary>
+        /// 서버 에러 메시지를 토스트용으로 파싱
+        /// </summary>
+        private (string errorType, string userMessage, MessagePriority priority) ParseServerErrorForToast(string errorMessage)
+        {
+            // 에러 형식: "ERROR_TYPE:사용자 메시지" 또는 단순 메시지
+            string[] parts = errorMessage.Split(':', 2);
+
+            if (parts.Length >= 2)
+            {
+                string errorType = parts[0].Trim();
+                string originalMessage = parts[1].Trim();
+
+                // 사용자 친화적 메시지로 변환
+                string userMessage = ConvertToUserFriendlyMessage(errorType, originalMessage);
+                MessagePriority priority = GetErrorPriorityForToast(errorType);
+
+                return (errorType, userMessage, priority);
+            }
+            else
+            {
+                // 단순 메시지인 경우
+                return ("UNKNOWN", errorMessage, MessagePriority.Error);
+            }
+        }
+
+        /// <summary>
+        /// 인증 에러인지 확인
+        /// </summary>
+        private bool IsAuthenticationError(string errorType)
+        {
+            return errorType.Contains("DUPLICATE_USER_IP") ||
+                   errorType.Contains("AUTHENTICATION_FAILED") ||
+                   errorType.Contains("INVALID_TOKEN") ||
+                   errorType.Contains("TOKEN_EXPIRED") ||
+                   errorType.Contains("UNAUTHORIZED");
+        }
+
+        /// <summary>
+        /// 에러 타입에 따른 토스트 우선순위 결정
+        /// </summary>
+        private MessagePriority GetErrorPriorityForToast(string errorType)
+        {
+            if (IsAuthenticationError(errorType))
+                return MessagePriority.Critical;
+
+            switch (errorType)
+            {
+                case "CONNECTION_LOST":
+                case "TIMEOUT":
+                    return MessagePriority.Error;
+                case "ROOM_FULL":
+                case "INVALID_MOVE":
+                    return MessagePriority.Warning;
+                default:
+                    return MessagePriority.Error;
+            }
+        }
+
+        /// <summary>
+        /// 사용자 친화적 메시지로 변환
+        /// </summary>
+        private string ConvertToUserFriendlyMessage(string errorType, string originalMessage)
+        {
+            switch (errorType)
+            {
+                case "DUPLICATE_USER_IP":
+                    return "이미 다른 곳에서 로그인되어 있습니다.\n메인 화면으로 이동합니다.";
+                case "AUTHENTICATION_FAILED":
+                    return "인증에 실패했습니다.\n메인 화면으로 이동합니다.";
+                case "INVALID_TOKEN":
+                case "TOKEN_EXPIRED":
+                    return "로그인 정보가 만료되었습니다.\n메인 화면으로 이동합니다.";
+                case "ROOM_FULL":
+                    return "방이 가득 찼습니다.";
+                case "CONNECTION_LOST":
+                    return "서버와의 연결이 끊어졌습니다.";
+                case "TIMEOUT":
+                    return "요청 시간이 초과되었습니다.";
+                case "INVALID_MOVE":
+                    return "잘못된 동작입니다.";
+                default:
+                    // 원본 메시지가 한글이면 그대로 사용, 아니면 일반적인 메시지
+                    return ContainsKorean(originalMessage) ? originalMessage : "서버 오류가 발생했습니다.";
+            }
+        }
+
+        /// <summary>
+        /// 문자열에 한글이 포함되어 있는지 확인
+        /// </summary>
+        private bool ContainsKorean(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return false;
+
+            foreach (char c in text)
+            {
+                if (c >= 0xAC00 && c <= 0xD7AF) // 한글 완성형 범위
+                    return true;
+            }
+            return false;
         }
         
         /// <summary>

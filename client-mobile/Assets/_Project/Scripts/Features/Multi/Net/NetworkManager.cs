@@ -552,11 +552,8 @@ namespace Features.Multi.Net
                 // 에러 응답 핸들러 등록 (인증 관련 에러만 처리)
                 tempErrorHandler = (errorMessage) => {
                     if (authCompleted) return; // 이미 완료된 경우 무시
-                    
-                    if (errorMessage.Contains("인증 토큰이 유효하지 않습니다") || 
-                        errorMessage.Contains("authentication") ||
-                        errorMessage.Contains("토큰") ||
-                        errorMessage.Contains("AUTH"))
+
+                    if (IsAuthenticationRelatedError(errorMessage))
                     {
                         authCompleted = true;
                         Debug.Log($"[NetworkManager] 인증 실패 감지: {errorMessage}");
@@ -619,9 +616,35 @@ namespace Features.Multi.Net
                 Debug.LogWarning("[NetworkManager] TCP 서버에 연결되지 않았습니다.");
                 return false;
             }
-            
+
             // 모바일 클라이언트 전용 인증 요청 (기존 JWT 메시지와 구분)
             return networkClient.SendProtocolMessage("auth", "mobile_jwt", validatedToken);
+        }
+
+        /// <summary>
+        /// 인증 관련 에러인지 확인
+        /// </summary>
+        private bool IsAuthenticationRelatedError(string errorMessage)
+        {
+            if (string.IsNullOrEmpty(errorMessage))
+                return false;
+
+            // 로그에서 확인된 실제 에러들과 기존 에러들 포함
+            return errorMessage.Contains("DUPLICATE_IP_DIFFERENT_USER") ||
+                   errorMessage.Contains("DUPLICATE_USER_IP") ||
+                   errorMessage.Contains("AUTHENTICATION_FAILED") ||
+                   errorMessage.Contains("INVALID_TOKEN") ||
+                   errorMessage.Contains("TOKEN_EXPIRED") ||
+                   errorMessage.Contains("UNAUTHORIZED") ||
+                   errorMessage.Contains("AUTH_ERROR") ||
+                   errorMessage.Contains("인증 토큰이 유효하지 않습니다") ||
+                   errorMessage.Contains("authentication") ||
+                   errorMessage.Contains("토큰") ||
+                   errorMessage.Contains("AUTH") ||
+                   errorMessage.Contains("모바일 클라이언트 인증에 실패했습니다") ||
+                   errorMessage.Contains("이미 다른 계정이 로그인되어 있습니다") ||
+                   errorMessage.Contains("이 위치에서 이미") ||
+                   errorMessage.Contains("다른 사용자가 같은 IP");
         }
 
         /// <summary>

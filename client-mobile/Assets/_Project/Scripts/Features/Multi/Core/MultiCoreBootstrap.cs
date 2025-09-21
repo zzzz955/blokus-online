@@ -1,5 +1,6 @@
 using UnityEngine;
 using Features.Multi.Net;
+using Features.Multi.UI;
 using System.Collections;
 using App.Core;
 using App.UI;
@@ -102,18 +103,87 @@ namespace Features.Multi.Core
             if (debugMode)
                 Debug.Log($"[MultiCoreBootstrap] 네트워크 에러 감지: {errorMessage}");
 
-            // 인증 관련 에러인지 확인
-            if (errorMessage.Contains("인증 토큰이 유효하지 않습니다") ||
-                errorMessage.Contains("authentication") ||
-                errorMessage.Contains("토큰"))
+            // 인증 관련 에러인지 확인 (로그에서 확인된 실제 에러 포함)
+            if (IsAuthenticationError(errorMessage))
             {
                 Debug.LogError($"[MultiCoreBootstrap] 인증 실패 감지: {errorMessage}");
-                
+
                 // 인증 실패 상태로 설정
                 isAuthenticated = false;
-                
-                // MainScene으로 복귀 (MultiGameplayScene으로 가지 않음)
-                HandleConnectionFailure("인증에 실패하여 메인 화면으로 돌아갑니다.");
+
+                // 에러 타입별 처리
+                DisconnectReason reason = GetDisconnectReason(errorMessage);
+                string userMessage = GetAuthErrorMessage(errorMessage);
+
+                // MainScene으로 복귀 (재연결 시도 없음)
+                HandleConnectionFailureWithReason(reason, userMessage);
+            }
+        }
+
+        /// <summary>
+        /// 인증 에러인지 확인
+        /// </summary>
+        private bool IsAuthenticationError(string errorMessage)
+        {
+            return errorMessage.Contains("DUPLICATE_USER_IP") ||
+                   errorMessage.Contains("AUTHENTICATION_FAILED") ||
+                   errorMessage.Contains("INVALID_TOKEN") ||
+                   errorMessage.Contains("TOKEN_EXPIRED") ||
+                   errorMessage.Contains("UNAUTHORIZED") ||
+                   errorMessage.Contains("인증 토큰이 유효하지 않습니다") ||
+                   errorMessage.Contains("authentication") ||
+                   errorMessage.Contains("토큰") ||
+                   errorMessage.Contains("모바일 클라이언트 인증에 실패했습니다");
+        }
+
+        /// <summary>
+        /// 에러 메시지에서 연결 끊김 원인 파악
+        /// </summary>
+        private DisconnectReason GetDisconnectReason(string errorMessage)
+        {
+            if (errorMessage.Contains("DUPLICATE_USER_IP"))
+            {
+                return DisconnectReason.DuplicateLogin;
+            }
+            else if (errorMessage.Contains("TOKEN_EXPIRED") || errorMessage.Contains("INVALID_TOKEN") ||
+                     errorMessage.Contains("AUTHENTICATION_FAILED") || errorMessage.Contains("UNAUTHORIZED"))
+            {
+                return DisconnectReason.AuthenticationFailure;
+            }
+            else if (errorMessage.Contains("TIMEOUT") || errorMessage.Contains("시간 초과"))
+            {
+                return DisconnectReason.ConnectionTimeout;
+            }
+            else if (errorMessage.Contains("SERVER_ERROR") || errorMessage.Contains("서버 오류"))
+            {
+                return DisconnectReason.ServerError;
+            }
+            else
+            {
+                return DisconnectReason.AuthenticationFailure; // 기본적으로 인증 실패로 간주
+            }
+        }
+
+        /// <summary>
+        /// 인증 에러 메시지를 사용자 친화적 메시지로 변환
+        /// </summary>
+        private string GetAuthErrorMessage(string errorMessage)
+        {
+            if (errorMessage.Contains("DUPLICATE_USER_IP"))
+            {
+                return "이미 다른 곳에서 로그인되어 있습니다.\n메인 화면으로 이동합니다.";
+            }
+            else if (errorMessage.Contains("TOKEN_EXPIRED") || errorMessage.Contains("INVALID_TOKEN"))
+            {
+                return "로그인 정보가 만료되었습니다.\n메인 화면으로 이동합니다.";
+            }
+            else if (errorMessage.Contains("모바일 클라이언트 인증에 실패했습니다"))
+            {
+                return "인증에 실패했습니다.\n메인 화면으로 이동합니다.";
+            }
+            else
+            {
+                return "인증에 실패하여 메인 화면으로 돌아갑니다.";
             }
         }
 
@@ -482,32 +552,76 @@ namespace Features.Multi.Core
         private void HandleConnectionFailure(string errorMessage)
         {
             Debug.LogError($"[MultiCoreBootstrap] 연결 실패: {errorMessage}");
-            
+
             // 멀티플레이 버튼 재활성화
             EnableMultiplayerButton();
-            
+
             // SystemMessageManager로 토스트 메시지 표시
             if (SystemMessageManager.Instance != null)
             {
-                SystemMessageManager.ShowToast(errorMessage, MessagePriority.Error);
+                SystemMessageManager.ShowToast(errorMessage, MessagePriority.Error, 3f);
             }
             else
             {
                 Debug.LogError("[MultiCoreBootstrap] SystemMessageManager를 찾을 수 없습니다.");
             }
-            
+
             // MainScene으로 복귀
-            StartCoroutine(ReturnToMainScene());
+            StartCoroutine(ReturnToMainScene(errorMessage));
+        }
+
+        /// <summary>
+        /// 특정 에러 원인과 함께 연결 실패 처리
+        /// </summary>
+        private void HandleConnectionFailureWithReason(DisconnectReason reason, string customMessage = null)
+        {
+            string errorMessage = customMessage ?? GetReasonMessage(reason);
+            Debug.LogError($"[MultiCoreBootstrap] 연결 실패 ({reason}): {errorMessage}");
+
+            // 멀티플레이 버튼 재활성화
+            EnableMultiplayerButton();
+
+            // SystemMessageManager로 토스트 메시지 표시
+            if (SystemMessageManager.Instance != null)
+            {
+                MessagePriority priority = reason == DisconnectReason.DuplicateLogin ||
+                                         reason == DisconnectReason.AuthenticationFailure ?
+                                         MessagePriority.Critical : MessagePriority.Error;
+                SystemMessageManager.ShowToast(errorMessage, priority, 3f);
+            }
+
+            // MainScene으로 복귀하면서 특정 에러 모달 표시 준비
+            StartCoroutine(ReturnToMainSceneWithReason(reason, errorMessage));
+        }
+
+        /// <summary>
+        /// 에러 원인별 기본 메시지 반환
+        /// </summary>
+        private string GetReasonMessage(DisconnectReason reason)
+        {
+            switch (reason)
+            {
+                case DisconnectReason.DuplicateLogin:
+                    return "이미 다른 곳에서 로그인되어 있습니다.\n메인 화면으로 이동합니다.";
+                case DisconnectReason.AuthenticationFailure:
+                    return "인증에 실패했습니다.\n메인 화면으로 이동합니다.";
+                case DisconnectReason.ConnectionTimeout:
+                    return "연결 시간이 초과되었습니다.\n메인 화면으로 이동합니다.";
+                case DisconnectReason.ServerError:
+                    return "서버 오류가 발생했습니다.\n메인 화면으로 이동합니다.";
+                default:
+                    return "연결에 실패하여 메인 화면으로 이동합니다.";
+            }
         }
 
         /// <summary>
         /// MainScene으로 복귀하는 코루틴
         /// </summary>
-        private IEnumerator ReturnToMainScene()
+        private IEnumerator ReturnToMainScene(string errorMessage = null)
         {
             // 약간의 지연 (사용자가 에러 메시지를 볼 수 있도록)
             yield return new WaitForSeconds(2f);
-            
+
             // SceneFlowController를 통한 MainScene 복귀
             if (App.Core.SceneFlowController.Instance != null)
             {
@@ -518,6 +632,40 @@ namespace Features.Multi.Core
                 // 레거시 방식
                 Debug.LogWarning("[MultiCoreBootstrap] SceneFlowController를 찾을 수 없어 레거시 방식으로 복귀");
                 UnityEngine.SceneManagement.SceneManager.LoadScene("MainScene");
+            }
+        }
+
+        /// <summary>
+        /// 특정 에러 원인과 함께 MainScene으로 복귀하는 코루틴
+        /// </summary>
+        private IEnumerator ReturnToMainSceneWithReason(DisconnectReason reason, string errorMessage)
+        {
+            // 약간의 지연 (사용자가 토스트 메시지를 볼 수 있도록)
+            yield return new WaitForSeconds(2f);
+
+            // SceneFlowController를 통한 MainScene 복귀
+            if (App.Core.SceneFlowController.Instance != null)
+            {
+                App.Core.SceneFlowController.Instance.StartExitMultiToMain();
+            }
+            else
+            {
+                // 레거시 방식
+                Debug.LogWarning("[MultiCoreBootstrap] SceneFlowController를 찾을 수 없어 레거시 방식으로 복귀");
+                UnityEngine.SceneManagement.SceneManager.LoadScene("MainScene");
+            }
+
+            // MainScene 로드 후 약간의 지연을 두고 NetworkDisconnectedModal 표시
+            yield return new WaitForSeconds(0.5f);
+
+            // 특정 에러 원인을 보여주는 모달 표시
+            if (NetworkDisconnectedModal.Instance != null)
+            {
+                NetworkDisconnectedModal.ShowWithReason(reason, errorMessage);
+            }
+            else
+            {
+                Debug.LogWarning("[MultiCoreBootstrap] NetworkDisconnectedModal Instance를 찾을 수 없습니다.");
             }
         }
 
