@@ -16,7 +16,7 @@ public:
     // 설정 구조체들
     // ===========================================
 
-    static constexpr const char* VERSION = "1.5.0";
+    static constexpr const char* VERSION = "1.6.0";
     static constexpr const char* BUILD_DATE = __DATE__ " " __TIME__;
     
     struct ServerConfig {

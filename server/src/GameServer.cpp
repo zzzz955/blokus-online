@@ -333,7 +333,7 @@ namespace Blokus::Server {
 
         // Session에 MessageHandler가 없으면 생성
         if (!session->getMessageHandler()) {
-            spdlog::info("🔧 [addSession] MessageHandler 생성 - SessionId: {}", sessionId);
+            // spdlog::info("🔧 [addSession] MessageHandler 생성 - SessionId: {}", sessionId);
 
             // MessageHandler 생성 및 설정
             auto messageHandler = std::make_unique<MessageHandler>(
@@ -348,7 +348,7 @@ namespace Blokus::Server {
             // Session에 MessageHandler 설정
             session->setMessageHandler(std::move(messageHandler));
 
-            spdlog::info("✅ [addSession] MessageHandler 생성 완료 - SessionId: {}", sessionId);
+            // spdlog::info("✅ [addSession] MessageHandler 생성 완료 - SessionId: {}", sessionId);
         }
 
         // 세션 기본 콜백만 설정 (연결 해제, 메시지 수신)
@@ -359,7 +359,7 @@ namespace Blokus::Server {
         session->setMessageCallback([this](const std::string& id, const std::string& msg) {
             onSessionMessage(id, msg);
             });
-        spdlog::info("✅ [addSession] 세션 설정 완료 (콜백 없음) - SessionId: {}", sessionId);
+        // spdlog::info("✅ [addSession] 세션 설정 완료 (콜백 없음) - SessionId: {}", sessionId);
     }
 
     void GameServer::removeSession(const std::string& sessionId) {
