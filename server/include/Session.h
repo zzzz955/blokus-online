@@ -89,6 +89,7 @@ namespace Blokus::Server {
 
         // ���� ����
         void setAuthenticated(const std::string& userId, const std::string& username);
+        void clearAuthentication();  // 인증 상태 완전 초기화
         void setUserAccount(const UserAccount& account);
         void updateUserAccount(const UserAccount& account);
 

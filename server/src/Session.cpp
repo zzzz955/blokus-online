@@ -102,6 +102,21 @@ namespace Blokus::Server {
         spdlog::info("✅ 세션 인증 완료: {} (사용자: '{}')", sessionId_, username);
     }
 
+    void Session::clearAuthentication() {
+        std::string previousUsername = username_;
+
+        userId_.clear();
+        username_.clear();
+        userAccount_.reset();
+        userSettings_.reset();
+        state_ = ConnectionState::Connected;  // 연결 상태로 되돌림
+        currentRoomId_ = -1;
+        justLeftRoom_ = false;
+        updateLastActivity();
+
+        spdlog::info("🔓 세션 인증 해제: {} (이전 사용자: '{}')", sessionId_, previousUsername);
+    }
+
     void Session::setUserAccount(const UserAccount& account) {
         userAccount_ = account;
         spdlog::debug("💾 사용자 계정 정보 설정: {} (레벨: {}, 경험치: {})", 

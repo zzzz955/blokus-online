@@ -109,6 +109,10 @@ namespace Blokus::Server {
         // 유저 스탯 정보 조회 헬퍼 함수
         std::string generateUserStatsResponse();
 
+        // 인증 관련 헬퍼 함수들
+        bool requiresAuthentication(MessageType messageType) const;
+        void logSecurityViolation(MessageType messageType, const std::string& details = "");
+
     private:
         Session* session_;  // 소유하지 않음, 단순 참조
         RoomManager* roomManager_;  // RoomManager 참조
