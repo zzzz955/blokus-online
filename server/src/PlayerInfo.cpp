@@ -134,7 +134,7 @@ namespace Blokus::Server {
         // 호스트가 되면 자동으로 준비 상태
         if (host) {
             isReady_ = true;
-            spdlog::info("Player '{}' is now the host", getUsername());
+            spdlog::debug("Player '{}' is now the host", getUsername());
         }
         else {
             spdlog::debug("Player '{}' is no longer the host", getUsername());
@@ -232,7 +232,7 @@ namespace Blokus::Server {
         updateActivity();
 
         if (session_) {
-            spdlog::info("Session set for player: {}", getUsername());
+            spdlog::debug("Session set for player: {}", getUsername());
         }
         else {
             spdlog::warn("Session cleared for player: {}", getUserId());
@@ -332,7 +332,7 @@ namespace Blokus::Server {
     }
 
     void PlayerInfo::logPlayerInfo() const {
-        spdlog::info("Player Info: {}", toString());
+        spdlog::debug("Player Info: {}", toString());
     }
 
     // ========================================

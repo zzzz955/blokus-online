@@ -269,14 +269,14 @@ namespace Blokus::Server
         {
             std::string accessToken = params[1];
             result = authService_->authenticateMobileClient(accessToken);
-            spdlog::info("모바일 클라이언트 JWT 인증 시도: {}", accessToken.substr(0, 20) + "...");
+            spdlog::debug("모바일 클라이언트 JWT 인증 시도: {}", accessToken.substr(0, 20) + "...");
         }
         // 표준 JWT 인증 (jwt) - 모바일 클라이언트용 (mobile_jwt와 동일한 로직 사용)
         else if (params.size() == 2 && params[0] == "jwt")
         {
             std::string accessToken = params[1];
             result = authService_->authenticateMobileClient(accessToken);
-            spdlog::info("모바일 클라이언트 JWT 인증 시도 (jwt): {}", accessToken.substr(0, 20) + "...");
+            spdlog::debug("모바일 클라이언트 JWT 인증 시도 (jwt): {}", accessToken.substr(0, 20) + "...");
         }
         // 기존 JWT 토큰인지 확인 (JWT는 '.'로 구분된 3개 부분으로 구성)
         else if (params.size() == 1 && std::count(params[0].begin(), params[0].end(), '.') == 2)
@@ -284,7 +284,7 @@ namespace Blokus::Server
             // 데스크톱 클라이언트 JWT 토큰 인증
             std::string jwtToken = params[0];
             result = authService_->loginWithJwt(jwtToken);
-            spdlog::info("데스크톱 클라이언트 JWT 토큰 인증 시도: {}", jwtToken.substr(0, 20) + "...");
+            spdlog::debug("데스크톱 클라이언트 JWT 토큰 인증 시도: {}", jwtToken.substr(0, 20) + "...");
         }
         else if (params.size() >= 2 && params[0] != "mobile_jwt" && params[0] != "jwt")
         {
@@ -292,7 +292,7 @@ namespace Blokus::Server
             std::string username = params[0];
             std::string password = params[1];
             result = authService_->loginUser(username, password);
-            spdlog::info("사용자명/비밀번호 인증 시도: {}", username);
+            spdlog::debug("사용자명/비밀번호 인증 시도: {}", username);
         }
         else
         {
@@ -415,7 +415,6 @@ namespace Blokus::Server
         if (result.success)
         {
             sendResponse("REGISTER_SUCCESS:" + username);
-            spdlog::info("✅ 회원가입 성공: {}", username);
         }
         else
         {
@@ -490,8 +489,6 @@ namespace Blokus::Server
             {
                 spdlog::warn("게스트 로그인 후 사용자 통계 전송 실패: {}", e.what());
             }
-
-            spdlog::info("게스트 로그인: {} ({}) - 로비 진입 및 정보 전송 완료", result.username, session_->getSessionId());
         }
         else
         {
@@ -597,7 +594,7 @@ namespace Blokus::Server
             std::string userId = session_->getUserId();
             std::string username = session_->getUsername();
 
-            spdlog::info("🏠 방 생성 요청: '{}' by '{}' (비공개: {})",
+            spdlog::debug("🏠 방 생성 요청: '{}' by '{}' (비공개: {})",
                          roomName, username, isPrivate);
 
             // 4. RoomManager를 통한 방 생성
@@ -626,7 +623,7 @@ namespace Blokus::Server
                     // 9. 방 정보 전체 동기화 전솥
                     sendRoomInfo(room);
 
-                    spdlog::info("✅ 방 생성 성공: '{}' by '{}' (ID: {})", roomName, username, roomId);
+                    spdlog::debug("✅ 방 생성 성공: '{}' by '{}' (ID: {})", roomName, username, roomId);
                 }
                 else
                 {
@@ -706,7 +703,7 @@ namespace Blokus::Server
             std::string userId = session_->getUserId();
             std::string username = session_->getUsername();
 
-            spdlog::info("🏠 방 참여 요청: '{}' -> 방 {}", username, roomId);
+            spdlog::debug("🏠 방 참여 요청: '{}' -> 방 {}", username, roomId);
 
             // 4. 방 존재 확인
             auto room = roomManager_->getRoom(roomId);
@@ -754,10 +751,10 @@ namespace Blokus::Server
                 {
                     session_->sendMessage("GAME_RESET");
                     session_->sendMessage("SYSTEM:새로운 게임을 시작할 수 있습니다!");
-                    spdlog::info("🔄 새 플레이어 {}에게 게임 리셋 상태 동기화 완료", username);
+                    spdlog::debug("🔄 새 플레이어 {}에게 게임 리셋 상태 동기화 완료", username);
                 }
 
-                spdlog::info("✅ 방 참여 성공: '{}' -> 방 {} ({}명)",
+                spdlog::debug("✅ 방 참여 성공: '{}' -> 방 {} ({}명)",
                              username, roomId, room->getPlayerCount());
             }
             else
@@ -808,7 +805,7 @@ namespace Blokus::Server
             std::string username = session_->getUsername();
             int currentRoomId = session_->getCurrentRoomId();
 
-            spdlog::info("🏠 방 나가기 요청: '{}' <- 방 {}", username, currentRoomId);
+            spdlog::debug("🏠 방 나가기 요청: '{}' <- 방 {}", username, currentRoomId);
 
             if (roomManager_->leaveRoom(userId))
             {
@@ -821,7 +818,7 @@ namespace Blokus::Server
                 }
 
                 sendResponse("ROOM_LEFT:OK");
-                spdlog::info("✅ 방 나가기 성공: '{}'", username);
+                spdlog::debug("✅ 방 나가기 성공: '{}'", username);
 
                 // 🎯 방 나간 후 DB에서 최신 스탯 정보 강제 조회하여 전송
                 try
@@ -919,7 +916,7 @@ namespace Blokus::Server
             std::string userId = session_->getUserId();
             std::string username = session_->getUsername();
 
-            spdlog::info("🎮 플레이어 준비 상태 변경: '{}' -> {}",
+            spdlog::debug("🎮 플레이어 준비 상태 변경: '{}' -> {}",
                          username, ready ? "준비" : "대기");
 
             // 3. RoomManager를 통한 준비 상태 설정 (브로드캐스트는 내부에서 처리)
@@ -977,7 +974,7 @@ namespace Blokus::Server
             std::string username = session_->getUsername();
             int roomId = session_->getCurrentRoomId();
 
-            spdlog::info("🎮 게임 시작 요청: '{}' (방 {})", username, roomId);
+            spdlog::debug("🎮 게임 시작 요청: '{}' (방 {})", username, roomId);
 
             // 3. 호스트 권한 확인
             auto room = roomManager_->getRoom(roomId);
@@ -1004,12 +1001,12 @@ namespace Blokus::Server
             if (roomManager_->startGame(userId))
             {
                 // 게임 시작 성공 - 세션 상태는 이미 startGame()에서 설정됨
-                spdlog::info("✅ 게임 시작 성공: 사용자 {}", userId);
+                spdlog::debug("✅ 게임 시작 성공: 사용자 {}", userId);
 
                 // 8. 성공 응답
                 sendResponse("GAME_START_SUCCESS");
 
-                spdlog::info("✅ 게임 시작 성공: '{}' (방 {}, {}명)",
+                spdlog::debug("✅ 게임 시작 성공: '{}' (방 {}, {}명)",
                              username, roomId, room->getPlayerCount());
             }
             else
@@ -1047,7 +1044,7 @@ namespace Blokus::Server
             std::string username = session_->getUsername();
             int roomId = session_->getCurrentRoomId();
 
-            spdlog::info("🎮 게임 종료 요청: '{}' (방 {})", username, roomId);
+            spdlog::debug("🎮 게임 종료 요청: '{}' (방 {})", username, roomId);
 
             // 3. 호스트 권한 확인 (또는 특별한 조건)
             auto room = roomManager_->getRoom(roomId);
@@ -1079,7 +1076,7 @@ namespace Blokus::Server
                 // 7. 성공 응답
                 sendResponse("GAME_END_SUCCESS");
 
-                spdlog::info("✅ 게임 종료 성공: '{}' (방 {})", username, roomId);
+                spdlog::debug("✅ 게임 종료 성공: '{}' (방 {})", username, roomId);
             }
             else
             {
@@ -1123,7 +1120,7 @@ namespace Blokus::Server
             std::string newHostId = params[0];
             int roomId = session_->getCurrentRoomId();
 
-            spdlog::info("👑 호스트 이양 요청: '{}' -> '{}' (방 {})",
+            spdlog::debug("👑 호스트 이양 요청: '{}' -> '{}' (방 {})",
                          currentHostId, newHostId, roomId);
 
             // 4. RoomManager를 통한 호스트 이양
@@ -1144,7 +1141,7 @@ namespace Blokus::Server
                 // 6. 성공 응답
                 sendResponse("HOST_TRANSFER_SUCCESS:" + newHostId);
 
-                spdlog::info("✅ 호스트 이양 성공: '{}' -> '{}' (방 {})",
+                spdlog::debug("✅ 호스트 이양 성공: '{}' -> '{}' (방 {})",
                              currentHostId, newHostId, roomId);
             }
             else
@@ -1239,7 +1236,7 @@ namespace Blokus::Server
             bool success = room->handleBlockPlacement(userId, placement);
             if (success)
             {
-                spdlog::info("🎮 블록 배치 성공: '{}' (방 {}, 위치: {},{}, 타입: {})",
+                spdlog::debug("🎮 블록 배치 성공: '{}' (방 {}, 위치: {},{}, 타입: {})",
                              userId, roomId, y, x, static_cast<int>(placement.type));
 
                 // 성공 응답 (브로드캐스트는 handleBlockPlacement에서 처리됨)
@@ -1284,7 +1281,7 @@ namespace Blokus::Server
             std::string username = session_->getUsername();
             bool wasAlreadyInLobby = session_->isInLobby();
 
-            spdlog::info("🏢 로비 입장/새로고침: '{}' (기존 로비 상태: {})", username, wasAlreadyInLobby);
+            spdlog::debug("🏢 로비 입장/새로고침: '{}' (기존 로비 상태: {})", username, wasAlreadyInLobby);
 
             // 로비 상태로 명시적 설정
             if (!session_->isInLobby())
@@ -1325,7 +1322,7 @@ namespace Blokus::Server
         try
         {
             std::string username = session_->getUsername();
-            spdlog::info("🏢 로비 퇴장: '{}'", username);
+            spdlog::debug("🏢 로비 퇴장: '{}'", username);
 
             // 다른 사용자들에게 사용자 퇴장 브로드캐스트
             broadcastLobbyUserLeft(username);
@@ -1387,7 +1384,7 @@ namespace Blokus::Server
         }
 
         std::string username = session_->getUsername();
-        spdlog::info("채팅 메시지: [{}] {}", username, message);
+        spdlog::debug("채팅 메시지: [{}] {}", username, message);
 
         // 채팅 메시지 브로드캐스팅
         try
@@ -1475,7 +1472,7 @@ namespace Blokus::Server
             }
 
             std::string message = "LOBBY_USER_JOINED:" + username;
-            spdlog::info("📢 로비 사용자 입장 브로드캐스트: {}", username);
+            spdlog::debug("📢 로비 사용자 입장 브로드캐스트: {}", username);
 
             // GameServer를 통해 로비의 모든 사용자에게 브로드캐스트
             auto lobbyUsers = gameServer_->getLobbyUsers();
@@ -1506,7 +1503,7 @@ namespace Blokus::Server
             }
 
             std::string message = "LOBBY_USER_LEFT:" + username;
-            spdlog::info("📢 로비 사용자 퇴장 브로드캐스트: {}", username);
+            spdlog::debug("📢 로비 사용자 퇴장 브로드캐스트: {}", username);
 
             // GameServer를 통해 로비의 모든 사용자에게 브로드캐스트
             auto lobbyUsers = gameServer_->getLobbyUsers();
@@ -1546,7 +1543,7 @@ namespace Blokus::Server
             
             // GameServer를 통해 실제 로비에 있는 사용자에게만 브로드캐스트
             auto lobbyUsers = gameServer_->getActualLobbyUsers();
-            spdlog::info("📢 로비 채팅 브로드캐스트: [{}] {} -> {}명의 로비 사용자에게", username, message, lobbyUsers.size());
+            spdlog::debug("📢 로비 채팅 브로드캐스트: [{}] {} -> {}명의 로비 사용자에게", username, message, lobbyUsers.size());
             for (const auto &lobbySession : lobbyUsers)
             {
                 if (lobbySession && lobbySession->isActive())
@@ -1587,7 +1584,7 @@ namespace Blokus::Server
                 displayName = session_->getDisplayName();
             }
             std::string chatMessage = "CHAT:" + username + ":" + displayName + ":" + message;
-            spdlog::info("📢 방 {} 채팅 브로드캐스트: [{}] {} ({})", currentRoomId, displayName, message, username);
+            spdlog::debug("📢 방 {} 채팅 브로드캐스트: [{}] {} ({})", currentRoomId, displayName, message, username);
 
             // GameRoom의 broadcastMessage 사용
             room->broadcastMessage(chatMessage);
@@ -1676,7 +1673,7 @@ namespace Blokus::Server
 
             std::string roomInfoMessage = response.str();
 
-            spdlog::info("📤 방 {} ROOM_INFO 메시지 생성: {}", room->getRoomId(), roomInfoMessage);
+            spdlog::debug("📤 방 {} ROOM_INFO 메시지 생성: {}", room->getRoomId(), roomInfoMessage);
 
             // 방의 모든 플레이어에게 브로드캐스트
             int sentCount = 0;
@@ -1990,7 +1987,7 @@ namespace Blokus::Server
             if (success)
             {
                 sendResponse("AFK_UNBLOCK_SUCCESS");
-                spdlog::info("🔓 AFK 모드 해제 성공: {} ({})", username, userId);
+                spdlog::debug("🔓 AFK 모드 해제 성공: {} ({})", username, userId);
             }
             else
             {
@@ -2025,7 +2022,7 @@ namespace Blokus::Server
         
         if (compatible) {
             sendTextMessage("version:ok");
-            spdlog::info("✅ 버전 호환: {} <-> {}", clientVersion, ConfigManager::serverVersion);
+            spdlog::debug("✅ 버전 호환: {} <-> {}", clientVersion, ConfigManager::serverVersion);
         } else {
             std::string response = "version:mismatch:" + versionManager_->getDownloadURL();
             sendTextMessage(response);
@@ -2087,7 +2084,7 @@ namespace Blokus::Server
                                      std::to_string(settings.effectVolume);
                 
                 sendTextMessage(response);
-                spdlog::info("Updated settings for user {}", session_->getUsername());
+                spdlog::debug("Updated settings for user {}", session_->getUsername());
             } else {
                 sendError("설정 업데이트에 실패했습니다");
             }

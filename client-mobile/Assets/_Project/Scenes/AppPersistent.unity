@@ -246,7 +246,7 @@ MonoBehaviour:
   devAuthPort: 9000
   devWebPort: 3000
   releaseBaseUrl: https://blokus-online.mooo.com
-  enableDebugLogs: 1
+  enableDebugLogs: 0
 --- !u!4 &261238384
 Transform:
   m_ObjectHideFlags: 0

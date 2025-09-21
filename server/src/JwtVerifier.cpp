@@ -49,7 +49,7 @@ namespace Blokus
                 startBackgroundRefresh();
 
                 m_isInitialized = true;
-                spdlog::info("JwtVerifier 초기화 완료 - 캐시된 키 개수: {}", getCachedKeyCount());
+                spdlog::debug("JwtVerifier 초기화 완료 - 캐시된 키 개수: {}", getCachedKeyCount());
                 return true;
             }
             catch (const std::exception &e)
@@ -141,7 +141,7 @@ namespace Blokus
                     return false;
                 }
 
-                spdlog::info("JWKS 캐시 새로고침 완료 - 키 개수: {}", getCachedKeyCount());
+                spdlog::debug("JWKS 캐시 새로고침 완료 - 키 개수: {}", getCachedKeyCount());
                 return true;
             }
             catch (const std::exception &e)

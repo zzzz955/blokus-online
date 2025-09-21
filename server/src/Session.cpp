@@ -65,7 +65,7 @@ namespace Blokus::Server {
             // IP 주소 추출 및 저장 (소켓이 완전히 설정된 후)
             remoteIP_ = extractIPFromSocket();
             std::string remoteAddr = getRemoteAddress();
-            spdlog::info("🔌 세션 시작: {} (클라이언트: {}, IP: {})", sessionId_, remoteAddr, remoteIP_);
+            spdlog::debug("🔌 세션 시작: {} (클라이언트: {}, IP: {})", sessionId_, remoteAddr, remoteIP_);
 
             state_ = ConnectionState::Connected;
             updateLastActivity();
@@ -84,7 +84,7 @@ namespace Blokus::Server {
             return; // 이미 중지됨
         }
 
-        spdlog::info("🔌 세션 중지: {}", sessionId_);
+        spdlog::debug("🔌 세션 중지: {}", sessionId_);
 
         try {
             if (socket_.is_open()) {
@@ -433,7 +433,7 @@ namespace Blokus::Server {
     // ========================================
 
     void Session::processMessage(const std::string& message) {
-        spdlog::info("📨 메시지 처리 시작: {}", message);
+        spdlog::debug("📨 메시지 처리 시작: {}", message);
         if (messageHandler_) {
             try {
                 messageHandler_->handleMessage(message);
@@ -442,7 +442,7 @@ namespace Blokus::Server {
                 spdlog::error("❌ 메시지 핸들러 오류 ({}): {}", sessionId_, e.what());
                 sendMessage("ERROR:Message processing failed");
             }
-            spdlog::info("📨 메시지 처리 완료: {}", message);
+            spdlog::debug("📨 메시지 처리 완료: {}", message);
         }
         else {
             notifyMessage(message);

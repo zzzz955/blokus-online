@@ -21,7 +21,7 @@ namespace Blokus {
 
         public:
             ConnectionPool(const std::string& connStr, size_t size) : connectionString_(connStr) {
-                spdlog::info("Creating database connection pool with {} connections", size);
+                spdlog::info("{}개 커넥션의 데이터베이스 풀 생성 중... ", size);
                 for (size_t i = 0; i < size; ++i) {
                     try {
                         connections_.push(std::make_unique<pqxx::connection>(connectionString_));
@@ -31,7 +31,7 @@ namespace Blokus {
                         throw;
                     }
                 }
-                spdlog::info("Database connection pool created successfully");
+                spdlog::info("데이터베이스 풀 생성 완료");
             }
 
             std::unique_ptr<pqxx::connection> getConnection() {
@@ -80,7 +80,7 @@ namespace Blokus {
             }
 
             try {
-                spdlog::info("Initializing database connection...");
+                spdlog::info("데이터베이스 서버 접속 중...");
 
                 std::string connectionString = fmt::format(
                     "host={} port={} dbname={} user={} password={}",
@@ -99,17 +99,13 @@ namespace Blokus {
 
                 if (!result.empty()) {
                     isInitialized_ = true;
-                    spdlog::info("DatabaseManager initialized successfully");
+                    spdlog::info("데이터베이스 매니저 초기화 완료");
                     return true;
                 }
 
             }
             catch (const std::exception& e) {
-                spdlog::error("Failed to initialize DatabaseManager: {}", e.what());
-                spdlog::error("💡 Please ensure:");
-                spdlog::error("  1. PostgreSQL server is running");
-                spdlog::error("  2. Database credentials are correct");
-                spdlog::error("  3. Database '{}' exists", ConfigManager::dbName);
+                spdlog::error("데이터베이스 매니저 초기화 실패 : {}", e.what());
             }
 
             return false;
@@ -117,10 +113,10 @@ namespace Blokus {
 
         void DatabaseManager::shutdown() {
             if (isInitialized_) {
-                spdlog::info("Shutting down DatabaseManager...");
+                spdlog::info("데이터베이스 매니저 종료 중...");
                 dbPool_.reset();
                 isInitialized_ = false;
-                spdlog::info("DatabaseManager shutdown complete");
+                spdlog::info("데이터베이스 매니저 종료 성공");
             }
         }
 
@@ -303,7 +299,7 @@ namespace Blokus {
 
                     txn.commit();
                     dbPool_->returnConnection(std::move(conn));
-                    spdlog::info("Created user: {} (ID: {})", username, userId);
+                    spdlog::debug("Created user: {} (ID: {})", username, userId);
                     return true;
                 }
 
@@ -572,7 +568,7 @@ namespace Blokus {
                             "INSERT INTO user_stats (user_id) VALUES ($1)",
                             playerIds[i]
                         );
-                        spdlog::info("새 통계 레코드 생성: 사용자 ID {}", playerIds[i]);
+                        spdlog::debug("새 통계 레코드 생성: 사용자 ID {}", playerIds[i]);
                     }
                     
                     // 통계 업데이트
@@ -593,13 +589,13 @@ namespace Blokus {
                         playerIds[i], won, draw, score
                     );
                     
-                    spdlog::info("플레이어 {} 통계 업데이트: 점수={}, 승리={} (최고점자={})",
+                    spdlog::debug("플레이어 {} 통계 업데이트: 점수={}, 승리={} (최고점자={})",
                                playerIds[i], score, won, isWinner[i] ? "YES" : "NO");
                 }
 
                 txn.commit();
                 dbPool_->returnConnection(std::move(conn));
-                spdlog::info("게임 결과 저장 완료");
+                spdlog::debug("게임 결과 저장 완료");
                 return true;
 
             }
@@ -680,7 +676,7 @@ namespace Blokus {
                         "INSERT INTO user_stats (user_id, experience_points) VALUES ($1, $2)",
                         userId, expGained
                     );
-                    spdlog::info("새 통계 레코드 생성 및 경험치 추가: 사용자 ID {}, 경험치 +{}", userId, expGained);
+                    spdlog::debug("새 통계 레코드 생성 및 경험치 추가: 사용자 ID {}, 경험치 +{}", userId, expGained);
                 } else {
                     int currentLevel = currentStats[0]["level"].as<int>();
                     int currentExp = currentStats[0]["experience_points"].as<int>();
@@ -692,7 +688,7 @@ namespace Blokus {
                         newExp, userId
                     );
                     
-                    spdlog::info("플레이어 {} 경험치 업데이트: {} -> {} (+{})", 
+                    spdlog::debug("플레이어 {} 경험치 업데이트: {} -> {} (+{})", 
                                userId, currentExp, newExp, expGained);
                 }
 
@@ -743,7 +739,7 @@ namespace Blokus {
                     if (remainingExp >= requiredExp) {
                         remainingExp -= requiredExp;  // 경험치 소모
                         newLevel++;
-                        spdlog::info("레벨업! 플레이어 {} : {} -> {} (소모: {}, 남은 경험치: {})", 
+                        spdlog::debug("레벨업! 플레이어 {} : {} -> {} (소모: {}, 남은 경험치: {})", 
                                    userId, newLevel-1, newLevel, requiredExp, remainingExp);
                     } else {
                         break;
@@ -760,7 +756,7 @@ namespace Blokus {
                     txn.commit();
                     dbPool_->returnConnection(std::move(conn));
                     
-                    spdlog::info("플레이어 {} 레벨업 완료: {} -> {} (남은 경험치: {})", 
+                    spdlog::debug("플레이어 {} 레벨업 완료: {} -> {} (남은 경험치: {})", 
                                userId, currentLevel, newLevel, remainingExp);
                     return true;
                 } else {
@@ -828,7 +824,7 @@ namespace Blokus {
                     );
                     txn.commit();
                     
-                    spdlog::info("Created default settings for user {}", userId);
+                    spdlog::debug("Created default settings for user {}", userId);
                     return defaults;
                 }
 
@@ -896,7 +892,7 @@ namespace Blokus {
                 );
 
                 txn.commit();
-                spdlog::info("Updated settings for user {}", userId);
+                spdlog::debug("Updated settings for user {}", userId);
                 dbPool_->returnConnection(std::move(conn));
                 return true;
 
@@ -926,7 +922,7 @@ namespace Blokus {
                 );
 
                 txn.commit();
-                spdlog::info("Deleted settings for user {} (affected rows: {})", userId, result.affected_rows());
+                spdlog::debug("Deleted settings for user {} (affected rows: {})", userId, result.affected_rows());
                 dbPool_->returnConnection(std::move(conn));
                 return true;
 
@@ -950,7 +946,7 @@ namespace Blokus {
         }
 
         bool DatabaseManager::insertDummyData() {
-            spdlog::info("Dummy data insertion - using schema defaults");
+            spdlog::debug("Dummy data insertion - using schema defaults");
             return true;
         }
 
