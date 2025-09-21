@@ -140,14 +140,25 @@ namespace App.Config
         /// <summary>
         /// 웹 앱 URL (Next.js)
         /// </summary>
-        public static string WebServerUrl => BaseUrl;
+        public static string WebServerUrl
+        {
+            get
+            {
+#if UNITY_EDITOR
+                return BaseUrl;
+#else
+                // 릴리즈 빌드: 하드코딩된 프로덕션 서버 사용
+                return "https://blokus-online.mooo.com";
+#endif
+            }
+        }
 
         /// <summary>
         /// Single API 서버 베이스 URL
         /// 업스트림이 /api/... 라우트를 쓰므로, 프록시 서브패스 + /api 로 맞춥니다.
         /// 결과: https://.../single-api/api (release) 또는 http://localhost:8080/api (dev)
         /// </summary>
-        public static string ApiServerUrl 
+        public static string ApiServerUrl
         {
             get
             {
@@ -158,9 +169,12 @@ namespace App.Config
                 {
                     return envManager.GetApiServerUrl();
                 }
-#endif
-                // 폴백 또는 빌드 환경에서는 기존 로직 사용
+                // 폴백
                 return $"{BaseUrl}/single-api/api";
+#else
+                // 릴리즈 빌드: 하드코딩된 프로덕션 서버 사용
+                return "https://blokus-online.mooo.com/single-api/api";
+#endif
             }
         }
 
@@ -168,7 +182,7 @@ namespace App.Config
         /// OIDC 서버 베이스 URL (서브패스)
         /// 결과: https://.../oidc (release) 또는 http://localhost:9000 (dev)
         /// </summary>
-        public static string OidcServerUrl 
+        public static string OidcServerUrl
         {
             get
             {
@@ -179,9 +193,12 @@ namespace App.Config
                 {
                     return envManager.GetAuthServerUrl();
                 }
-#endif
-                // 폴백 또는 빌드 환경에서는 기존 로직 사용
+                // 폴백
                 return $"{BaseUrl}/oidc";
+#else
+                // 릴리즈 빌드: 하드코딩된 프로덕션 서버 사용
+                return "https://blokus-online.mooo.com/oidc";
+#endif
             }
         }
 
@@ -199,23 +216,12 @@ namespace App.Config
                 {
                     return envManager.GetTcpServerHost();
                 }
-                
+
                 // 폴백: EnvironmentModeManager가 없을 경우 기존 로직 사용
                 return "localhost"; // 에디터 로컬 테스트
 #else
-                try
-                {
-                    var uri = new Uri(BaseUrl);
-                    return uri.Host;
-                }
-                catch
-                {
-                    // BaseUrl이 비정상일 경우 대비
-                    var webUrl = GetEnv("WEB_APP_URL", DefaultProdBaseUrl);
-                    if (webUrl.StartsWith("http://")) return webUrl.Substring(7);
-                    if (webUrl.StartsWith("https://")) return webUrl.Substring(8);
-                    return webUrl;
-                }
+                // 릴리즈 빌드: 데스크탑 클라이언트와 동일하게 하드코딩된 프로덕션 서버 사용
+                return "blokus-online.mooo.com";
 #endif
             }
         }
@@ -234,12 +240,12 @@ namespace App.Config
                 {
                     return envManager.GetTcpServerPort();
                 }
-                
+
                 // 폴백: EnvironmentModeManager가 없을 경우 기존 로직 사용
                 return 9999;
 #else
-                string portStr = GetEnv("SERVER_PORT", "9999");
-                return int.TryParse(portStr, out int port) ? port : 9999;
+                // 릴리즈 빌드: 데스크탑 클라이언트와 동일하게 하드코딩된 포트 사용
+                return 9999;
 #endif
             }
         }

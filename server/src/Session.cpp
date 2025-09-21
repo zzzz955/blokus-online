@@ -28,7 +28,7 @@ namespace Blokus::Server {
         , messageHandler_(nullptr)
         , writing_(false)
     {
-        spdlog::debug("🔌 세션 생성: {} (상태: Connected)", sessionId_);
+        spdlog::info("🔌 세션 생성: {} (상태: Connected)", sessionId_);
     }
 
     Session::~Session() {

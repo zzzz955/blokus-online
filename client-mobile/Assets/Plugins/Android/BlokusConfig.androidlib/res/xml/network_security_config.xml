@@ -10,8 +10,8 @@
     <domain includeSubdomains="true">10.0.2.2</domain>
   </domain-config>
 
-  <!-- 프로덕션 도메인: HTTPS만 -->
-  <domain-config cleartextTrafficPermitted="false">
+  <!-- 프로덕션 도메인: TCP 게임 서버 연결을 위해 cleartext 허용 -->
+  <domain-config cleartextTrafficPermitted="true">
     <domain includeSubdomains="true">blokus-online.mooo.com</domain>
   </domain-config>
 </network-security-config>

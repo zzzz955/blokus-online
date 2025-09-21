@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
@@ -8,6 +10,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 using Shared.Models;
 using MultiModels = Features.Multi.Models;
+using App.UI;
 
 namespace Features.Multi.Net
 {
@@ -22,7 +25,7 @@ namespace Features.Multi.Net
         [SerializeField] private string serverHost = "localhost";
         [SerializeField] private int serverPort = 9999;
         [SerializeField] private int connectionTimeoutMs = 15000; // 15초로 증가
-        
+
         // 연결 상태
         private TcpClient tcpClient;
         private NetworkStream networkStream;
@@ -30,23 +33,23 @@ namespace Features.Multi.Net
         private StreamWriter streamWriter;
         private bool isConnected;
         private bool isConnecting;
-        
+
         // 스레딩
         private Thread receiveThread;
         private CancellationTokenSource cancellationTokenSource;
-        
+
         // 메시지 큐 (메인 스레드에서 처리)
         private readonly Queue<string> incomingMessages = new Queue<string>();
         private readonly object messageLock = new object();
-        
+
         // 싱글톤 패턴
         public static NetworkClient Instance { get; private set; }
-        
+
         // 이벤트
         public event System.Action<bool> OnConnectionChanged; // 연결 상태 변경
         public event System.Action<string> OnMessageReceived; // 메시지 수신
         public event System.Action<string> OnError; // 에러 발생
-        
+
         void Awake()
         {
             // 싱글톤 패턴
@@ -61,9 +64,9 @@ namespace Features.Multi.Net
                 Destroy(gameObject);
             }
         }
-        
+
         void Start()
-        {            
+        {
             // 자동 연결은 하지 않음 - 명시적으로 ConnectToServer() 호출 필요
             // UnityMainThreadDispatcher가 없으면 생성
             if (UnityMainThreadDispatcher.Instance == null)
@@ -72,13 +75,13 @@ namespace Features.Multi.Net
                 dispatcherObj.AddComponent<UnityMainThreadDispatcher>();
             }
         }
-        
+
         void Update()
         {
             // 메인 스레드에서 메시지 처리
             ProcessIncomingMessages();
         }
-        
+
         void OnApplicationPause(bool pauseStatus)
         {
             // 앱이 백그라운드로 갈 때 연결 유지 처리
@@ -96,16 +99,16 @@ namespace Features.Multi.Net
                 }
             }
         }
-        
+
         void OnDestroy()
         {
             DisconnectFromServer();
         }
-        
-//         // ========================================
-//         // 환경 설정
-//         // ========================================
-        
+
+        //         // ========================================
+        //         // 환경 설정
+        //         // ========================================
+
         /// <summary>
         /// EnvironmentConfig에서 서버 정보 로드
         /// </summary>
@@ -113,10 +116,10 @@ namespace Features.Multi.Net
         {
             // 기본값 사용 (NetworkSetup에서 SetServerInfo로 오버라이드 가능)
             // EnvironmentConfig 의존성 제거됨
-            
+
             Debug.Log($"[NetworkClient] TCP 서버 연결 정보: {serverHost}:{serverPort}");
         }
-        
+
         /// <summary>
         /// 서버 연결 정보 설정
         /// </summary>
@@ -126,16 +129,106 @@ namespace Features.Multi.Net
             serverPort = port;
             Debug.Log($"[NetworkClient] 서버 정보 변경: {serverHost}:{serverPort}");
         }
-        
-//         // ========================================
-//         // 연결 관리
-//         // ========================================
-        
+
+        //         // ========================================
+        //         // 연결 관리
+        //         // ========================================
+
+        /// <summary>
+        /// 포트별 연결 테스트로 방화벽 차단 여부 확인
+        /// </summary>
+        private async Task TestPortConnectivity(string host)
+        {
+            try
+            {
+                SystemMessageManager.ShowToast("🔍 포트 연결 테스트 시작...", Shared.UI.MessagePriority.Info, 2f);
+
+                // 443 포트 테스트 (HTTPS - 일반적으로 열려있음)
+                bool port443Success = await TestSinglePort(host, 443, 5000);
+
+                // 9999 포트 테스트 (게임 서버)
+                bool port9999Success = await TestSinglePort(host, 9999, 5000);
+
+                // 결과 분석 및 토스트 표시
+                if (port443Success && !port9999Success)
+                {
+                    SystemMessageManager.ShowToast("🚫 포트 9999 차단됨 (방화벽/보안SW)", Shared.UI.MessagePriority.Error, 5f);
+                    UnityMainThreadDispatcher.Enqueue(() => OnError?.Invoke("[포트테스트] 443:✅ 9999:❌ → 방화벽/보안SW에서 9999 포트 차단"));
+                }
+                else if (!port443Success && !port9999Success)
+                {
+                    SystemMessageManager.ShowToast("🌐 전체 네트워크 연결 문제", Shared.UI.MessagePriority.Error, 5f);
+                    UnityMainThreadDispatcher.Enqueue(() => OnError?.Invoke("[포트테스트] 443:❌ 9999:❌ → 전체 네트워크 연결 문제"));
+                }
+                else if (port443Success && port9999Success)
+                {
+                    SystemMessageManager.ShowToast("✅ 포트 연결 정상 (다른 원인)", Shared.UI.MessagePriority.Warning, 3f);
+                    UnityMainThreadDispatcher.Enqueue(() => OnError?.Invoke("[포트테스트] 443:✅ 9999:✅ → 포트는 정상, 다른 원인 확인 필요"));
+                }
+                else
+                {
+                    SystemMessageManager.ShowToast("⚠️ 443 차단됨 (특이한 환경)", Shared.UI.MessagePriority.Warning, 3f);
+                    UnityMainThreadDispatcher.Enqueue(() => OnError?.Invoke("[포트테스트] 443:❌ 9999:✅ → 특이한 네트워크 환경"));
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[NetworkClient] 포트 테스트 실패: {ex.Message}");
+                SystemMessageManager.ShowToast($"⚠️ 포트 테스트 실패: {ex.GetType().Name}", Shared.UI.MessagePriority.Warning, 3f);
+            }
+        }
+
+        /// <summary>
+        /// 단일 포트 연결 테스트
+        /// </summary>
+        private async Task<bool> TestSinglePort(string host, int port, int timeoutMs)
+        {
+            try
+            {
+                using (var testClient = new TcpClient())
+                {
+                    var connectTask = testClient.ConnectAsync(host, port);
+                    var timeoutTask = Task.Delay(timeoutMs);
+
+                    if (await Task.WhenAny(connectTask, timeoutTask) == timeoutTask)
+                    {
+                        return false; // 타임아웃
+                    }
+
+                    await connectTask;
+                    Debug.Log($"[NetworkClient] 포트 테스트 성공: {host}:{port}");
+                    return true;
+                }
+            }
+            catch (SocketException se)
+            {
+                Debug.LogWarning($"[NetworkClient] 포트 테스트 실패: {host}:{port} - {se.SocketErrorCode}");
+                UnityMainThreadDispatcher.Enqueue(() => OnError?.Invoke($"[포트테스트] {host}:{port} - {se.SocketErrorCode}"));
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[NetworkClient] 포트 테스트 실패: {host}:{port} - {ex.Message}");
+                return false;
+            }
+        }
+
         /// <summary>
         /// 서버에 연결
         /// </summary>
         public async Task<bool> ConnectToServerAsync()
         {
+#if !UNITY_EDITOR
+    if (serverHost.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
+        serverHost == "127.0.0.1" || serverHost == "::1")
+    {
+        // 배포용 기본 호스트로 강제(원하는 값으로 변경)
+        serverHost = "blokus-online.mooo.com";
+        serverPort = serverPort <= 0 ? 9999 : serverPort;
+        Debug.LogWarning($"[NetworkClient] serverHost가 localhost여서 배포 호스트로 강제: {serverHost}:{serverPort}");
+    }
+#endif
+
             // 실제 TCP 연결 상태 확인
             if (isConnected && tcpClient != null && tcpClient.Connected)
             {
@@ -149,90 +242,175 @@ namespace Features.Multi.Net
                 Debug.LogWarning("[NetworkClient] 연결 상태 불일치 감지 - 연결 정리 후 재시도");
                 CleanupConnection();
             }
-            
+
             if (isConnecting)
             {
                 Debug.LogWarning("[NetworkClient] 연결 시도 중입니다.");
                 return false;
             }
-            
+
             isConnecting = true;
-            
+
             try
             {
                 Debug.Log($"[NetworkClient] 서버 연결 시도: {serverHost}:{serverPort}");
-                
-                // 모바일 플랫폼에서 네트워크 상태 확인
+
+                // 모바일 플랫폼에서 네트워크 상태 확인 (소프트 체크)
                 if (Application.isMobilePlatform)
                 {
+                    string reachabilityStatus = Application.internetReachability.ToString();
                     if (Application.internetReachability == NetworkReachability.NotReachable)
                     {
-                        throw new System.Exception("인터넷 연결이 없습니다. 네트워크를 확인해주세요.");
+                        Debug.LogWarning("[NetworkClient] Reachability=NotReachable 이지만 연결 시도는 진행합니다 (에뮬레이터/일부 단말 오탐 방지).");
                     }
-                    Debug.Log($"[NetworkClient] 모바일 네트워크 상태: {Application.internetReachability}");
+                    else
+                    {
+                        Debug.Log($"[NetworkClient] 모바일 네트워크 상태: {Application.internetReachability}");
+                    }
                 }
-                
-                tcpClient = new TcpClient();
+
                 cancellationTokenSource = new CancellationTokenSource();
-                
+
                 // 모바일에서 연결 타임아웃 더 길게 설정
                 int actualTimeout = Application.isMobilePlatform ? connectionTimeoutMs * 2 : connectionTimeoutMs;
                 Debug.Log($"[NetworkClient] 연결 타임아웃: {actualTimeout}ms (모바일: {Application.isMobilePlatform})");
-                
-                // 연결 타임아웃 설정
-                var connectTask = tcpClient.ConnectAsync(serverHost, serverPort);
-                var timeoutTask = Task.Delay(actualTimeout);
-                
-                if (await Task.WhenAny(connectTask, timeoutTask) == timeoutTask)
+
+                // DNS 해결 및 IPv4 우선 연결 시도
+                Debug.Log($"[NetworkClient] DNS 해결 시작: {serverHost}");
+                SystemMessageManager.ShowToast($"🔍 DNS 해결 중...", Shared.UI.MessagePriority.Info, 2f);
+
+                var addresses = await Dns.GetHostAddressesAsync(serverHost);
+
+                // IPv4를 우선으로 정렬 (AddressFamily.InterNetwork = IPv4)
+                var orderedAddresses = addresses.OrderBy(ip => ip.AddressFamily == AddressFamily.InterNetwork ? 0 : 1).ToArray();
+                Debug.Log($"[NetworkClient] 해결된 주소 ({orderedAddresses.Length}개): {string.Join(", ", orderedAddresses.Select(ip => ip.ToString()))}");
+
+                Exception lastException = null;
+                bool connected = false;
+
+                // 각 주소에 대해 연결 시도
+                foreach (var address in orderedAddresses)
                 {
-                    throw new TimeoutException($"서버 연결 타임아웃 ({actualTimeout}ms)");
+                    try
+                    {
+                        Debug.Log($"[NetworkClient] 연결 시도: {address} ({address.AddressFamily})");
+
+                        tcpClient = new TcpClient(address.AddressFamily);
+                        var connectTask = tcpClient.ConnectAsync(address, serverPort);
+                        var timeoutTask = Task.Delay(actualTimeout);
+
+                        if (await Task.WhenAny(connectTask, timeoutTask) == timeoutTask)
+                        {
+                            tcpClient?.Close();
+                            throw new TimeoutException($"연결 타임아웃: {address}:{serverPort} ({actualTimeout}ms)");
+                        }
+
+                        await connectTask; // 실제 연결 완료 확인
+                        Debug.Log($"[NetworkClient] 연결 성공: {address}:{serverPort}");
+
+                        // 릴리즈 디버깅: 연결 성공 토스트 표시
+                        SystemMessageManager.ShowToast($"✅ 서버 연결 성공!", Shared.UI.MessagePriority.Success, 3f);
+
+                        connected = true;
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        lastException = ex;
+                        Debug.LogWarning($"[NetworkClient] 연결 실패: {address}:{serverPort} - {ex.Message}");
+
+                        // 릴리즈 디버깅: SocketException 코드 표시로 정확한 원인 파악
+                        string errorInfo;
+                        if (ex is SocketException se)
+                        {
+                            errorInfo = $"❌ {(address.AddressFamily == AddressFamily.InterNetwork ? "IPv4" : "IPv6")} 실패: {se.SocketErrorCode}";
+                            UnityMainThreadDispatcher.Enqueue(() => OnError?.Invoke($"[TCP] {address}:{serverPort} 실패 - {se.SocketErrorCode}/{se.ErrorCode}"));
+                        }
+                        else
+                        {
+                            errorInfo = $"❌ {(address.AddressFamily == AddressFamily.InterNetwork ? "IPv4" : "IPv6")} 실패: {ex.GetType().Name}";
+                            UnityMainThreadDispatcher.Enqueue(() => OnError?.Invoke($"[TCP] {address}:{serverPort} 실패 - {ex.GetType().Name}: {ex.Message}"));
+                        }
+
+                        SystemMessageManager.ShowToast(errorInfo, Shared.UI.MessagePriority.Warning, 3f);
+
+                        tcpClient?.Close();
+                        tcpClient = null;
+                    }
                 }
-                
-                await connectTask; // 실제 연결 완료 확인
-                
+
+                if (!connected)
+                {
+                    // 릴리즈 디버깅: 모든 주소 연결 실패 시 포트 테스트 실행
+                    SystemMessageManager.ShowToast($"💥 모든 연결 시도 실패", Shared.UI.MessagePriority.Error, 3f);
+
+                    // 포트 연결 테스트로 방화벽 차단 여부 확인
+                    await TestPortConnectivity(serverHost);
+
+                    throw new Exception($"모든 주소 연결 실패: {serverHost}:{serverPort} (마지막 오류: {lastException?.Message})");
+                }
+
                 // 즉시 메시지 전송을 위한 소켓 최적화 설정
                 tcpClient.NoDelay = true; // TCP Nagle 알고리즘 비활성화
                 tcpClient.ReceiveBufferSize = 4096; // 수신 버퍼 크기 최적화
                 tcpClient.SendBufferSize = 4096; // 전송 버퍼 크기 최적화
                 Debug.Log("[NetworkClient] TCP 소켓 최적화 설정 완료 (NoDelay=true, Buffer=4KB)");
-                
+
                 // 스트림 설정
                 networkStream = tcpClient.GetStream();
                 streamReader = new StreamReader(networkStream, Encoding.UTF8);
                 streamWriter = new StreamWriter(networkStream, Encoding.UTF8) { AutoFlush = true };
-                
+
                 isConnected = true;
                 isConnecting = false;
-                
+
                 // 수신 스레드 시작
                 receiveThread = new Thread(ReceiveMessagesThread) { IsBackground = true };
                 receiveThread.Start();
-                
+
                 Debug.Log("[NetworkClient] 서버 연결 성공!");
-                
+
                 // 메인스레드에서 연결 이벤트 발생
                 UnityMainThreadDispatcher.Enqueue(() => OnConnectionChanged?.Invoke(true));
-                
+
                 return true;
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[NetworkClient] 서버 연결 실패: {ex.Message}");
-                
+                // 상세한 예외 정보 로그 출력 (Android 디버깅용)
+                Debug.LogError($"[NetworkClient] 서버 연결 실패:");
+                Debug.LogError($"[NetworkClient] - 서버: {serverHost}:{serverPort}");
+                Debug.LogError($"[NetworkClient] - 예외 타입: {ex.GetType().Name}");
+                Debug.LogError($"[NetworkClient] - 메시지: {ex.Message}");
+                Debug.LogError($"[NetworkClient] - 스택트레이스: {ex.StackTrace}");
+                if (ex.InnerException != null)
+                {
+                    Debug.LogError($"[NetworkClient] - 내부 예외: {ex.InnerException.Message}");
+                }
+
+                // 릴리즈 디버깅: 일반적인 연결 실패 정보 토스트 표시
+                string generalError = $"🚫 서버 연결 실패\n예외: {ex.GetType().Name}";
+                if (ex.InnerException != null)
+                {
+                    generalError += $"\n내부 예외: {ex.InnerException.GetType().Name}";
+                }
+                SystemMessageManager.ShowToast(generalError, Shared.UI.MessagePriority.Error, 5f);
+
                 isConnected = false;
                 isConnecting = false;
                 CleanupConnection();
-                
+
                 // 메인스레드에서 에러 이벤트 발생
-                UnityMainThreadDispatcher.Enqueue(() => {
+                UnityMainThreadDispatcher.Enqueue(() =>
+                {
                     OnError?.Invoke($"연결 실패: {ex.Message}");
                     OnConnectionChanged?.Invoke(false);
                 });
-                
+
                 return false;
             }
         }
-        
+
         /// <summary>
         /// 동기 버전 (Unity 메인 스레드용)
         /// </summary>
@@ -240,7 +418,7 @@ namespace Features.Multi.Net
         {
             _ = ConnectToServerAsync();
         }
-        
+
         /// <summary>
         /// 서버 연결 해제
         /// </summary>
@@ -250,35 +428,35 @@ namespace Features.Multi.Net
             {
                 return;
             }
-            
+
             Debug.Log("[NetworkClient] 서버 연결 해제");
-            
+
             isConnected = false;
             cancellationTokenSource?.Cancel();
-            
+
             CleanupConnection();
-            
+
             // 메인스레드에서 연결 해제 이벤트 발생
             UnityMainThreadDispatcher.Enqueue(() => OnConnectionChanged?.Invoke(false));
         }
-        
+
         /// <summary>
         /// 자동 재연결
         /// </summary>
         public async Task<bool> ReconnectAsync()
         {
             Debug.Log("[NetworkClient] 서버 재연결 시도");
-            
+
             DisconnectFromServer();
             await Task.Delay(1000); // 1초 대기
-            
+
             return await ConnectToServerAsync();
         }
-        
-//         // ========================================
-//         // 메시지 송수신
-//         // ========================================
-        
+
+        //         // ========================================
+        //         // 메시지 송수신
+        //         // ========================================
+
         /// <summary>
         /// 서버로 메시지 전송
         /// </summary>
@@ -289,7 +467,7 @@ namespace Features.Multi.Net
                 Debug.LogWarning("[NetworkClient] 서버에 연결되지 않음");
                 return false;
             }
-            
+
             try
             {
                 // UTF-8 BOM 없이 메시지 전송 (서버 파싱 에러 방지)
@@ -302,20 +480,20 @@ namespace Features.Multi.Net
             catch (Exception ex)
             {
                 Debug.LogError($"[NetworkClient] 메시지 전송 실패: {ex.Message}");
-                
+
                 // 메인스레드에서 에러 이벤트 발생
                 UnityMainThreadDispatcher.Enqueue(() => OnError?.Invoke($"전송 실패: {ex.Message}"));
-                
+
                 // 연결 상태 확인 및 재연결 시도
                 if (!IsSocketConnected())
                 {
                     _ = ReconnectAsync();
                 }
-                
+
                 return false;
             }
         }
-        
+
         /// <summary>
         /// 커스텀 프로토콜 메시지 전송 (C++ 클라이언트와 동일한 형식)
         /// </summary>
@@ -323,11 +501,11 @@ namespace Features.Multi.Net
         {
             List<string> messageParts = new List<string> { messageType };
             messageParts.AddRange(parameters);
-            
+
             string fullMessage = string.Join(":", messageParts);
             return SendMessage(fullMessage);
         }
-        
+
         /// <summary>
         /// 깨끗한 TCP 메시지 전송 (불필요한 제어 문자 없이)
         /// </summary>
@@ -338,14 +516,14 @@ namespace Features.Multi.Net
                 Debug.LogWarning("[NetworkClient] 서버에 연결되지 않음");
                 return false;
             }
-            
+
             try
             {
                 List<string> messageParts = new List<string> { messageType };
                 messageParts.AddRange(parameters);
-                
+
                 string message = string.Join(":", messageParts);
-                
+
                 // WriteLine 대신 Write + 단일 \n 사용 (불필요한 \r 제거)
                 streamWriter.Write(message + "\n");
                 streamWriter.Flush(); // 즉시 전송 보장
@@ -360,20 +538,20 @@ namespace Features.Multi.Net
             catch (Exception ex)
             {
                 Debug.LogError($"[NetworkClient] 깨끗한 메시지 전송 실패: {ex.Message}");
-                
+
                 // 메인스레드에서 에러 이벤트 발생
                 UnityMainThreadDispatcher.Enqueue(() => OnError?.Invoke($"전송 실패: {ex.Message}"));
-                
+
                 // 연결 상태 확인 및 재연결 시도
                 if (!IsSocketConnected())
                 {
                     _ = ReconnectAsync();
                 }
-                
+
                 return false;
             }
         }
-        
+
         /// <summary>
         /// 메시지 수신 스레드
         /// </summary>
@@ -396,7 +574,7 @@ namespace Features.Multi.Net
                                 {
                                     incomingMessages.Enqueue(message);
                                 }
-                                
+
                                 // 즉시 메인 스레드에서 처리하도록 알림
                                 UnityMainThreadDispatcher.Enqueue(ProcessIncomingMessages);
                             }
@@ -416,7 +594,7 @@ namespace Features.Multi.Net
                             break;
                         }
                     }
-                    
+
                     // CPU 사용률 최적화를 위한 짧은 대기 (1ms로 단축)
                     Thread.Sleep(1);
                 }
@@ -439,7 +617,7 @@ namespace Features.Multi.Net
                 }
             }
         }
-        
+
         /// <summary>
         /// 메인 스레드에서 수신된 메시지 처리
         /// </summary>
@@ -455,11 +633,11 @@ namespace Features.Multi.Net
                 }
             }
         }
-        
-//         // ========================================
-//         // 연결 상태 확인
-//         // ========================================
-        
+
+        //         // ========================================
+        //         // 연결 상태 확인
+        //         // ========================================
+
         /// <summary>
         /// 연결 상태 반환
         /// </summary>
@@ -467,7 +645,7 @@ namespace Features.Multi.Net
         {
             return isConnected && IsSocketConnected();
         }
-        
+
         /// <summary>
         /// 소켓 연결 상태 확인
         /// </summary>
@@ -475,7 +653,7 @@ namespace Features.Multi.Net
         {
             if (tcpClient == null || !tcpClient.Connected)
                 return false;
-            
+
             try
             {
                 // Poll을 사용하여 실제 연결 상태 확인
@@ -486,7 +664,7 @@ namespace Features.Multi.Net
                 return false;
             }
         }
-        
+
         /// <summary>
         /// 연결 정리
         /// </summary>
@@ -495,17 +673,17 @@ namespace Features.Multi.Net
             try
             {
                 receiveThread?.Join(1000); // 1초 대기
-                
+
                 streamWriter?.Close();
                 streamReader?.Close();
                 networkStream?.Close();
                 tcpClient?.Close();
-                
+
                 streamWriter = null;
                 streamReader = null;
                 networkStream = null;
                 tcpClient = null;
-                
+
                 cancellationTokenSource?.Dispose();
                 cancellationTokenSource = null;
             }
@@ -514,11 +692,11 @@ namespace Features.Multi.Net
                 Debug.LogError($"[NetworkClient] 연결 정리 중 오류: {ex.Message}");
             }
         }
-        
+
         // ========================================
         // 게임별 메시지 전송 함수들 (C++ 클라이언트와 동일)
         // ========================================
-        
+
         /// <summary>
         /// JWT 로그인 요청 (서버 프로토콜에 맞춤)
         /// </summary>
@@ -527,7 +705,7 @@ namespace Features.Multi.Net
             // 서버에서 예상하는 형식: auth:JWT토큰
             return SendCleanTCPMessage("auth", token);
         }
-        
+
         /// <summary>
         /// 로그인 요청 (서버 프로토콜에 맞춤)
         /// </summary>
@@ -536,7 +714,7 @@ namespace Features.Multi.Net
             // 서버에서 예상하는 형식: auth:username:password
             return SendCleanTCPMessage("auth", username, password);
         }
-        
+
         /// <summary>
         /// 회원가입 요청 (서버 프로토콜에 맞춤)
         /// </summary>
@@ -545,7 +723,7 @@ namespace Features.Multi.Net
             // 서버에서 예상하는 형식: register:username:email:password (이메일은 빈값)
             return SendCleanTCPMessage("register", username, "", password);
         }
-        
+
         /// <summary>
         /// 게스트 로그인 요청 (서버 프로토콜에 맞춤)
         /// </summary>
@@ -554,7 +732,7 @@ namespace Features.Multi.Net
             // 서버에서 예상하는 형식: guest
             return SendCleanTCPMessage("guest");
         }
-        
+
         /// <summary>
         /// 버전 체크 요청 (서버 프로토콜에 맞춤)
         /// </summary>
@@ -563,7 +741,7 @@ namespace Features.Multi.Net
             // 서버에서 예상하는 형식: version:check:clientVersion
             return SendCleanTCPMessage("version", "check", clientVersion);
         }
-        
+
         /// <summary>
         /// 사용자 통계 정보 요청 (서버 프로토콜에 맞춤)
         /// </summary>
@@ -572,7 +750,7 @@ namespace Features.Multi.Net
             // 서버에서 예상하는 형식: user:stats:username
             return SendCleanTCPMessage("user", "stats", username);
         }
-        
+
         /// <summary>
         /// 로비 입장 요청 (서버 프로토콜에 맞춤)
         /// </summary>
@@ -581,7 +759,7 @@ namespace Features.Multi.Net
             // 서버에서 예상하는 형식: lobby:enter
             return SendCleanTCPMessage("lobby", "enter");
         }
-        
+
         /// <summary>
         /// 로비 나가기 요청 (서버 프로토콜에 맞춤)
         /// </summary>
@@ -590,7 +768,7 @@ namespace Features.Multi.Net
             // 서버에서 예상하는 형식: lobby:leave
             return SendCleanTCPMessage("lobby", "leave");
         }
-        
+
         /// <summary>
         /// 로비 사용자 목록 요청 (서버 프로토콜에 맞춤)
         /// </summary>
@@ -599,7 +777,7 @@ namespace Features.Multi.Net
             // 서버에서 예상하는 형식: lobby:list
             return SendCleanTCPMessage("lobby", "list");
         }
-        
+
         /// <summary>
         /// 방 목록 요청 (서버 프로토콜에 맞춤)
         /// </summary>
@@ -608,7 +786,7 @@ namespace Features.Multi.Net
             // 서버에서 예상하는 형식: room:list
             return SendCleanTCPMessage("room", "list");
         }
-        
+
         /// <summary>
         /// 방 생성 요청 (서버 프로토콜에 맞춤)
         /// </summary>
@@ -624,7 +802,7 @@ namespace Features.Multi.Net
                 return SendCleanTCPMessage("room", "create", roomName, isPrivate ? "1" : "0");
             }
         }
-        
+
         /// <summary>
         /// 방 참가 요청 (서버 프로토콜에 맞춤)
         /// </summary>
@@ -640,7 +818,7 @@ namespace Features.Multi.Net
                 return SendCleanTCPMessage("room", "join", roomId.ToString());
             }
         }
-        
+
         /// <summary>
         /// 방 나가기 요청 (서버 프로토콜에 맞춤)
         /// </summary>
@@ -649,7 +827,7 @@ namespace Features.Multi.Net
             // 서버에서 예상하는 형식: room:leave
             return SendCleanTCPMessage("room", "leave");
         }
-        
+
         /// <summary>
         /// 플레이어 준비 상태 설정 (서버 프로토콜에 맞춤)
         /// </summary>
@@ -658,7 +836,7 @@ namespace Features.Multi.Net
             // 서버에서 예상하는 형식: room:ready:0/1
             return SendCleanTCPMessage("room", "ready", isReady ? "1" : "0");
         }
-        
+
         /// <summary>
         /// 게임 시작 요청 (서버 프로토콜에 맞춤)
         /// </summary>
@@ -667,7 +845,7 @@ namespace Features.Multi.Net
             // 서버에서 예상하는 형식: room:start
             return SendCleanTCPMessage("room", "start");
         }
-        
+
         /// <summary>
         /// 채팅 메시지 전송 (서버 프로토콜에 맞춤)
         /// </summary>
@@ -676,7 +854,7 @@ namespace Features.Multi.Net
             // 서버에서 예상하는 형식: chat:message
             return SendCleanTCPMessage("chat", message);
         }
-        
+
         /// <summary>
         /// 핑 메시지 전송 (서버 프로토콜에 맞춤)
         /// </summary>
@@ -685,7 +863,7 @@ namespace Features.Multi.Net
             // 서버에서 예상하는 형식: ping
             return SendCleanTCPMessage("ping");
         }
-        
+
         /// <summary>
         /// 블록 배치 요청 (서버 프로토콜: game:move:blockType:col:row:rotation:flip)
         /// </summary>
@@ -694,7 +872,7 @@ namespace Features.Multi.Net
             // 서버가 기대하는 형식: game:move:11:17:0:0:0
             // blockType:col:row:rotation:flip (flip: 0=Normal, 1=Flipped)
             int flipValue = placement.isFlipped ? 1 : 0;
-            
+
             return SendProtocolMessage("game:move",
                 ((int)placement.blockType).ToString(),
                 placement.position.x.ToString(),        // x좌표 = col (서버에서 열)
@@ -710,7 +888,7 @@ namespace Features.Multi.Net
         {
             return SendProtocolMessage("HEARTBEAT");
         }
-        
+
         /// <summary>
         /// 최대 클리어 스테이지 업데이트
         /// </summary>
@@ -718,7 +896,7 @@ namespace Features.Multi.Net
         {
             return SendProtocolMessage("UPDATE_MAX_STAGE", maxStageCompleted.ToString());
         }
-        
+
         /// <summary>
         /// 사용자 싱글플레이어 통계 요청
         /// </summary>
@@ -726,22 +904,22 @@ namespace Features.Multi.Net
         {
             return SendProtocolMessage("GET_SINGLE_STATS_REQUEST");
         }
-        
+
         /// <summary>
         /// 범위 스테이지 진행도 요청 (여러 스테이지 한번에)
         /// </summary>
         public bool SendBatchStageProgressRequest(int startStage, int endStage)
         {
-            return SendProtocolMessage("BATCH_STAGE_PROGRESS_REQUEST", 
-                startStage.ToString(), 
+            return SendProtocolMessage("BATCH_STAGE_PROGRESS_REQUEST",
+                startStage.ToString(),
                 endStage.ToString()
             );
         }
-        
+
         // ========================================
         // 네트워크 상태 정보 메서드들
         // ========================================
-        
+
         /// <summary>
         /// 서버 정보 반환
         /// </summary>
@@ -756,7 +934,7 @@ namespace Features.Multi.Net
                 return $"서버: {serverHost}:{serverPort} (연결 안됨)";
             }
         }
-        
+
         /// <summary>
         /// 네트워크 통계 정보 반환
         /// </summary>

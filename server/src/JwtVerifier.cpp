@@ -240,7 +240,7 @@ namespace Blokus
                 }
 
                 m_lastCacheUpdate = now;
-                spdlog::info("JWKS 파싱 완료 - 총 {} 개 키 캐시됨", m_cachedKeys.size());
+                spdlog::debug("JWKS 파싱 완료 - 총 {} 개 키 캐시됨", m_cachedKeys.size());
                 return !m_cachedKeys.empty();
             }
             catch (const std::exception &e)
@@ -586,7 +586,7 @@ namespace Blokus
                     // 캐시가 만료되었으면 새로고침
                     if (!isKeyCacheValid())
                     {
-                        spdlog::info("JWKS 캐시 만료, 백그라운드 새로고침 실행");
+                        spdlog::debug("JWKS 캐시 만료, 백그라운드 새로고침 실행");
                         refreshJwksCache();
                     }
                 }
