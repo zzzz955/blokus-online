@@ -334,7 +334,7 @@ namespace Blokus
                     return AuthResult(false, "세션 생성에 실패했습니다", "", "", "");
                 }
 
-                spdlog::info("JWT 로그인 성공: {} (ID: {})", username, userId);
+                spdlog::debug("JWT 로그인 성공: {} (ID: {})", username, userId);
                 return AuthResult(true, "JWT 인증으로 로그인되었습니다", userId, sessionToken, username);
             }
             catch (const std::exception &e)

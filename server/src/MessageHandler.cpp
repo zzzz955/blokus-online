@@ -181,7 +181,7 @@ namespace Blokus::Server
             (unsigned char)commandStr[1] == 0xBB && 
             (unsigned char)commandStr[2] == 0xBF) {
             commandStr = commandStr.substr(3);
-            spdlog::warn("DEBUG: UTF-8 BOM removed from commandStr");
+            spdlog::debug("DEBUG: UTF-8 BOM removed from commandStr");
         }
 
         // room:xxx, game:xxx 형태 처리
