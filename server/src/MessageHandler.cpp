@@ -110,10 +110,12 @@ namespace Blokus::Server
 
         try
         {
-            spdlog::debug("📨 메시지 수신 ({}): {}, 현재 상태: {}",
-                          session_->getSessionId(),
-                          rawMessage.length() > 100 ? rawMessage.substr(0, 100) + "..." : rawMessage, (int)session_->getState());
-
+            // ping 메시지는 로깅하지 않음 (너무 빈번함)
+            if (rawMessage != "ping") {
+                spdlog::debug("📨 메시지 수신 ({}): {}, 현재 상태: {}",
+                              session_->getSessionId(),
+                              rawMessage.length() > 100 ? rawMessage.substr(0, 100) + "..." : rawMessage, (int)session_->getState());
+            }
 
             // AFK 관련 메시지 특별 처리
             if (rawMessage == "AFK_VERIFY") {
@@ -128,8 +130,11 @@ namespace Blokus::Server
             // 기존 텍스트 기반 메시지 처리
             auto [messageType, params] = parseMessage(rawMessage);
 
-            spdlog::debug("파싱 결과: {} ({})",
-                          messageTypeToString(messageType), static_cast<int>(messageType));
+            // ping 메시지 파싱 결과도 로깅하지 않음
+            if (messageType != MessageType::Ping) {
+                spdlog::debug("파싱 결과: {} ({})",
+                              messageTypeToString(messageType), static_cast<int>(messageType));
+            }
 
             // 🔒 중앙집중식 인증 검증 (화이트리스트 기반)
             if (requiresAuthentication(messageType) && !session_->isAuthenticated()) {
