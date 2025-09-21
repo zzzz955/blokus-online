@@ -18,7 +18,7 @@ namespace Blokus {
             , m_eventCallback(nullptr)
             , m_databaseManager(nullptr)
         {
-            spdlog::info("🏠 RoomManager 초기화 (최대 방: {}, 최대 플레이어/방: {})",
+            spdlog::debug("🏠 RoomManager 초기화 (최대 방: {}, 최대 플레이어/방: {})",
                 m_maxRooms, m_maxPlayersPerRoom);
         }
         
@@ -29,18 +29,18 @@ namespace Blokus {
             , m_eventCallback(nullptr)
             , m_databaseManager(dbManager)
         {
-            spdlog::info("🏠 RoomManager 초기화 with DB (최대 방: {}, 최대 플레이어/방: {})",
+            spdlog::debug("🏠 RoomManager 초기화 with DB (최대 방: {}, 최대 플레이어/방: {})",
                 m_maxRooms, m_maxPlayersPerRoom);
         }
 
         RoomManager::~RoomManager() {
             removeAllRooms();
-            spdlog::info("🏠 RoomManager 소멸");
+            spdlog::debug("🏠 RoomManager 소멸");
         }
         
         void RoomManager::setDatabaseManager(std::shared_ptr<DatabaseManager> dbManager) {
             m_databaseManager = dbManager;
-            spdlog::info("🗄️ RoomManager에 DatabaseManager 설정 완료");
+            spdlog::debug("🗄️ RoomManager에 DatabaseManager 설정 완료");
         }
         
         std::shared_ptr<DatabaseManager> RoomManager::getDatabaseManager() const {
@@ -182,7 +182,7 @@ namespace Blokus {
             // 5. 플레이어-방 매핑 업데이트
             updatePlayerMapping(userId, roomId);
 
-            spdlog::info("✅ 방 참여 성공: 플레이어 '{}' -> 방 {} ({}명)",
+            spdlog::debug("✅ 방 참여 성공: 플레이어 '{}' -> 방 {} ({}명)",
                 username, roomId, room->getPlayerCount());
 
             // displayName 포함하여 이벤트 전송
@@ -229,7 +229,7 @@ namespace Blokus {
             // 플레이어-방 매핑 제거
             removePlayerMapping(userId);
 
-            spdlog::info("✅ 방 나가기 성공: 플레이어 '{}' <- 방 {} ({}명)",
+            spdlog::debug("✅ 방 나가기 성공: 플레이어 '{}' <- 방 {} ({}명)",
                 username, roomId, room->getPlayerCount());
 
             // displayName 포함하여 이벤트 전송
@@ -238,9 +238,9 @@ namespace Blokus {
             // 방이 비었거나 해체 상태라면 제거
             if (room->isEmpty() || room->getState() == RoomState::Disbanded) {
                 if (room->getState() == RoomState::Disbanded) {
-                    spdlog::info("💥 해체된 방 {} 자동 삭제 (RoomManager)", roomId);
+                    spdlog::debug("💥 해체된 방 {} 자동 삭제 (RoomManager)", roomId);
                 } else {
-                    spdlog::info("빈 방 {} 자동 삭제 (RoomManager)", roomId);
+                    spdlog::debug("빈 방 {} 자동 삭제 (RoomManager)", roomId);
                 }
                 removeRoom(roomId);
             }
@@ -334,7 +334,7 @@ namespace Blokus {
                 return false;
             }
 
-            spdlog::info("✅ 호스트 이양: 방 {} ('{}' -> '{}')", roomId, currentHostId, newHostId);
+            spdlog::debug("✅ 호스트 이양: 방 {} ('{}' -> '{}')", roomId, currentHostId, newHostId);
             triggerRoomEvent(roomId, "HOST_TRANSFERRED", currentHostId + ":" + newHostId);
 
             return true;

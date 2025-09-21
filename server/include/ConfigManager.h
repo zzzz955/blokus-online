@@ -72,8 +72,7 @@ namespace Blokus {
                     " user=" + dbUser + " password=" + dbPassword +
                     " dbname=" + dbName + " client_encoding=UTF8";
 
-                spdlog::info("환경변수 불러오기 완료!",
-                    serverPort, dbUser, dbHost, dbPort, dbName);
+                spdlog::info("환경변수 불러오기 완료!");
 
                 if (debugMode) {
                     printConfig();
@@ -89,16 +88,14 @@ namespace Blokus {
             }
 
             static void printConfig() {
-                spdlog::info("=== Configuration Settings ===");
-                spdlog::info("SERVER_PORT={}", serverPort);
-                spdlog::info("SERVER_MAX_CLIENTS={}", maxClients);
+                spdlog::info("====== 환경 변수 세팅 목록 ======");
+                spdlog::info("서버 포트={}", serverPort);
+                spdlog::info("최대 클라이언트 수={}", maxClients);
                 spdlog::info("DB_HOST={}", dbHost);
                 spdlog::info("DB_PORT={}", dbPort);
                 spdlog::info("DB_USER={}", dbUser);
                 spdlog::info("DB_PASSWORD=***MASKED***");
                 spdlog::info("DB_NAME={}", dbName);
-                spdlog::info("LOG_LEVEL={}", logLevel);
-                spdlog::info("DEBUG_MODE={}", debugMode ? "true" : "false");
                 spdlog::info("==============================");
             }
 

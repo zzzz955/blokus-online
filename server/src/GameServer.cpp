@@ -98,7 +98,7 @@ namespace Blokus::Server {
         // 🔥 핵심 수정: work_guard 생성으로 ioContext가 계속 실행되도록 보장
         workGuard_ = std::make_unique<boost::asio::executor_work_guard<boost::asio::io_context::executor_type>>(
             boost::asio::make_work_guard(ioContext_));
-        spdlog::info("🔧 [DEBUG] work_guard 생성 완료");
+        spdlog::debug("🔧 [DEBUG] work_guard 생성 완료");
 
         // 스레드 풀 생성
         int threadCount = ConfigManager::threadPoolSize;
@@ -165,7 +165,7 @@ namespace Blokus::Server {
 
         // 5. work_guard 해제로 ioContext가 자연스럽게 종료되도록 함
         if (workGuard_) {
-            spdlog::info("🔧 [DEBUG] work_guard 해제");
+            spdlog::debug("🔧 [DEBUG] work_guard 해제");
             workGuard_.reset();
         }
 
@@ -180,19 +180,19 @@ namespace Blokus::Server {
     }
 
     void GameServer::run() {
-        spdlog::info("🔧 [DEBUG] run() 메서드 시작");
+        spdlog::debug("🔧 [DEBUG] run() 메서드 시작");
 
         if (!initialize()) {
             spdlog::error("서버 초기화 실패");
             return;
         }
-        spdlog::info("🔧 [DEBUG] 초기화 완료");
+        spdlog::debug("🔧 [DEBUG] 초기화 완료");
 
         start();
-        spdlog::info("🔧 [DEBUG] start() 완료");
+        spdlog::debug("🔧 [DEBUG] start() 완료");
 
         spdlog::info("서버가 실행 중입니다. Ctrl+C로 종료하세요");
-        spdlog::info("🔧 [DEBUG] 메인 스레드에서 대기 중...");
+        spdlog::debug("🔧 [DEBUG] 메인 스레드에서 대기 중...");
 
         // 🔥 핵심 수정: 메인 스레드에서 ioContext_.run() 중복 호출 제거
         // 대신 스레드풀이 종료될 때까지 대기
@@ -202,13 +202,13 @@ namespace Blokus::Server {
                     thread.join();
                 }
             }
-            spdlog::info("🔧 [DEBUG] 모든 스레드 종료 완료");
+            spdlog::debug("🔧 [DEBUG] 모든 스레드 종료 완료");
         }
         catch (const std::exception& e) {
             spdlog::error("스레드 대기 중 예외: {}", e.what());
         }
 
-        spdlog::info("🔧 [DEBUG] run() 메서드 종료");
+        spdlog::debug("🔧 [DEBUG] run() 메서드 종료");
     }
 
     // ========================================
@@ -328,7 +328,7 @@ namespace Blokus::Server {
             }
         }
 
-        spdlog::info("새 세션 추가: {} (총 연결: {})",
+        spdlog::debug("새 세션 추가: {} (총 연결: {})",
             sessionId, getCurrentConnections());
 
         // Session에 MessageHandler가 없으면 생성
@@ -377,7 +377,7 @@ namespace Blokus::Server {
                 }
             }
 
-            spdlog::info("세션 제거: {} (남은 연결: {})",
+            spdlog::debug("세션 제거: {} (남은 연결: {})",
                 sessionId, getCurrentConnections());
         }
     }
@@ -445,7 +445,7 @@ namespace Blokus::Server {
                 return false;
             }
 
-            spdlog::info("설정 로드 완료 - 포트: {}, 최대 클라이언트: {}",
+            spdlog::debug("설정 로드 완료 - 포트: {}, 최대 클라이언트: {}",
                 ConfigManager::serverPort, ConfigManager::maxClients);
             return true;
         }
@@ -457,13 +457,13 @@ namespace Blokus::Server {
 
     bool GameServer::initializeDatabase() {
         try {
-            spdlog::info("데이터베이스 연결 테스트 중...");
+            spdlog::debug("데이터베이스 연결 테스트 중...");
 
             // DatabaseManager 인스턴스 생성 및 테스트
             databaseManager_ = std::make_shared<DatabaseManager>();
             if (databaseManager_->initialize()) {
                 auto stats = databaseManager_->getStats();
-                spdlog::info("데이터베이스 연결 성공");
+                spdlog::debug("데이터베이스 연결 성공");
                 spdlog::info("DB 통계: {} 사용자, {} 게임", stats.totalUsers, stats.totalGames);
                 return true;
             }
@@ -561,7 +561,7 @@ namespace Blokus::Server {
         if (!error) {
             try {
                 std::string remoteAddr = session->getRemoteAddress();
-                spdlog::info("새 클라이언트 연결: {}", remoteAddr);
+                spdlog::debug("새 클라이언트 연결: {}", remoteAddr);
 
                 // 연결 제한 체크
                 if (getCurrentConnections() >= ConfigManager::maxClients) {
@@ -618,7 +618,7 @@ namespace Blokus::Server {
                 if (wasInGame) {
                     spdlog::warn("🎮 게임 중 세션 강제 종료로 인한 방 {} 나가기: {} (좀비방 방지)", roomId, username);
                 } else {
-                    spdlog::info("🏠 방 대기 중 세션 연결 해제로 인한 방 {} 나가기: {}", roomId, username);
+                    spdlog::debug("🏠 방 대기 중 세션 연결 해제로 인한 방 {} 나가기: {}", roomId, username);
                 }
                 roomManager_->leaveRoom(userId);
             }
@@ -639,7 +639,7 @@ namespace Blokus::Server {
     }
 
     void GameServer::onSessionDisconnect(const std::string& sessionId) {
-        spdlog::info("세션 연결 해제: {}", sessionId);
+        spdlog::debug("세션 연결 해제: {}", sessionId);
         
         // 공통 세션 종료 처리 로직 실행
         handleSessionExit(sessionId);
@@ -668,7 +668,7 @@ namespace Blokus::Server {
             std::string message = "LOBBY_USER_LEFT:" + username;
             auto lobbyUsers = getLobbyUsers();
             
-            spdlog::info("🔊 로비 사용자 퇴장 브로드캐스트: '{}' -> {}명에게", username, lobbyUsers.size());
+            spdlog::debug("🔊 로비 사용자 퇴장 브로드캐스트: '{}' -> {}명에게", username, lobbyUsers.size());
             
             for (const auto& session : lobbyUsers) {
                 if (session && session->isActive()) {

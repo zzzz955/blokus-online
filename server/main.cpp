@@ -20,7 +20,7 @@ std::unique_ptr<Blokus::Server::GameServer> g_server;
 // 시그널 핸들러 (Ctrl+C 처리)
 void signalHandler(int signal) {
     if (signal == SIGINT || signal == SIGTERM) {
-        spdlog::info("Shutdown signal received. Stopping server safely...");
+        spdlog::info("서버 종료 수행");
         if (g_server) {
             g_server->stop();
         }
@@ -66,7 +66,7 @@ int main() {
             spdlog::set_level(spdlog::level::info);  // 기본값
         }
 
-        spdlog::info("블로커스 온라인 서버 v1.0.0");
+        spdlog::info("블로커스 온라인 서버 v{}", Blokus::Server::ConfigManager::serverVersion);
         spdlog::info("========================================");
         spdlog::info("현재 로그 레벨: {}", logLevel);
         if (!Blokus::Server::ConfigManager::validate()) {
@@ -98,10 +98,10 @@ int main() {
         // ========================================
         // 5. 정리 및 종료
         // ========================================
-        spdlog::info("Cleaning up server resources...");
+        spdlog::info("서버 리소스 정리 중...");
         g_server.reset();
 
-        spdlog::info("Server shutdown complete");
+        spdlog::info("서버 종료 성공");
         spdlog::info("========================================");
 
     }
@@ -109,12 +109,7 @@ int main() {
         // ========================================
         // 예외 처리
         // ========================================
-        spdlog::error("Server execution error: {}", e.what());
-        spdlog::error("Possible causes:");
-        spdlog::error("  1. Port {} already in use", Blokus::Server::ConfigManager::serverPort);
-        spdlog::error("  2. Insufficient network permissions");
-        spdlog::error("  3. Configuration file error");
-        spdlog::error("  4. Missing required libraries");
+        spdlog::error("서버 실행 에러: {}", e.what());
 
         if (g_server) {
             g_server->stop();
