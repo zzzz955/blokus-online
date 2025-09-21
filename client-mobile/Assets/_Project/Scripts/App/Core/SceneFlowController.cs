@@ -42,6 +42,7 @@ namespace App.Core
         
         // 중복 실행 방지 플래그
         private static bool isGoMultiInProgress = false;
+        private static bool isGoMultiGameplayInProgress = false;
 
         void Awake()
         {
@@ -539,6 +540,12 @@ namespace App.Core
             // MultiGameplayScene 언로드
             yield return UnloadIfLoaded(MultiGameplayScene);
 
+            // DontDestroyOnLoad 객체 정리는 NetworkManager.HandleDisconnection()에서 처리됨
+            // (로그아웃 시 autoReconnect = false로 설정되어 자동 정리)
+
+            // MultiCore 씬도 언로드 (연결 실패 시를 위해)
+            yield return UnloadIfLoaded(MultiCoreScene);
+
             // MainScene 활성
             SetActive(MainScene);
 
@@ -786,7 +793,30 @@ namespace App.Core
         /// </summary>
         public void StartGoMultiGameplay()
         {
-            StartCoroutine(GoMultiGameplay());
+            if (isGoMultiGameplayInProgress)
+            {
+                if (debugMode)
+                    Debug.LogWarning("[SceneFlowController] GoMultiGameplay already in progress, ignoring duplicate call");
+                return;
+            }
+            
+            StartCoroutine(GoMultiGameplayWithFlag());
+        }
+        
+        /// <summary>
+        /// GoMultiGameplay wrapper with progress flag management
+        /// </summary>
+        private System.Collections.IEnumerator GoMultiGameplayWithFlag()
+        {
+            isGoMultiGameplayInProgress = true;
+            try
+            {
+                yield return StartCoroutine(GoMultiGameplay());
+            }
+            finally
+            {
+                isGoMultiGameplayInProgress = false;
+            }
         }
         
         /// <summary>

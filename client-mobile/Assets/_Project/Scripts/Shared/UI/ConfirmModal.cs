@@ -94,22 +94,56 @@ namespace Shared.UI{
         /// </summary>
         public void ShowModal(string title, string message, Action onAccept, Action onReject = null)
         {
+            Debug.Log($"[ConfirmModal] ShowModal 호출됨 - Title: {title}");
+            Debug.Log($"[ConfirmModal] modalPanel null 여부: {modalPanel == null}");
+            
             // 텍스트 설정
             if (titleText != null)
                 titleText.text = title;
+            else
+                Debug.LogWarning("[ConfirmModal] titleText가 null입니다!");
                 
             if (messageText != null)
                 messageText.text = message;
+            else
+                Debug.LogWarning("[ConfirmModal] messageText가 null입니다!");
             
             // 콜백 설정
             onAcceptCallback = onAccept;
             onRejectCallback = onReject;
             
+            // ConfirmModal GameObject 자체도 활성화
+            if (!gameObject.activeInHierarchy)
+            {
+                gameObject.SetActive(true);
+                Debug.Log($"[ConfirmModal] ConfirmModal GameObject 활성화됨");
+            }
+            
             // 모달 표시
             if (modalPanel != null)
             {
                 modalPanel.SetActive(true);
-                Debug.Log($"[ConfirmModal] 모달 표시: {title}");
+                Debug.Log($"[ConfirmModal] 모달 표시 완료: {title}");
+                Debug.Log($"[ConfirmModal] modalPanel.activeSelf: {modalPanel.activeSelf}");
+                Debug.Log($"[ConfirmModal] ConfirmModal GameObject.activeSelf: {gameObject.activeSelf}");
+                
+                // 추가 디버그 정보
+                var rectTransform = modalPanel.GetComponent<RectTransform>();
+                var canvasGroup = modalPanel.GetComponent<CanvasGroup>();
+                var canvas = modalPanel.GetComponentInParent<Canvas>();
+                
+                Debug.Log($"[ConfirmModal] modalPanel 위치: {rectTransform?.anchoredPosition}");
+                Debug.Log($"[ConfirmModal] modalPanel 크기: {rectTransform?.sizeDelta}");
+                if (canvasGroup != null)
+                    Debug.Log($"[ConfirmModal] CanvasGroup alpha: {canvasGroup.alpha}");
+                else
+                    Debug.Log("[ConfirmModal] CanvasGroup 컴포넌트 없음");
+                Debug.Log($"[ConfirmModal] Canvas sortingOrder: {canvas?.sortingOrder}");
+                Debug.Log($"[ConfirmModal] 부모 Canvas 이름: {canvas?.name}");
+            }
+            else
+            {
+                Debug.LogError("[ConfirmModal] modalPanel이 null입니다! Inspector에서 Modal Panel을 할당해주세요.");
             }
         }
         
@@ -123,6 +157,10 @@ namespace Shared.UI{
                 modalPanel.SetActive(false);
                 Debug.Log("[ConfirmModal] 모달 숨김");
             }
+            
+            // ConfirmModal GameObject도 비활성화하여 BackgroundButton 등 완전히 제거
+            gameObject.SetActive(false);
+            Debug.Log("[ConfirmModal] ConfirmModal GameObject 비활성화");
             
             // 콜백 초기화
             onAcceptCallback = null;

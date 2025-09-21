@@ -4,8 +4,8 @@ using System.Collections.Generic;
 namespace Features.Multi.Models
 {
     /// <summary>
-    /// 블록 타입 열거형
-    /// 블로커스의 다양한 블록 모양들
+    /// 블록 타입 열거형 (서버와 동일한 매핑)
+    /// common/include/Types.h와 일치
     /// </summary>
     public enum BlockType
     {
@@ -16,31 +16,29 @@ namespace Features.Multi.Models
         Domino = 2,
         
         // 3칸 블록
-        TriominoI = 3,  // 일자형
-        TriominoL = 4,  // L자형
+        TrioLine = 3,       // 3일자 (구 TriominoI)
+        TrioAngle = 4,      // 3꺾임 (구 TriominoL)
         
-        // 4칸 블록
-        TetrominoI = 5, // 일자형
-        TetrominoO = 6, // 정사각형
-        TetrominoT = 7, // T자형
-        TetrominoS = 8, // S자형
-        TetrominoZ = 9, // Z자형
-        TetrominoJ = 10, // J자형
-        TetrominoL = 11, // L자형
+        // 4칸 블록 (테트로미노)
+        Tetro_I = 5,        // 4일자 (구 TetrominoI)
+        Tetro_O = 6,        // 정사각형 (구 TetrominoO)
+        Tetro_T = 7,        // T자 (구 TetrominoT)
+        Tetro_L = 8,        // L자 (구 TetrominoL)
+        Tetro_S = 9,        // S자 (구 TetrominoS, TetrominoZ)
         
-        // 5칸 블록 (블로커스 고유)
-        PentominoF = 12,
-        PentominoI = 13,
-        PentominoL = 14,
-        PentominoN = 15,
-        PentominoP = 16,
-        PentominoT = 17,
-        PentominoU = 18,
-        PentominoV = 19,
-        PentominoW = 20,
-        PentominoX = 21,
-        PentominoY = 22,
-        PentominoZ = 23
+        // 5칸 블록 (펜토미노) - 서버와 정확히 일치
+        Pento_F = 10,       // F자
+        Pento_I = 11,       // 5일자 (이전에 TetrominoL=11이었던 부분!)
+        Pento_L = 12,       // 5L자
+        Pento_N = 13,       // N자
+        Pento_P = 14,       // P자
+        Pento_T = 15,       // 5T자
+        Pento_U = 16,       // U자
+        Pento_V = 17,       // V자
+        Pento_W = 18,       // W자
+        Pento_X = 19,       // X자
+        Pento_Y = 20,       // Y자
+        Pento_Z = 21        // 5Z자
     }
     
     /// <summary>
@@ -59,7 +57,7 @@ namespace Features.Multi.Models
         public List<Vector2Int> occupiedCells;  // 실제로 차지하는 셀들의 좌표
         
         /// <summary>
-        /// BlockPlacement 생성자
+        /// BlockPlacement 생성자 (기본 - 점유셀 자동 계산)
         /// </summary>
         public BlockPlacement(int playerId, BlockType blockType, Vector2Int position, int rotation = 0, bool isFlipped = false)
         {
@@ -76,44 +74,273 @@ namespace Features.Multi.Models
         }
         
         /// <summary>
-        /// 점유하는 셀들 계산 (Stub 구현)
+        /// BlockPlacement 생성자 (서버 좌표 직접 사용 - 개선된 동기화)
+        /// </summary>
+        public BlockPlacement(int playerId, BlockType blockType, Vector2Int position, int rotation, bool isFlipped, List<Vector2Int> occupiedCells)
+        {
+            this.playerId = playerId;
+            this.playerColor = PlayerColorExtensions.FromPlayerId(playerId);
+            this.blockType = blockType;
+            this.position = position;
+            this.rotation = rotation;
+            this.isFlipped = isFlipped;
+            this.occupiedCells = occupiedCells ?? new List<Vector2Int>();
+        }
+        
+        /// <summary>
+        /// 점유하는 셀들 계산
         /// </summary>
         private void CalculateOccupiedCells()
         {
             occupiedCells = new List<Vector2Int>();
             
-            // Stub: 간단한 블록 모양들만 구현
+            // 기본 블록 모양 정의 (회전과 뒤집힘 적용 전)
+            List<Vector2Int> baseShape = GetBaseBlockShape(blockType);
+            
+            // 회전 적용
+            if (rotation != 0)
+            {
+                baseShape = ApplyRotation(baseShape, rotation);
+            }
+            
+            // 뒤집힘 적용
+            if (isFlipped)
+            {
+                baseShape = ApplyFlip(baseShape);
+            }
+            
+            // 위치 오프셋 적용
+            foreach (Vector2Int cell in baseShape)
+            {
+                occupiedCells.Add(position + cell);
+            }
+        }
+        
+        /// <summary>
+        /// 블록 타입에 따른 기본 모양 반환 (0,0 기준)
+        /// </summary>
+        private List<Vector2Int> GetBaseBlockShape(BlockType blockType)
+        {
+            List<Vector2Int> shape = new List<Vector2Int>();
+            
             switch (blockType)
             {
                 case BlockType.Single:
-                    occupiedCells.Add(position);
+                    shape.Add(Vector2Int.zero);
                     break;
                     
                 case BlockType.Domino:
-                    occupiedCells.Add(position);
-                    occupiedCells.Add(position + Vector2Int.right);
+                    shape.Add(Vector2Int.zero);
+                    shape.Add(Vector2Int.right);
                     break;
                     
-                case BlockType.TriominoI:
-                    for (int i = 0; i < 3; i++)
-                    {
-                        occupiedCells.Add(position + Vector2Int.right * i);
-                    }
+                // 3칸 블록 - 서버와 일치하는 형태
+                case BlockType.TrioLine:
+                    shape.Add(Vector2Int.zero);
+                    shape.Add(Vector2Int.right);
+                    shape.Add(Vector2Int.right * 2);
                     break;
                     
-                case BlockType.TriominoL:
-                    occupiedCells.Add(position);
-                    occupiedCells.Add(position + Vector2Int.right);
-                    occupiedCells.Add(position + Vector2Int.down);
+                case BlockType.TrioAngle:
+                    shape.Add(Vector2Int.zero);
+                    shape.Add(Vector2Int.right);
+                    shape.Add(Vector2Int.down + Vector2Int.right);
+                    break;
+                    
+                // 4칸 블록 (테트로미노) - 서버와 일치하는 형태
+                case BlockType.Tetro_I:
+                    shape.Add(Vector2Int.zero);
+                    shape.Add(Vector2Int.right);
+                    shape.Add(Vector2Int.right * 2);
+                    shape.Add(Vector2Int.right * 3);
+                    break;
+                    
+                case BlockType.Tetro_O:
+                    shape.Add(Vector2Int.zero);
+                    shape.Add(Vector2Int.right);
+                    shape.Add(Vector2Int.down);
+                    shape.Add(Vector2Int.down + Vector2Int.right);
+                    break;
+                    
+                case BlockType.Tetro_T:
+                    shape.Add(Vector2Int.zero);
+                    shape.Add(Vector2Int.right);
+                    shape.Add(Vector2Int.right * 2);
+                    shape.Add(Vector2Int.down + Vector2Int.right);
+                    break;
+                    
+                case BlockType.Tetro_L:
+                    shape.Add(Vector2Int.zero);
+                    shape.Add(Vector2Int.right);
+                    shape.Add(Vector2Int.right * 2);
+                    shape.Add(Vector2Int.down);
+                    break;
+                    
+                case BlockType.Tetro_S:
+                    shape.Add(Vector2Int.zero);
+                    shape.Add(Vector2Int.right);
+                    shape.Add(Vector2Int.down + Vector2Int.right);
+                    shape.Add(Vector2Int.down + Vector2Int.right * 2);
+                    break;
+                    
+                // 5칸 펜토미노 블록들 - 서버 (row, col) → Unity Vector2Int(col, row)
+                case BlockType.Pento_F:
+                    // 서버: {0, 1}, {0, 2}, {1, 0}, {1, 1}, {2, 1}
+                    shape.Add(new Vector2Int(1, 0)); // {0,1} → (1,0)
+                    shape.Add(new Vector2Int(2, 0)); // {0,2} → (2,0)
+                    shape.Add(new Vector2Int(0, 1)); // {1,0} → (0,1)
+                    shape.Add(new Vector2Int(1, 1)); // {1,1} → (1,1)
+                    shape.Add(new Vector2Int(1, 2)); // {2,1} → (1,2)
+                    break;
+                    
+                case BlockType.Pento_I:
+                    // 서버: {0, 0}, {0, 1}, {0, 2}, {0, 3}, {0, 4}
+                    shape.Add(new Vector2Int(0, 0)); // {0,0} → (0,0)
+                    shape.Add(new Vector2Int(1, 0)); // {0,1} → (1,0)
+                    shape.Add(new Vector2Int(2, 0)); // {0,2} → (2,0)
+                    shape.Add(new Vector2Int(3, 0)); // {0,3} → (3,0)
+                    shape.Add(new Vector2Int(4, 0)); // {0,4} → (4,0)
+                    break;
+                    
+                case BlockType.Pento_L:
+                    // 서버: {0, 0}, {0, 1}, {0, 2}, {0, 3}, {1, 0}
+                    shape.Add(new Vector2Int(0, 0)); // {0,0} → (0,0)
+                    shape.Add(new Vector2Int(1, 0)); // {0,1} → (1,0)
+                    shape.Add(new Vector2Int(2, 0)); // {0,2} → (2,0)
+                    shape.Add(new Vector2Int(3, 0)); // {0,3} → (3,0)
+                    shape.Add(new Vector2Int(0, 1)); // {1,0} → (0,1)
+                    break;
+                    
+                case BlockType.Pento_N:
+                    // 서버: {0, 0}, {0, 1}, {0, 2}, {1, 2}, {1, 3}
+                    shape.Add(new Vector2Int(0, 0)); // {0,0} → (0,0)
+                    shape.Add(new Vector2Int(1, 0)); // {0,1} → (1,0)
+                    shape.Add(new Vector2Int(2, 0)); // {0,2} → (2,0)
+                    shape.Add(new Vector2Int(2, 1)); // {1,2} → (2,1)
+                    shape.Add(new Vector2Int(3, 1)); // {1,3} → (3,1)
+                    break;
+                    
+                case BlockType.Pento_P:
+                    // 서버: {0, 0}, {0, 1}, {1, 0}, {1, 1}, {2, 0}
+                    shape.Add(new Vector2Int(0, 0)); // {0,0} → (0,0)
+                    shape.Add(new Vector2Int(1, 0)); // {0,1} → (1,0)
+                    shape.Add(new Vector2Int(0, 1)); // {1,0} → (0,1)
+                    shape.Add(new Vector2Int(1, 1)); // {1,1} → (1,1)
+                    shape.Add(new Vector2Int(0, 2)); // {2,0} → (0,2)
+                    break;
+                    
+                case BlockType.Pento_T:
+                    // 서버: {0, 0}, {0, 1}, {0, 2}, {1, 1}, {2, 1}
+                    shape.Add(new Vector2Int(0, 0)); // {0,0} → (0,0)
+                    shape.Add(new Vector2Int(1, 0)); // {0,1} → (1,0)
+                    shape.Add(new Vector2Int(2, 0)); // {0,2} → (2,0)
+                    shape.Add(new Vector2Int(1, 1)); // {1,1} → (1,1)
+                    shape.Add(new Vector2Int(1, 2)); // {2,1} → (1,2)
+                    break;
+                    
+                case BlockType.Pento_U:
+                    // 서버: {0, 0}, {0, 2}, {1, 0}, {1, 1}, {1, 2} (row, col)
+                    // Unity: Vector2Int(col, row)
+                    shape.Add(new Vector2Int(0, 0)); // {0,0} → (0,0)
+                    shape.Add(new Vector2Int(2, 0)); // {0,2} → (2,0)
+                    shape.Add(new Vector2Int(0, 1)); // {1,0} → (0,1)
+                    shape.Add(new Vector2Int(1, 1)); // {1,1} → (1,1)
+                    shape.Add(new Vector2Int(2, 1)); // {1,2} → (2,1)
+                    break;
+                    
+                case BlockType.Pento_V:
+                    // 서버: {0, 0}, {1, 0}, {2, 0}, {2, 1}, {2, 2}
+                    shape.Add(new Vector2Int(0, 0)); // {0,0} → (0,0)
+                    shape.Add(new Vector2Int(0, 1)); // {1,0} → (0,1)
+                    shape.Add(new Vector2Int(0, 2)); // {2,0} → (0,2)
+                    shape.Add(new Vector2Int(1, 2)); // {2,1} → (1,2)
+                    shape.Add(new Vector2Int(2, 2)); // {2,2} → (2,2)
+                    break;
+                    
+                case BlockType.Pento_W:
+                    // 서버: {0, 0}, {1, 0}, {1, 1}, {2, 1}, {2, 2}
+                    shape.Add(new Vector2Int(0, 0)); // {0,0} → (0,0)
+                    shape.Add(new Vector2Int(0, 1)); // {1,0} → (0,1)
+                    shape.Add(new Vector2Int(1, 1)); // {1,1} → (1,1)
+                    shape.Add(new Vector2Int(1, 2)); // {2,1} → (1,2)
+                    shape.Add(new Vector2Int(2, 2)); // {2,2} → (2,2)
+                    break;
+                    
+                case BlockType.Pento_X:
+                    // 서버: {0, 1}, {1, 0}, {1, 1}, {1, 2}, {2, 1}
+                    shape.Add(new Vector2Int(1, 0)); // {0,1} → (1,0)
+                    shape.Add(new Vector2Int(0, 1)); // {1,0} → (0,1)
+                    shape.Add(new Vector2Int(1, 1)); // {1,1} → (1,1)
+                    shape.Add(new Vector2Int(2, 1)); // {1,2} → (2,1)
+                    shape.Add(new Vector2Int(1, 2)); // {2,1} → (1,2)
+                    break;
+                    
+                case BlockType.Pento_Y:
+                    // 서버: {0, 0}, {0, 1}, {0, 2}, {0, 3}, {1, 1}
+                    shape.Add(new Vector2Int(0, 0)); // {0,0} → (0,0)
+                    shape.Add(new Vector2Int(1, 0)); // {0,1} → (1,0)
+                    shape.Add(new Vector2Int(2, 0)); // {0,2} → (2,0)
+                    shape.Add(new Vector2Int(3, 0)); // {0,3} → (3,0)
+                    shape.Add(new Vector2Int(1, 1)); // {1,1} → (1,1)
+                    break;
+                    
+                case BlockType.Pento_Z:
+                    // 서버: {0, 0}, {0, 1}, {1, 1}, {2, 1}, {2, 2}
+                    shape.Add(new Vector2Int(0, 0)); // {0,0} → (0,0)
+                    shape.Add(new Vector2Int(1, 0)); // {0,1} → (1,0)
+                    shape.Add(new Vector2Int(1, 1)); // {1,1} → (1,1)
+                    shape.Add(new Vector2Int(1, 2)); // {2,1} → (1,2)
+                    shape.Add(new Vector2Int(2, 2)); // {2,2} → (2,2)
                     break;
                     
                 default:
-                    // 기본적으로 단일 셀
-                    occupiedCells.Add(position);
+                    // 알 수 없는 블록 타입은 단일 셀로 처리
+                    shape.Add(Vector2Int.zero);
                     break;
             }
             
-            // 회전과 뒤집힘 적용 (Stub에서는 생략)
+            return shape;
+        }
+        
+        /// <summary>
+        /// 회전 적용 (90도씩 시계 방향)
+        /// </summary>
+        private List<Vector2Int> ApplyRotation(List<Vector2Int> shape, int rotation)
+        {
+            List<Vector2Int> rotatedShape = new List<Vector2Int>();
+            
+            int rotationSteps = (rotation / 90) % 4;
+            
+            foreach (Vector2Int cell in shape)
+            {
+                Vector2Int rotatedCell = cell;
+                
+                for (int i = 0; i < rotationSteps; i++)
+                {
+                    // 90도 시계방향 회전: (x, y) -> (y, -x)
+                    rotatedCell = new Vector2Int(rotatedCell.y, -rotatedCell.x);
+                }
+                
+                rotatedShape.Add(rotatedCell);
+            }
+            
+            return rotatedShape;
+        }
+        
+        /// <summary>
+        /// 뒤집힘 적용 (세로축 기준)
+        /// </summary>
+        private List<Vector2Int> ApplyFlip(List<Vector2Int> shape)
+        {
+            List<Vector2Int> flippedShape = new List<Vector2Int>();
+            
+            foreach (Vector2Int cell in shape)
+            {
+                // 세로축 기준 뒤집기: (x, y) -> (-x, y)
+                flippedShape.Add(new Vector2Int(-cell.x, cell.y));
+            }
+            
+            return flippedShape;
         }
         
         /// <summary>
@@ -166,31 +393,29 @@ namespace Features.Multi.Models
                 case BlockType.Domino:
                     return 2;
                     
-                case BlockType.TriominoI:
-                case BlockType.TriominoL:
+                case BlockType.TrioLine:
+                case BlockType.TrioAngle:
                     return 3;
                     
-                case BlockType.TetrominoI:
-                case BlockType.TetrominoO:
-                case BlockType.TetrominoT:
-                case BlockType.TetrominoS:
-                case BlockType.TetrominoZ:
-                case BlockType.TetrominoJ:
-                case BlockType.TetrominoL:
+                case BlockType.Tetro_I:
+                case BlockType.Tetro_O:
+                case BlockType.Tetro_T:
+                case BlockType.Tetro_L:
+                case BlockType.Tetro_S:
                     return 4;
                     
-                case BlockType.PentominoF:
-                case BlockType.PentominoI:
-                case BlockType.PentominoL:
-                case BlockType.PentominoN:
-                case BlockType.PentominoP:
-                case BlockType.PentominoT:
-                case BlockType.PentominoU:
-                case BlockType.PentominoV:
-                case BlockType.PentominoW:
-                case BlockType.PentominoX:
-                case BlockType.PentominoY:
-                case BlockType.PentominoZ:
+                case BlockType.Pento_F:
+                case BlockType.Pento_I:
+                case BlockType.Pento_L:
+                case BlockType.Pento_N:
+                case BlockType.Pento_P:
+                case BlockType.Pento_T:
+                case BlockType.Pento_U:
+                case BlockType.Pento_V:
+                case BlockType.Pento_W:
+                case BlockType.Pento_X:
+                case BlockType.Pento_Y:
+                case BlockType.Pento_Z:
                     return 5;
                     
                 default:
@@ -207,15 +432,25 @@ namespace Features.Multi.Models
             {
                 case BlockType.Single: return "점";
                 case BlockType.Domino: return "막대";
-                case BlockType.TriominoI: return "I(3)";
-                case BlockType.TriominoL: return "L(3)";
-                case BlockType.TetrominoI: return "I(4)";
-                case BlockType.TetrominoO: return "정사각형";
-                case BlockType.TetrominoT: return "T자";
-                case BlockType.TetrominoS: return "S자";
-                case BlockType.TetrominoZ: return "Z자";
-                case BlockType.TetrominoJ: return "J자";
-                case BlockType.TetrominoL: return "L자";
+                case BlockType.TrioLine: return "3일자";
+                case BlockType.TrioAngle: return "3꺾임";
+                case BlockType.Tetro_I: return "4일자";
+                case BlockType.Tetro_O: return "정사각형";
+                case BlockType.Tetro_T: return "T자";
+                case BlockType.Tetro_L: return "L자";
+                case BlockType.Tetro_S: return "S자";
+                case BlockType.Pento_F: return "F자";
+                case BlockType.Pento_I: return "5일자";
+                case BlockType.Pento_L: return "5L자";
+                case BlockType.Pento_N: return "N자";
+                case BlockType.Pento_P: return "P자";
+                case BlockType.Pento_T: return "5T자";
+                case BlockType.Pento_U: return "U자";
+                case BlockType.Pento_V: return "V자";
+                case BlockType.Pento_W: return "W자";
+                case BlockType.Pento_X: return "X자";
+                case BlockType.Pento_Y: return "Y자";
+                case BlockType.Pento_Z: return "5Z자";
                 default: return blockType.ToString();
             }
         }

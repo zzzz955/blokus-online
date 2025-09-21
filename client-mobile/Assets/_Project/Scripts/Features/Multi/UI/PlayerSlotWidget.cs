@@ -32,6 +32,9 @@ namespace Features.Multi.UI
         [Header("호스트 표시")]
         [SerializeField] private Sprite hostCrownSprite; // 호스트 표시용 왕관 스프라이트
         
+        [Header("본인 식별 표시")]
+        [SerializeField] private Image currentPlayerIndicator; // 본인 식별용 이미지 (나일 경우에만 표시)
+        
         // 플레이어 데이터
         private PlayerSlot playerData;
         private bool isHost = false;
@@ -62,7 +65,6 @@ namespace Features.Multi.UI
         {
             playerData = data;
             isHost = isCurrentUserHost;
-            
             UpdateUI();
         }
         
@@ -102,6 +104,10 @@ namespace Features.Multi.UI
             
             if (kickButton != null)
                 kickButton.gameObject.SetActive(false);
+                
+            // 본인 식별 표시도 해제
+            if (currentPlayerIndicator != null)
+                currentPlayerIndicator.gameObject.SetActive(false);
         }
         
         /// <summary>
@@ -117,13 +123,24 @@ namespace Features.Multi.UI
             
             // 플레이어 이름
             if (playerNameText != null)
+            {
                 playerNameText.text = playerData.playerName;
+            }
+            else
+            {
+                Debug.LogError($"[PlayerSlotWidget] playerNameText가 null입니다!");
+            }
             
-            // 준비 상태 표시 (스프라이트 기반)
+            // 준비 상태 표시 (스프라이트 기반) - 호스트는 항상 Ready 상태로 표시
             if (readyIndicator != null)
             {
                 readyIndicator.gameObject.SetActive(true);
-                readyIndicator.sprite = playerData.isReady ? readySprite : notReadySprite;
+                bool displayReady = playerData.isHost || playerData.isReady; // 호스트는 항상 Ready로 표시
+                readyIndicator.sprite = displayReady ? readySprite : notReadySprite;
+            }
+            else
+            {
+                Debug.LogError($"[PlayerSlotWidget] readyIndicator가 null입니다!");
             }
             
             // 호스트 표시
@@ -134,6 +151,10 @@ namespace Features.Multi.UI
                 {
                     hostIndicator.sprite = hostCrownSprite;
                 }
+            }
+            else if (playerData.isHost)
+            {
+                Debug.LogError($"[PlayerSlotWidget] hostIndicator가 null인데 플레이어가 호스트입니다!");
             }
             
             // 점수 표시
@@ -236,10 +257,10 @@ namespace Features.Multi.UI
         /// </summary>
         public void SetAsMySlot(bool isMySlot)
         {
-            // Stub: 내 슬롯 강조 표시 (추후 구현)
-            if (playerNameText != null)
+            // 본인 식별 이미지 표시/숨김
+            if (currentPlayerIndicator != null)
             {
-                playerNameText.fontStyle = isMySlot ? FontStyles.Bold : FontStyles.Normal;
+                currentPlayerIndicator.gameObject.SetActive(isMySlot);
             }
         }
         

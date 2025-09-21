@@ -333,7 +333,7 @@ namespace Blokus::Server {
 
         // Session에 MessageHandler가 없으면 생성
         if (!session->getMessageHandler()) {
-            spdlog::info("🔧 [addSession] MessageHandler 생성 - SessionId: {}", sessionId);
+            // spdlog::info("🔧 [addSession] MessageHandler 생성 - SessionId: {}", sessionId);
 
             // MessageHandler 생성 및 설정
             auto messageHandler = std::make_unique<MessageHandler>(
@@ -348,7 +348,7 @@ namespace Blokus::Server {
             // Session에 MessageHandler 설정
             session->setMessageHandler(std::move(messageHandler));
 
-            spdlog::info("✅ [addSession] MessageHandler 생성 완료 - SessionId: {}", sessionId);
+            // spdlog::info("✅ [addSession] MessageHandler 생성 완료 - SessionId: {}", sessionId);
         }
 
         // 세션 기본 콜백만 설정 (연결 해제, 메시지 수신)
@@ -359,12 +359,7 @@ namespace Blokus::Server {
         session->setMessageCallback([this](const std::string& id, const std::string& msg) {
             onSessionMessage(id, msg);
             });
-
-        // 🔥 핵심 변경: MessageHandler 콜백 모두 제거!
-        // MessageHandler가 직접 AuthService, RoomManager와 상호작용하므로
-        // 중간 콜백이 불필요함. 중복 처리 방지!
-
-        spdlog::info("✅ [addSession] 세션 설정 완료 (콜백 없음) - SessionId: {}", sessionId);
+        // spdlog::info("✅ [addSession] 세션 설정 완료 (콜백 없음) - SessionId: {}", sessionId);
     }
 
     void GameServer::removeSession(const std::string& sessionId) {
@@ -549,7 +544,7 @@ namespace Blokus::Server {
             return;
         }
 
-        auto newSession = std::make_shared<Session>(tcp::socket(ioContext_));
+        auto newSession = std::make_shared<Session>(tcp::socket(ioContext_), this);
 
         acceptor_.async_accept(newSession->getSocket(),
             [this, newSession](const boost::system::error_code& error) {
@@ -594,10 +589,8 @@ namespace Blokus::Server {
     // 세션 이벤트 핸들러
     // ========================================
 
-    void GameServer::onSessionDisconnect(const std::string& sessionId) {
-        spdlog::info("세션 연결 해제: {}", sessionId);
-        
-        // 세션 제거 전에 사용자 정보 저장 (로비 사용자 제거 브로드캐스트 및 방 나가기용)
+    void GameServer::handleSessionExit(const std::string& sessionId) {
+        // 🔥 데드락 방지: 세션 정보만 추출, 즉시 잠금 해제
         std::string username;
         std::string userId;
         bool wasInLobby = false;
@@ -619,22 +612,40 @@ namespace Blokus::Server {
             }
         }
         
-        // 방에 있던 사용자가 연결 해제된 경우 자동으로 방에서 나가기
+        // 🔥 데드락 방지: 잠금 해제 후 방 정리 (데드락 위험 제거)
         if ((wasInRoom || wasInGame) && !userId.empty() && roomManager_) {
-            if (wasInGame) {
-                spdlog::warn("🎮 게임 중 세션 강제 종료로 인한 방 {} 나가기: {} (좀비방 방지)", roomId, username);
-            } else {
-                spdlog::info("🏠 방 대기 중 세션 연결 해제로 인한 방 {} 나가기: {}", roomId, username);
+            try {
+                if (wasInGame) {
+                    spdlog::warn("🎮 게임 중 세션 강제 종료로 인한 방 {} 나가기: {} (좀비방 방지)", roomId, username);
+                } else {
+                    spdlog::info("🏠 방 대기 중 세션 연결 해제로 인한 방 {} 나가기: {}", roomId, username);
+                }
+                roomManager_->leaveRoom(userId);
             }
-            roomManager_->leaveRoom(userId);
+            catch (const std::exception& e) {
+                spdlog::error("❌ 방 나가기 처리 중 오류 ({}): {}", sessionId, e.what());
+            }
         }
         
-        removeSession(sessionId);
-        
-        // 로비에 있던 사용자가 연결 해제된 경우 다른 로비 사용자들에게 브로드캐스트
+        // 로비 브로드캐스트 (잠금 없는 작업)
         if (wasInLobby && !username.empty()) {
-            broadcastLobbyUserLeft(username);
+            try {
+                broadcastLobbyUserLeft(username);
+            }
+            catch (const std::exception& e) {
+                spdlog::error("❌ 로비 브로드캐스트 중 오류 ({}): {}", sessionId, e.what());
+            }
         }
+    }
+
+    void GameServer::onSessionDisconnect(const std::string& sessionId) {
+        spdlog::info("세션 연결 해제: {}", sessionId);
+        
+        // 공통 세션 종료 처리 로직 실행
+        handleSessionExit(sessionId);
+        
+        // 세션 제거 (별도 잠금, 데드락 위험 최소화)
+        removeSession(sessionId);
     }
 
     void GameServer::onSessionMessage(const std::string& sessionId, const std::string& message) {
@@ -773,48 +784,27 @@ namespace Blokus::Server {
     }
 
     void GameServer::cleanupSessions() {
-        std::lock_guard<std::mutex> lock(sessionsMutex_);
-
-        auto it = sessions_.begin();
-        while (it != sessions_.end()) {
-            if (!it->second || !it->second->isActive()) {
-                spdlog::debug("비활성 세션 정리: {}", it->first);
-                it = sessions_.erase(it);
-
-                // 통계 업데이트
-                {
-                    std::lock_guard<std::mutex> statsLock(statsMutex_);
-                    if (stats_.currentConnections > 0) {
-                        stats_.currentConnections--;
-                    }
-                }
-            }
-            else {
-                // 타임아웃 체크 - 게임 중인 세션은 더 짧은 타임아웃 적용
-                std::chrono::seconds timeoutDuration = std::chrono::seconds(300); // 기본 5분
-                if (it->second->isInGame()) {
-                    timeoutDuration = std::chrono::seconds(120); // 게임 중은 2분으로 단축
-                }
-                
-                if (it->second->isTimedOut(timeoutDuration)) {
-                    std::string sessionId = it->first;
-                    
-                    if (it->second->isInGame()) {
-                        spdlog::warn("🎮 게임 중 세션 타임아웃 (좀비방 방지): {} ({}분)", sessionId, timeoutDuration.count() / 60);
-                    } else {
-                        spdlog::info("세션 타임아웃: {} ({}분)", sessionId, timeoutDuration.count() / 60);
-                    }
-                    
-                    // 🔥 개선: Session::stop() 호출로 기존 세션 정리 플로우 재사용
-                    // Session::stop()은 내부에서 notifyDisconnect()를 호출하고
-                    // 이는 onSessionDisconnect() 콜백을 실행하여 다음을 모두 처리함:
-                    // 1. 세션 정보 추출
-                    // 2. 방 나가기 처리 (roomManager_->leaveRoom())  
-                    // 3. 세션 제거 (removeSession())
-                    // 4. 로비 브로드캐스트
-                    spdlog::debug("🔄 [TIMEOUT_CLEANUP] 타임아웃 세션 {} stop() 호출로 정리", sessionId);
-                    
-                    it->second->stop();
+        // 🔥 타임아웃된 세션 정보를 담는 구조체 (방 정보 포함)
+        struct TimeoutSessionInfo {
+            std::string sessionId;
+            std::shared_ptr<Session> session;
+            std::string username;
+            std::string userId;
+            bool wasInLobby;
+            bool wasInRoom;
+            bool wasInGame;
+            int roomId;
+        };
+        
+        std::vector<TimeoutSessionInfo> timeoutSessions;
+        
+        // 🔥 데드락 방지: 1단계 - 타임아웃된 세션 식별 및 세션 정보 추출 (잠금 보유 시간 최소화)
+        {
+            std::lock_guard<std::mutex> lock(sessionsMutex_);
+            auto it = sessions_.begin();
+            while (it != sessions_.end()) {
+                if (!it->second || !it->second->isActive()) {
+                    spdlog::debug("비활성 세션 정리: {}", it->first);
                     it = sessions_.erase(it);
 
                     // 통계 업데이트
@@ -826,9 +816,93 @@ namespace Blokus::Server {
                     }
                 }
                 else {
-                    ++it;
+                    // 타임아웃 체크 - 게임 중인 세션은 더 짧은 타임아웃 적용
+                    std::chrono::seconds timeoutDuration = std::chrono::seconds(300); // 기본 5분
+                    if (it->second->isInGame()) {
+                        timeoutDuration = std::chrono::seconds(120); // 게임 중은 2분으로 단축
+                    }
+                    
+                    if (it->second->isTimedOut(timeoutDuration)) {
+                        std::string sessionId = it->first;
+                        
+                        if (it->second->isInGame()) {
+                            spdlog::warn("🎮 게임 중 세션 타임아웃 (좀비방 방지): {} ({}분)", sessionId, timeoutDuration.count() / 60);
+                        } else {
+                            spdlog::info("세션 타임아웃: {} ({}분)", sessionId, timeoutDuration.count() / 60);
+                        }
+                        
+                        // 🔥 중요: 세션 정보를 미리 추출해서 저장 (맵에서 제거되기 전에)
+                        TimeoutSessionInfo info;
+                        info.sessionId = sessionId;
+                        info.session = it->second;
+                        info.username = it->second->getUsername();
+                        info.userId = it->second->getUserId();
+                        info.wasInLobby = it->second->isInLobby();
+                        info.wasInRoom = it->second->isInRoom();
+                        info.wasInGame = it->second->isInGame();
+                        info.roomId = -1;
+                        if (info.wasInRoom || info.wasInGame) {
+                            info.roomId = it->second->getCurrentRoomId();
+                        }
+                        
+                        timeoutSessions.emplace_back(std::move(info));
+                        it = sessions_.erase(it);
+
+                        // 통계 업데이트
+                        {
+                            std::lock_guard<std::mutex> statsLock(statsMutex_);
+                            if (stats_.currentConnections > 0) {
+                                stats_.currentConnections--;
+                            }
+                        }
+                        
+                        spdlog::debug("🔄 [ASYNC_CLEANUP] 타임아웃 세션 {} 비동기 정리 예약", sessionId);
+                    }
+                    else {
+                        ++it;
+                    }
                 }
             }
+        }
+        
+        // 🔥 데드락 방지: 2단계 - 잠금 해제 후 비동기로 세션 정리 (세션 정보를 이미 추출했으므로 안전)
+        for (auto& info : timeoutSessions) {
+            boost::asio::post(ioContext_, [this, info]() {
+                spdlog::debug("🔄 [ASYNC_CLEANUP] 비동기 타임아웃 정리 실행: {}", info.sessionId);
+                
+                try {
+                    // 🔥 방 퇴장 처리 (미리 추출된 세션 정보 사용)
+                    if ((info.wasInRoom || info.wasInGame) && !info.userId.empty() && roomManager_) {
+                        try {
+                            if (info.wasInGame) {
+                                spdlog::warn("🎮 게임 중 세션 타임아웃으로 인한 방 {} 나가기: {} (좀비방 방지)", info.roomId, info.username);
+                            } else {
+                                spdlog::info("🏠 방 대기 중 세션 타임아웃으로 인한 방 {} 나가기: {}", info.roomId, info.username);
+                            }
+                            roomManager_->leaveRoom(info.userId);
+                        }
+                        catch (const std::exception& e) {
+                            spdlog::error("❌ 방 나가기 처리 중 오류 ({}): {}", info.sessionId, e.what());
+                        }
+                    }
+                    
+                    // 로비 브로드캐스트 (잠금 없는 작업)
+                    if (info.wasInLobby && !info.username.empty()) {
+                        try {
+                            broadcastLobbyUserLeft(info.username);
+                        }
+                        catch (const std::exception& e) {
+                            spdlog::error("❌ 로비 브로드캐스트 중 오류 ({}): {}", info.sessionId, e.what());
+                        }
+                    }
+                    
+                    // 이제 안전하게 세션 중지
+                    info.session->stop();
+                }
+                catch (const std::exception& e) {
+                    spdlog::error("❌ 비동기 세션 정리 중 오류 ({}): {}", info.sessionId, e.what());
+                }
+            });
         }
     }
 
@@ -879,6 +953,104 @@ namespace Blokus::Server {
         spdlog::debug("처리된 메시지: {}", stats_.messagesReceived);
         spdlog::debug("업타임: {}초 ({}분)", uptime, uptime / 60);
         spdlog::debug("================");
+    }
+
+    // ========================================
+    // 중복 로그인 차단 관련 함수들 구현
+    // ========================================
+
+    bool GameServer::registerActiveSession(const std::string& userIP, const std::string& userID) {
+        std::lock_guard<std::mutex> lock(activeSessionsMutex_);
+
+        // 이미 활성화된 IP나 사용자 ID인지 확인
+        if (activeIPs_.count(userIP) || activeUserIDs_.count(userID)) {
+            spdlog::warn("🚫 중복 로그인 시도 차단: IP={}, UserID={}", userIP, userID);
+            return false;
+        }
+
+        // 활성 세션으로 등록
+        activeIPs_.insert(userIP);
+        activeUserIDs_.insert(userID);
+        ipToUserMap_[userIP] = userID;
+
+        spdlog::debug("✅ 활성 세션 등록: IP={}, UserID={}", userIP, userID);
+        return true;
+    }
+
+    void GameServer::unregisterActiveSession(const std::string& userIP, const std::string& userID) {
+        std::lock_guard<std::mutex> lock(activeSessionsMutex_);
+
+        // 활성 세션에서 제거
+        activeIPs_.erase(userIP);
+        activeUserIDs_.erase(userID);
+        ipToUserMap_.erase(userIP);
+
+        spdlog::debug("🗑️ 활성 세션 해제: IP={}, UserID={}", userIP, userID);
+    }
+
+    bool GameServer::isIPActive(const std::string& userIP) const {
+        std::lock_guard<std::mutex> lock(activeSessionsMutex_);
+        return activeIPs_.count(userIP) > 0;
+    }
+
+    bool GameServer::isUserActive(const std::string& userID) const {
+        std::lock_guard<std::mutex> lock(activeSessionsMutex_);
+        return activeUserIDs_.count(userID) > 0;
+    }
+
+    bool GameServer::isDuplicateLogin(const std::string& userIP, const std::string& userID) const {
+        return checkDuplicateType(userIP, userID) != DuplicateType::NONE;
+    }
+
+    GameServer::DuplicateType GameServer::checkDuplicateType(const std::string& userIP, const std::string& userID) const {
+        std::lock_guard<std::mutex> lock(activeSessionsMutex_);
+
+        bool ipExists = activeIPs_.count(userIP) > 0;
+        bool userExists = activeUserIDs_.count(userID) > 0;
+
+        if (!ipExists && !userExists) {
+            return DuplicateType::NONE;  // 중복 없음
+        }
+
+        if (ipExists && userExists) {
+            // IP와 사용자 모두 존재 - 매핑 확인
+            auto it = ipToUserMap_.find(userIP);
+            if (it != ipToUserMap_.end() && it->second == userID) {
+                spdlog::info("🚫 중복 로그인 감지: 같은 사용자가 같은 IP에서 재로그인 - IP={}, UserID={}", userIP, userID);
+                return DuplicateType::SAME_USER_IP;
+            } else {
+                spdlog::info("🚫 중복 로그인 감지: 복합 상황 - IP={}, UserID={}", userIP, userID);
+                return DuplicateType::DIFF_USER_SAME_IP;  // 보수적 접근
+            }
+        }
+
+        if (userExists && !ipExists) {
+            spdlog::info("🚫 중복 로그인 감지: 같은 사용자가 다른 IP에서 로그인 - IP={}, UserID={}", userIP, userID);
+            return DuplicateType::SAME_USER_DIFF_IP;
+        }
+
+        if (ipExists && !userExists) {
+            spdlog::info("🚫 중복 로그인 감지: 다른 사용자가 같은 IP에서 로그인 - IP={}, UserID={}", userIP, userID);
+            return DuplicateType::DIFF_USER_SAME_IP;
+        }
+
+        return DuplicateType::NONE;
+    }
+
+    std::vector<std::string> GameServer::getActiveIPs() const {
+        std::lock_guard<std::mutex> lock(activeSessionsMutex_);
+        return std::vector<std::string>(activeIPs_.begin(), activeIPs_.end());
+    }
+
+    std::vector<std::string> GameServer::getActiveUserIDs() const {
+        std::lock_guard<std::mutex> lock(activeSessionsMutex_);
+        return std::vector<std::string>(activeUserIDs_.begin(), activeUserIDs_.end());
+    }
+
+    size_t GameServer::getActiveSessionCount() const {
+        std::lock_guard<std::mutex> lock(activeSessionsMutex_);
+        // activeIPs_와 activeUserIDs_의 크기는 같아야 함
+        return activeIPs_.size();
     }
 
 } // namespace Blokus::Server

@@ -63,7 +63,7 @@ namespace Features.Multi.Net
         }
         
         void Start()
-        {
+        {            
             // 자동 연결은 하지 않음 - 명시적으로 ConnectToServer() 호출 필요
             // UnityMainThreadDispatcher가 없으면 생성
             if (UnityMainThreadDispatcher.Instance == null)
@@ -136,10 +136,18 @@ namespace Features.Multi.Net
         /// </summary>
         public async Task<bool> ConnectToServerAsync()
         {
-            if (isConnected)
+            // 실제 TCP 연결 상태 확인
+            if (isConnected && tcpClient != null && tcpClient.Connected)
             {
                 Debug.LogWarning("[NetworkClient] 이미 서버에 연결되어 있습니다.");
                 return true;
+            }
+
+            // 연결 상태 플래그가 true이지만 실제 TCP 연결이 끊어진 경우 정리
+            if (isConnected && (tcpClient == null || !tcpClient.Connected))
+            {
+                Debug.LogWarning("[NetworkClient] 연결 상태 불일치 감지 - 연결 정리 후 재시도");
+                CleanupConnection();
             }
             
             if (isConnecting)
@@ -181,6 +189,12 @@ namespace Features.Multi.Net
                 }
                 
                 await connectTask; // 실제 연결 완료 확인
+                
+                // 즉시 메시지 전송을 위한 소켓 최적화 설정
+                tcpClient.NoDelay = true; // TCP Nagle 알고리즘 비활성화
+                tcpClient.ReceiveBufferSize = 4096; // 수신 버퍼 크기 최적화
+                tcpClient.SendBufferSize = 4096; // 전송 버퍼 크기 최적화
+                Debug.Log("[NetworkClient] TCP 소켓 최적화 설정 완료 (NoDelay=true, Buffer=4KB)");
                 
                 // 스트림 설정
                 networkStream = tcpClient.GetStream();
@@ -335,8 +349,12 @@ namespace Features.Multi.Net
                 // WriteLine 대신 Write + 단일 \n 사용 (불필요한 \r 제거)
                 streamWriter.Write(message + "\n");
                 streamWriter.Flush(); // 즉시 전송 보장
-                
-                Debug.Log($"[NetworkClient] 깨끗한 메시지 전송: {message}");
+
+                // ping 메시지가 아닌 경우에만 로그 출력
+                if (messageType != "ping")
+                {
+                    Debug.Log($"[NetworkClient] 깨끗한 메시지 전송: {message}");
+                }
                 return true;
             }
             catch (Exception ex)
@@ -365,20 +383,42 @@ namespace Features.Multi.Net
             {
                 while (isConnected && !cancellationTokenSource.Token.IsCancellationRequested)
                 {
-                    if (streamReader != null && tcpClient.Available > 0)
+                    try
                     {
-                        string message = streamReader.ReadLine();
-                        if (!string.IsNullOrEmpty(message))
+                        // 블로킹 읽기로 즉시 메시지 처리 (Available 체크 제거)
+                        if (streamReader != null)
                         {
-                            // 메시지를 큐에 추가 (메인 스레드에서 처리)
-                            lock (messageLock)
+                            string message = streamReader.ReadLine();
+                            if (!string.IsNullOrEmpty(message))
                             {
-                                incomingMessages.Enqueue(message);
+                                // 메시지를 큐에 추가 (메인 스레드에서 처리)
+                                lock (messageLock)
+                                {
+                                    incomingMessages.Enqueue(message);
+                                }
+                                
+                                // 즉시 메인 스레드에서 처리하도록 알림
+                                UnityMainThreadDispatcher.Enqueue(ProcessIncomingMessages);
                             }
                         }
                     }
+                    catch (IOException ioEx)
+                    {
+                        // 연결이 끊어진 경우
+                        if (isConnected)
+                        {
+                            Debug.LogWarning($"[NetworkClient] 연결 끊어짐: {ioEx.Message}");
+
+                            // 연결 상태 정리 및 이벤트 발생
+                            CleanupConnection();
+                            UnityMainThreadDispatcher.Enqueue(() => OnConnectionChanged?.Invoke(false));
+
+                            break;
+                        }
+                    }
                     
-                    Thread.Sleep(10); // CPU 사용률 최적화
+                    // CPU 사용률 최적화를 위한 짧은 대기 (1ms로 단축)
+                    Thread.Sleep(1);
                 }
             }
             catch (Exception ex)
@@ -386,12 +426,15 @@ namespace Features.Multi.Net
                 if (isConnected) // 정상 종료가 아닌 경우만 에러 로그
                 {
                     Debug.LogError($"[NetworkClient] 메시지 수신 에러: {ex.Message}");
-                    
-                    // 메인 스레드에서 재연결 시도
-                    UnityMainThreadDispatcher.Enqueue(() => 
+
+                    // 연결 상태 정리
+                    CleanupConnection();
+
+                    // 메인 스레드에서 연결 해제 이벤트 및 에러 이벤트 발생
+                    UnityMainThreadDispatcher.Enqueue(() =>
                     {
+                        OnConnectionChanged?.Invoke(false);
                         OnError?.Invoke($"수신 에러: {ex.Message}");
-                        _ = ReconnectAsync();
                     });
                 }
             }
@@ -477,114 +520,187 @@ namespace Features.Multi.Net
         // ========================================
         
         /// <summary>
-        /// JWT 로그인 요청
+        /// JWT 로그인 요청 (서버 프로토콜에 맞춤)
         /// </summary>
         public bool SendJwtLoginRequest(string token)
         {
-            return SendCleanTCPMessage("auth", "jwt", token);
+            // 서버에서 예상하는 형식: auth:JWT토큰
+            return SendCleanTCPMessage("auth", token);
         }
         
         /// <summary>
-        /// 로그인 요청
+        /// 로그인 요청 (서버 프로토콜에 맞춤)
         /// </summary>
         public bool SendLoginRequest(string username, string password)
         {
-            return SendProtocolMessage("auth", "login", username, password);
+            // 서버에서 예상하는 형식: auth:username:password
+            return SendCleanTCPMessage("auth", username, password);
         }
         
         /// <summary>
-        /// 회원가입 요청
+        /// 회원가입 요청 (서버 프로토콜에 맞춤)
         /// </summary>
         public bool SendRegisterRequest(string username, string password)
         {
-            return SendProtocolMessage("auth", "register", username, password);
+            // 서버에서 예상하는 형식: register:username:email:password (이메일은 빈값)
+            return SendCleanTCPMessage("register", username, "", password);
         }
         
         /// <summary>
-        /// 게스트 로그인 요청
+        /// 게스트 로그인 요청 (서버 프로토콜에 맞춤)
         /// </summary>
         public bool SendGuestLoginRequest()
         {
-            string guestName = $"Guest_{UnityEngine.Random.Range(1000, 9999)}";
-            return SendProtocolMessage("auth", "guest", guestName);
+            // 서버에서 예상하는 형식: guest
+            return SendCleanTCPMessage("guest");
         }
         
         /// <summary>
-        /// 사용자 통계 정보 요청
+        /// 버전 체크 요청 (서버 프로토콜에 맞춤)
+        /// </summary>
+        public bool SendVersionCheckRequest(string clientVersion)
+        {
+            // 서버에서 예상하는 형식: version:check:clientVersion
+            return SendCleanTCPMessage("version", "check", clientVersion);
+        }
+        
+        /// <summary>
+        /// 사용자 통계 정보 요청 (서버 프로토콜에 맞춤)
         /// </summary>
         public bool SendGetUserStatsRequest(string username)
         {
-            return SendProtocolMessage("GET_USER_STATS_REQUEST", username);
+            // 서버에서 예상하는 형식: user:stats:username
+            return SendCleanTCPMessage("user", "stats", username);
         }
         
         /// <summary>
-        /// 로비 입장 요청
+        /// 로비 입장 요청 (서버 프로토콜에 맞춤)
         /// </summary>
         public bool SendLobbyEnterRequest()
         {
-            return SendProtocolMessage("LOBBY_ENTER_REQUEST");
+            // 서버에서 예상하는 형식: lobby:enter
+            return SendCleanTCPMessage("lobby", "enter");
         }
         
         /// <summary>
-        /// 로비 나가기 요청
+        /// 로비 나가기 요청 (서버 프로토콜에 맞춤)
         /// </summary>
         public bool SendLobbyLeaveRequest()
         {
-            return SendProtocolMessage("LOBBY_LEAVE_REQUEST");
+            // 서버에서 예상하는 형식: lobby:leave
+            return SendCleanTCPMessage("lobby", "leave");
         }
         
         /// <summary>
-        /// 방 생성 요청
+        /// 로비 사용자 목록 요청 (서버 프로토콜에 맞춤)
         /// </summary>
-        public bool SendCreateRoomRequest(string roomName, int maxPlayers = 4)
+        public bool SendLobbyListRequest()
         {
-            return SendProtocolMessage("CREATE_ROOM_REQUEST", roomName, maxPlayers.ToString());
+            // 서버에서 예상하는 형식: lobby:list
+            return SendCleanTCPMessage("lobby", "list");
         }
         
         /// <summary>
-        /// 방 참가 요청
+        /// 방 목록 요청 (서버 프로토콜에 맞춤)
         /// </summary>
-        public bool SendJoinRoomRequest(int roomId)
+        public bool SendRoomListRequest()
         {
-            return SendProtocolMessage("JOIN_ROOM_REQUEST", roomId.ToString());
+            // 서버에서 예상하는 형식: room:list
+            return SendCleanTCPMessage("room", "list");
         }
         
         /// <summary>
-        /// 방 나가기 요청
+        /// 방 생성 요청 (서버 프로토콜에 맞춤)
+        /// </summary>
+        public bool SendCreateRoomRequest(string roomName, bool isPrivate = false, string password = "")
+        {
+            // 서버에서 예상하는 형식: room:create:name:private[:password]
+            if (isPrivate && !string.IsNullOrEmpty(password))
+            {
+                return SendCleanTCPMessage("room", "create", roomName, "1", password);
+            }
+            else
+            {
+                return SendCleanTCPMessage("room", "create", roomName, isPrivate ? "1" : "0");
+            }
+        }
+        
+        /// <summary>
+        /// 방 참가 요청 (서버 프로토콜에 맞춤)
+        /// </summary>
+        public bool SendJoinRoomRequest(int roomId, string password = "")
+        {
+            // 서버에서 예상하는 형식: room:join:roomId[:password]
+            if (!string.IsNullOrEmpty(password))
+            {
+                return SendCleanTCPMessage("room", "join", roomId.ToString(), password);
+            }
+            else
+            {
+                return SendCleanTCPMessage("room", "join", roomId.ToString());
+            }
+        }
+        
+        /// <summary>
+        /// 방 나가기 요청 (서버 프로토콜에 맞춤)
         /// </summary>
         public bool SendLeaveRoomRequest()
         {
-            return SendProtocolMessage("LEAVE_ROOM_REQUEST");
+            // 서버에서 예상하는 형식: room:leave
+            return SendCleanTCPMessage("room", "leave");
         }
         
         /// <summary>
-        /// 플레이어 준비 상태 설정
+        /// 플레이어 준비 상태 설정 (서버 프로토콜에 맞춤)
         /// </summary>
         public bool SendPlayerReadyRequest(bool isReady)
         {
-            return SendProtocolMessage("PLAYER_READY_REQUEST", isReady.ToString());
+            // 서버에서 예상하는 형식: room:ready:0/1
+            return SendCleanTCPMessage("room", "ready", isReady ? "1" : "0");
         }
         
         /// <summary>
-        /// 게임 시작 요청
+        /// 게임 시작 요청 (서버 프로토콜에 맞춤)
         /// </summary>
         public bool SendStartGameRequest()
         {
-            return SendProtocolMessage("START_GAME_REQUEST");
+            // 서버에서 예상하는 형식: room:start
+            return SendCleanTCPMessage("room", "start");
         }
         
         /// <summary>
-        /// 블록 배치 요청
+        /// 채팅 메시지 전송 (서버 프로토콜에 맞춤)
+        /// </summary>
+        public bool SendChatMessage(string message)
+        {
+            // 서버에서 예상하는 형식: chat:message
+            return SendCleanTCPMessage("chat", message);
+        }
+        
+        /// <summary>
+        /// 핑 메시지 전송 (서버 프로토콜에 맞춤)
+        /// </summary>
+        public bool SendPing()
+        {
+            // 서버에서 예상하는 형식: ping
+            return SendCleanTCPMessage("ping");
+        }
+        
+        /// <summary>
+        /// 블록 배치 요청 (서버 프로토콜: game:move:blockType:col:row:rotation:flip)
         /// </summary>
         public bool SendPlaceBlockRequest(MultiModels.BlockPlacement placement)
         {
-            return SendProtocolMessage("PLACE_BLOCK_REQUEST", 
+            // 서버가 기대하는 형식: game:move:11:17:0:0:0
+            // blockType:col:row:rotation:flip (flip: 0=Normal, 1=Flipped)
+            int flipValue = placement.isFlipped ? 1 : 0;
+            
+            return SendProtocolMessage("game:move",
                 ((int)placement.blockType).ToString(),
-                placement.position.x.ToString(),
-                placement.position.y.ToString(),
+                placement.position.x.ToString(),        // x좌표 = col (서버에서 열)
+                placement.position.y.ToString(),        // y좌표 = row (서버에서 행)
                 placement.rotation.ToString(),
-                placement.isFlipped.ToString(),
-                placement.playerId.ToString()
+                flipValue.ToString()
             );
         }
         /// <summary>

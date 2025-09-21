@@ -135,9 +135,9 @@ namespace App.Services{
 
             float percentage = (float)playerScore / optimalScore;
 
-            if (percentage >= 0.9f) return 3;      // 90% 이상: 3별
-            if (percentage >= 0.7f) return 2;      // 70% 이상: 2별  
-            if (percentage >= 0.5f) return 1;      // 50% 이상: 1별
+            if (percentage >= 1f) return 3;      // 90% 이상: 3별
+            if (percentage >= 0.9f) return 2;      // 70% 이상: 2별  
+            if (percentage >= 0.8f) return 1;      // 50% 이상: 1별
             return 0;                               // 50% 미만: 0별
         }
 

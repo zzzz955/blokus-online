@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using TMPro;
 using App.UI;
 using App.Core;
+using Features.Multi.Net;
 
 namespace Features.Multi.UI
 {
@@ -32,7 +33,27 @@ namespace Features.Multi.UI
         {
             InitializeUI();
             SetupEventHandlers();
-            Hide(); // 시작 시 숨김
+            // Hide() 제거 - 초기 상태는 GameObject 비활성화로 관리
+        }
+
+        /// <summary>
+        /// 현재 사용자의 DisplayName 가져오기
+        /// </summary>
+        private string GetCurrentDisplayName()
+        {
+            // NetworkManager에서 현재 사용자 정보 가져오기 (우선순위)
+            if (NetworkManager.Instance?.CurrentUserInfo != null)
+            {
+                return NetworkManager.Instance.CurrentUserInfo.displayName ?? "플레이어";
+            }
+            
+            // SessionManager 폴백
+            if (SessionManager.Instance != null)
+            {
+                return SessionManager.Instance.DisplayName ?? "플레이어";
+            }
+            
+            return "플레이어";
         }
         
         /// <summary>
@@ -41,15 +62,9 @@ namespace Features.Multi.UI
         private void InitializeUI()
         {
             // 방 이름 초기값 설정 (사용자명 + "님의 방")
-            if (SessionManager.Instance != null)
-            {
-                string username = SessionManager.Instance.DisplayName ?? "플레이어";
-                roomNameInput.text = $"{username}님의 방";
-            }
-            else
-            {
-                roomNameInput.text = "새로운 방";
-            }
+            string displayName = GetCurrentDisplayName();
+            roomNameInput.text = $"{displayName}님의 방";
+            Debug.Log($"[CreateRoomPanel] 방 이름 초기값 설정: {roomNameInput.text}");
             
             roomNameInput.characterLimit = 30;
             
@@ -157,10 +172,28 @@ namespace Features.Multi.UI
         /// </summary>
         public void Show()
         {
+            Debug.Log($"[CreateRoomPanel] Show() 호출됨 - 현재 상태: gameObject.activeSelf={gameObject.activeSelf}");
+            
+            // Show 시마다 최신 사용자 정보로 방 이름 업데이트
+            string displayName = GetCurrentDisplayName();
+            if (roomNameInput != null)
+            {
+                roomNameInput.text = $"{displayName}님의 방";
+                Debug.Log($"[CreateRoomPanel] 방 이름 업데이트: {roomNameInput.text}");
+            }
+            
             if (modalBackground != null)
+            {
                 modalBackground.SetActive(true);
+                Debug.Log($"[CreateRoomPanel] modalBackground 활성화됨");
+            }
+            else
+            {
+                Debug.LogWarning("[CreateRoomPanel] modalBackground가 null입니다!");
+            }
                 
             gameObject.SetActive(true);
+            Debug.Log($"[CreateRoomPanel] gameObject 활성화 완료 - 새 상태: {gameObject.activeSelf}");
             
             // 방 이름 입력 필드에 포커스
             if (roomNameInput != null)

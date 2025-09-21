@@ -11,9 +11,9 @@ namespace Features.Single.Core{
     public class StageProgressManager : MonoBehaviour
     {
         [Header("별점 시스템 설정")]
-        [SerializeField, Range(0f, 1f)] private float threeStarThreshold = 0.9f; // 90% 이상
-        [SerializeField, Range(0f, 1f)] private float twoStarThreshold = 0.7f;   // 70% 이상
-        [SerializeField, Range(0f, 1f)] private float oneStarThreshold = 0.5f;   // 50% 이상
+        [SerializeField, Range(0f, 1f)] private float threeStarThreshold = 1.0f; // 100% 이상
+        [SerializeField, Range(0f, 1f)] private float twoStarThreshold = 0.9f;   // 90% 이상
+        [SerializeField, Range(0f, 1f)] private float oneStarThreshold = 0.8f;   // 80% 이상
         
         // 현재 유저의 최대 클리어 스테이지 (서버에서 받아옴)
         private int maxStageCompleted = 0;

@@ -5,7 +5,11 @@ using UnityEngine;
 using Shared.Models;
 using Features.Multi.Net;
 using App.Network;
+using App.UI;
+using Shared.UI;
 using MultiModels = Features.Multi.Models;
+using TurnChangeInfo = Features.Multi.Net.TurnChangeInfo;
+using GameStateData = Features.Multi.Net.GameStateData;
 
 namespace Features.Multi.Net
 {
@@ -22,8 +26,12 @@ namespace Features.Multi.Net
         [SerializeField] private int maxReconnectAttempts = 3;
         
         [Header("하트비트 설정")]
-        [SerializeField] private bool enableHeartbeat = true;
+        [SerializeField] private bool enableHeartbeat = false; // 모바일 클라이언트는 하트비트 불필요
         [SerializeField] private float heartbeatInterval = 30.0f;
+
+        [Header("핑 설정")]
+        [SerializeField] private bool enablePing = true; // TCP 연결 상태 확인용 핑
+        [SerializeField] private float pingInterval = 30.0f; // 30초마다 핑 전송
         
         // 컴포넌트 참조
         private NetworkClient networkClient;
@@ -34,9 +42,37 @@ namespace Features.Multi.Net
         private bool isInitialized;
         private int reconnectAttempts;
         private Coroutine heartbeatCoroutine;
+        private Coroutine pingCoroutine;
+        private bool isAuthenticated = false;
+        private string lastUsedToken = null;
+        private bool isHandlingDisconnection = false;
+        
+        // 현재 사용자 정보 (LobbyPanel에서 접근 가능)
+        private UserInfo currentUserInfo = null;
+        
+        // 현재 방 정보 (GameRoomPanel에서 접근 가능)
+        private RoomInfo currentRoomInfo = null;
+        
+        // 방 생성자 여부 플래그 (타이밍 이슈 해결용)
+        private bool isCurrentUserRoomCreator = false;
+        
+        // 현재 방 플레이어 데이터 목록 (플레이어 찾기용)
+        private System.Collections.Generic.List<PlayerData> currentPlayerDataList;
+        
+        // 마지막 ROOM_INFO 데이터 저장 (이벤트 구독 타이밍 이슈 해결용)
+        private System.Collections.Generic.List<PlayerData> lastRoomInfoData = null;
         
         // 싱글톤 패턴
         public static NetworkManager Instance { get; private set; }
+        
+        // 현재 사용자 정보 접근 프로퍼티
+        public UserInfo CurrentUserInfo => currentUserInfo;
+        
+        // 현재 방 정보 접근 프로퍼티
+        public RoomInfo CurrentRoomInfo => currentRoomInfo;
+        
+        // 방 생성자 여부 접근 프로퍼티 (타이밍 이슈 해결용)
+        public bool IsCurrentUserRoomCreator => isCurrentUserRoomCreator;
         
         // 이벤트 (MessageHandler 이벤트를 래핑)
         public event System.Action<bool> OnConnectionChanged
@@ -81,6 +117,18 @@ namespace Features.Multi.Net
             add { if (messageHandler != null) messageHandler.OnJoinRoomResponse += value; }
             remove { if (messageHandler != null) messageHandler.OnJoinRoomResponse -= value; }
         }
+
+        public event System.Action OnRoomJoined
+        {
+            add { if (messageHandler != null) messageHandler.OnRoomJoined += value; }
+            remove { if (messageHandler != null) messageHandler.OnRoomJoined -= value; }
+        }
+        
+        public event System.Action OnRoomLeft
+        {
+            add { if (messageHandler != null) messageHandler.OnRoomLeft += value; }
+            remove { if (messageHandler != null) messageHandler.OnRoomLeft -= value; }
+        }
         
         // 게임 관련 이벤트
         public event System.Action<MultiModels.BlockPlacement> OnBlockPlaced
@@ -89,7 +137,7 @@ namespace Features.Multi.Net
             remove { if (messageHandler != null) messageHandler.OnBlockPlaced -= value; }
         }
         
-        public event System.Action<MultiModels.PlayerColor> OnTurnChanged
+        public event System.Action<TurnChangeInfo> OnTurnChanged
         {
             add { if (messageHandler != null) messageHandler.OnTurnChanged += value; }
             remove { if (messageHandler != null) messageHandler.OnTurnChanged -= value; }
@@ -106,6 +154,44 @@ namespace Features.Multi.Net
         {
             add { if (messageHandler != null) messageHandler.OnErrorReceived += value; }
             remove { if (messageHandler != null) messageHandler.OnErrorReceived -= value; }
+        }
+
+        public event System.Action<string, string, string> OnChatMessageReceived
+        {
+            add { if (messageHandler != null) messageHandler.OnChatMessageReceived += value; }
+            remove { if (messageHandler != null) messageHandler.OnChatMessageReceived -= value; }
+        }
+
+        public event System.Action<System.Collections.Generic.List<UserInfo>> OnUserListUpdated
+        {
+            add { if (messageHandler != null) messageHandler.OnUserListUpdated += value; }
+            remove { if (messageHandler != null) messageHandler.OnUserListUpdated -= value; }
+        }
+        
+        // AFK 관련 이벤트
+        public event System.Action OnAfkVerifyReceived
+        {
+            add { if (messageHandler != null) messageHandler.OnAfkVerifyReceived += value; }
+            remove { if (messageHandler != null) messageHandler.OnAfkVerifyReceived -= value; }
+        }
+        
+        public event System.Action OnAfkUnblockSuccess
+        {
+            add { if (messageHandler != null) messageHandler.OnAfkUnblockSuccess += value; }
+            remove { if (messageHandler != null) messageHandler.OnAfkUnblockSuccess -= value; }
+        }
+        
+        public event System.Action<string> OnAfkStatusReset
+        {
+            add { if (messageHandler != null) messageHandler.OnAfkStatusReset += value; }
+            remove { if (messageHandler != null) messageHandler.OnAfkStatusReset -= value; }
+        }
+
+        // 게임 결과 관련 이벤트
+        public event System.Action<GameResultData> OnGameResultReceived
+        {
+            add { if (messageHandler != null) messageHandler.OnGameResultReceived += value; }
+            remove { if (messageHandler != null) messageHandler.OnGameResultReceived -= value; }
         }
         
         void Awake()
@@ -166,6 +252,20 @@ namespace Features.Multi.Net
             networkClient.OnConnectionChanged += OnConnectionStatusChanged;
             networkClient.OnError += OnNetworkError;
             
+            // 사용자 정보 업데이트 이벤트 구독
+            if (messageHandler != null)
+            {
+                messageHandler.OnMyStatsUpdated += OnMyStatsUpdatedHandler;
+                messageHandler.OnRoomCreated += OnRoomCreatedHandler;
+                messageHandler.OnRoomJoined += OnRoomJoinedHandler;
+                messageHandler.OnRoomLeft += OnRoomLeftHandler;
+                messageHandler.OnRoomInfoUpdated += OnRoomInfoUpdatedHandler;
+                messageHandler.OnPlayerJoined += OnPlayerJoinedHandler;
+                messageHandler.OnPlayerLeft += OnPlayerLeftHandler;
+                messageHandler.OnPlayerReadyChanged += OnPlayerReadyChangedHandler;
+                messageHandler.OnPlayerSystemJoined += OnPlayerSystemJoinedHandler;
+            }
+            
             isInitialized = true;
             Debug.Log("[NetworkManager] 초기화 완료 (토큰 검증 서비스 포함)");
         }
@@ -204,9 +304,56 @@ namespace Features.Multi.Net
                 return;
             
             StopHeartbeat();
+            StopPing();
+            networkClient?.DisconnectFromServer();
+
+            // 인증 상태 초기화
+            isAuthenticated = false;
+            lastUsedToken = null;
+            
+            Debug.Log("[NetworkManager] 서버 연결 해제됨 (인증 상태 초기화)");
+        }
+        
+        /// <summary>
+        /// 로그아웃 - 재연결 없이 서버 연결 해제
+        /// </summary>
+        public void LogoutFromServer()
+        {
+            if (!isInitialized)
+                return;
+                
+            Debug.Log("[NetworkManager] 로그아웃 시작 - 자동 재연결 비활성화");
+            
+            // 자동 재연결 임시 비활성화
+            bool originalAutoReconnect = autoReconnect;
+            autoReconnect = false;
+            reconnectAttempts = maxReconnectAttempts; // 재연결 시도 횟수를 최대로 설정
+            
+            StopHeartbeat();
             networkClient?.DisconnectFromServer();
             
-            Debug.Log("[NetworkManager] 서버 연결 해제됨");
+            // 인증 상태 및 사용자 정보 초기화
+            isAuthenticated = false;
+            lastUsedToken = null;
+            currentUserInfo = null;
+            currentRoomInfo = null;
+            isCurrentUserRoomCreator = false; // 방 생성자 플래그 리셋
+            
+            Debug.Log("[NetworkManager] 로그아웃 완료 - 모든 세션 정보 정리됨");
+            
+            // 1초 후 자동 재연결 설정을 원래대로 복구 (다음 연결을 위해)
+            StartCoroutine(RestoreAutoReconnectAfterLogout(originalAutoReconnect));
+        }
+        
+        /// <summary>
+        /// 로그아웃 후 자동 재연결 설정 복구
+        /// </summary>
+        private System.Collections.IEnumerator RestoreAutoReconnectAfterLogout(bool originalSetting)
+        {
+            yield return new UnityEngine.WaitForSeconds(2f);
+            autoReconnect = originalSetting;
+            reconnectAttempts = 0; // 재연결 시도 횟수 리셋
+            Debug.Log($"[NetworkManager] 자동 재연결 설정 복구: {autoReconnect}");
         }
         
         /// <summary>
@@ -215,6 +362,14 @@ namespace Features.Multi.Net
         public bool IsConnected()
         {
             return isInitialized && networkClient != null && networkClient.IsConnected();
+        }
+        
+        /// <summary>
+        /// 인증 상태 확인
+        /// </summary>
+        public bool IsAuthenticated()
+        {
+            return isAuthenticated && IsConnected();
         }
         
         /// <summary>
@@ -326,8 +481,16 @@ namespace Features.Multi.Net
 
                 Debug.Log("[NetworkManager] TCP 서버 연결 성공");
 
-                // Step 3: 모바일 클라이언트 인증 (간소화된 JWT 전송)
+                // Step 3: 모바일 클라이언트 인증 (중복 방지)
                 Debug.Log("[NetworkManager] Step 3: 모바일 클라이언트 인증 중...");
+                
+                // 이미 같은 토큰으로 인증된 경우 건너뛰기
+                if (isAuthenticated && validToken == lastUsedToken)
+                {
+                    Debug.Log("[NetworkManager] 이미 인증됨 - 중복 인증 방지");
+                    return true;
+                }
+                
                 bool authSuccess = await SendMobileJwtLoginAsync(validToken);
                 
                 if (!authSuccess)
@@ -337,6 +500,13 @@ namespace Features.Multi.Net
                     OnNetworkError("모바일 클라이언트 인증에 실패했습니다.");
                     return false;
                 }
+
+                // 인증 성공 시 상태 업데이트
+                isAuthenticated = true;
+                lastUsedToken = validToken;
+
+                // TCP 연결 상태 확인용 ping 시작
+                StartPing();
 
                 Debug.Log("[NetworkManager] 모바일 멀티플레이어 연결 완료!");
                 return true;
@@ -365,17 +535,25 @@ namespace Features.Multi.Net
             // 인증 결과를 기다리기 위한 TaskCompletionSource
             var authCompletionSource = new TaskCompletionSource<bool>();
             System.Action<string> tempErrorHandler = null;
+            System.Action<bool, string> tempAuthHandler = null;
             bool authCompleted = false;
 
             try
             {
+                // 인증 성공/실패 응답 핸들러 등록
+                tempAuthHandler = (success, message) => {
+                    if (authCompleted) return; // 이미 완료된 경우 무시
+                    
+                    authCompleted = true;
+                    Debug.Log($"[NetworkManager] 인증 응답 수신: {success} - {message}");
+                    authCompletionSource.TrySetResult(success);
+                };
+
                 // 에러 응답 핸들러 등록 (인증 관련 에러만 처리)
                 tempErrorHandler = (errorMessage) => {
                     if (authCompleted) return; // 이미 완료된 경우 무시
-                    
-                    if (errorMessage.Contains("인증 토큰이 유효하지 않습니다") || 
-                        errorMessage.Contains("authentication") ||
-                        errorMessage.Contains("토큰"))
+
+                    if (IsAuthenticationRelatedError(errorMessage))
                     {
                         authCompleted = true;
                         Debug.Log($"[NetworkManager] 인증 실패 감지: {errorMessage}");
@@ -383,7 +561,8 @@ namespace Features.Multi.Net
                     }
                 };
 
-                // 에러 이벤트 구독
+                // 이벤트 구독
+                OnAuthResponse += tempAuthHandler;
                 OnErrorReceived += tempErrorHandler;
 
                 // 모바일 클라이언트 전용 인증 요청 전송
@@ -394,26 +573,32 @@ namespace Features.Multi.Net
                     return false;
                 }
 
-                // 서버 응답 대기 (최대 5초)
-                var timeoutTask = Task.Delay(5000);
+                Debug.Log("[NetworkManager] JWT 인증 요청 전송됨, 응답 대기 중...");
+
+                // 서버 응답 대기 (최대 10초로 증가)
+                var timeoutTask = Task.Delay(10000);
                 var completedTask = await Task.WhenAny(authCompletionSource.Task, timeoutTask);
 
                 if (completedTask == timeoutTask)
                 {
-                    // 타임아웃 - 에러가 발생하지 않았으므로 성공으로 간주
+                    // 타임아웃 - 실제 응답을 받지 못함
                     authCompleted = true;
-                    Debug.Log("[NetworkManager] 인증 응답 타임아웃 - 성공으로 간주");
-                    return true;
+                    Debug.LogWarning("[NetworkManager] 인증 응답 타임아웃 - 네트워크 문제 가능성");
+                    return false; // 타임아웃을 실패로 처리
                 }
 
                 // 실제 서버 응답 결과 반환
                 bool result = authCompletionSource.Task.Result;
-                Debug.Log($"[NetworkManager] 인증 결과: {result}");
+                Debug.Log($"[NetworkManager] 인증 최종 결과: {result}");
                 return result;
             }
             finally
             {
                 // 이벤트 핸들러 해제
+                if (tempAuthHandler != null)
+                {
+                    OnAuthResponse -= tempAuthHandler;
+                }
                 if (tempErrorHandler != null)
                 {
                     OnErrorReceived -= tempErrorHandler;
@@ -431,9 +616,35 @@ namespace Features.Multi.Net
                 Debug.LogWarning("[NetworkManager] TCP 서버에 연결되지 않았습니다.");
                 return false;
             }
-            
+
             // 모바일 클라이언트 전용 인증 요청 (기존 JWT 메시지와 구분)
             return networkClient.SendProtocolMessage("auth", "mobile_jwt", validatedToken);
+        }
+
+        /// <summary>
+        /// 인증 관련 에러인지 확인
+        /// </summary>
+        private bool IsAuthenticationRelatedError(string errorMessage)
+        {
+            if (string.IsNullOrEmpty(errorMessage))
+                return false;
+
+            // 로그에서 확인된 실제 에러들과 기존 에러들 포함
+            return errorMessage.Contains("DUPLICATE_IP_DIFFERENT_USER") ||
+                   errorMessage.Contains("DUPLICATE_USER_IP") ||
+                   errorMessage.Contains("AUTHENTICATION_FAILED") ||
+                   errorMessage.Contains("INVALID_TOKEN") ||
+                   errorMessage.Contains("TOKEN_EXPIRED") ||
+                   errorMessage.Contains("UNAUTHORIZED") ||
+                   errorMessage.Contains("AUTH_ERROR") ||
+                   errorMessage.Contains("인증 토큰이 유효하지 않습니다") ||
+                   errorMessage.Contains("authentication") ||
+                   errorMessage.Contains("토큰") ||
+                   errorMessage.Contains("AUTH") ||
+                   errorMessage.Contains("모바일 클라이언트 인증에 실패했습니다") ||
+                   errorMessage.Contains("이미 다른 계정이 로그인되어 있습니다") ||
+                   errorMessage.Contains("이 위치에서 이미") ||
+                   errorMessage.Contains("다른 사용자가 같은 IP");
         }
 
         /// <summary>
@@ -517,7 +728,7 @@ namespace Features.Multi.Net
         /// <summary>
         /// 방 생성 요청
         /// </summary>
-        public bool CreateRoom(string roomName, int maxPlayers = 4)
+        public bool CreateRoom(string roomName, bool isPrivate = false, string password = "")
         {
             if (!IsConnected())
             {
@@ -525,7 +736,7 @@ namespace Features.Multi.Net
                 return false;
             }
             
-            return networkClient.SendCreateRoomRequest(roomName, maxPlayers);
+            return networkClient.SendCreateRoomRequest(roomName, isPrivate, password);
         }
         
         /// <summary>
@@ -608,24 +819,457 @@ namespace Features.Multi.Net
         private void OnConnectionStatusChanged(bool isConnected)
         {
             Debug.Log($"[NetworkManager] 연결 상태 변경: {(isConnected ? "연결됨" : "연결 해제됨")}");
-            
+
             if (isConnected)
             {
                 // 연결 성공
                 reconnectAttempts = 0;
+                isHandlingDisconnection = false;
                 StartHeartbeat();
             }
             else
             {
-                // 연결 해제
-                StopHeartbeat();
-                
-                // 자동 재연결 시도
-                if (autoReconnect && reconnectAttempts < maxReconnectAttempts)
+                // 중복 처리 방지 - 이미 재연결 처리 중이면 스킵
+                if (isHandlingDisconnection)
                 {
-                    StartCoroutine(AttemptReconnect());
+                    Debug.Log("[NetworkManager] 이미 연결 해제 처리 중 - 중복 이벤트 무시");
+                    return;
+                }
+
+                // 연결 해제 처리
+                StopHeartbeat();
+                HandleDisconnection();
+            }
+        }
+
+        /// <summary>
+        /// 연결 해제 시 상태별 복구 처리
+        /// </summary>
+        private void HandleDisconnection()
+        {
+            Debug.Log($"[NetworkManager] 연결 해제 처리 시작 - autoReconnect: {autoReconnect}, currentRoomInfo: {(currentRoomInfo?.roomName ?? "null")}");
+
+            // 중복 처리 방지 플래그 설정
+            isHandlingDisconnection = true;
+
+            if (!autoReconnect)
+            {
+                // 로그아웃 (의도적 종료)
+                Debug.Log("[NetworkManager] 로그아웃 감지 - DontDestroyOnLoad 객체 정리");
+                Features.Multi.Core.MultiCoreBootstrap.DestroyAllDontDestroyOnLoadObjects();
+                isHandlingDisconnection = false;
+                return;
+            }
+
+            // 모든 멀티플레이 연결 해제를 동일하게 처리
+            string locationInfo = currentRoomInfo != null ? $"방: {currentRoomInfo.roomName}" : "로비";
+            Debug.Log($"[NetworkManager] {locationInfo}에서 연결 해제 감지 - MainScene 복귀 처리 시작");
+
+            // 로비든 게임룸이든 모두 동일하게 MainScene 복귀 처리
+            HandleAllDisconnections();
+        }
+
+        /// <summary>
+        /// 모든 멀티플레이 연결 해제 통합 처리
+        /// 로비/게임룸 구분 없이 동일하게 MainScene 복귀 처리
+        /// </summary>
+        private void HandleAllDisconnections()
+        {
+            Debug.Log("[NetworkManager] 멀티플레이 연결 해제 - 통합 복구 처리 시작");
+
+            // LoadingOverlay 표시
+            App.UI.LoadingOverlay.Show("연결 해제 감지 - MainScene으로 복귀 중...");
+
+            // 인증 상태 리셋 (로그아웃, 서버 연결 끊김 등 모든 경우)
+            ResetAuthenticationStateForMainSceneReturn();
+
+            // 현재 방 정보 초기화 (서버에서 이미 퇴장 처리됨)
+            currentRoomInfo = null;
+            currentPlayerDataList = null;
+            lastRoomInfoData = null;
+            isCurrentUserRoomCreator = false;
+
+            // MultiGameplayScene이 활성화되어 있는지 확인
+            bool isMultiGameplayActive = UnityEngine.SceneManagement.SceneManager.GetSceneByName("MultiGameplayScene").isLoaded;
+
+            if (isMultiGameplayActive)
+            {
+                Debug.Log("[NetworkManager] MultiGameplayScene 활성 - MainScene 복귀 처리 시작");
+                StartCoroutine(HandleMultiGameplayToMainRecovery());
+            }
+            else
+            {
+                // MultiCore에만 있는 경우 바로 MainScene 복귀
+                Debug.Log("[NetworkManager] MultiCore에서 연결 해제 - MainScene 복귀 처리");
+                StartCoroutine(HandleMultiCoreToMainRecovery());
+            }
+        }
+
+        /// <summary>
+        /// 방/게임 중 연결 해제 시 상태 복구 (기존 메서드 유지)
+        /// MultiGameplayScene → MultiCore로 복귀 후 재연결
+        /// </summary>
+        private void HandleRoomDisconnection()
+        {
+            Debug.Log("[NetworkManager] 방/게임 중 연결 해제 - MultiGameplayScene 언로드 및 재연결 처리");
+
+            // LoadingOverlay 표시
+            App.UI.LoadingOverlay.Show("연결 해제 감지 - 상태 복구 중...");
+
+            // 현재 방 정보 초기화 (서버에서 이미 퇴장 처리됨)
+            currentRoomInfo = null;
+            currentPlayerDataList = null;
+            isCurrentUserRoomCreator = false;
+
+            // MultiGameplayScene이 활성화되어 있는지 확인
+            bool isMultiGameplayActive = UnityEngine.SceneManagement.SceneManager.GetSceneByName("MultiGameplayScene").isLoaded;
+
+            if (isMultiGameplayActive)
+            {
+                Debug.Log("[NetworkManager] MultiGameplayScene 활성 - SceneFlowController를 통한 MultiCore 복귀 시작");
+
+                // SceneFlowController를 통해 MultiCore로 복귀
+                if (App.Core.SceneFlowController.Instance != null)
+                {
+                    StartCoroutine(HandleMultiGameplayToMultiCoreRecovery());
+                }
+                else
+                {
+                    Debug.LogError("[NetworkManager] SceneFlowController를 찾을 수 없음 - 수동 재연결 시도");
+                    StartCoroutine(AttemptReconnectWithDelay(2f));
                 }
             }
+            else
+            {
+                // MultiCore에 있는 경우 단순 재연결
+                Debug.Log("[NetworkManager] MultiCore에서 연결 해제 - 재연결 시도");
+                StartCoroutine(AttemptReconnectWithDelay(1f));
+            }
+        }
+
+        /// <summary>
+        /// MultiGameplayScene → MultiCore 복귀 및 재연결 처리
+        /// </summary>
+        private System.Collections.IEnumerator HandleMultiGameplayToMultiCoreRecovery()
+        {
+            Debug.Log("[NetworkManager] MultiGameplayScene → MultiCore 복귀 프로세스 시작");
+
+            // LoadingOverlay 메시지 업데이트
+            App.UI.LoadingOverlay.Show("로비로 복귀 중...");
+
+            // 1. 사용자에게 알림
+            if (SystemMessageManager.Instance != null)
+            {
+                SystemMessageManager.ShowToast("연결이 끊어져 로비로 복귀합니다.", MessagePriority.Warning);
+            }
+
+            // 2. 약간의 대기 (사용자가 메시지를 볼 수 있도록)
+            yield return new WaitForSeconds(1f);
+
+            // 3. MultiCore로 복귀 (DontDestroyOnLoad 객체는 정리하지 않음)
+            bool recoverySuccess = false;
+
+            // SceneFlowController의 GoMulti 사용 (MultiCore → MultiGameplayScene 로직을 역으로 사용)
+            var sceneFlow = App.Core.SceneFlowController.Instance;
+            if (sceneFlow != null)
+            {
+                // MultiGameplayScene 언로드만 수행 (MultiCore는 유지)
+                yield return StartCoroutine(UnloadMultiGameplaySceneOnly());
+
+                // 성공 여부 확인 - MultiGameplayScene이 언로드되었는지 체크
+                var multiGameplayScene = UnityEngine.SceneManagement.SceneManager.GetSceneByName("MultiGameplayScene");
+                if (!multiGameplayScene.isLoaded)
+                {
+                    recoverySuccess = true;
+                    Debug.Log("[NetworkManager] MultiGameplayScene 언로드 성공");
+                }
+                else
+                {
+                    Debug.LogError("[NetworkManager] MultiGameplayScene 언로드 실패");
+                }
+            }
+            else
+            {
+                Debug.LogError("[NetworkManager] SceneFlowController를 찾을 수 없음");
+            }
+
+            // 4. MainScene으로 완전 복귀 (서버 인증 상태 재검증을 위해)
+            if (recoverySuccess)
+            {
+                Debug.Log("[NetworkManager] MultiCore 복귀 완료 - MainScene으로 이동하여 인증 상태 재검증");
+                App.UI.LoadingOverlay.Hide();
+
+                yield return new WaitForSeconds(1f);
+
+                // DontDestroyOnLoad 객체들 정리 (MainScene 이동 전)
+                Debug.Log("[NetworkManager] 서버 연결 해제로 인한 MainScene 복귀 - DontDestroyOnLoad 객체 정리");
+                Features.Multi.Core.MultiCoreBootstrap.DestroyAllDontDestroyOnLoadObjects();
+
+                // 중복 처리 방지 플래그 해제
+                isHandlingDisconnection = false;
+
+                // MainScene으로 완전 복귀
+                if (App.Core.SceneFlowController.Instance != null)
+                {
+                    App.Core.SceneFlowController.Instance.StartExitMultiToMain();
+
+                    // MainScene 이동 완료 후 연결 끊김 모달 표시
+                    StartCoroutine(ShowNetworkDisconnectedModalAfterSceneTransition());
+                }
+                else
+                {
+                    Debug.LogError("[NetworkManager] SceneFlowController를 찾을 수 없음");
+                }
+            }
+            else
+            {
+                App.UI.LoadingOverlay.Hide();
+                Debug.LogError("[NetworkManager] MultiCore 복귀 실패 - MainScene으로 복귀");
+
+                // DontDestroyOnLoad 객체들 정리 (복귀 실패 시에도)
+                Debug.Log("[NetworkManager] MultiCore 복귀 실패로 인한 MainScene 복귀 - DontDestroyOnLoad 객체 정리");
+                Features.Multi.Core.MultiCoreBootstrap.DestroyAllDontDestroyOnLoadObjects();
+
+                // 중복 처리 방지 플래그 해제
+                isHandlingDisconnection = false;
+
+                if (App.Core.SceneFlowController.Instance != null)
+                {
+                    App.Core.SceneFlowController.Instance.StartExitMultiToMain();
+
+                    // MainScene 이동 완료 후 연결 끊김 모달 표시
+                    StartCoroutine(ShowNetworkDisconnectedModalAfterSceneTransition());
+                }
+                else
+                {
+                    Debug.LogError("[NetworkManager] SceneFlowController를 찾을 수 없음");
+                }
+            }
+        }
+
+        /// <summary>
+        /// MultiGameplayScene → MainScene 직접 복귀 처리
+        /// </summary>
+        private System.Collections.IEnumerator HandleMultiGameplayToMainRecovery()
+        {
+            Debug.Log("[NetworkManager] MultiGameplayScene → MainScene 직접 복귀 시작");
+
+            // 1. 사용자에게 알림
+            if (SystemMessageManager.Instance != null)
+            {
+                SystemMessageManager.ShowToast("연결이 끊어져 메인 화면으로 복귀합니다.", MessagePriority.Warning);
+            }
+
+            yield return new WaitForSeconds(1f);
+
+            // 2. DontDestroyOnLoad 객체들 정리
+            Debug.Log("[NetworkManager] 서버 연결 해제로 인한 MainScene 복귀 - DontDestroyOnLoad 객체 정리");
+            Features.Multi.Core.MultiCoreBootstrap.DestroyAllDontDestroyOnLoadObjects();
+
+            // 3. 중복 처리 방지 플래그 해제
+            isHandlingDisconnection = false;
+
+            // 4. MainScene으로 직접 복귀
+            if (App.Core.SceneFlowController.Instance != null)
+            {
+                App.Core.SceneFlowController.Instance.StartExitMultiToMain();
+
+                // 씬 전환 후 모달 표시
+                StartCoroutine(ShowNetworkDisconnectedModalAfterSceneTransition());
+            }
+            else
+            {
+                App.UI.LoadingOverlay.Hide();
+                Debug.LogError("[NetworkManager] SceneFlowController를 찾을 수 없음");
+            }
+        }
+
+        /// <summary>
+        /// MultiCore → MainScene 직접 복귀 처리
+        /// </summary>
+        private System.Collections.IEnumerator HandleMultiCoreToMainRecovery()
+        {
+            Debug.Log("[NetworkManager] MultiCore → MainScene 직접 복귀 시작");
+
+            // 1. 사용자에게 알림
+            if (SystemMessageManager.Instance != null)
+            {
+                SystemMessageManager.ShowToast("연결이 끊어져 메인 화면으로 복귀합니다.", MessagePriority.Warning);
+            }
+
+            yield return new WaitForSeconds(1f);
+
+            // 2. DontDestroyOnLoad 객체들 정리
+            Debug.Log("[NetworkManager] 로비 연결 해제로 인한 MainScene 복귀 - DontDestroyOnLoad 객체 정리");
+            Features.Multi.Core.MultiCoreBootstrap.DestroyAllDontDestroyOnLoadObjects();
+
+            // 3. 중복 처리 방지 플래그 해제
+            isHandlingDisconnection = false;
+
+            // 4. MainScene으로 직접 복귀 (MultiCore만 언로드)
+            if (App.Core.SceneFlowController.Instance != null)
+            {
+                App.Core.SceneFlowController.Instance.StartExitMultiToMain();
+
+                // 씬 전환 후 모달 표시
+                StartCoroutine(ShowNetworkDisconnectedModalAfterSceneTransition());
+            }
+            else
+            {
+                App.UI.LoadingOverlay.Hide();
+                Debug.LogError("[NetworkManager] SceneFlowController를 찾을 수 없음");
+            }
+        }
+
+        /// <summary>
+        /// MainScene 전환 완료 후 네트워크 연결 끊김 모달 표시
+        /// </summary>
+        private System.Collections.IEnumerator ShowNetworkDisconnectedModalAfterSceneTransition()
+        {
+            Debug.Log("[NetworkManager] MainScene 전환 완료 대기 시작");
+
+            // MainScene 전환 완료까지 최대 5초간 0.1초마다 체크
+            float maxWaitTime = 5f;
+            float checkInterval = 0.1f;
+            float elapsedTime = 0f;
+
+            while (elapsedTime < maxWaitTime)
+            {
+                var mainScene = UnityEngine.SceneManagement.SceneManager.GetSceneByName("MainScene");
+                if (mainScene.isLoaded && mainScene == UnityEngine.SceneManagement.SceneManager.GetActiveScene())
+                {
+                    // LoadingOverlay 숨김
+                    App.UI.LoadingOverlay.Hide();
+
+                    // 추가 안정화 대기 (UI 로딩 완료 보장)
+                    yield return new WaitForSeconds(0.5f);
+
+                    // 연결 끊김 알림 모달 표시
+                    Features.Multi.UI.NetworkDisconnectedModal.Show(
+                        title: "연결 끊김",
+                        message: "서버와의 연결이 끊어졌습니다.\n메인 화면으로 이동했습니다."
+                    );
+
+                    Debug.Log($"[NetworkManager] MainScene 전환 완료 ({elapsedTime:F1}초 후) - 연결 끊김 모달 표시됨");
+                    yield break;
+                }
+
+                yield return new WaitForSeconds(checkInterval);
+                elapsedTime += checkInterval;
+            }
+
+            // 최대 대기 시간 초과 시 강제로 처리
+            App.UI.LoadingOverlay.Hide();
+            Debug.LogWarning($"[NetworkManager] MainScene 전환 대기 시간 초과 ({maxWaitTime}초) - 강제로 알림 모달 표시");
+
+            Features.Multi.UI.NetworkDisconnectedModal.Show(
+                title: "연결 끊김",
+                message: "서버와의 연결이 끊어졌습니다.\n메인 화면으로 이동했습니다."
+            );
+        }
+
+
+        /// <summary>
+        /// MainScene 복귀를 위한 인증 상태 리셋
+        /// 로그아웃, 서버 연결 끊김 등 모든 멀티 모드 종료 시 호출
+        /// </summary>
+        private void ResetAuthenticationStateForMainSceneReturn()
+        {
+            Debug.Log("[NetworkManager] MainScene 복귀를 위한 인증 상태 리셋 시작");
+
+            // Ping 중지
+            StopPing();
+
+            // 인증 상태 초기화
+            isAuthenticated = false;
+            lastUsedToken = null;
+
+            // TCP 연결 정리
+            if (networkClient != null && networkClient.IsConnected())
+            {
+                networkClient.DisconnectFromServer();
+            }
+
+            Debug.Log("[NetworkManager] 인증 상태 리셋 완료 - 다음 멀티 모드 진입 시 JWT 인증 재수행");
+        }
+
+
+        /// <summary>
+        /// MultiGameplayScene만 언로드 (MultiCore는 유지)
+        /// </summary>
+        private System.Collections.IEnumerator UnloadMultiGameplaySceneOnly()
+        {
+            Debug.Log("[NetworkManager] MultiGameplayScene 언로드 시작");
+
+            var multiGameplayScene = UnityEngine.SceneManagement.SceneManager.GetSceneByName("MultiGameplayScene");
+            if (multiGameplayScene.isLoaded)
+            {
+                var unloadOperation = UnityEngine.SceneManagement.SceneManager.UnloadSceneAsync("MultiGameplayScene");
+                yield return unloadOperation;
+
+                if (unloadOperation.isDone)
+                {
+                    Debug.Log("[NetworkManager] MultiGameplayScene 언로드 완료");
+                }
+                else
+                {
+                    Debug.LogError("[NetworkManager] MultiGameplayScene 언로드 실패");
+                }
+            }
+
+            // MultiCore 씬 활성화
+            var multiCoreScene = UnityEngine.SceneManagement.SceneManager.GetSceneByName("MultiCore");
+            if (multiCoreScene.isLoaded)
+            {
+                UnityEngine.SceneManagement.SceneManager.SetActiveScene(multiCoreScene);
+                Debug.Log("[NetworkManager] MultiCore 씬 활성화 완료");
+            }
+        }
+
+        /// <summary>
+        /// 지연된 재연결 시도
+        /// </summary>
+        private System.Collections.IEnumerator AttemptReconnectWithDelay(float delay)
+        {
+            Debug.Log($"[NetworkManager] {delay}초 후 재연결 시도");
+
+            // LoadingOverlay 표시 (지연 시간 포함)
+            App.UI.LoadingOverlay.Show($"서버 연결 대기 중... ({delay:F0}초)");
+
+            yield return new WaitForSeconds(delay);
+
+            if (reconnectAttempts < maxReconnectAttempts)
+            {
+                StartCoroutine(AttemptReconnect());
+            }
+            else
+            {
+                App.UI.LoadingOverlay.Hide();
+                Debug.LogError($"[NetworkManager] 지연 재연결도 최대 시도 횟수 초과 - DontDestroyOnLoad 객체 정리");
+                HandleReconnectionFailure();
+            }
+        }
+
+        /// <summary>
+        /// 재연결 실패 시 처리
+        /// </summary>
+        private void HandleReconnectionFailure()
+        {
+            Debug.Log("[NetworkManager] 재연결 완전 실패 - 시스템 정리 시작");
+
+            // LoadingOverlay 숨김
+            App.UI.LoadingOverlay.Hide();
+
+            // 중복 처리 방지 플래그 해제
+            isHandlingDisconnection = false;
+
+            // autoReconnect를 false로 설정하여 더 이상의 재연결 시도 방지
+            autoReconnect = false;
+
+            // DontDestroyOnLoad 객체들 정리
+            Features.Multi.Core.MultiCoreBootstrap.DestroyAllDontDestroyOnLoadObjects();
+
+            Debug.Log("[NetworkManager] 재연결 실패 처리 완료 - 멀티플레이 모드 종료");
         }
         
         /// <summary>
@@ -633,8 +1277,7 @@ namespace Features.Multi.Net
         /// </summary>
         private void OnNetworkError(string errorMessage)
         {
-            Debug.LogError($"[NetworkManager] 네트워크 에러: {errorMessage}");
-            
+            // NetworkClient에서 이미 로그를 출력하므로 여기서는 로그 생략
             // MessageHandler를 통해 에러 이벤트 발생 (UI에서 구독 가능)
             messageHandler?.TriggerError(errorMessage);
         }
@@ -650,12 +1293,43 @@ namespace Features.Multi.Net
         {
             reconnectAttempts++;
             Debug.Log($"[NetworkManager] 재연결 시도 {reconnectAttempts}/{maxReconnectAttempts} ({reconnectDelay}초 후)");
-            
+
+            // LoadingOverlay 표시
+            App.UI.LoadingOverlay.Show($"서버 재연결 중... ({reconnectAttempts}/{maxReconnectAttempts})");
+
             yield return new WaitForSeconds(reconnectDelay);
-            
+
             if (!IsConnected())
             {
                 ConnectToServer();
+
+                // 연결 시도 후 잠시 대기하여 연결 결과 확인
+                yield return new WaitForSeconds(1f);
+
+                // 연결 성공 시 LoadingOverlay 숨김
+                if (IsConnected())
+                {
+                    App.UI.LoadingOverlay.Hide();
+                    Debug.Log($"[NetworkManager] 재연결 성공 ({reconnectAttempts}/{maxReconnectAttempts})");
+                }
+                // 재연결 실패 시 처리
+                else if (reconnectAttempts >= maxReconnectAttempts)
+                {
+                    App.UI.LoadingOverlay.Hide();
+                    Debug.LogError($"[NetworkManager] 재연결 최대 시도 횟수 초과 ({maxReconnectAttempts}회) - DontDestroyOnLoad 객체 정리");
+                    HandleReconnectionFailure();
+                }
+                else
+                {
+                    // 재연결 실패했지만 최대 시도 횟수에 도달하지 않은 경우 다시 시도
+                    Debug.Log($"[NetworkManager] 재연결 실패 ({reconnectAttempts}/{maxReconnectAttempts}) - 다음 시도 예약");
+                    StartCoroutine(AttemptReconnectWithDelay(reconnectDelay));
+                }
+            }
+            else
+            {
+                // 이미 연결된 상태면 LoadingOverlay 숨김
+                App.UI.LoadingOverlay.Hide();
             }
         }
         
@@ -810,30 +1484,339 @@ namespace Features.Multi.Net
         }
         
         /// <summary>
+        /// 사용자 정보 업데이트 핸들러 (내부용)
+        /// </summary>
+        private void OnMyStatsUpdatedHandler(UserInfo userInfo)
+        {
+            currentUserInfo = userInfo;
+            Debug.Log($"[NetworkManager] 현재 사용자 정보 저장됨: {userInfo.displayName} [{userInfo.username}]");
+        }
+
+        /// <summary>
+        /// 방 생성 핸들러 (내부용)
+        /// </summary>
+        private void OnRoomCreatedHandler(RoomInfo roomInfo)
+        {
+            currentRoomInfo = roomInfo;
+            isCurrentUserRoomCreator = true; // 방 생성자 플래그 설정
+            Debug.Log($"[NetworkManager] 현재 방 정보 저장됨 (생성): {roomInfo.roomName} [ID: {roomInfo.roomId}]");
+            Debug.Log($"[NetworkManager] 방 생성자 플래그 설정: {isCurrentUserRoomCreator}");
+        }
+
+        /// <summary>
+        /// 방 입장 핸들러 (내부용)
+        /// </summary>
+        private void OnRoomJoinedHandler()
+        {
+            Debug.Log($"[NetworkManager] 방 입장됨");
+            
+            // ROOM_INFO는 서버에서 자동으로 전송되므로 별도 트리거 불필요
+        }
+
+
+        /// <summary>
+        /// 방 나가기 핸들러 (내부용) - 호스트 관련 플래그 리셋
+        /// </summary>
+        private void OnRoomLeftHandler()
+        {
+            // 방 나가기 시 모든 방 관련 상태 리셋
+            currentRoomInfo = null;
+            currentPlayerDataList = null;
+            isCurrentUserRoomCreator = false;
+            
+            Debug.Log($"[NetworkManager] 방 나가기 완료 - 모든 방 관련 상태 리셋");
+            Debug.Log($"[NetworkManager] 방 생성자 플래그 리셋: {isCurrentUserRoomCreator}");
+        }
+        
+        /// <summary>
+        /// 플레이어 입장 핸들러 - MessageHandler로부터 이벤트 수신
+        /// </summary>
+        private void OnPlayerJoinedHandler(string username)
+        {
+            Debug.Log($"[NetworkManager] 플레이어 입장 처리: {username}");
+            
+            // 플레이어 입장 시 서버에서 자동으로 ROOM_INFO를 전송하므로 별도 요청 불필요
+        }
+        
+        
+        /// <summary>
+        /// 시스템 메시지 기반 플레이어 입장 핸들러 - MessageHandler로부터 이벤트 수신
+        /// </summary>
+        private void OnPlayerSystemJoinedHandler()
+        {
+            Debug.Log($"[NetworkManager] 시스템 메시지 기반 플레이어 입장 감지 - 즉시 동기화 트리거");
+            
+            // 시스템 메시지 기반 플레이어 입장 시에도 서버에서 자동으로 ROOM_INFO 전송
+        }
+        
+
+        /// <summary>
+        /// 플레이어 퇴장 핸들러 - MessageHandler로부터 이벤트 수신
+        /// </summary>
+        private void OnPlayerLeftHandler(string username)
+        {
+            Debug.Log($"[NetworkManager] 플레이어 퇴장 처리: {username}");
+            
+            // currentPlayerDataList에서 username으로 플레이어를 찾아 colorSlot 전달
+            if (currentPlayerDataList != null)
+            {
+                for (int i = 0; i < currentPlayerDataList.Count; i++)
+                {
+                    var player = currentPlayerDataList[i];
+                    if (player.username == username)
+                    {
+                        Debug.Log($"[NetworkManager] 플레이어 {username} → colorSlot: {player.colorSlot}");
+                        
+                        // GameRoomPanel의 OnPlayerLeft는 colorSlot을 기준으로 작동
+                        OnPlayerLeft?.Invoke(player.colorSlot);
+                        break;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// 플레이어 준비 상태 변경 핸들러 - MessageHandler로부터 이벤트 수신
+        /// </summary>
+        private void OnPlayerReadyChangedHandler(string username, bool isReady)
+        {
+            Debug.Log($"[NetworkManager] 플레이어 준비 상태 변경: {username} → {(isReady ? "준비완료" : "대기중")}");
+            
+            // currentPlayerDataList에서 username으로 플레이어를 찾아 colorSlot 전달
+            if (currentPlayerDataList != null)
+            {
+                for (int i = 0; i < currentPlayerDataList.Count; i++)
+                {
+                    var player = currentPlayerDataList[i];
+                    if (player.username == username)
+                    {
+                        Debug.Log($"[NetworkManager] 플레이어 {username} → colorSlot: {player.colorSlot}");
+                        
+                        // GameRoomPanel의 OnPlayerReadyChanged는 colorSlot을 기준으로 작동
+                        OnPlayerReadyChanged?.Invoke(player.colorSlot, isReady);
+                        break;
+                    }
+                }
+            }
+        }
+        
+        /// <summary>
+        /// 주기적으로 방 정보 업데이트 요청 (비활성화됨)
+        /// 서버에서 room:info 명령어를 지원하지 않아서 주석 처리
+        /// </summary>
+        /*
+        private System.Collections.IEnumerator RequestRoomInfoPeriodically()
+        {
+            while (currentRoomInfo != null && IsConnected())
+            {
+                yield return new WaitForSeconds(5f); // 5초마다
+                
+                if (currentRoomInfo != null)
+                {
+                    // 서버에 현재 방 정보 요청 - 서버에서 지원하지 않는 명령어
+                    networkClient?.SendCleanTCPMessage("room", "info", currentRoomInfo.roomId.ToString());
+                    Debug.Log($"[NetworkManager] 방 정보 업데이트 요청: {currentRoomInfo.roomId}");
+                }
+            }
+        }
+        */
+
+        private void OnRoomInfoUpdatedHandler(RoomInfo roomInfo, System.Collections.Generic.List<PlayerData> playerDataList)
+        {
+            // 방 정보 업데이트 - playerDataList 함께 전달, 이벤트는 MessageHandler에서 이미 발생했으므로 중복 방지
+            UpdateCurrentRoomInfo(roomInfo, playerDataList, false);
+            
+            // 플레이어 데이터 목록 저장 (플레이어 찾기용)
+            currentPlayerDataList = playerDataList;
+            
+            // 실제 서버 데이터 수신 시 방 생성자 플래그 리셋 (타이밍 이슈 해결 역할 완료)
+            if (isCurrentUserRoomCreator)
+            {
+                isCurrentUserRoomCreator = false;
+                Debug.Log("[NetworkManager] 방 생성자 플래그 리셋 - 실제 서버 데이터 수신됨");
+            }
+            
+            // GameRoomPanel에 플레이어 정보 전달
+            var gameRoomPanel = FindObjectOfType<Features.Multi.UI.GameRoomPanel>();
+            if (gameRoomPanel != null)
+            {
+                gameRoomPanel.UpdatePlayerData(playerDataList);
+            }
+        }
+
+        /// <summary>
         /// NetworkManager 정리 (MultiCoreBootstrap에서 사용)
         /// </summary>
         public void Cleanup()
         {
+            // 이벤트 구독 해제
+            if (messageHandler != null)
+            {
+                messageHandler.OnMyStatsUpdated -= OnMyStatsUpdatedHandler;
+                messageHandler.OnRoomCreated -= OnRoomCreatedHandler;
+                messageHandler.OnRoomJoined -= OnRoomJoinedHandler;
+                messageHandler.OnRoomLeft -= OnRoomLeftHandler;
+                messageHandler.OnRoomInfoUpdated -= OnRoomInfoUpdatedHandler;
+                messageHandler.OnPlayerJoined -= OnPlayerJoinedHandler;
+                messageHandler.OnPlayerLeft -= OnPlayerLeftHandler;
+                messageHandler.OnPlayerReadyChanged -= OnPlayerReadyChangedHandler;
+                messageHandler.OnPlayerSystemJoined -= OnPlayerSystemJoinedHandler;
+            }
+            
             DisconnectFromServer();
+            currentUserInfo = null;
+            currentRoomInfo = null;
+            isCurrentUserRoomCreator = false; // 방 생성자 플래그 리셋
         }
         
         // ========================================
-        // Missing Events
+        // Missing Events (Stub) - OnRoomJoined, OnRoomLeft는 위에서 구현됨
         // ========================================
-        
-        public event System.Action<string> OnChatMessage;
-        public event System.Action OnRoomJoined;
-        public event System.Action OnRoomLeft;
-        public event System.Action<RoomInfo> OnRoomInfoUpdated;
+        public event System.Action<RoomInfo, System.Collections.Generic.List<PlayerData>> OnRoomInfoUpdated;
         public event System.Action<UserInfo> OnPlayerJoined;
         public event System.Action<int> OnPlayerLeft;
         public event System.Action<int, bool> OnPlayerReadyChanged;
-        public event System.Action OnGameStarted;
+        public event System.Action OnGameStarted
+        {
+            add { if (messageHandler != null) messageHandler.OnGameStarted += value; }
+            remove { if (messageHandler != null) messageHandler.OnGameStarted -= value; }
+        }
         
+        public event System.Action<GameStateData> OnGameStateUpdate
+        {
+            add { if (messageHandler != null) messageHandler.OnGameStateUpdate += value; }
+            remove { if (messageHandler != null) messageHandler.OnGameStateUpdate -= value; }
+        }
+        
+        // ========================================
+        // Room Info Management
+        // ========================================
+        
+        /// <summary>
+        /// 현재 방 정보 업데이트 (MessageHandler에서 호출)
+        /// </summary>
+        public void UpdateCurrentRoomInfo(RoomInfo roomInfo, System.Collections.Generic.List<PlayerData> playerDataList = null, bool fireEvent = true)
+        {
+            currentRoomInfo = roomInfo;
+            Debug.Log($"[NetworkManager] 방 정보 업데이트됨: {roomInfo.roomName} (플레이어: {roomInfo.currentPlayers}/{roomInfo.maxPlayers}) - fireEvent={fireEvent}");
+            
+            // 마지막 ROOM_INFO 데이터 저장 (이벤트 구독 타이밍 이슈 해결용)
+            if (playerDataList != null)
+            {
+                lastRoomInfoData = new System.Collections.Generic.List<PlayerData>(playerDataList);
+                Debug.Log($"[NetworkManager] 마지막 ROOM_INFO 데이터 저장됨: {playerDataList.Count}명");
+            }
+            
+            // 이벤트 발생 - playerDataList가 제공된 경우 함께 전달 (fireEvent가 true인 경우에만)
+            if (fireEvent)
+            {
+                if (playerDataList != null)
+                {
+                    OnRoomInfoUpdated?.Invoke(roomInfo, playerDataList);
+                }
+                else
+                {
+                    OnRoomInfoUpdated?.Invoke(roomInfo, new System.Collections.Generic.List<PlayerData>());
+                }
+            }
+        }
+
+        /// <summary>
+        /// 마지막 ROOM_INFO 데이터 즉시 전달 (이벤트 구독 타이밍 이슈 해결)
+        /// GameRoomPanel 활성화 시 호출하여 이미 도착한 ROOM_INFO 데이터를 즉시 처리
+        /// </summary>
+        public void RequestLastRoomInfo()
+        {
+            if (lastRoomInfoData != null && currentRoomInfo != null)
+            {
+                Debug.Log($"[NetworkManager] 마지막 ROOM_INFO 데이터 즉시 전달: {lastRoomInfoData.Count}명 (중복 이벤트 방지 - 직접 GameRoomPanel 업데이트)");
+
+                // 중복 이벤트 발생 방지 - 직접 GameRoomPanel 업데이트
+                var gameRoomPanel = FindObjectOfType<Features.Multi.UI.GameRoomPanel>();
+                if (gameRoomPanel != null)
+                {
+                    gameRoomPanel.UpdatePlayerData(lastRoomInfoData);
+                }
+            }
+            else
+            {
+                Debug.Log("[NetworkManager] 저장된 ROOM_INFO 데이터가 없음");
+            }
+        }
+        
+        /// <summary>
+        /// 서버 동기화 대기 (호스트 변경 등 서버 자동 응답 대기)
+        /// 실제로는 서버가 HOST_CHANGED + ROOM_INFO를 자동으로 보내므로 별도 요청 불필요
+        /// </summary>
+        public void RequestRoomInfoSync()
+        {
+            Debug.Log($"[NetworkManager] 서버 동기화 대기 중 - HOST_CHANGED 및 ROOM_INFO 자동 수신 예정");
+            // 서버가 자동으로 HOST_CHANGED와 새로운 ROOM_INFO를 전송하므로
+            // 클라이언트에서 추가 요청을 보낼 필요가 없음
+            // 단순히 로깅만 하고 서버 응답을 기다림
+        }
+
+        /// <summary>
+        /// user_name을 display_name으로 변환 (게임 결과 표시용)
+        /// </summary>
+        /// <param name="username">서버에서 사용하는 user_name</param>
+        /// <returns>UI에 표시할 display_name, 찾지 못하면 원본 반환</returns>
+        public string GetPlayerDisplayName(string username)
+        {
+            if (string.IsNullOrEmpty(username))
+                return username;
+
+            // currentPlayerDataList에서 username으로 검색
+            if (currentPlayerDataList != null)
+            {
+                foreach (var player in currentPlayerDataList)
+                {
+                    if (player.username == username)
+                    {
+                        return player.displayName;
+                    }
+                }
+            }
+
+            // lastRoomInfoData에서 검색 (fallback)
+            if (lastRoomInfoData != null)
+            {
+                foreach (var player in lastRoomInfoData)
+                {
+                    if (player.username == username)
+                    {
+                        return player.displayName;
+                    }
+                }
+            }
+
+            // 찾지 못한 경우 원본 username 반환
+            Debug.LogWarning($"[NetworkManager] username '{username}'에 대한 displayName을 찾을 수 없습니다. 원본 반환");
+            return username;
+        }
+
+        /// <summary>
+        /// username이 빈 슬롯인지 확인 (게임 결과 필터링용)
+        /// </summary>
+        /// <param name="username">확인할 username</param>
+        /// <returns>빈 슬롯이면 true</returns>
+        public bool IsEmptySlotPlayer(string username)
+        {
+            if (string.IsNullOrEmpty(username))
+                return true;
+
+            // 기본 빈 슬롯 이름들
+            return username.Contains("Player") ||
+                   username == "Red Player" ||
+                   username == "Green Player" ||
+                   username == "Blue Player" ||
+                   username == "Yellow Player";
+        }
+
         // ========================================
         // Missing Request Methods
         // ========================================
-        
+
         /// <summary>
         /// 방 목록 요청
         /// </summary>
@@ -848,8 +1831,22 @@ namespace Features.Multi.Net
         /// </summary>
         public void RequestOnlineUsers()
         {
-            Debug.Log("[NetworkManager] RequestOnlineUsers - Stub");
-            // Stub: 서버에 온라인 사용자 목록 요청
+            if (networkClient != null && networkClient.IsConnected())
+            {
+                bool success = networkClient.SendMessage("lobby:list");
+                if (success)
+                {
+                    Debug.Log("[NetworkManager] 온라인 사용자 목록 요청 전송");
+                }
+                else
+                {
+                    Debug.LogError("[NetworkManager] 온라인 사용자 목록 요청 실패");
+                }
+            }
+            else
+            {
+                Debug.LogError("[NetworkManager] RequestOnlineUsers: 서버에 연결되지 않음");
+            }
         }
         
         /// <summary>
@@ -866,8 +1863,28 @@ namespace Features.Multi.Net
         /// </summary>
         public void SendChatMessage(string message)
         {
-            Debug.Log($"[NetworkManager] SendChatMessage: {message} - Stub");
-            // Stub: 서버에 채팅 메시지 전송
+            if (string.IsNullOrEmpty(message?.Trim()))
+            {
+                Debug.LogWarning("[NetworkManager] SendChatMessage: 빈 메시지는 전송할 수 없습니다.");
+                return;
+            }
+
+            if (networkClient != null && networkClient.IsConnected())
+            {
+                bool success = networkClient.SendChatMessage(message);
+                if (success)
+                {
+                    Debug.Log($"[NetworkManager] SendChatMessage: {message}");
+                }
+                else
+                {
+                    Debug.LogError($"[NetworkManager] SendChatMessage 실패: {message}");
+                }
+            }
+            else
+            {
+                Debug.LogError("[NetworkManager] SendChatMessage: 서버에 연결되지 않음");
+            }
         }
         
         /// <summary>
@@ -886,6 +1903,190 @@ namespace Features.Multi.Net
         {
             Debug.Log($"[NetworkManager] KickPlayer: {playerId} - Stub");
             // Stub: 서버에 플레이어 추방 요청
+        }
+        
+        // ========================================
+        // 테스트 및 검증 메서드
+        // ========================================
+        
+        /// <summary>
+        /// 기본 통신 테스트 (연결, 인증, 로비 입장)
+        /// </summary>
+        public async Task<bool> TestBasicCommunication(string testToken = null)
+        {
+            Debug.Log("[NetworkManager] === 기본 통신 테스트 시작 ===");
+            
+            try
+            {
+                // Step 1: 연결 테스트
+                Debug.Log("[NetworkManager] 1단계: 서버 연결 테스트");
+                if (!IsConnected())
+                {
+                    await networkClient.ConnectToServerAsync();
+                    await Task.Delay(1000); // 연결 대기
+                }
+                
+                if (!IsConnected())
+                {
+                    Debug.LogError("[NetworkManager] 연결 테스트 실패");
+                    return false;
+                }
+                Debug.Log("[NetworkManager] ✅ 서버 연결 성공");
+                
+                // Step 2: 인증 테스트 (JWT 토큰이 있는 경우)
+                if (!string.IsNullOrEmpty(testToken))
+                {
+                    Debug.Log("[NetworkManager] 2단계: JWT 인증 테스트");
+                    bool authResult = await SendMobileJwtLoginAsync(testToken);
+                    if (!authResult)
+                    {
+                        Debug.LogWarning("[NetworkManager] ⚠️ JWT 인증 테스트 실패 (계속 진행)");
+                    }
+                    else
+                    {
+                        Debug.Log("[NetworkManager] ✅ JWT 인증 성공");
+                    }
+                }
+                
+                // Step 3: 게스트 로그인 테스트
+                Debug.Log("[NetworkManager] 3단계: 게스트 로그인 테스트");
+                bool guestResult = GuestLogin();
+                if (!guestResult)
+                {
+                    Debug.LogWarning("[NetworkManager] ⚠️ 게스트 로그인 전송 실패");
+                }
+                else
+                {
+                    Debug.Log("[NetworkManager] ✅ 게스트 로그인 요청 전송됨");
+                }
+                
+                await Task.Delay(2000); // 응답 대기
+                
+                // Step 4: 로비 입장 테스트
+                Debug.Log("[NetworkManager] 4단계: 로비 입장 테스트");
+                bool lobbyResult = EnterLobby();
+                if (!lobbyResult)
+                {
+                    Debug.LogWarning("[NetworkManager] ⚠️ 로비 입장 요청 실패");
+                }
+                else
+                {
+                    Debug.Log("[NetworkManager] ✅ 로비 입장 요청 전송됨");
+                }
+                
+                await Task.Delay(2000); // 응답 대기
+                
+                Debug.Log("[NetworkManager] === 기본 통신 테스트 완료 ===");
+                
+                return true;
+                
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[NetworkManager] 통신 테스트 중 예외: {ex.Message}");
+                return false;
+            }
+        }
+        
+        /// <summary>
+        /// 메시지 프로토콜 테스트 (서버 프로토콜 형식 확인)
+        /// </summary>
+        public void TestMessageProtocols()
+        {
+            Debug.Log("[NetworkManager] === 메시지 프로토콜 테스트 시작 ===");
+            
+            if (!IsConnected())
+            {
+                Debug.LogError("[NetworkManager] 서버에 연결되지 않았습니다.");
+                return;
+            }
+            
+            // 다양한 프로토콜 메시지 테스트
+            Debug.Log("[NetworkManager] 하트비트 테스트...");
+            networkClient.SendHeartbeat();
+            
+            Debug.Log("[NetworkManager] 로비 목록 요청 테스트...");
+            networkClient.SendCleanTCPMessage("lobby", "list");
+            
+            Debug.Log("[NetworkManager] 방 목록 요청 테스트...");
+            networkClient.SendCleanTCPMessage("room", "list");
+            
+            Debug.Log("[NetworkManager] === 메시지 프로토콜 테스트 완료 ===");
+        }
+
+        /// <summary>
+        /// NetworkClient 인스턴스 반환 (직접 메시지 전송용)
+        /// </summary>
+        public NetworkClient GetNetworkClient()
+        {
+            return networkClient;
+        }
+
+        // ========================================
+        // Ping 관리
+        // ========================================
+
+        /// <summary>
+        /// TCP 연결 상태 확인용 ping 시작
+        /// </summary>
+        private void StartPing()
+        {
+            if (!enablePing)
+            {
+                return;
+            }
+
+            StopPing(); // 기존 ping 중지
+
+            if (IsConnected())
+            {
+                pingCoroutine = StartCoroutine(PingCoroutine());
+                Debug.Log($"[NetworkManager] Ping 시작됨 (간격: {pingInterval}초)");
+            }
+        }
+
+        /// <summary>
+        /// Ping 중지
+        /// </summary>
+        private void StopPing()
+        {
+            if (pingCoroutine != null)
+            {
+                StopCoroutine(pingCoroutine);
+                pingCoroutine = null;
+                Debug.Log("[NetworkManager] Ping 중지됨");
+            }
+        }
+
+        /// <summary>
+        /// Ping 코루틴 - 30초마다 ping 메시지 전송
+        /// </summary>
+        private System.Collections.IEnumerator PingCoroutine()
+        {
+            while (IsConnected() && isAuthenticated)
+            {
+                yield return new WaitForSeconds(pingInterval);
+
+                // 연결 상태 재확인
+                if (!IsConnected() || !isAuthenticated)
+                {
+                    Debug.Log("[NetworkManager] 연결 끊김 또는 인증 해제로 Ping 중지");
+                    break;
+                }
+
+                try
+                {
+                    // ping 메시지 전송 (로그 제외)
+                    networkClient?.SendCleanTCPMessage("ping");
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogError($"[NetworkManager] Ping 전송 실패: {ex.Message}");
+                    break;
+                }
+            }
+
+            Debug.Log("[NetworkManager] Ping 코루틴 종료");
         }
     }
 }

@@ -86,15 +86,47 @@ namespace App.Core{
         }
 
         /// <summary>
-        /// 보드 클리어
+        /// 보드 클리어 및 게임 상태 초기화
         /// </summary>
         public void ClearBoard()
         {
+            // 보드 셀 초기화
             for (int row = 0; row < GameConstants.BOARD_SIZE; row++)
             {
                 for (int col = 0; col < GameConstants.BOARD_SIZE; col++)
                 {
                     board[row, col] = PlayerColor.None;
+                }
+            }
+
+            // 플레이어별 게임 상태 초기화
+            if (hasPlacedFirstBlock != null)
+            {
+                for (int i = 1; i <= GameConstants.MAX_PLAYERS; i++)
+                {
+                    PlayerColor player = (PlayerColor)i;
+                    if (hasPlacedFirstBlock.ContainsKey(player))
+                    {
+                        hasPlacedFirstBlock[player] = false;
+                    }
+                }
+            }
+
+            // 사용된 블록 초기화
+            if (usedBlocks != null)
+            {
+                foreach (var kvp in usedBlocks.ToList())
+                {
+                    usedBlocks[kvp.Key].Clear();
+                }
+            }
+
+            // 점유된 셀 초기화
+            if (playerOccupiedCells != null)
+            {
+                foreach (var kvp in playerOccupiedCells.ToList())
+                {
+                    playerOccupiedCells[kvp.Key].Clear();
                 }
             }
 

@@ -59,6 +59,9 @@ namespace Blokus {
             // 디버깅
             int getPlacedBlockCount(PlayerColor player) const;
 
+            // 블록 형태 계산 (블록 배치 브로드캐스트용)
+            PositionList getBlockShape(const BlockPlacement& placement) const;
+
         private:
             PlayerColor m_currentPlayer;
             PlayerColor m_board[BOARD_SIZE][BOARD_SIZE];
@@ -89,7 +92,6 @@ namespace Blokus {
             Position getPlayerStartCorner(PlayerColor player) const;
 
             // 블록 변환 헬퍼
-            PositionList getBlockShape(const BlockPlacement& placement) const;
             PositionList applyTransformation(const PositionList& shape, Rotation rotation, FlipState flip) const;
             
             // 캐시 관리

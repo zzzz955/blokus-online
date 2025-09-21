@@ -507,6 +507,9 @@ namespace App.UI
         {
             Debug.Log("[UIManager] OnMultiModeSelected() 호출됨");
             
+            // 멀티플레이 버튼 비활성화
+            DisableMultiplayerButton();
+            
             // 멀티플레이 모드 선택 시 MultiCore 씬으로 전환
             if (App.Core.SceneFlowController.Instance != null)
             {
@@ -517,6 +520,9 @@ namespace App.UI
             {
                 Debug.LogError("[UIManager] SceneFlowController.Instance가 null입니다!");
                 SystemMessageManager.ShowToast("멀티플레이 화면을 로드할 수 없습니다.", MessagePriority.Error);
+                
+                // 실패 시 버튼 재활성화
+                EnableMultiplayerButton();
             }
         }
 
@@ -844,6 +850,78 @@ namespace App.UI
         {
             enableDebugLogs = enabled;
             Debug.Log($"[UIManager] 디버그 로그 {(enabled ? "활성화" : "비활성화")}");
+        }
+        
+        // ========================================
+        // 멀티플레이 버튼 제어
+        // ========================================
+        
+        /// <summary>
+        /// 멀티플레이 버튼 비활성화
+        /// </summary>
+        public void DisableMultiplayerButton()
+        {
+            var modeSelectionPanel = panels.TryGetValue(UIState.ModeSelection, out var panel) ? panel : null;
+            if (modeSelectionPanel != null)
+            {
+                var modePanel = modeSelectionPanel.GetComponent<ModeSelectionPanel>();
+                if (modePanel != null)
+                {
+                    var multiButton = modePanel.GetComponent<UnityEngine.UI.Button>();
+                    if (multiButton == null)
+                    {
+                        // ModeSelectionPanel의 multiPlayerButton 필드 직접 접근
+                        var field = typeof(ModeSelectionPanel).GetField("multiPlayerButton", 
+                            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                        if (field != null)
+                        {
+                            var button = field.GetValue(modePanel) as UnityEngine.UI.Button;
+                            if (button != null)
+                            {
+                                button.interactable = false;
+                                Debug.Log("[UIManager] 멀티플레이 버튼 비활성화");
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if (enableDebugLogs)
+                Debug.Log("[UIManager] DisableMultiplayerButton() 호출");
+        }
+        
+        /// <summary>
+        /// 멀티플레이 버튼 재활성화
+        /// </summary>
+        public void EnableMultiplayerButton()
+        {
+            var modeSelectionPanel = panels.TryGetValue(UIState.ModeSelection, out var panel) ? panel : null;
+            if (modeSelectionPanel != null)
+            {
+                var modePanel = modeSelectionPanel.GetComponent<ModeSelectionPanel>();
+                if (modePanel != null)
+                {
+                    var multiButton = modePanel.GetComponent<UnityEngine.UI.Button>();
+                    if (multiButton == null)
+                    {
+                        // ModeSelectionPanel의 multiPlayerButton 필드 직접 접근
+                        var field = typeof(ModeSelectionPanel).GetField("multiPlayerButton", 
+                            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                        if (field != null)
+                        {
+                            var button = field.GetValue(modePanel) as UnityEngine.UI.Button;
+                            if (button != null)
+                            {
+                                button.interactable = true;
+                                Debug.Log("[UIManager] 멀티플레이 버튼 재활성화");
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if (enableDebugLogs)
+                Debug.Log("[UIManager] EnableMultiplayerButton() 호출");
         }
         
     }

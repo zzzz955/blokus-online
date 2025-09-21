@@ -60,7 +60,7 @@ namespace Blokus {
                 enableSqlLogging = getEnvBool("ENABLE_SQL_LOGGING", false);
 
                 // 버전 관리 설정
-                serverVersion = getEnvString("BLOKUS_SERVER_VERSION", "1.5.0");
+                serverVersion = getEnvString("BLOKUS_SERVER_VERSION", "1.6.0");
                 buildDate = getEnvString("BLOKUS_BUILD_DATE", __DATE__ " " __TIME__);
                 gitCommit = getEnvString("BLOKUS_GIT_COMMIT", "unknown");
                 gitBranch = getEnvString("BLOKUS_GIT_BRANCH", "main");
@@ -72,7 +72,7 @@ namespace Blokus {
                     " user=" + dbUser + " password=" + dbPassword +
                     " dbname=" + dbName + " client_encoding=UTF8";
 
-                spdlog::info("환경변수 불러오기 완료! 서버 포트: {}, DB: {}@{}:{}/{}",
+                spdlog::info("환경변수 불러오기 완료!",
                     serverPort, dbUser, dbHost, dbPort, dbName);
 
                 if (debugMode) {

@@ -188,8 +188,8 @@ namespace Features.Multi.UI
             if (success)
             {
                 ShowMessage($"로그인 성공: {message}");
-                // 로그인 성공하면 멀티플레이 씬으로 이동
-                LoadMultiplayerScene();
+                // MultiCore에서 인증 후 자동으로 MultiGameplayScene으로 전환됨
+                // 중복 씬 로드 방지를 위해 LoadMultiplayerScene() 호출 제거
             }
             else
             {
@@ -202,7 +202,11 @@ namespace Features.Multi.UI
         /// </summary>
         private void OnErrorReceived(string error)
         {
-            ShowError($"네트워크 에러: {error}");
+            // NetworkClient에서 이미 로그를 출력하므로 UI 토스트만 표시
+            if (SystemMessageManager.Instance != null)
+            {
+                SystemMessageManager.ShowToast($"네트워크 에러: {error}");
+            }
         }
         
         /// <summary>

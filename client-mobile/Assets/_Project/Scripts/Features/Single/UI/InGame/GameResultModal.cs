@@ -38,9 +38,9 @@ namespace Features.Single.UI.InGame
         [SerializeField] private Color failureColor = Color.red;
 
         [Header("Star thresholds (ratio)")]
-        [SerializeField] private float threeStarThreshold = 0.90f;
-        [SerializeField] private float twoStarThreshold   = 0.70f;
-        [SerializeField] private float oneStarThreshold   = 0.50f;
+        [SerializeField] private float threeStarThreshold = 1f;
+        [SerializeField] private float twoStarThreshold   = 0.90f;
+        [SerializeField] private float oneStarThreshold   = 0.80f;
 
         [Header("Router (선택: 미지정 시 자동 탐색)")]
         [SerializeField] private Features.Single.UI.Scene.SingleGameplayUIScreenController uiController;

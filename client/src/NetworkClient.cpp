@@ -16,6 +16,7 @@ namespace Blokus {
         , m_socket(nullptr)
         , m_connectionTimer(new QTimer(this))
         , m_reconnectTimer(new QTimer(this))
+        , m_pingTimer(new QTimer(this))
         , m_state(ConnectionState::Disconnected)
         , m_currentSessionToken("")
         , m_reconnectAttempts(0)
@@ -55,6 +56,11 @@ namespace Blokus {
                 emit connectionError(QString::fromUtf8("서버에 연결할 수 없습니다."));
             }
         });
+
+        // ping 타이머 설정 (30초 간격으로 ping 메시지 전송)
+        m_pingTimer->setSingleShot(false); // 반복 실행
+        m_pingTimer->setInterval(30000); // 30초 (30,000ms)
+        connect(m_pingTimer, &QTimer::timeout, this, &NetworkClient::sendHeartbeat);
         
         qDebug() << QString::fromUtf8("NetworkClient 초기화 완료");
     }
@@ -183,7 +189,7 @@ namespace Blokus {
             return;
         }
         
-        QString message = QString("auth:%1:%2").arg(username, password);
+        QString message = QString("auth:login:%1:%2").arg(username, password);
         sendMessage(message);
         qDebug() << QString::fromUtf8("로그인 요청 전송: %1").arg(username);
     }
@@ -195,7 +201,7 @@ namespace Blokus {
             return;
         }
         
-        QString message = QString("auth:%1").arg(jwtToken);
+        QString message = QString("auth:jwt:%1").arg(jwtToken);
         sendMessage(message);
         qDebug() << QString::fromUtf8("JWT 토큰 로그인 요청 전송: %1...").arg(jwtToken.left(20));
     }
@@ -416,7 +422,10 @@ namespace Blokus {
         m_connectionTimer->stop();
         m_reconnectAttempts = 0;
         setState(ConnectionState::Connected);
-        
+
+        // ping 타이머 시작
+        m_pingTimer->start();
+
         // 연결 성공 후 즉시 버전 검사 수행
         performVersionCheck();
     }
@@ -425,6 +434,7 @@ namespace Blokus {
     {
         qDebug() << QString::fromUtf8("서버 연결 해제됨");
         m_connectionTimer->stop();
+        m_pingTimer->stop(); // ping 타이머 정지
         
         ConnectionState oldState = m_state;
         setState(ConnectionState::Disconnected);
@@ -511,8 +521,13 @@ namespace Blokus {
 
     void NetworkClient::processMessage(const QString& message)
     {
+        // pong 응답은 무시 (로그도 출력하지 않음)
+        if (message.trimmed() == "pong") {
+            return;
+        }
+
         emit messageReceived(message);
-        
+
         // 기존 텍스트 기반 메시지 처리
         if (message.startsWith("ERROR:")) {
             QString error = message.mid(6); // "ERROR:" 제거
@@ -869,11 +884,31 @@ namespace Blokus {
             if (playerColorRegex.indexIn(jsonData) != -1) playerColor = playerColorRegex.cap(1);
             if (scoreRegex.indexIn(jsonData) != -1) scoreGained = scoreRegex.cap(1);
             
+            // placedCells 파싱 (새로운 기능 - 개선된 동기화)
+            QVector<QPair<int, int>> placedCells;
+            QRegExp placedCellsRegex("\"placedCells\":\\[([^\\]]*)\\]");
+            if (placedCellsRegex.indexIn(jsonData) != -1) {
+                QString cellsData = placedCellsRegex.cap(1);
+                QRegExp cellRegex("\\{\"row\":(\\d+),\"col\":(\\d+)\\}");
+                int pos = 0;
+                while ((pos = cellRegex.indexIn(cellsData, pos)) != -1) {
+                    int cellRow = cellRegex.cap(1).toInt();
+                    int cellCol = cellRegex.cap(2).toInt();
+                    placedCells.append(QPair<int, int>(cellRow, cellCol));
+                    pos += cellRegex.matchedLength();
+                }
+                qDebug() << QString::fromUtf8("📦 배치된 셀 좌표 수신: %1개").arg(placedCells.size());
+            }
+            
+            // 기존 신호 발생 (하위 호환성 유지)
             emit blockPlaced(playerName, blockType.toInt(), row.toInt(), col.toInt(), 
                            rotation.toInt(), flip.toInt(), playerColor.toInt(), scoreGained.toInt());
             
-            qDebug() << QString::fromUtf8("블록 배치 알림: %1이 블록을 배치함 (점수: +%2)")
-                        .arg(playerName).arg(scoreGained);
+            // 새로운 신호 발생 (placedCells 포함) - 향후 활용 가능
+            // emit blockPlacedWithCells(playerName, blockType.toInt(), playerColor.toInt(), scoreGained.toInt(), placedCells);
+            
+            qDebug() << QString::fromUtf8("블록 배치 알림: %1이 블록을 배치함 (점수: +%2, 셀: %3개)")
+                        .arg(playerName).arg(scoreGained).arg(placedCells.size());
         }
         else if (message.startsWith("TURN_CHANGED:")) {
             QString jsonData = message.mid(13); // "TURN_CHANGED:" 제거
@@ -1095,6 +1130,16 @@ namespace Blokus {
             qWarning() << "Invalid user settings response";
             emit userSettingsUpdateResult(false, "잘못된 서버 응답입니다");
         }
+    }
+
+    void NetworkClient::sendHeartbeat()
+    {
+        if (!isConnected()) {
+            return; // 연결되지 않은 상태에서는 ping을 보내지 않음
+        }
+
+        // ping 메시지 전송 (로그 없이 조용히 전송)
+        sendMessage("ping");
     }
 
 } // namespace Blokus

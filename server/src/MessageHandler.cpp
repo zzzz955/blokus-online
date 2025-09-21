@@ -110,10 +110,12 @@ namespace Blokus::Server
 
         try
         {
-            spdlog::debug("📨 메시지 수신 ({}): {}, 현재 상태: {}",
-                          session_->getSessionId(),
-                          rawMessage.length() > 100 ? rawMessage.substr(0, 100) + "..." : rawMessage, (int)session_->getState());
-
+            // ping 메시지는 로깅하지 않음 (너무 빈번함)
+            if (rawMessage != "ping") {
+                spdlog::debug("📨 메시지 수신 ({}): {}, 현재 상태: {}",
+                              session_->getSessionId(),
+                              rawMessage.length() > 100 ? rawMessage.substr(0, 100) + "..." : rawMessage, (int)session_->getState());
+            }
 
             // AFK 관련 메시지 특별 처리
             if (rawMessage == "AFK_VERIFY") {
@@ -128,8 +130,18 @@ namespace Blokus::Server
             // 기존 텍스트 기반 메시지 처리
             auto [messageType, params] = parseMessage(rawMessage);
 
-            spdlog::debug("파싱 결과: {} ({})",
-                          messageTypeToString(messageType), static_cast<int>(messageType));
+            // ping 메시지 파싱 결과도 로깅하지 않음
+            if (messageType != MessageType::Ping) {
+                spdlog::debug("파싱 결과: {} ({})",
+                              messageTypeToString(messageType), static_cast<int>(messageType));
+            }
+
+            // 🔒 중앙집중식 인증 검증 (화이트리스트 기반)
+            if (requiresAuthentication(messageType) && !session_->isAuthenticated()) {
+                logSecurityViolation(messageType, "인증되지 않은 사용자의 메시지 접근 시도");
+                sendError("인증이 필요한 기능입니다");
+                return;
+            }
 
             // 핸들러 실행
             auto it = handlers_.find(messageType);
@@ -290,7 +302,13 @@ namespace Blokus::Server
 
         if (result.success)
         {
-            session_->setAuthenticated(result.userId, result.username);
+            // 중복 로그인 검증 포함된 인증 시도
+            std::string errorMessage;
+            if (!session_->setAuthenticated(result.userId, result.username, &errorMessage)) {
+                // 중복 로그인 차단됨 - 상세 에러 메시지 전송
+                sendError(errorMessage.empty() ? "DUPLICATE_LOGIN:이미 다른 곳에서 로그인된 계정입니다" : errorMessage);
+                return;
+            }
 
             // DB에서 사용자 계정 정보를 불러와 세션에 저장
             if (databaseManager_)
@@ -428,7 +446,13 @@ namespace Blokus::Server
 
         if (result.success)
         {
-            session_->setAuthenticated(result.userId, result.username);
+            // 중복 로그인 검증 포함된 인증 시도
+            std::string errorMessage;
+            if (!session_->setAuthenticated(result.userId, result.username, &errorMessage)) {
+                // 중복 로그인 차단됨 - 상세 에러 메시지 전송
+                sendError(errorMessage.empty() ? "DUPLICATE_LOGIN:이미 다른 곳에서 로그인된 계정입니다" : errorMessage);
+                return;
+            }
 
             // DB에서 사용자 계정 정보 조회 (게스트도 DB에 저장될 수 있음)
             if (databaseManager_)
@@ -477,7 +501,7 @@ namespace Blokus::Server
 
     void MessageHandler::handleLogout(const std::vector<std::string> &params)
     {
-        if (!session_->isInLobby())
+        if (!session_->isAuthenticated())
         {
             sendError("로그인 상태가 아닙니다");
             return;
@@ -485,8 +509,8 @@ namespace Blokus::Server
 
         std::string username = session_->getUsername();
 
-        // 세션 상태 초기화
-        session_->setStateToConnected();
+        // 인증 상태 완전 초기화
+        session_->clearAuthentication();
 
         sendResponse("LOGOUT_SUCCESS");
         spdlog::info("사용자 로그아웃: {} ({})", username, session_->getSessionId());
@@ -1248,8 +1272,8 @@ namespace Blokus::Server
             return;
         }
 
-        // 연결되지 않은 사용자는 로비 진입 거부
-        if (!session_->isConnected())
+        // 인증되지 않은 사용자는 로비 진입 거부
+        if (!session_->isAuthenticated())
         {
             sendError("로그인 후 로비에 입장할 수 있습니다");
             return;
@@ -1341,7 +1365,7 @@ namespace Blokus::Server
 
     void MessageHandler::handleChat(const std::vector<std::string> &params)
     {
-        if (!session_->isConnected())
+        if (!session_->isAuthenticated())
         {
             sendError("채팅은 로그인 후 이용 가능합니다");
             return;
@@ -2126,5 +2150,41 @@ namespace Blokus::Server
             sendError("서버 오류가 발생했습니다");
         }
     }
-    
+
+    // ========================================
+    // 인증 관련 헬퍼 함수들
+    // ========================================
+
+    bool MessageHandler::requiresAuthentication(MessageType messageType) const
+    {
+        // 인증이 불필요한 메시지들만 명시적 정의 (화이트리스트)
+        static const std::unordered_set<MessageType> publicMessages = {
+            MessageType::Ping,           // 연결 확인
+            MessageType::Auth,           // 인증 (당연히 인증 전)
+            MessageType::Register,       // 회원가입
+            MessageType::Guest,          // 게스트 로그인
+            MessageType::VersionCheck,   // 버전 확인
+            MessageType::Validate        // 세션 검증 (언제든 가능)
+        };
+
+        return publicMessages.find(messageType) == publicMessages.end();
+    }
+
+    void MessageHandler::logSecurityViolation(MessageType messageType, const std::string& details)
+    {
+        try {
+            std::string sessionId = session_ ? session_->getSessionId() : "unknown";
+            std::string messageTypeStr = messageTypeToString(messageType);
+
+            spdlog::warn("🚨 보안 위반: 세션 {} - 메시지 타입 {} - {}",
+                        sessionId, messageTypeStr, details);
+
+            // 추가 보안 로깅이 필요한 경우 여기에 구현
+            // 예: 파일 로그, 외부 보안 시스템 알림 등
+        }
+        catch (const std::exception& e) {
+            spdlog::error("보안 로깅 중 오류: {}", e.what());
+        }
+    }
+
 } // namespace Blokus::Server

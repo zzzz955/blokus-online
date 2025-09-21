@@ -17,6 +17,7 @@
 // ���� ����
 namespace Blokus::Server {
     class MessageHandler;
+    class GameServer;
 }
 
 namespace Blokus::Server {
@@ -31,7 +32,7 @@ namespace Blokus::Server {
         using MessageEventCallback = std::function<void(const std::string&, const std::string&)>;
 
         // ������/�Ҹ���
-        explicit Session(boost::asio::ip::tcp::socket socket);
+        explicit Session(boost::asio::ip::tcp::socket socket, GameServer* server = nullptr);
         ~Session();
 
         // ���� ����
@@ -87,8 +88,9 @@ namespace Blokus::Server {
         void setStateToInGame();
         void clearJustLeftRoomFlag() { justLeftRoom_ = false; }
 
-        // ���� ����
-        void setAuthenticated(const std::string& userId, const std::string& username);
+        // ���� ���� (����/���� ��ȯ, �ߺ� Ÿ�� ���� ����)
+        bool setAuthenticated(const std::string& userId, const std::string& username, std::string* errorMessage = nullptr);
+        void clearAuthentication();  // 인증 상태 완전 초기화
         void setUserAccount(const UserAccount& account);
         void updateUserAccount(const UserAccount& account);
 
@@ -107,6 +109,7 @@ namespace Blokus::Server {
 
         // ��Ʈ��ũ ����
         std::string getRemoteAddress() const;
+        std::string getRemoteIP() const;  // IP 주소만 반환 (포트 제외)
         boost::asio::ip::tcp::socket& getSocket() { return socket_; }  // GameServer���� �ʿ�
 
         // ��� �� �����
@@ -138,6 +141,11 @@ namespace Blokus::Server {
         // 사용자 설정 정보 (세션 캐시용)
         std::optional<UserSettings> userSettings_;
 
+        // 중복 로그인 차단을 위한 추가 정보
+        GameServer* gameServer_;        // GameServer 참조 (소유하지 않음)
+        std::string remoteIP_;          // 클라이언트 IP 주소 (캐시용)
+        bool isRegisteredInServer_;     // GameServer에 등록되었는지 여부
+
         // �޽��� ó��
         std::unique_ptr<MessageHandler> messageHandler_;
 
@@ -167,6 +175,7 @@ namespace Blokus::Server {
 
         // ��ƿ��Ƽ
         std::string generateSessionId();
+        std::string extractIPFromSocket();  // 소켓에서 IP 주소 추출
     };
 
     // ========================================
