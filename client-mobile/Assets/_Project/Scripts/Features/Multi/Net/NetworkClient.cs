@@ -349,8 +349,12 @@ namespace Features.Multi.Net
                 // WriteLine 대신 Write + 단일 \n 사용 (불필요한 \r 제거)
                 streamWriter.Write(message + "\n");
                 streamWriter.Flush(); // 즉시 전송 보장
-                
-                Debug.Log($"[NetworkClient] 깨끗한 메시지 전송: {message}");
+
+                // ping 메시지가 아닌 경우에만 로그 출력
+                if (messageType != "ping")
+                {
+                    Debug.Log($"[NetworkClient] 깨끗한 메시지 전송: {message}");
+                }
                 return true;
             }
             catch (Exception ex)

@@ -28,6 +28,10 @@ namespace Features.Multi.Net
         [Header("하트비트 설정")]
         [SerializeField] private bool enableHeartbeat = false; // 모바일 클라이언트는 하트비트 불필요
         [SerializeField] private float heartbeatInterval = 30.0f;
+
+        [Header("핑 설정")]
+        [SerializeField] private bool enablePing = true; // TCP 연결 상태 확인용 핑
+        [SerializeField] private float pingInterval = 30.0f; // 30초마다 핑 전송
         
         // 컴포넌트 참조
         private NetworkClient networkClient;
@@ -38,6 +42,7 @@ namespace Features.Multi.Net
         private bool isInitialized;
         private int reconnectAttempts;
         private Coroutine heartbeatCoroutine;
+        private Coroutine pingCoroutine;
         private bool isAuthenticated = false;
         private string lastUsedToken = null;
         private bool isHandlingDisconnection = false;
@@ -299,8 +304,9 @@ namespace Features.Multi.Net
                 return;
             
             StopHeartbeat();
+            StopPing();
             networkClient?.DisconnectFromServer();
-            
+
             // 인증 상태 초기화
             isAuthenticated = false;
             lastUsedToken = null;
@@ -498,7 +504,10 @@ namespace Features.Multi.Net
                 // 인증 성공 시 상태 업데이트
                 isAuthenticated = true;
                 lastUsedToken = validToken;
-                
+
+                // TCP 연결 상태 확인용 ping 시작
+                StartPing();
+
                 Debug.Log("[NetworkManager] 모바일 멀티플레이어 연결 완료!");
                 return true;
 
@@ -1144,6 +1153,9 @@ namespace Features.Multi.Net
         private void ResetAuthenticationStateForMainSceneReturn()
         {
             Debug.Log("[NetworkManager] MainScene 복귀를 위한 인증 상태 리셋 시작");
+
+            // Ping 중지
+            StopPing();
 
             // 인증 상태 초기화
             isAuthenticated = false;
@@ -1985,6 +1997,73 @@ namespace Features.Multi.Net
         public NetworkClient GetNetworkClient()
         {
             return networkClient;
+        }
+
+        // ========================================
+        // Ping 관리
+        // ========================================
+
+        /// <summary>
+        /// TCP 연결 상태 확인용 ping 시작
+        /// </summary>
+        private void StartPing()
+        {
+            if (!enablePing)
+            {
+                return;
+            }
+
+            StopPing(); // 기존 ping 중지
+
+            if (IsConnected())
+            {
+                pingCoroutine = StartCoroutine(PingCoroutine());
+                Debug.Log($"[NetworkManager] Ping 시작됨 (간격: {pingInterval}초)");
+            }
+        }
+
+        /// <summary>
+        /// Ping 중지
+        /// </summary>
+        private void StopPing()
+        {
+            if (pingCoroutine != null)
+            {
+                StopCoroutine(pingCoroutine);
+                pingCoroutine = null;
+                Debug.Log("[NetworkManager] Ping 중지됨");
+            }
+        }
+
+        /// <summary>
+        /// Ping 코루틴 - 30초마다 ping 메시지 전송
+        /// </summary>
+        private System.Collections.IEnumerator PingCoroutine()
+        {
+            while (IsConnected() && isAuthenticated)
+            {
+                yield return new WaitForSeconds(pingInterval);
+
+                // 연결 상태 재확인
+                if (!IsConnected() || !isAuthenticated)
+                {
+                    Debug.Log("[NetworkManager] 연결 끊김 또는 인증 해제로 Ping 중지");
+                    break;
+                }
+
+                try
+                {
+                    // ping 메시지 전송 (로그 제외)
+                    networkClient?.SendCleanTCPMessage("ping");
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogError($"[NetworkManager] Ping 전송 실패: {ex.Message}");
+                    break;
+                }
+            }
+
+            Debug.Log("[NetworkManager] Ping 코루틴 종료");
         }
     }
 }

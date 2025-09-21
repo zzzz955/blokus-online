@@ -1578,7 +1578,7 @@ namespace Features.Multi.Net
         /// </summary>
         private void HandlePong(string[] parts)
         {
-            Debug.Log("[MessageHandler] Pong 응답 수신");
+            // Ping/Pong은 연결 상태 확인용이므로 로그 출력 없이 조용히 처리
             OnHeartbeatReceived?.Invoke();
         }
 
