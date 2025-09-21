@@ -1,5 +1,6 @@
 ﻿#include "Session.h"
 #include "MessageHandler.h"
+#include "GameServer.h"
 #include <openssl/rand.h>
 #include <chrono>
 #include <iomanip>
@@ -11,7 +12,7 @@ namespace Blokus::Server {
     // 생성자 및 소멸자
     // ========================================
 
-    Session::Session(boost::asio::ip::tcp::socket socket)
+    Session::Session(boost::asio::ip::tcp::socket socket, GameServer* server)
         : socket_(std::move(socket))
         , sessionId_(generateSessionId())
         , userId_("")
@@ -21,6 +22,9 @@ namespace Blokus::Server {
         , active_(true)
         , lastActivity_(std::chrono::steady_clock::now())
         , justLeftRoom_(false)
+        , gameServer_(server)
+        , remoteIP_("unknown")  // start()에서 설정
+        , isRegisteredInServer_(false)
         , messageHandler_(nullptr)
         , writing_(false)
     {
@@ -29,6 +33,13 @@ namespace Blokus::Server {
 
     Session::~Session() {
         spdlog::debug("🔌 세션 소멸: {}", sessionId_);
+
+        // GameServer에서 활성 세션 해제
+        if (gameServer_ && isRegisteredInServer_ && !userId_.empty()) {
+            gameServer_->unregisterActiveSession(remoteIP_, userId_);
+            isRegisteredInServer_ = false;
+        }
+
         if (active_.load()) {
             stop();
         }
@@ -51,8 +62,10 @@ namespace Blokus::Server {
         }
 
         try {
+            // IP 주소 추출 및 저장 (소켓이 완전히 설정된 후)
+            remoteIP_ = extractIPFromSocket();
             std::string remoteAddr = getRemoteAddress();
-            spdlog::info("🔌 세션 시작: {} (클라이언트: {})", sessionId_, remoteAddr);
+            spdlog::info("🔌 세션 시작: {} (클라이언트: {}, IP: {})", sessionId_, remoteAddr, remoteIP_);
 
             state_ = ConnectionState::Connected;
             updateLastActivity();
@@ -92,7 +105,52 @@ namespace Blokus::Server {
     // 상태 관리 (기존 프로젝트 구조 기반)
     // ========================================
 
-    void Session::setAuthenticated(const std::string& userId, const std::string& username) {
+    bool Session::setAuthenticated(const std::string& userId, const std::string& username, std::string* errorMessage) {
+        // GameServer에 활성 세션 등록 시도 (중복 검증)
+        if (gameServer_ && !isRegisteredInServer_) {
+            auto duplicateType = gameServer_->checkDuplicateType(remoteIP_, userId);
+
+            if (duplicateType != GameServer::DuplicateType::NONE) {
+                // 중복 타입별 에러 메시지 생성
+                std::string error;
+                switch (duplicateType) {
+                    case GameServer::DuplicateType::SAME_USER_IP:
+                        error = "DUPLICATE_USER_IP:해당 계정이 이미 이 위치에서 로그인되어 있습니다";
+                        spdlog::warn("🚫 중복 로그인 차단: 같은 사용자, 같은 IP - IP={}, UserID={}", remoteIP_, userId);
+                        break;
+                    case GameServer::DuplicateType::SAME_USER_DIFF_IP:
+                        error = "DUPLICATE_USER_DIFFERENT_IP:해당 계정이 이미 다른 위치에서 로그인되어 있습니다";
+                        spdlog::warn("🚫 중복 로그인 차단: 같은 사용자, 다른 IP - IP={}, UserID={}", remoteIP_, userId);
+                        break;
+                    case GameServer::DuplicateType::DIFF_USER_SAME_IP:
+                        error = "DUPLICATE_IP_DIFFERENT_USER:이 위치에서 이미 다른 계정이 로그인되어 있습니다";
+                        spdlog::warn("🚫 중복 로그인 차단: 다른 사용자, 같은 IP - IP={}, UserID={}", remoteIP_, userId);
+                        break;
+                    default:
+                        error = "DUPLICATE_LOGIN:중복 로그인이 감지되었습니다";
+                        break;
+                }
+
+                if (errorMessage) {
+                    *errorMessage = error;
+                }
+
+                return false;  // 인증 실패
+            }
+
+            // 등록 시도
+            if (!gameServer_->registerActiveSession(remoteIP_, userId)) {
+                spdlog::error("❌ 활성 세션 등록 실패: IP={}, UserID={}", remoteIP_, userId);
+                if (errorMessage) {
+                    *errorMessage = "SESSION_REGISTER_FAILED:세션 등록에 실패했습니다";
+                }
+                return false;
+            }
+
+            isRegisteredInServer_ = true;
+            spdlog::debug("✅ 활성 세션 등록 성공: IP={}, UserID={}", remoteIP_, userId);
+        }
+
         userId_ = userId;
         username_ = username;
         state_ = ConnectionState::InLobby;  // 인증 완료 즉시 로비로
@@ -100,10 +158,18 @@ namespace Blokus::Server {
         updateLastActivity();
 
         spdlog::info("✅ 세션 인증 완료: {} (사용자: '{}')", sessionId_, username);
+        return true;  // 인증 성공
     }
 
     void Session::clearAuthentication() {
         std::string previousUsername = username_;
+        std::string previousUserId = userId_;
+
+        // GameServer에서 활성 세션 해제
+        if (gameServer_ && isRegisteredInServer_ && !previousUserId.empty()) {
+            gameServer_->unregisterActiveSession(remoteIP_, previousUserId);
+            isRegisteredInServer_ = false;
+        }
 
         userId_.clear();
         username_.clear();
@@ -246,6 +312,32 @@ namespace Blokus::Server {
         }
         catch (const std::exception&) {
             // 소켓이 이미 닫혔거나 오류 발생
+        }
+        return "unknown";
+    }
+
+    std::string Session::getRemoteIP() const {
+        try {
+            if (socket_.is_open()) {
+                auto endpoint = socket_.remote_endpoint();
+                return endpoint.address().to_string();  // 포트 제외하고 IP만 반환
+            }
+        }
+        catch (const std::exception&) {
+            // 소켓이 이미 닫혔거나 오류 발생
+        }
+        return remoteIP_;  // 캐시된 IP 반환
+    }
+
+    std::string Session::extractIPFromSocket() {
+        try {
+            if (socket_.is_open()) {
+                auto endpoint = socket_.remote_endpoint();
+                return endpoint.address().to_string();
+            }
+        }
+        catch (const std::exception&) {
+            // 소켓 오류 시 기본값 반환
         }
         return "unknown";
     }

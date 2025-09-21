@@ -5,6 +5,7 @@
 #include <thread>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <mutex>
 #include <optional>
 #include <boost/asio.hpp>
@@ -97,6 +98,35 @@ namespace Blokus::Server {
         boost::asio::io_context& getIOContext() { return ioContext_; }
         std::shared_ptr<DatabaseManager> getDatabaseManager() const { return databaseManager_; }
 
+        // ========================================
+        // 중복 로그인 차단 관련 함수들
+        // ========================================
+
+        // 세션 등록/해제 (Session 생성자/소멸자에서 호출)
+        bool registerActiveSession(const std::string& userIP, const std::string& userID);
+        void unregisterActiveSession(const std::string& userIP, const std::string& userID);
+
+        // 중복 검증 함수들
+        bool isIPActive(const std::string& userIP) const;
+        bool isUserActive(const std::string& userID) const;
+        bool isDuplicateLogin(const std::string& userIP, const std::string& userID) const;
+
+        // 중복 타입을 구분하는 열거형
+        enum class DuplicateType {
+            NONE,           // 중복 없음
+            SAME_USER_IP,   // 같은 사용자가 같은 IP에서 재로그인
+            SAME_USER_DIFF_IP,  // 같은 사용자가 다른 IP에서 로그인
+            DIFF_USER_SAME_IP   // 다른 사용자가 같은 IP에서 로그인
+        };
+
+        // 상세한 중복 검증
+        DuplicateType checkDuplicateType(const std::string& userIP, const std::string& userID) const;
+
+        // 활성 세션 조회 (디버깅/모니터링용)
+        std::vector<std::string> getActiveIPs() const;
+        std::vector<std::string> getActiveUserIDs() const;
+        size_t getActiveSessionCount() const;
+
         // 통계 접근자
         int getCurrentConnections() const {
             std::lock_guard<std::mutex> lock(statsMutex_);
@@ -170,6 +200,14 @@ namespace Blokus::Server {
         // 세션 관리
         std::unordered_map<std::string, std::shared_ptr<Session>> sessions_;
         mutable std::mutex sessionsMutex_;
+
+        // ========================================
+        // 중복 로그인 차단을 위한 메모리 기반 추적
+        // ========================================
+        std::unordered_set<std::string> activeIPs_;           // 활성 IP 주소들
+        std::unordered_set<std::string> activeUserIDs_;       // 활성 사용자 ID들
+        std::unordered_map<std::string, std::string> ipToUserMap_;  // IP -> UserID 매핑
+        mutable std::mutex activeSessionsMutex_;              // 중복 로그인 차단용 뮤텍스
 
         // 서버 통계 (ServerTypes.h의 ServerStats 사용)
         ServerStats stats_;

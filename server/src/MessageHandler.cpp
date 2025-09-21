@@ -302,7 +302,13 @@ namespace Blokus::Server
 
         if (result.success)
         {
-            session_->setAuthenticated(result.userId, result.username);
+            // 중복 로그인 검증 포함된 인증 시도
+            std::string errorMessage;
+            if (!session_->setAuthenticated(result.userId, result.username, &errorMessage)) {
+                // 중복 로그인 차단됨 - 상세 에러 메시지 전송
+                sendError(errorMessage.empty() ? "DUPLICATE_LOGIN:이미 다른 곳에서 로그인된 계정입니다" : errorMessage);
+                return;
+            }
 
             // DB에서 사용자 계정 정보를 불러와 세션에 저장
             if (databaseManager_)
@@ -440,7 +446,13 @@ namespace Blokus::Server
 
         if (result.success)
         {
-            session_->setAuthenticated(result.userId, result.username);
+            // 중복 로그인 검증 포함된 인증 시도
+            std::string errorMessage;
+            if (!session_->setAuthenticated(result.userId, result.username, &errorMessage)) {
+                // 중복 로그인 차단됨 - 상세 에러 메시지 전송
+                sendError(errorMessage.empty() ? "DUPLICATE_LOGIN:이미 다른 곳에서 로그인된 계정입니다" : errorMessage);
+                return;
+            }
 
             // DB에서 사용자 계정 정보 조회 (게스트도 DB에 저장될 수 있음)
             if (databaseManager_)

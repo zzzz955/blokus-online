@@ -544,7 +544,7 @@ namespace Blokus::Server {
             return;
         }
 
-        auto newSession = std::make_shared<Session>(tcp::socket(ioContext_));
+        auto newSession = std::make_shared<Session>(tcp::socket(ioContext_), this);
 
         acceptor_.async_accept(newSession->getSocket(),
             [this, newSession](const boost::system::error_code& error) {
@@ -953,6 +953,104 @@ namespace Blokus::Server {
         spdlog::debug("처리된 메시지: {}", stats_.messagesReceived);
         spdlog::debug("업타임: {}초 ({}분)", uptime, uptime / 60);
         spdlog::debug("================");
+    }
+
+    // ========================================
+    // 중복 로그인 차단 관련 함수들 구현
+    // ========================================
+
+    bool GameServer::registerActiveSession(const std::string& userIP, const std::string& userID) {
+        std::lock_guard<std::mutex> lock(activeSessionsMutex_);
+
+        // 이미 활성화된 IP나 사용자 ID인지 확인
+        if (activeIPs_.count(userIP) || activeUserIDs_.count(userID)) {
+            spdlog::warn("🚫 중복 로그인 시도 차단: IP={}, UserID={}", userIP, userID);
+            return false;
+        }
+
+        // 활성 세션으로 등록
+        activeIPs_.insert(userIP);
+        activeUserIDs_.insert(userID);
+        ipToUserMap_[userIP] = userID;
+
+        spdlog::debug("✅ 활성 세션 등록: IP={}, UserID={}", userIP, userID);
+        return true;
+    }
+
+    void GameServer::unregisterActiveSession(const std::string& userIP, const std::string& userID) {
+        std::lock_guard<std::mutex> lock(activeSessionsMutex_);
+
+        // 활성 세션에서 제거
+        activeIPs_.erase(userIP);
+        activeUserIDs_.erase(userID);
+        ipToUserMap_.erase(userIP);
+
+        spdlog::debug("🗑️ 활성 세션 해제: IP={}, UserID={}", userIP, userID);
+    }
+
+    bool GameServer::isIPActive(const std::string& userIP) const {
+        std::lock_guard<std::mutex> lock(activeSessionsMutex_);
+        return activeIPs_.count(userIP) > 0;
+    }
+
+    bool GameServer::isUserActive(const std::string& userID) const {
+        std::lock_guard<std::mutex> lock(activeSessionsMutex_);
+        return activeUserIDs_.count(userID) > 0;
+    }
+
+    bool GameServer::isDuplicateLogin(const std::string& userIP, const std::string& userID) const {
+        return checkDuplicateType(userIP, userID) != DuplicateType::NONE;
+    }
+
+    GameServer::DuplicateType GameServer::checkDuplicateType(const std::string& userIP, const std::string& userID) const {
+        std::lock_guard<std::mutex> lock(activeSessionsMutex_);
+
+        bool ipExists = activeIPs_.count(userIP) > 0;
+        bool userExists = activeUserIDs_.count(userID) > 0;
+
+        if (!ipExists && !userExists) {
+            return DuplicateType::NONE;  // 중복 없음
+        }
+
+        if (ipExists && userExists) {
+            // IP와 사용자 모두 존재 - 매핑 확인
+            auto it = ipToUserMap_.find(userIP);
+            if (it != ipToUserMap_.end() && it->second == userID) {
+                spdlog::info("🚫 중복 로그인 감지: 같은 사용자가 같은 IP에서 재로그인 - IP={}, UserID={}", userIP, userID);
+                return DuplicateType::SAME_USER_IP;
+            } else {
+                spdlog::info("🚫 중복 로그인 감지: 복합 상황 - IP={}, UserID={}", userIP, userID);
+                return DuplicateType::DIFF_USER_SAME_IP;  // 보수적 접근
+            }
+        }
+
+        if (userExists && !ipExists) {
+            spdlog::info("🚫 중복 로그인 감지: 같은 사용자가 다른 IP에서 로그인 - IP={}, UserID={}", userIP, userID);
+            return DuplicateType::SAME_USER_DIFF_IP;
+        }
+
+        if (ipExists && !userExists) {
+            spdlog::info("🚫 중복 로그인 감지: 다른 사용자가 같은 IP에서 로그인 - IP={}, UserID={}", userIP, userID);
+            return DuplicateType::DIFF_USER_SAME_IP;
+        }
+
+        return DuplicateType::NONE;
+    }
+
+    std::vector<std::string> GameServer::getActiveIPs() const {
+        std::lock_guard<std::mutex> lock(activeSessionsMutex_);
+        return std::vector<std::string>(activeIPs_.begin(), activeIPs_.end());
+    }
+
+    std::vector<std::string> GameServer::getActiveUserIDs() const {
+        std::lock_guard<std::mutex> lock(activeSessionsMutex_);
+        return std::vector<std::string>(activeUserIDs_.begin(), activeUserIDs_.end());
+    }
+
+    size_t GameServer::getActiveSessionCount() const {
+        std::lock_guard<std::mutex> lock(activeSessionsMutex_);
+        // activeIPs_와 activeUserIDs_의 크기는 같아야 함
+        return activeIPs_.size();
     }
 
 } // namespace Blokus::Server
