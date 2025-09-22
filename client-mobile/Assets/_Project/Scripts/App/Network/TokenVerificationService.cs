@@ -70,8 +70,6 @@ namespace App.Network
 #if UNITY_ANDROID && !UNITY_EDITOR
                 App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] 토큰 검증 요청 시작");
                 App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] URL: {baseUrl}{TOKEN_VERIFICATION_ENDPOINT}");
-                App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] ClientId: {clientId}");
-                App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] 토큰 길이: {currentAccessToken?.Length ?? 0}");
 #endif
 
                 var requestData = new TokenVerificationRequest
@@ -89,17 +87,10 @@ namespace App.Network
                 string jsonData = JsonUtility.ToJson(unityRequestData);
 
 #if UNITY_ANDROID && !UNITY_EDITOR
-                App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] Unity JsonUtility 사용");
+                App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] JSON 직렬화 완료");
 #endif
 
                 byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonData);
-
-#if UNITY_ANDROID && !UNITY_EDITOR
-                App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] JSON 직렬화 결과: {jsonData}");
-                App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] 요청 JSON 크기: {bodyRaw?.Length ?? 0} bytes");
-                App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] requestData.ClientId: {requestData.ClientId}");
-                App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] requestData.AccessToken 길이: {requestData.AccessToken?.Length ?? 0}");
-#endif
 
                 using (UnityWebRequest request = new UnityWebRequest($"{baseUrl}{TOKEN_VERIFICATION_ENDPOINT}", "POST"))
                 {
@@ -125,8 +116,6 @@ namespace App.Network
 #if UNITY_ANDROID && !UNITY_EDITOR
                     App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] HTTP 요청 완료");
                     App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] 응답 코드: {request.responseCode}");
-                    App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] 요청 결과: {request.result}");
-                    App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] 에러 메시지: {request.error ?? "없음"}");
 #endif
 
                     // 응답 처리
@@ -137,8 +126,7 @@ namespace App.Network
             {
                 Debug.LogError($"[TokenVerificationService] 토큰 검증 중 예외 발생: {ex.Message}");
 #if UNITY_ANDROID && !UNITY_EDITOR
-                App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] 예외 발생: {ex.Message}");
-                App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] 스택트레이스: {ex.StackTrace}");
+                App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] 네트워크 예외 발생");
 #endif
                 return new TokenVerificationResult
                 {
@@ -162,30 +150,20 @@ namespace App.Network
                 if (request.result == UnityWebRequest.Result.Success)
                 {
                     string responseText = request.downloadHandler.text;
-                    Debug.Log($"[TokenVerificationService] 토큰 검증 응답: {responseText}");
-
-#if UNITY_ANDROID && !UNITY_EDITOR
-                    App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] 서버 응답 내용: {responseText}");
-                    App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] 응답 길이: {responseText?.Length ?? 0}");
-#endif
+                    Debug.Log($"[TokenVerificationService] 토큰 검증 성공");
 
                     // 요청과 동일하게 Unity JsonUtility 사용 (IL2CPP 호환성)
                     TokenVerificationResponse response = JsonUtility.FromJson<TokenVerificationResponse>(responseText);
 
 #if UNITY_ANDROID && !UNITY_EDITOR
-                    App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] Unity JsonUtility 파싱 사용");
-#endif
-                    
-#if UNITY_ANDROID && !UNITY_EDITOR
-                    App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] 파싱된 응답 - Valid: {response?.Valid}, Error: {response?.Error}, Message: {response?.Message}");
-                    App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] 파싱된 응답 - AccessToken 존재: {!string.IsNullOrEmpty(response?.AccessToken)}, ExpiresIn: {response?.ExpiresIn}, Refreshed: {response?.Refreshed}");
+                    App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] 응답 파싱 완료");
 #endif
 
                     if (response != null && response.Valid)
                     {
                         Debug.Log($"[TokenVerificationService] 토큰 검증 성공 (갱신됨: {response.Refreshed})");
 #if UNITY_ANDROID && !UNITY_EDITOR
-                        App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] 토큰 검증 성공 처리");
+                        App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] 토큰 검증 성공");
 #endif
                         return new TokenVerificationResult
                         {
@@ -199,7 +177,7 @@ namespace App.Network
                     {
                         Debug.LogWarning($"[TokenVerificationService] 토큰 검증 실패: {response?.Error ?? "Unknown error"}");
 #if UNITY_ANDROID && !UNITY_EDITOR
-                        App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] 토큰 검증 실패 처리");
+                        App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] 토큰 검증 실패");
 #endif
                         return new TokenVerificationResult
                         {
@@ -216,19 +194,16 @@ namespace App.Network
                     string responseBody = request.downloadHandler?.text ?? "No response body";
 
                     Debug.LogError($"[TokenVerificationService] HTTP 에러: {errorMessage}");
-                    Debug.LogError($"[TokenVerificationService] 응답 내용: {responseBody}");
 
 #if UNITY_ANDROID && !UNITY_EDITOR
                     App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] HTTP 에러 발생");
                     App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] 응답 코드: {request.responseCode}");
-                    App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] 에러 메시지: {request.error}");
-                    App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] 응답 본문: {responseBody}");
 #endif
                     
                     // 응답 본문에서 에러 정보 추출 시도
                     try
                     {
-                        var errorResponse = JsonConvert.DeserializeObject<TokenVerificationResponse>(responseBody);
+                        var errorResponse = JsonUtility.FromJson<TokenVerificationResponse>(responseBody);
                         if (errorResponse != null && !string.IsNullOrEmpty(errorResponse.Error))
                         {
                             return new TokenVerificationResult
