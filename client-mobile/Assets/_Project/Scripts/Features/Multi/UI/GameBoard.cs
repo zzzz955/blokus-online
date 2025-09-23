@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using TMPro;
 using App.Services;
 using Shared.Models;
+using Shared.UI;
 using Features.Single.Gameplay;
 using SharedGameLogic = App.Core.GameLogic;
 using SharedPosition = Shared.Models.Position;
@@ -55,6 +56,9 @@ namespace Features.Multi.UI
         [Header("셀 스프라이트 시스템")]
         [SerializeField] private Features.Single.Gameplay.CellSpriteProvider cellSpriteProvider;
 
+        [Header("줌/팬 기능")]
+        [SerializeField] private GameBoardZoomPan zoomPanComponent;
+
         // 내부 상태
         private SharedGameLogic gameLogic;
         private GameObject[,] cellObjects;
@@ -98,6 +102,7 @@ namespace Features.Multi.UI
         {
             InitializeBoard();
             SetupUI();
+            InitializeZoomPan();
         }
 
         /// <summary>
@@ -820,6 +825,113 @@ namespace Features.Multi.UI
                 Debug.Log($"[GameBoard] 보드 셀 설정: ({row}, {col}) -> {playerColor}");
                 // boardState[row, col] = playerColor; // 보드 상태 배열이 있다면
             }
+        }
+
+        /// <summary>
+        /// 줌/팬 기능 초기화
+        /// </summary>
+        private void InitializeZoomPan()
+        {
+            Debug.Log("[MultiGameBoard] ===== 줌/팬 기능 초기화 시작 =====");
+
+            // RectTransform 확인
+            RectTransform rect = GetComponent<RectTransform>();
+            if (rect == null)
+            {
+                Debug.LogWarning("[MultiGameBoard] ⚠️ GameBoard GameObject에 RectTransform이 없습니다.");
+                Debug.Log("[MultiGameBoard] GameObject 이름: " + gameObject.name);
+                Debug.Log("[MultiGameBoard] 부모: " + (transform.parent != null ? transform.parent.name : "없음"));
+                Debug.Log("[MultiGameBoard] Canvas를 찾을 수 있나요: " + (GetComponentInParent<Canvas>() != null));
+
+                // 부모에서 Canvas를 찾아보고 정보 출력
+                Canvas canvas = GetComponentInParent<Canvas>();
+                if (canvas != null)
+                {
+                    Debug.Log("[MultiGameBoard] 발견된 Canvas: " + canvas.name + " (renderMode: " + canvas.renderMode + ")");
+                }
+
+                // cellParent를 대신 사용하는 방식으로 시도
+                if (cellParent != null)
+                {
+                    Debug.Log("[MultiGameBoard] 🔄 GameBoard 대신 cellParent에 줌/팬 기능을 추가합니다.");
+
+                    // cellParent에 GameBoardZoomPan 추가
+                    GameBoardZoomPan cellParentZoomPan = cellParent.GetComponent<GameBoardZoomPan>();
+                    if (cellParentZoomPan == null)
+                    {
+                        cellParentZoomPan = cellParent.gameObject.AddComponent<GameBoardZoomPan>();
+                        Debug.Log("[MultiGameBoard] ✅ cellParent에 GameBoardZoomPan 컴포넌트 추가됨");
+                    }
+
+                    // 줌 타겟을 cellParent 자기 자신으로 설정
+                    cellParentZoomPan.SetZoomTarget(cellParent);
+
+                    // 참조 저장 (GameBoard에서 접근할 수 있도록)
+                    zoomPanComponent = cellParentZoomPan;
+
+                    Debug.Log("[MultiGameBoard] ✅ cellParent 기반 줌/팬 기능 초기화 완료");
+                    return;
+                }
+                else
+                {
+                    Debug.LogError("[MultiGameBoard] ❌ cellParent도 null이어서 줌/팬 기능을 초기화할 수 없습니다!");
+                    return;
+                }
+            }
+
+            Debug.Log("[MultiGameBoard] ✅ GameBoard에 RectTransform 발견됨");
+
+            // GameBoardZoomPan 컴포넌트가 없으면 추가
+            if (zoomPanComponent == null)
+            {
+                zoomPanComponent = GetComponent<GameBoardZoomPan>();
+                if (zoomPanComponent == null)
+                {
+                    zoomPanComponent = gameObject.AddComponent<GameBoardZoomPan>();
+                    Debug.Log("[MultiGameBoard] GameBoardZoomPan 컴포넌트 자동 추가됨");
+                }
+            }
+
+            // 줌 타겟을 cellParent로 설정
+            if (cellParent != null)
+            {
+                zoomPanComponent.SetZoomTarget(cellParent);
+                Debug.Log("[MultiGameBoard] ✅ 줌/팬 기능 초기화 완료 - Target: cellParent");
+            }
+            else
+            {
+                Debug.LogError("[MultiGameBoard] ❌ cellParent가 null이어서 줌/팬 기능을 초기화할 수 없습니다!");
+            }
+
+            Debug.Log("[MultiGameBoard] ===== 줌/팬 기능 초기화 완료 =====");
+        }
+
+        /// <summary>
+        /// 줌/팬 상태 초기화
+        /// </summary>
+        public void ResetZoomPan()
+        {
+            if (zoomPanComponent != null)
+            {
+                zoomPanComponent.ResetZoomPan();
+                Debug.Log("[MultiGameBoard] 줌/팬 상태 초기화됨");
+            }
+        }
+
+        /// <summary>
+        /// 현재 줌 레벨 반환
+        /// </summary>
+        public float GetCurrentZoom()
+        {
+            return zoomPanComponent != null ? zoomPanComponent.GetCurrentZoom() : 1.0f;
+        }
+
+        /// <summary>
+        /// 현재 팬 오프셋 반환
+        /// </summary>
+        public Vector2 GetCurrentPan()
+        {
+            return zoomPanComponent != null ? zoomPanComponent.GetCurrentPan() : Vector2.zero;
         }
     }
 

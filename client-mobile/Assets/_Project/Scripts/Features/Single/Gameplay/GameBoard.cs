@@ -6,6 +6,7 @@ using App.Services;
 using Features.Single.Core;
 using Features.Single.UI.InGame;
 using Shared.Models;
+using Shared.UI;
 using App.Core; // GameLogic
 namespace Features.Single.Gameplay
 {
@@ -52,6 +53,9 @@ namespace Features.Single.Gameplay
 
         [Header("셀 스프라이트 시스템")]
         [SerializeField] private CellSpriteProvider cellSpriteProvider;
+
+        [Header("줌/팬 기능")]
+        [SerializeField] private GameBoardZoomPan zoomPanComponent;
 
         // 내부 상태
         private GameLogic gameLogic;
@@ -146,6 +150,9 @@ namespace Features.Single.Gameplay
 
             CreateBoardCells();
             RefreshBoard();
+
+            // --- 줌/팬 기능 초기화 ---
+            InitializeZoomPan();
 
             // --- Action Buttons 초기화 ---
             if (actionButtonPanel != null)
@@ -856,6 +863,179 @@ namespace Features.Single.Gameplay
                 if (p.row < 0 || p.col < 0 || p.row >= boardSize || p.col >= boardSize)
                     return false;
             return true;
+        }
+
+        /// <summary>
+        /// 줌/팬 기능 초기화
+        /// </summary>
+        private void InitializeZoomPan()
+        {
+            Debug.Log("[GameBoard] ===== 줌/팬 기능 초기화 시작 =====");
+
+            // RectTransform 확인
+            RectTransform rect = GetComponent<RectTransform>();
+            if (rect == null)
+            {
+                Debug.LogWarning("[GameBoard] ⚠️ GameBoard GameObject에 RectTransform이 없습니다.");
+                Debug.Log("[GameBoard] GameObject 이름: " + gameObject.name);
+                Debug.Log("[GameBoard] 부모: " + (transform.parent != null ? transform.parent.name : "없음"));
+                Debug.Log("[GameBoard] Canvas를 찾을 수 있나요: " + (GetComponentInParent<Canvas>() != null));
+
+                // 부모에서 Canvas를 찾아보고 정보 출력
+                Canvas canvas = GetComponentInParent<Canvas>();
+                if (canvas != null)
+                {
+                    Debug.Log("[GameBoard] 발견된 Canvas: " + canvas.name + " (renderMode: " + canvas.renderMode + ")");
+                }
+
+#if UNITY_EDITOR
+                // 에디터에서만 Transform → RectTransform 변경 시도
+                if (!Application.isPlaying)
+                {
+                    Debug.Log("[GameBoard] 🔧 에디터에서 Transform을 RectTransform으로 변경 시도");
+                    // 에디터 스크립트에서 처리해야 하는 부분
+                }
+#endif
+
+                // cellParent를 대신 사용하는 방식으로 시도
+                if (cellParent != null)
+                {
+                    Debug.Log("[GameBoard] 🔄 GameBoard 대신 cellParent에 줌/팬 기능을 추가합니다.");
+
+                    // cellParent에 GameBoardZoomPan 추가
+                    GameBoardZoomPan cellParentZoomPan = cellParent.GetComponent<GameBoardZoomPan>();
+                    if (cellParentZoomPan == null)
+                    {
+                        cellParentZoomPan = cellParent.gameObject.AddComponent<GameBoardZoomPan>();
+                        Debug.Log("[GameBoard] ✅ cellParent에 GameBoardZoomPan 컴포넌트 추가됨");
+                    }
+
+                    // 줌 타겟을 cellParent 자기 자신으로 설정
+                    cellParentZoomPan.SetZoomTarget(cellParent);
+
+                    // 참조 저장 (GameBoard에서 접근할 수 있도록)
+                    zoomPanComponent = cellParentZoomPan;
+
+                    Debug.Log("[GameBoard] ✅ cellParent 기반 줌/팬 기능 초기화 완료");
+                    return;
+                }
+                else
+                {
+                    Debug.LogError("[GameBoard] ❌ cellParent도 null이어서 줌/팬 기능을 초기화할 수 없습니다!");
+                    return;
+                }
+            }
+
+            Debug.Log("[GameBoard] ✅ GameBoard에 RectTransform 발견됨");
+
+            // GameBoardZoomPan 컴포넌트가 없으면 추가
+            if (zoomPanComponent == null)
+            {
+                zoomPanComponent = GetComponent<GameBoardZoomPan>();
+                if (zoomPanComponent == null)
+                {
+                    zoomPanComponent = gameObject.AddComponent<GameBoardZoomPan>();
+                    Debug.Log("[GameBoard] GameBoardZoomPan 컴포넌트 자동 추가됨");
+                }
+            }
+
+            // 줌 타겟을 cellParent로 설정
+            if (cellParent != null)
+            {
+                zoomPanComponent.SetZoomTarget(cellParent);
+                Debug.Log("[GameBoard] ✅ 줌/팬 기능 초기화 완료 - Target: cellParent");
+            }
+            else
+            {
+                Debug.LogError("[GameBoard] ❌ cellParent가 null이어서 줌/팬 기능을 초기화할 수 없습니다!");
+            }
+
+            Debug.Log("[GameBoard] ===== 줌/팬 기능 초기화 완료 =====");
+        }
+
+        /// <summary>
+        /// 줌/팬 상태 초기화
+        /// </summary>
+        public void ResetZoomPan()
+        {
+            if (zoomPanComponent != null)
+            {
+                zoomPanComponent.ResetZoomPan();
+                Debug.Log("[GameBoard] 줌/팬 상태 초기화됨");
+            }
+        }
+
+        /// <summary>
+        /// 현재 줌 레벨 반환
+        /// </summary>
+        public float GetCurrentZoom()
+        {
+            return zoomPanComponent != null ? zoomPanComponent.GetCurrentZoom() : 1.0f;
+        }
+
+        /// <summary>
+        /// 현재 팬 오프셋 반환
+        /// </summary>
+        public Vector2 GetCurrentPan()
+        {
+            return zoomPanComponent != null ? zoomPanComponent.GetCurrentPan() : Vector2.zero;
+        }
+
+        /// <summary>
+        /// 셀들의 raycastTarget을 조건부로 비활성화하여 드래그 이벤트가 GridContainer에 도달하도록 함
+        /// </summary>
+        /// <param name="disableCellRaycast">true면 셀 raycast 비활성화, false면 활성화</param>
+        public void SetCellRaycastEnabled(bool enableCellRaycast)
+        {
+            if (cellImages == null) return;
+
+            Debug.Log($"[GameBoard] 셀 raycastTarget 설정: {enableCellRaycast}");
+
+            for (int row = 0; row < boardSize; row++)
+            {
+                for (int col = 0; col < boardSize; col++)
+                {
+                    if (cellObjects[row, col] != null)
+                    {
+                        // 메인 셀 이미지
+                        Image mainImage = cellObjects[row, col].GetComponent<Image>();
+                        if (mainImage != null)
+                        {
+                            mainImage.raycastTarget = enableCellRaycast;
+                        }
+
+                        // Border와 Inner 이미지들
+                        Transform border = cellObjects[row, col].transform.Find("Border");
+                        if (border != null)
+                        {
+                            Image borderImage = border.GetComponent<Image>();
+                            if (borderImage != null)
+                            {
+                                borderImage.raycastTarget = enableCellRaycast;
+                            }
+
+                            Transform inner = border.Find("Inner");
+                            if (inner != null)
+                            {
+                                Image innerImage = inner.GetComponent<Image>();
+                                if (innerImage != null)
+                                {
+                                    innerImage.raycastTarget = enableCellRaycast;
+                                }
+                            }
+                        }
+
+                        // Button 컴포넌트는 클릭 기능을 위해 유지하되, interactable로 제어
+                        Button cellButton = cellObjects[row, col].GetComponent<Button>();
+                        if (cellButton != null)
+                        {
+                            cellButton.interactable = enableCellRaycast;
+                        }
+                    }
+                }
+            }
+
+            Debug.Log($"[GameBoard] 모든 셀의 raycastTarget 설정 완료: {enableCellRaycast}");
         }
     }
 }
