@@ -1328,7 +1328,7 @@ private:
 
     void initializeApplication()
     {
-        qDebug() << QString::fromUtf8("=== 블로커스 온라인 초기화 ===");
+        qDebug() << QString::fromUtf8("=== 블로블로 초기화 ===");
     }
 
     void initializeConfiguration()
@@ -1724,7 +1724,7 @@ int main(int argc, char *argv[])
 #endif
 
     // 애플리케이션 설정
-    app.setApplicationName(QString::fromUtf8("블로커스 온라인"));
+    app.setApplicationName(QString::fromUtf8("블로블로"));
     app.setApplicationVersion("1.2.0");
     app.setOrganizationName("Blokus Online");
 
@@ -1754,7 +1754,7 @@ int main(int argc, char *argv[])
     AppController controller;
     controller.start();
 
-    qDebug() << QString::fromUtf8("블로커스 온라인 시작됨 - 클래식 모드 전용");
+    qDebug() << QString::fromUtf8("블로블로 시작됨 - 클래식 모드 전용");
 
     return app.exec();
 }

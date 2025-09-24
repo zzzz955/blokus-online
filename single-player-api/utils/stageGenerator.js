@@ -6,7 +6,7 @@ const logger = require('../config/logger')
 
 class StageGenerator {
   constructor () {
-    // 블로쿠스 블록 타입들 (실제 블록 모양에 따라 조정 필요)
+    // 블로블로 블록 타입들 (실제 블록 모양에 따라 조정 필요)
     this.blockTypes = {
       // 1칸 블록
       1: { size: 1, shapes: [[1]] },
@@ -244,7 +244,7 @@ class StageGenerator {
     const title = `${titleOptions[Math.floor(random.next() * titleOptions.length)]} ${stageNumber}`
 
     const descriptions = [
-      `${stageNumber}번째 블로쿠스 퍼즐에 도전하세요!`,
+      `${stageNumber}번째 블로블로 퍼즐에 도전하세요!`,
       `난이도 ${difficulty}의 전략적 퍼즐입니다.`,
       '창의적 사고가 필요한 도전입니다.',
       '완벽한 배치를 찾아보세요.'

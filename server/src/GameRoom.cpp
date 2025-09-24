@@ -1233,7 +1233,7 @@ namespace Blokus {
                 personalMsg << "\"levelUp\":" << (levelUp ? "true" : "false") << ",";
                 personalMsg << "\"newLevel\":" << newLevel << ",";
                 personalMsg << "\"gameTime\":" << gameTimeSeconds << ",";
-                personalMsg << "\"gameType\":\"블로커스\",";
+                personalMsg << "\"gameType\":\"블로블로\",";
                 personalMsg << "\"roomId\":" << m_roomId << ",";
                 personalMsg << "\"timestamp\":\"" << std::time(nullptr) << "\"";
                 personalMsg << "}";

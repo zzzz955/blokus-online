@@ -3,7 +3,7 @@ using UnityEngine;
 namespace Features.Multi.Models
 {
     /// <summary>
-    /// 블로커스 플레이어 색상
+    /// 블로블로 플레이어 색상
     /// 4가지 고정 색상으로 플레이어를 구분
     /// </summary>
     public enum PlayerColor

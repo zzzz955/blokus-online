@@ -270,7 +270,7 @@ namespace Blokus {
 
             // 환영 메시지
             qDebug() << QString::fromUtf8("환영 메시지 추가...");
-            addSystemMessage(QString::fromUtf8("안녕하세요, %1님! 블로커스 온라인에 오신 것을 환영합니다.").arg(displayname));
+            addSystemMessage(QString::fromUtf8("안녕하세요, %1님! 블로블로에 오신 것을 환영합니다.").arg(displayname));
             qDebug() << QString::fromUtf8("LobbyWindow 생성자 완료");
         }
         catch (const std::exception& e) {
@@ -944,7 +944,7 @@ namespace Blokus {
     void LobbyWindow::closeEvent(QCloseEvent* event)
     {
         int result = QMessageBox::question(this, QString::fromUtf8("종료"),
-            QString::fromUtf8("블로커스 온라인을 종료하시겠습니까?"),
+            QString::fromUtf8("블로블로을 종료하시겠습니까?"),
             QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
 
         if (result == QMessageBox::Yes) {
