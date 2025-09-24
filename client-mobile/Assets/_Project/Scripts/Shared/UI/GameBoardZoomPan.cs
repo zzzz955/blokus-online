@@ -1423,9 +1423,26 @@ namespace Shared.UI
                     }
                 }
 
-                // Multi GameBoard도 동일하게 처리 (필요시)
-                // var multiGameBoard = FindObjectOfType<Features.Multi.UI.GameBoard>();
-                // if (multiGameBoard != null) { ... }
+                // Multi GameBoard도 동일하게 처리
+                var multiGameBoard = FindObjectOfType<Features.Multi.UI.GameBoard>();
+                if (multiGameBoard != null)
+                {
+                    // Multi GameBoard용 좌표 변환
+                    Position cellPosition = DirectScreenToBoardMulti(screenPosition, multiGameBoard);
+
+                    // 유효한 위치인지 확인
+                    if (cellPosition.row >= 0 && cellPosition.col >= 0 && cellPosition.row < 20 && cellPosition.col < 20)
+                    {
+                        // Multi GameBoard의 OnCellClicked 이벤트 직접 호출
+                        multiGameBoard.OnCellClicked?.Invoke(cellPosition);
+
+                        Debug.Log($"[GameBoardZoomPan] Multi 블록 배치: ({cellPosition.row}, {cellPosition.col}) [스크린:{screenPosition}]");
+                    }
+                    else
+                    {
+                        Debug.Log($"[GameBoardZoomPan] ⚠️ Multi 유효하지 않은 셀 위치: ({cellPosition.row}, {cellPosition.col}) [스크린:{screenPosition}]");
+                    }
+                }
             }
             catch (System.Exception e)
             {
@@ -1434,8 +1451,8 @@ namespace Shared.UI
         }
 
         /// <summary>
-        /// 스크린 좌표를 줌/팬이 적용된 GridContainer 기준으로 직접 보드 좌표 변환
-        /// GameBoard.ScreenToBoard()를 우회하여 현재 변환 상태에서 정확한 변환 수행
+        /// 스크린 좌표를 줌/팬이 적용된 상태에서 정확한 보드 좌표로 변환 (Single GameBoard용)
+        /// 단계별 역변환으로 정확도 보장: GameBoard 컨테이너 기준 → 팬 제거 → 스케일 제거 → 보드 좌표
         /// </summary>
         private Position DirectScreenToBoard(Vector2 screenPosition, Features.Single.Gameplay.GameBoard gameBoard)
         {
@@ -1454,22 +1471,28 @@ namespace Shared.UI
                 return new Position(-1, -1);
             }
 
-            // 2. 스크린 좌표를 현재 변환된 GridContainer 로컬 좌표로 변환
+            // 2. 스크린 좌표를 GameBoard 컨테이너 기준 로컬 좌표로 변환
             Canvas canvas = GetComponentInParent<Canvas>();
             Vector2 localPosition;
 
             if (canvas != null && canvas.renderMode == RenderMode.ScreenSpaceOverlay)
             {
                 RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                    cellParentRect, screenPosition, null, out localPosition);
+                    containerRect, screenPosition, null, out localPosition);
             }
             else
             {
                 RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                    cellParentRect, screenPosition, canvas?.worldCamera, out localPosition);
+                    containerRect, screenPosition, canvas?.worldCamera, out localPosition);
             }
 
-            // 3. GameBoard 설정값 가져오기 (reflection 필요할 수 있음)
+            // 3. 단계별 역변환: 팬 오프셋 제거
+            localPosition -= cellParentRect.anchoredPosition;
+
+            // 4. 단계별 역변환: 스케일 제거 (원본 크기 기준으로 복원)
+            localPosition /= currentZoom;
+
+            // 5. GameBoard 설정값 가져오기 (reflection 필요할 수 있음)
             int boardSize = 20; // 기본값
             float cellSize = 25f; // 기본값
 
@@ -1489,17 +1512,94 @@ namespace Shared.UI
                 Debug.LogWarning($"[GameBoardZoomPan] GameBoard 설정값 가져오기 실패, 기본값 사용: {e.Message}");
             }
 
-            // 4. 로컬 좌표를 보드 좌표로 변환 (GameBoard.ScreenToBoard()와 동일한 로직)
+            // 6. 로컬 좌표를 보드 좌표로 변환 (GameBoard.ScreenToBoard()와 동일한 로직)
             float x0 = -(boardSize * 0.5f - 0.5f) * cellSize;
             float y0 = +(boardSize * 0.5f - 0.5f) * cellSize;
 
-            int col = Mathf.FloorToInt((localPosition.x - x0) / cellSize);
-            int row = Mathf.FloorToInt((y0 - localPosition.y) / cellSize);
+            int col = Mathf.RoundToInt((localPosition.x - x0) / cellSize);
+            int row = Mathf.RoundToInt((y0 - localPosition.y) / cellSize);
 
             col = Mathf.Clamp(col, 0, boardSize - 1);
             row = Mathf.Clamp(row, 0, boardSize - 1);
 
             Debug.Log($"[GameBoardZoomPan] 좌표 변환: 스크린{screenPosition} → 로컬{localPosition} → 셀({row},{col}) [boardSize:{boardSize}, cellSize:{cellSize}]");
+
+            return new Position(row, col);
+        }
+
+        /// <summary>
+        /// 스크린 좌표를 줌/팬이 적용된 상태에서 정확한 보드 좌표로 변환 (Multi GameBoard용)
+        /// 단계별 역변환으로 정확도 보장: GameBoard 컨테이너 기준 → 팬 제거 → 스케일 제거 → 보드 좌표
+        /// </summary>
+        private Position DirectScreenToBoardMulti(Vector2 screenPosition, Features.Multi.UI.GameBoard gameBoard)
+        {
+            // 1. GameBoard의 GridContainer(cellParent) 찾기
+            Transform cellParent = gameBoard.transform.Find("GridContainer");
+            if (cellParent == null)
+            {
+                Debug.LogError("[GameBoardZoomPan] Multi GridContainer를 찾을 수 없습니다!");
+                return new Position(-1, -1);
+            }
+
+            RectTransform cellParentRect = cellParent.GetComponent<RectTransform>();
+            if (cellParentRect == null)
+            {
+                Debug.LogError("[GameBoardZoomPan] Multi GridContainer에 RectTransform이 없습니다!");
+                return new Position(-1, -1);
+            }
+
+            // 2. 스크린 좌표를 GameBoard 컨테이너 기준 로컬 좌표로 변환
+            Canvas canvas = GetComponentInParent<Canvas>();
+            Vector2 localPosition;
+
+            if (canvas != null && canvas.renderMode == RenderMode.ScreenSpaceOverlay)
+            {
+                RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    containerRect, screenPosition, null, out localPosition);
+            }
+            else
+            {
+                RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    containerRect, screenPosition, canvas?.worldCamera, out localPosition);
+            }
+
+            // 3. 단계별 역변환: 팬 오프셋 제거
+            localPosition -= cellParentRect.anchoredPosition;
+
+            // 4. 단계별 역변환: 스케일 제거 (원본 크기 기준으로 복원)
+            localPosition /= currentZoom;
+
+            // 5. GameBoard 설정값 가져오기 (reflection 필요할 수 있음)
+            int boardSize = 20; // 기본값
+            float cellSize = 45f; // Multi 기본값
+
+            try
+            {
+                // GameBoard에서 실제 값 가져오기
+                var boardSizeField = gameBoard.GetType().GetField("boardSize",
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                var cellSizeField = gameBoard.GetType().GetField("cellSize",
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+                if (boardSizeField != null) boardSize = (int)boardSizeField.GetValue(gameBoard);
+                if (cellSizeField != null) cellSize = (float)cellSizeField.GetValue(gameBoard);
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[GameBoardZoomPan] Multi GameBoard 설정값 가져오기 실패, 기본값 사용: {e.Message}");
+            }
+
+            // 6. 로컬 좌표를 보드 좌표로 변환 (GameBoard.ScreenToBoard()와 동일한 로직)
+            float x0 = -(boardSize * 0.5f - 0.5f) * cellSize;
+            float y0 = +(boardSize * 0.5f - 0.5f) * cellSize;
+
+            int col = Mathf.RoundToInt((localPosition.x - x0) / cellSize);
+            int row = Mathf.RoundToInt((y0 - localPosition.y) / cellSize);
+
+            col = Mathf.Clamp(col, 0, boardSize - 1);
+            row = Mathf.Clamp(row, 0, boardSize - 1);
+
+            Debug.Log($"[GameBoardZoomPan] Multi 좌표 변환: 스크린{screenPosition} → 로컬{localPosition} → 셀({row},{col}) [boardSize:{boardSize}, cellSize:{cellSize}]");
 
             return new Position(row, col);
         }

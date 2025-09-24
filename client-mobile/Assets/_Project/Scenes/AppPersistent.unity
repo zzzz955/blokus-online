@@ -245,7 +245,7 @@ MonoBehaviour:
   devApiPort: 8080
   devAuthPort: 9000
   devWebPort: 3000
-  releaseBaseUrl: https://bloblo.mooo.com
+  releaseBaseUrl: https://blokus-online.mooo.com
   enableDebugLogs: 0
 --- !u!4 &261238384
 Transform:
