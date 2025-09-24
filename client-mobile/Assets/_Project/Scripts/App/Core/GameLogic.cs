@@ -5,7 +5,7 @@ using UnityEngine;
 using Shared.Models;
 namespace App.Core{
     /// <summary>
-    /// Unity 블로쿠스 게임 로직 (C++ GameLogic.h 포팅)
+    /// Unity 블로블로 게임 로직 (C++ GameLogic.h 포팅)
     /// 서버와 클라이언트가 공유하는 핵심 게임 규칙
     /// </summary>
     public class GameLogic

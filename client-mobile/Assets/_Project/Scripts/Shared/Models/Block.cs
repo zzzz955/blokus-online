@@ -5,7 +5,7 @@ using UnityEngine;
 using Shared.Models;
 namespace Shared.Models{
     /// <summary>
-    /// Unity 블로쿠스 블록 클래스 (C++ Block.h/cpp 포팅)
+    /// Unity 블로블로 블록 클래스 (C++ Block.h/cpp 포팅)
     /// 21가지 블록 모양과 회전/뒤집기 변환 처리
     /// </summary>
     public class Block

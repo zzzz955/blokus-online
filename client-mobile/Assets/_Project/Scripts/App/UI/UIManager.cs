@@ -9,7 +9,7 @@ using App.Core;
 namespace App.UI
 {
     /// <summary>
-    /// Unity 블로쿠스 UI 매니저
+    /// Unity 블로블로 UI 매니저
     /// 모든 UI 패널 전환을 중앙에서 관리
     /// 
     /// Inspector SerializeField 참조 복구용 강화 버전

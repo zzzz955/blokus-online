@@ -17,7 +17,7 @@ namespace Features.Multi.Net
 {
 
     /// <summary>
-    /// Unity 블로쿠스 네트워크 클라이언트
+    /// Unity 블로블로 네트워크 클라이언트
     /// C++/Qt 클라이언트와 동일한 TCP 소켓 + 커스텀 문자열 프로토콜 사용
     /// </summary>
     public class NetworkClient : MonoBehaviour
