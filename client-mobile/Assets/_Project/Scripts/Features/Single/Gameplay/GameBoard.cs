@@ -336,7 +336,7 @@ namespace Features.Single.Gameplay
 
         private void CreateCellBorder(GameObject cellObj)
         {
-            float overflow = 5f;
+            float overflow = 0f;
             var borderObj = new GameObject("Border", typeof(RectTransform));
             borderObj.transform.SetParent(cellObj.transform, false);
 
