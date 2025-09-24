@@ -74,7 +74,7 @@ const PLATFORM_INFO = {
     name: 'Windows 데스크톱',
     icon: '💻',
     description: 'Windows PC용 클라이언트',
-    installGuide: 'BlokusClient.exe를 실행하세요. Windows Defender에서 경고가 나타날 수 있지만 안전한 파일입니다.'
+    installGuide: 'BlobloClient.exe를 실행하세요. Windows Defender에서 경고가 나타날 수 있지만 안전한 파일입니다.'
   },
   mobile: {
     name: 'Android 모바일',

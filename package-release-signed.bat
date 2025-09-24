@@ -2,7 +2,7 @@
 echo Creating signed release package...
 
 set BUILD_DIR=build\client\Release
-set EXE_NAME=BlokusClient.exe
+set EXE_NAME=BlobloClient.exe
 set RELEASES_DIR=releases
 
 REM Get version input
@@ -51,7 +51,7 @@ echo   Release directory copied completely (includes all DLLs, plugins, and reso
 
 REM Check signature status
 echo [INFO] Checking code signature...
-powershell -Command "& { $sig = Get-AuthenticodeSignature '%TEMP_DIR%\BlokusClient.exe'; if ($sig.Status -eq 'Valid') { Write-Host '[OK] Executable is properly signed.' -ForegroundColor Green } else { Write-Host '[WARN] Signature status: ' $sig.Status -ForegroundColor Yellow; Write-Host '        Please use build-prod-signed.bat to create signed builds.' -ForegroundColor Yellow } }"
+powershell -Command "& { $sig = Get-AuthenticodeSignature '%TEMP_DIR%\BlobloClient.exe'; if ($sig.Status -eq 'Valid') { Write-Host '[OK] Executable is properly signed.' -ForegroundColor Green } else { Write-Host '[WARN] Signature status: ' $sig.Status -ForegroundColor Yellow; Write-Host '        Please use build-prod-signed.bat to create signed builds.' -ForegroundColor Yellow } }"
 
 REM Create README file
 echo [INFO] Creating README...
@@ -60,7 +60,7 @@ echo ================================ >> "%TEMP_DIR%\README.txt"
 echo. >> "%TEMP_DIR%\README.txt"
 echo Installation Instructions: >> "%TEMP_DIR%\README.txt"
 echo 1. Extract the archive >> "%TEMP_DIR%\README.txt"
-echo 2. Run BlokusClient.exe >> "%TEMP_DIR%\README.txt"
+echo 2. Run BlobloClient.exe >> "%TEMP_DIR%\README.txt"
 echo. >> "%TEMP_DIR%\README.txt"
 echo Notes: >> "%TEMP_DIR%\README.txt"
 echo - Windows Defender may show "Unknown Publisher" warning >> "%TEMP_DIR%\README.txt"
@@ -74,8 +74,8 @@ echo. >> "%TEMP_DIR%\README.txt"
 echo Release Date: %date% %time% >> "%TEMP_DIR%\README.txt"
 
 REM Create ZIP archive
-echo [INFO] Creating release archive: BlokusClient-v%VERSION%.zip
-set RELEASE_ARCHIVE=%VERSION_DIR%\BlokusClient-v%VERSION%.zip
+echo [INFO] Creating release archive: BlobloClient-v%VERSION%.zip
+set RELEASE_ARCHIVE=%VERSION_DIR%\BlobloClient-v%VERSION%.zip
 powershell -Command "Compress-Archive -Path '%TEMP_DIR%\*' -DestinationPath '%RELEASE_ARCHIVE%' -Force"
 
 REM Create release info JSON
@@ -92,7 +92,7 @@ xcopy "%VERSION_DIR%" "%LATEST_DIR%\" /E /I /Q >nul
 REM Update overall release index
 echo [INFO] Updating release index...
 set RELEASE_INDEX=%RELEASES_DIR%\releases.json
-powershell -Command "if (Test-Path '%RELEASE_INDEX%') { $releases = Get-Content '%RELEASE_INDEX%' | ConvertFrom-Json } else { $releases = @() } ; $newRelease = @{ version = '%VERSION%'; releaseDate = (Get-Date).ToString('yyyy-MM-ddTHH:mm:ss.fffZ'); platform = 'Windows'; architecture = 'x64'; signed = $true; downloadPath = 'v%VERSION%/BlokusClient-v%VERSION%.zip'; fileSize = (Get-Item '%RELEASE_ARCHIVE%').Length }; $releases = @($newRelease) + @($releases | Where-Object { $_.version -ne '%VERSION%' }); $releases | ConvertTo-Json -Depth 3 | Out-File -FilePath '%RELEASE_INDEX%' -Encoding UTF8"
+powershell -Command "if (Test-Path '%RELEASE_INDEX%') { $releases = Get-Content '%RELEASE_INDEX%' | ConvertFrom-Json } else { $releases = @() } ; $newRelease = @{ version = '%VERSION%'; releaseDate = (Get-Date).ToString('yyyy-MM-ddTHH:mm:ss.fffZ'); platform = 'Windows'; architecture = 'x64'; signed = $true; downloadPath = 'v%VERSION%/BlobloClient-v%VERSION%.zip'; fileSize = (Get-Item '%RELEASE_ARCHIVE%').Length }; $releases = @($newRelease) + @($releases | Where-Object { $_.version -ne '%VERSION%' }); $releases | ConvertTo-Json -Depth 3 | Out-File -FilePath '%RELEASE_INDEX%' -Encoding UTF8"
 
 REM Clean up temporary directory
 rmdir /s /q %TEMP_DIR%
@@ -119,7 +119,7 @@ echo Overall Release Index:
 echo    %RELEASE_INDEX%
 echo.
 echo Next Steps:
-echo    1. Test release: Extract and run %LATEST_DIR%\BlokusClient-v%VERSION%.zip
+echo    1. Test release: Extract and run %LATEST_DIR%\BlobloClient-v%VERSION%.zip
 echo    2. Git commit: git add %RELEASES_DIR%/ ^&^& git commit -m "Release v%VERSION% with code signing"
 echo    3. Git tag: git tag v%VERSION% ^&^& git push origin v%VERSION%
 echo.

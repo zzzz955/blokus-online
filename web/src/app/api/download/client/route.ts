@@ -56,9 +56,9 @@ function getLocalFilePath(platform: PlatformType, version: string): string {
   
   switch (platform) {
     case 'desktop':
-      return path.join(latestDir, `BlokusClient-Desktop-v${version}.zip`);
+      return path.join(latestDir, `BlobloClient-Desktop-v${version}.zip`);
     case 'mobile':
-      return path.join(latestDir, `BlokusClient-Mobile-v${version}.apk`);
+      return path.join(latestDir, `BlobloClient-Mobile-v${version}.apk`);
     default:
       return '';
   }
@@ -69,9 +69,9 @@ function getGitHubUrl(platform: PlatformType, version: string): string {
   const baseUrl = `https://github.com/zzzz955/blokus-online/releases/download/v${version}`;
   switch (platform) {
     case 'desktop':
-      return `${baseUrl}/BlokusClient-Desktop-v${version}.zip`;
+      return `${baseUrl}/BlobloClient-Desktop-v${version}.zip`;
     case 'mobile':
-      return `${baseUrl}/BlokusClient-Mobile-v${version}.apk`;
+      return `${baseUrl}/BlobloClient-Mobile-v${version}.apk`;
     default:
       return '';
   }
@@ -155,7 +155,7 @@ async function getLatestMultiPlatformRelease(): Promise<MultiPlatformReleaseInfo
       platforms: {
         desktop: {
           version: fallbackVersion,
-          filename: `BlokusClient-Desktop-v${fallbackVersion}.zip`,
+          filename: `BlobloClient-Desktop-v${fallbackVersion}.zip`,
           githubUrl: getGitHubUrl('desktop', fallbackVersion),
           available: true,
           fileSize: 15670931,
@@ -163,7 +163,7 @@ async function getLatestMultiPlatformRelease(): Promise<MultiPlatformReleaseInfo
         },
         mobile: {
           version: fallbackVersion,
-          filename: `BlokusClient-Mobile-v${fallbackVersion}.apk`,
+          filename: `BlobloClient-Mobile-v${fallbackVersion}.apk`,
           githubUrl: getGitHubUrl('mobile', fallbackVersion),
           available: true,
           fileSize: 45000000,
