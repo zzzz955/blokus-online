@@ -440,7 +440,7 @@ namespace Blokus {
         }
 
         // 창 설정
-        setWindowTitle(QString::fromUtf8("블로커스 온라인 - %1 (%2님)").arg(roomInfo.roomName, myUsername));
+        setWindowTitle(QString::fromUtf8("블로블로 - %1 (%2님)").arg(roomInfo.roomName, myUsername));
         setMinimumSize(1280, 800);  // 더 작은 최소 크기 설정
         resize(1280, 800);         // 초기 진입 시 최소 크기로 시작
 

@@ -12,10 +12,10 @@ export default function Footer() {
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center space-x-2 mb-4">
               <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-lg"></div>
-              <span className="font-sans text-xl text-white">Blokus-online</span>
+              <span className="font-sans text-xl text-white">Bloblo</span>
             </div>
             <p className="text-gray-400 text-sm mb-4">
-              전략적 사고와 창의성이 만나는 온라인 블로커스 게임입니다. 
+              전략적 사고와 창의성이 만나는 온라인 블로블로 게임입니다. 
               친구들과 함께 즐기는 멀티플레이어 보드게임의 새로운 경험을 제공합니다.
             </p>
             <div className="flex space-x-4">
@@ -101,7 +101,7 @@ export default function Footer() {
         <div className="border-t border-dark-border mt-8 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <p className="text-gray-400 text-sm">
-              © {currentYear} 블로커스 온라인. All rights reserved.
+              © {currentYear} 블로블로. All rights reserved.
             </p>
             <div className="flex space-x-6 mt-4 md:mt-0">
               <a href="#" className="text-gray-400 hover:text-white text-sm transition-colors">

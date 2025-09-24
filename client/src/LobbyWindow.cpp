@@ -258,7 +258,7 @@ namespace Blokus {
             connect(m_buttonCooldownTimer, &QTimer::timeout, this, &LobbyWindow::onCooldownTimerTick);
 
             // 창 설정 - 스크롤바 없이 모든 요소가 보이는 최소 크기
-            setWindowTitle(QString::fromUtf8("블로커스 온라인 - 로비 (%1님)").arg(username));
+            setWindowTitle(QString::fromUtf8("블로블로 - 로비 (%1님)").arg(username));
             setMinimumSize(1280, 800);  // 계산된 실제 최소 크기
             resize(1280, 800);         // 초기 진입 시 진짜 최소 크기로 시작
 
