@@ -159,31 +159,118 @@ namespace Shared.UI
 
             // 추가 raycastTarget 강제 재설정 (지연 실행)
             StartCoroutine(ForceRaycastTargetAfterDelay());
+
+            // ActionButtonPanel 가시성 지속 모니터링 시작
+            StartCoroutine(MonitorActionButtonPanelVisibility());
         }
 
         /// <summary>
-        /// GameBoard가 다른 UI 요소보다 이벤트 우선권을 갖도록 보장
+        /// GameBoard가 적절한 이벤트 우선권을 갖도록 보장하면서 ActionButtonPanel 가시성 유지
         /// </summary>
         private void EnsureGameBoardEventPriority()
         {
-            // 1. GameBoardZoomPan이 맨 앞에 오도록 설정
-            transform.SetAsLastSibling();
+            // ActionButtonPanel을 먼저 최상위로 이동시켜 가시성 보장
+            EnsureActionButtonPanelVisibility();
 
-            // 2. 다른 UI 요소들이 이벤트를 가로채지 않도록 Canvas 정렬 순서 조정
-            Canvas canvas = GetComponentInParent<Canvas>();
-            if (canvas != null)
-            {
-                canvas.sortingOrder = 100; // 높은 우선순위 설정
-            }
-
-            // 3. GraphicRaycaster가 올바르게 설정되어 있는지 확인
+            // GraphicRaycaster가 올바르게 설정되어 있는지 확인
             GraphicRaycaster raycaster = GetComponentInParent<GraphicRaycaster>();
             if (raycaster == null)
             {
                 Debug.LogWarning("[GameBoardZoomPan] ⚠️ GraphicRaycaster가 없습니다. Canvas에 추가해야 합니다.");
             }
 
-            Debug.Log("[GameBoardZoomPan] 🎯 GameBoard 이벤트 우선권 설정 완료");
+            Debug.Log("[GameBoardZoomPan] 🎯 GameBoard 이벤트 우선권 설정 완료 (ActionButtonPanel 가시성 보장)");
+        }
+
+        /// <summary>
+        /// ActionButtonPanel이 GameBoard보다 앞에 렌더링되도록 보장
+        /// </summary>
+        private void EnsureActionButtonPanelVisibility()
+        {
+            try
+            {
+                if (singleGameBoard != null)
+                {
+                    // reflection으로 actionButtonPanel 접근
+                    var actionButtonPanelField = singleGameBoard.GetType()
+                        .GetField("actionButtonPanel", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+                    if (actionButtonPanelField != null)
+                    {
+                        var actionButtonPanel = actionButtonPanelField.GetValue(singleGameBoard) as RectTransform;
+
+                        if (actionButtonPanel != null && actionButtonPanel.gameObject.activeInHierarchy)
+                        {
+                            // ActionButtonPanel을 GameBoard보다 앞에 렌더링되도록 설정
+                            actionButtonPanel.SetAsLastSibling();
+
+                            // ActionButtonPanel의 Canvas Group 설정으로 항상 최상위 렌더링 보장
+                            var canvasGroup = actionButtonPanel.GetComponent<CanvasGroup>();
+                            if (canvasGroup == null)
+                            {
+                                canvasGroup = actionButtonPanel.gameObject.AddComponent<CanvasGroup>();
+                            }
+                            canvasGroup.blocksRaycasts = true;
+                            canvasGroup.interactable = true;
+                            canvasGroup.alpha = 1f;
+
+                            Debug.Log("[GameBoardZoomPan] ✅ ActionButtonPanel 가시성 보장 완료");
+                        }
+                        else
+                        {
+                            Debug.LogWarning("[GameBoardZoomPan] ⚠️ ActionButtonPanel이 비활성화되어 있거나 null입니다");
+                        }
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[GameBoardZoomPan] ⚠️ actionButtonPanel 필드를 찾을 수 없습니다");
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[GameBoardZoomPan] ❌ ActionButtonPanel 가시성 설정 중 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// ActionButtonPanel 가시성 보장 (로그 없는 버전 - 주기적 모니터링용)
+        /// </summary>
+        private void EnsureActionButtonPanelVisibilitySilent()
+        {
+            try
+            {
+                if (singleGameBoard != null)
+                {
+                    var actionButtonPanelField = singleGameBoard.GetType()
+                        .GetField("actionButtonPanel", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+                    if (actionButtonPanelField != null)
+                    {
+                        var actionButtonPanel = actionButtonPanelField.GetValue(singleGameBoard) as RectTransform;
+
+                        if (actionButtonPanel != null && actionButtonPanel.gameObject.activeInHierarchy)
+                        {
+                            // ActionButtonPanel을 최상위에 유지
+                            actionButtonPanel.SetAsLastSibling();
+
+                            // CanvasGroup 설정 유지
+                            var canvasGroup = actionButtonPanel.GetComponent<CanvasGroup>();
+                            if (canvasGroup == null)
+                            {
+                                canvasGroup = actionButtonPanel.gameObject.AddComponent<CanvasGroup>();
+                            }
+                            canvasGroup.blocksRaycasts = true;
+                            canvasGroup.interactable = true;
+                            canvasGroup.alpha = 1f;
+                        }
+                    }
+                }
+            }
+            catch (System.Exception)
+            {
+                // 주기적 모니터링이므로 에러 로그 생략
+            }
         }
 
         /// <summary>
@@ -253,14 +340,19 @@ namespace Shared.UI
                 image.raycastTarget = true;
                 Debug.Log("[GameBoardZoomPan] 🔧 지연된 raycastTarget 강제 재설정 완료");
             }
+        }
 
-            // 추가로 2초 후 한 번 더 확인
-            yield return new WaitForSeconds(2f);
-
-            if (image != null)
+        /// <summary>
+        /// ActionButtonPanel 가시성을 지속적으로 모니터링하고 보장
+        /// </summary>
+        private System.Collections.IEnumerator MonitorActionButtonPanelVisibility()
+        {
+            while (true)
             {
-                image.raycastTarget = true;
-                Debug.Log("[GameBoardZoomPan] 🔧 최종 raycastTarget 재확인 완료");
+                yield return new WaitForSeconds(3.0f); // 3초마다 체크 (성능 최적화)
+
+                // ActionButtonPanel 가시성 재보장 (로그 없이)
+                EnsureActionButtonPanelVisibilitySilent();
             }
         }
 
@@ -1506,6 +1598,9 @@ namespace Shared.UI
                             }
 
                             Debug.Log($"[GameBoardZoomPan] 🔧 액션 버튼 raycast 복원 완료 - {buttons.Length}개 버튼, {images.Length}개 이미지");
+
+                            // ActionButtonPanel 가시성 재보장
+                            actionButtonPanel.SetAsLastSibling();
                         }
                         else
                         {
