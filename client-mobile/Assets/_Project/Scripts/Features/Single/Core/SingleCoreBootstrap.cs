@@ -19,12 +19,12 @@ namespace Features.Single.Core{
         // Singleton for scene-scoped access
         public static SingleCoreBootstrap Instance { get; private set; }
 
-        // 🔥 추가: 데이터 로딩 상태 관리
+        //  추가: 데이터 로딩 상태 관리
         private bool isDataLoaded = false;
         private bool isDataLoading = false;
         private string lastLoadedUserId = null; // 마지막 로딩된 사용자 ID 추적
 
-        // 🔥 추가: 데이터 로딩 완료 이벤트
+        //  추가: 데이터 로딩 완료 이벤트
         public event System.Action OnDataLoadingComplete;
         public event System.Action<string> OnDataLoadingFailed;
 
@@ -45,13 +45,13 @@ namespace Features.Single.Core{
             if (debugMode)
                 Debug.Log("[SingleCoreBootstrap] Start - Connecting dependencies");
 
-            // 🔥 추가: 이전 사용자 데이터 완전 정리
+            //  추가: 이전 사용자 데이터 완전 정리
             ClearAllCachedData();
 
             InitializeManagers();
             ConnectDependencies();
             
-            // 🔥 추가: 초기화 후 데이터 로딩 시작
+            //  추가: 초기화 후 데이터 로딩 시작
             StartCoroutine(LoadInitialDataCoroutine());
         }
 
@@ -197,7 +197,7 @@ namespace Features.Single.Core{
         }
 
         /// <summary>
-        /// 🔥 추가: 데이터 로딩 완료 여부 확인 (완전한 동기화 기준)
+        ///  추가: 데이터 로딩 완료 여부 확인 (완전한 동기화 기준)
         /// </summary>
         public bool IsDataLoaded()
         {
@@ -205,7 +205,7 @@ namespace Features.Single.Core{
         }
 
         /// <summary>
-        /// 🔥 추가: 데이터 로딩 중인지 확인
+        ///  추가: 데이터 로딩 중인지 확인
         /// </summary>
         public bool IsDataLoading()
         {
@@ -213,7 +213,7 @@ namespace Features.Single.Core{
         }
 
         /// <summary>
-        /// 🔥 수정: 사용자 변경 확인 및 강제 데이터 재로딩 (null 체크 개선)
+        ///  수정: 사용자 변경 확인 및 강제 데이터 재로딩 (null 체크 개선)
         /// </summary>
         public bool CheckUserChangedAndReload()
         {
@@ -234,7 +234,7 @@ namespace Features.Single.Core{
                 return false;
             }
 
-            // 🔥 수정: 첫 로딩인 경우와 실제 사용자 변경을 구분
+            //  수정: 첫 로딩인 경우와 실제 사용자 변경을 구분
             bool isFirstLoad = string.IsNullOrEmpty(lastLoadedUserId);
             bool userActuallyChanged = !isFirstLoad && (lastLoadedUserId != currentUserId);
             
@@ -248,14 +248,14 @@ namespace Features.Single.Core{
                     Debug.Log($"[SingleCoreBootstrap] 동일 사용자: {currentUserId}");
             }
             
-            // 🔥 수정: 실제 사용자 변경일 때만 데이터 재로딩
+            //  수정: 실제 사용자 변경일 때만 데이터 재로딩
             if (userActuallyChanged)
             {
                 ForceReloadData();
                 return true;
             }
             
-            // 🔥 추가: 첫 로딩인 경우 lastLoadedUserId 설정하고 기존 데이터 사용
+            //  추가: 첫 로딩인 경우 lastLoadedUserId 설정하고 기존 데이터 사용
             if (isFirstLoad)
             {
                 lastLoadedUserId = currentUserId;
@@ -267,7 +267,7 @@ namespace Features.Single.Core{
         }
 
         /// <summary>
-        /// 🔥 추가: 강제 데이터 재로딩
+        ///  추가: 강제 데이터 재로딩
         /// </summary>
         public void ForceReloadData()
         {
@@ -284,7 +284,7 @@ namespace Features.Single.Core{
         }
 
         /// <summary>
-        /// 🔥 추가: 초기 데이터 로딩 코루틴
+        ///  추가: 초기 데이터 로딩 코루틴
         /// </summary>
         private System.Collections.IEnumerator LoadInitialDataCoroutine()
         {
@@ -309,7 +309,7 @@ namespace Features.Single.Core{
                 if (debugMode)
                     Debug.Log("[SingleCoreBootstrap] SessionManager 로그인 감지 - 서버 데이터 로드 시작");
 
-                // 🔥 수정: 메타데이터뿐만 아니라 완전한 동기화 대기
+                //  수정: 메타데이터뿐만 아니라 완전한 동기화 대기
                 
                 // UserDataCache의 초기 데이터 로드 트리거
                 yield return StartCoroutine(TriggerUserDataLoad());
@@ -325,7 +325,7 @@ namespace Features.Single.Core{
         }
 
         /// <summary>
-        /// 🔥 추가: UserDataCache 데이터 로드 트리거
+        ///  추가: UserDataCache 데이터 로드 트리거
         /// </summary>
         private System.Collections.IEnumerator TriggerUserDataLoad()
         {
@@ -367,7 +367,7 @@ namespace Features.Single.Core{
                 yield break;
             }
 
-            // 🔥 수정: 완전한 동기화 완료까지 대기 (메타데이터 + 진행도 + 현재 상태)
+            //  수정: 완전한 동기화 완료까지 대기 (메타데이터 + 진행도 + 현재 상태)
             yield return StartCoroutine(userDataCache.WaitUntilSynced(15f));
 
             if (!userDataCache.IsInitialSyncCompleted)
@@ -383,12 +383,12 @@ namespace Features.Single.Core{
         }
 
         /// <summary>
-        /// 🔥 제거됨: 이제 완전한 동기화를 위해 IsMetadataLoaded와 OnStageMetadataLoaded는 사용하지 않음
+        ///  제거됨: 이제 완전한 동기화를 위해 IsMetadataLoaded와 OnStageMetadataLoaded는 사용하지 않음
         /// WaitUntilSynced()를 통해 metadata + progress + status 모두 대기
         /// </summary>
 
         /// <summary>
-        /// 🔥 추가: 데이터 로딩 완료 처리
+        ///  추가: 데이터 로딩 완료 처리
         /// </summary>
         private void CompleteDataLoading()
         {
@@ -403,13 +403,13 @@ namespace Features.Single.Core{
                     Debug.Log($"[SingleCoreBootstrap] 데이터 로딩 완료 - 사용자 ID 기록: {lastLoadedUserId}");
             }
 
-            // 🔥 추가: 사용자 진행도 기반 CurrentStage 설정 (스테이지 선택 모드)
+            //  추가: 사용자 진행도 기반 CurrentStage 설정 (스테이지 선택 모드)
             if (stageProgressManager != null && stageDataManager != null)
             {
                 int nextStage = stageProgressManager.GetMaxUnlockedStage(); // 다음 도전할 스테이지
                 nextStage = UnityEngine.Mathf.Max(1, nextStage); // 최소 1스테이지
                 
-                // 🔥 수정: IsInGameplayMode=false로 설정하여 스테이지 선택 모드 유지
+                //  수정: IsInGameplayMode=false로 설정하여 스테이지 선택 모드 유지
                 Features.Single.Gameplay.SingleGameManager.SetStageContext(nextStage, stageDataManager, false);
                 
                 if (debugMode)
@@ -438,7 +438,7 @@ namespace Features.Single.Core{
         }
 
         /// <summary>
-        /// 🔥 추가: 이전 사용자 데이터 완전 정리
+        ///  추가: 이전 사용자 데이터 완전 정리
         /// SingleCore 로딩 시 이전 사용자의 캐시 데이터가 남아있지 않도록 정리
         /// </summary>
         private void ClearAllCachedData()

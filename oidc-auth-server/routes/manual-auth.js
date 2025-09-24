@@ -423,7 +423,7 @@ function generateManualLoginForm(authParams) {
         </div>
 
         <a href="/authorize?${new URLSearchParams(authParams).toString()}" class="google-btn">
-            🚀 Google OAuth로 로그인 (권장)
+             Google OAuth로 로그인 (권장)
         </a>
 
         <div style="text-align: center; margin: 20px 0; color: #999;">또는</div>

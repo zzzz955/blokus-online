@@ -115,7 +115,7 @@ namespace Features.Single.UI.InGame
             if (undoCountText != null) undoCountText.text = $"{remain}";
 
             var gm = SingleGameManager.Instance;
-            bool can = (gm != null && gm.CanUndo());     // 🔥 실제 되돌릴 게 있어야 true
+            bool can = (gm != null && gm.CanUndo());     //  실제 되돌릴 게 있어야 true
             if (undoButton != null) undoButton.interactable = can;
         }
 

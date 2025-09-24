@@ -31,7 +31,7 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       data: {
-        // ✅ DB에서 int[] 포맷으로 직접 사용
+        //  DB에서 int[] 포맷으로 직접 사용
         stages: (stages as any[]).map(row => ({
           ...row,
           initial_board_state: row.initial_board_state || []
@@ -69,12 +69,12 @@ export async function POST(request: NextRequest) {
       is_featured
     } = body;
 
-    // ✅ 보드 상태 정규화: 모든 포맷 → int[] 포맷
+    //  보드 상태 정규화: 모든 포맷 → int[] 포맷
     const boardForDB = initial_board_state
       ? normalizeBoardState(initial_board_state)
       : [];
 
-    // ✅ time_limit 기본값: 무제한(null)
+    //  time_limit 기본값: 무제한(null)
     const finalTimeLimit =
       Object.prototype.hasOwnProperty.call(body, 'time_limit')
         ? time_limit
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
     if (!finalThumbnailUrl || (typeof finalThumbnailUrl === 'string' && finalThumbnailUrl.trim() === '')) {
       finalThumbnailUrl = await generateStageThumbnail(
         stage_number,
-        boardForDB,      // ✅ int[] 포맷으로 썸네일 생성
+        boardForDB,      //  int[] 포맷으로 썸네일 생성
         available_blocks
       );
     }
@@ -187,10 +187,10 @@ async function generateStageThumbnail(
   availableBlocks: number[]
 ): Promise<string | null> {
   try {
-    // ✅ 기존 썸네일 정리
+    //  기존 썸네일 정리
     await fileStorage.cleanupOldThumbnails(stageNumber); // 또는 deleteOldThumbnailsForStage
 
-    // ✅ 보드 미리보기 생성
+    //  보드 미리보기 생성
     const generator = getThumbnailGenerator();
     const dataUrl = await generator.generateThumbnail(boardState, {
       width: 300,

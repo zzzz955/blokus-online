@@ -26,7 +26,7 @@ namespace Features.Single.UI.StageSelect{
         {
             Debug.Log($"[StageFeed] Awake - Unity Inspector totalStages: {totalStages}개 (데이터 로딩 대기 중)");
             
-            // 🔥 수정: 즉시 GeneratePath() 호출 안함 - 데이터 로딩 완료 대기
+            //  수정: 즉시 GeneratePath() 호출 안함 - 데이터 로딩 완료 대기
             // GeneratePath()는 UpdateTotalStagesFromMetadata()에서 호출됨
         }
         
@@ -105,14 +105,14 @@ namespace Features.Single.UI.StageSelect{
         /// </summary>
         public Vector2 GetStagePosition(int stageNumber)
         {
-            // 🔥 추가: 데이터 로딩 실패시 기능 비활성화 확인
+            //  추가: 데이터 로딩 실패시 기능 비활성화 확인
             if (totalStages == 0)
             {
                 Debug.LogError($"[StageFeed] 데이터 로딩 실패로 기능이 비활성화됨. Stage={stageNumber} 요청 거부");
                 return Vector2.zero;
             }
 
-            // 🔥 수정: 유효하지 않은 스테이지는 Vector2.zero 반환
+            //  수정: 유효하지 않은 스테이지는 Vector2.zero 반환
             if (!IsValidStage(stageNumber))
             {
                 Debug.LogError($"[StageFeed] 유효하지 않은 스테이지 요청! Stage={stageNumber}, TotalStages={totalStages}");
@@ -123,12 +123,12 @@ namespace Features.Single.UI.StageSelect{
             {
                 Vector2 position = stagePositions[stageNumber];
                 
-                // 🔥 추가: 위치 유효성 검증
+                //  추가: 위치 유효성 검증
                 if (Mathf.Abs(position.y) > 50000f || Mathf.Abs(position.x) > 10000f)
                 {
                     Debug.LogError($"[StageFeed] 비정상적인 스테이지 위치 감지! Stage={stageNumber}, Position={position}");
                     
-                    // 🔥 비상 위치 계산: 기본 공식 사용
+                    //  비상 위치 계산: 기본 공식 사용
                     float safeY = -(stageNumber - 1) * stageVerticalSpacing;
                     float safeX = 0f; // 비상시에는 중앙 정렬
                     Vector2 safePosition = new Vector2(safeX, safeY);
@@ -142,7 +142,7 @@ namespace Features.Single.UI.StageSelect{
             
             Debug.LogWarning($"[StageFeed] 스테이지 {stageNumber}의 위치를 찾을 수 없습니다! 비상 위치 생성");
             
-            // 🔥 비상 위치 생성: 캐시에 없을 때
+            //  비상 위치 생성: 캐시에 없을 때
             float emergencyY = -(stageNumber - 1) * stageVerticalSpacing;
             float emergencyX = 0f;
             Vector2 emergencyPosition = new Vector2(emergencyX, emergencyY);
@@ -172,7 +172,7 @@ namespace Features.Single.UI.StageSelect{
         /// </summary>
         public int GetTotalStages()
         {
-            // 🔥 수정: 데이터 로딩 실패시 기능 비활성화 확인
+            //  수정: 데이터 로딩 실패시 기능 비활성화 확인
             if (totalStages == 0)
             {
                 Debug.LogError("[StageFeed] 데이터 로딩 실패로 기능이 비활성화됨. GetTotalStages() 요청 거부");
@@ -183,7 +183,7 @@ namespace Features.Single.UI.StageSelect{
         }
         
         /// <summary>
-        /// 🔥 수정: 실제 메타데이터 기반으로 총 스테이지 수 업데이트 (데이터 로딩 완료 후 초기화)
+        ///  수정: 실제 메타데이터 기반으로 총 스테이지 수 업데이트 (데이터 로딩 완료 후 초기화)
         /// </summary>
         public void UpdateTotalStagesFromMetadata()
         {
@@ -194,7 +194,7 @@ namespace Features.Single.UI.StageSelect{
                 {
                     int newTotalStages = metadata.Length;
                     
-                    // 🔥 안전장치: 비정상적으로 큰 값일 때 에러 처리
+                    //  안전장치: 비정상적으로 큰 값일 때 에러 처리
                     if (newTotalStages > 100)
                     {
                         Debug.LogError($"[StageFeed] 비정상적인 스테이지 수 감지: {newTotalStages}개. StageFeed 기능 비활성화.");
@@ -206,7 +206,7 @@ namespace Features.Single.UI.StageSelect{
                     totalStages = newTotalStages;
                     Debug.Log($"[StageFeed] 데이터 기반 스테이지 수 설정: {previousTotal}개(Inspector) → {totalStages}개(실제데이터)");
                     
-                    // 🔥 수정: 항상 경로 생성 (초기 생성 포함)
+                    //  수정: 항상 경로 생성 (초기 생성 포함)
                     GeneratePath();
                 }
                 else
@@ -248,7 +248,7 @@ namespace Features.Single.UI.StageSelect{
         /// </summary>
         public float GetTotalHeight()
         {
-            // 🔥 추가: 데이터 로딩 실패시 기본 높이 반환
+            //  추가: 데이터 로딩 실패시 기본 높이 반환
             if (totalStages == 0)
             {
                 Debug.LogWarning("[StageFeed] 데이터 로딩 실패로 기본 높이 반환");

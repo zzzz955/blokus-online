@@ -16,18 +16,18 @@ export const testFirstBlockPlacement = async () => {
   
   const availableBlocks = [1]; // Single 1x1 block
   
-  console.log('🎯 Testing first block placement (corner requirement)...');
+  console.log(' Testing first block placement (corner requirement)...');
   const startTime = Date.now();
   
   try {
     const score = await calculator.calculateGreedy(boardState, availableBlocks);
     const duration = Date.now() - startTime;
-    console.log(`✅ First block test completed: ${score} points in ${duration}ms`);
-    console.log(`📍 Expected: 1 point (should place at corner), Actual: ${score}`);
+    console.log(` First block test completed: ${score} points in ${duration}ms`);
+    console.log(` Expected: 1 point (should place at corner), Actual: ${score}`);
     return { success: true, score, duration, expectedScore: 1 };
   } catch (error) {
     const duration = Date.now() - startTime;
-    console.error(`❌ First block test failed after ${duration}ms:`, error);
+    console.error(` First block test failed after ${duration}ms:`, error);
     return { success: false, error, duration };
   }
 };
@@ -45,18 +45,18 @@ export const testPreplacedBlockContinuation = async () => {
   
   const availableBlocks = [1, 2]; // Small blocks
   
-  console.log('🔗 Testing preplaced block continuation (corner adjacency)...');
+  console.log(' Testing preplaced block continuation (corner adjacency)...');
   const startTime = Date.now();
   
   try {
     const score = await calculator.calculateGreedy(boardState, availableBlocks);
     const duration = Date.now() - startTime;
-    console.log(`✅ Preplaced continuation test: ${score} points in ${duration}ms`);
-    console.log(`📍 Expected: >1 point (should connect to preplaced), Actual: ${score}`);
+    console.log(` Preplaced continuation test: ${score} points in ${duration}ms`);
+    console.log(` Expected: >1 point (should connect to preplaced), Actual: ${score}`);
     return { success: true, score, duration, expectedMinScore: 2 };
   } catch (error) {
     const duration = Date.now() - startTime;
-    console.error(`❌ Preplaced continuation test failed after ${duration}ms:`, error);
+    console.error(` Preplaced continuation test failed after ${duration}ms:`, error);
     return { success: false, error, duration };
   }
 };
@@ -80,12 +80,12 @@ export const testObstacleBlocking = async () => {
   try {
     const score = await calculator.calculateGreedy(boardState, availableBlocks);
     const duration = Date.now() - startTime;
-    console.log(`✅ Obstacle test completed: ${score} points in ${duration}ms`);
-    console.log(`📍 Expected: Lower score due to obstacles, Actual: ${score}`);
+    console.log(` Obstacle test completed: ${score} points in ${duration}ms`);
+    console.log(` Expected: Lower score due to obstacles, Actual: ${score}`);
     return { success: true, score, duration };
   } catch (error) {
     const duration = Date.now() - startTime;
-    console.error(`❌ Obstacle test failed after ${duration}ms:`, error);
+    console.error(` Obstacle test failed after ${duration}ms:`, error);
     return { success: false, error, duration };
   }
 };
@@ -107,12 +107,12 @@ export const testMultiColorCalculation = async () => {
   try {
     const score = await calculator.calculateGreedyMultiColor(boardState, availableBlocks);
     const duration = Date.now() - startTime;
-    console.log(`✅ Multi-color test completed: ${score} points in ${duration}ms`);
-    console.log(`📍 Expected: Higher score with multiple colors, Actual: ${score}`);
+    console.log(` Multi-color test completed: ${score} points in ${duration}ms`);
+    console.log(` Expected: Higher score with multiple colors, Actual: ${score}`);
     return { success: true, score, duration };
   } catch (error) {
     const duration = Date.now() - startTime;
-    console.error(`❌ Multi-color test failed after ${duration}ms:`, error);
+    console.error(` Multi-color test failed after ${duration}ms:`, error);
     return { success: false, error, duration };
   }
 };
@@ -130,16 +130,16 @@ export const testCornerAdjacencyRule = async () => {
   
   const availableBlocks = [1]; // Single block that must connect diagonally
   
-  console.log('🔗 Testing corner adjacency rule compliance...');
+  console.log(' Testing corner adjacency rule compliance...');
   const startTime = Date.now();
   
   try {
     const score = await calculator.calculateGreedy(boardState, availableBlocks);
     const duration = Date.now() - startTime;
-    console.log(`✅ Corner adjacency test: ${score} points in ${duration}ms`);
+    console.log(` Corner adjacency test: ${score} points in ${duration}ms`);
     
     if (score >= 2) {
-      console.log(`✅ Rule compliance: Block successfully connected diagonally`);
+      console.log(` Rule compliance: Block successfully connected diagonally`);
     } else {
       console.log(`⚠️ Rule issue: Block may not have connected properly`);
     }
@@ -147,7 +147,7 @@ export const testCornerAdjacencyRule = async () => {
     return { success: true, score, duration, ruleCompliant: score >= 2 };
   } catch (error) {
     const duration = Date.now() - startTime;
-    console.error(`❌ Corner adjacency test failed after ${duration}ms:`, error);
+    console.error(` Corner adjacency test failed after ${duration}ms:`, error);
     return { success: false, error, duration };
   }
 };
@@ -170,10 +170,10 @@ export const testBlokusRulesPerformance = async () => {
   try {
     const score = await calculator.calculateGreedy(boardState, availableBlocks);
     const duration = Date.now() - startTime;
-    console.log(`✅ Performance test completed: ${score} points in ${duration}ms`);
+    console.log(` Performance test completed: ${score} points in ${duration}ms`);
     
     if (duration < 5000) {
-      console.log(`✅ Performance: Acceptable speed (${duration}ms < 5000ms)`);
+      console.log(` Performance: Acceptable speed (${duration}ms < 5000ms)`);
     } else {
       console.log(`⚠️ Performance: Slower than expected (${duration}ms)`);
     }
@@ -181,7 +181,7 @@ export const testBlokusRulesPerformance = async () => {
     return { success: true, score, duration, performanceGood: duration < 5000 };
   } catch (error) {
     const duration = Date.now() - startTime;
-    console.error(`❌ Performance test failed after ${duration}ms:`, error);
+    console.error(` Performance test failed after ${duration}ms:`, error);
     return { success: false, error, duration };
   }
 };
@@ -203,28 +203,28 @@ export const testUserSpecificScenario = async () => {
   // All 21 blocks available (theoretical max = 89 points)
   const availableBlocks = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
   
-  console.log('🎯 Testing user-specific scenario (Target: 89 points)...');
+  console.log(' Testing user-specific scenario (Target: 89 points)...');
   console.log('📋 Board setup: 3 obstacles, 397 empty spaces, start from (19,19)');
   const startTime = Date.now();
   
   try {
     const score = await calculator.calculateGreedy(boardState, availableBlocks);
     const duration = Date.now() - startTime;
-    console.log(`✅ User scenario test completed: ${score} points in ${duration}ms`);
-    console.log(`📍 Target: 89 points, Achieved: ${score} points`);
+    console.log(` User scenario test completed: ${score} points in ${duration}ms`);
+    console.log(` Target: 89 points, Achieved: ${score} points`);
     
     // Calculate efficiency
     const efficiency = (score / 89) * 100;
-    console.log(`📊 Efficiency: ${efficiency.toFixed(1)}% of theoretical maximum`);
+    console.log(` Efficiency: ${efficiency.toFixed(1)}% of theoretical maximum`);
     
     if (score >= 89) {
       console.log(`🎉 EXCELLENT: Achieved theoretical maximum!`);
     } else if (score >= 85) {
-      console.log(`✅ GOOD: Very close to theoretical maximum`);
+      console.log(` GOOD: Very close to theoretical maximum`);
     } else if (score >= 80) {
       console.log(`⚠️ OK: Reasonable but room for improvement`);
     } else {
-      console.log(`❌ POOR: Significant gap from theoretical maximum`);
+      console.log(` POOR: Significant gap from theoretical maximum`);
     }
     
     return { 
@@ -238,7 +238,7 @@ export const testUserSpecificScenario = async () => {
     };
   } catch (error) {
     const duration = Date.now() - startTime;
-    console.error(`❌ User scenario test failed after ${duration}ms:`, error);
+    console.error(` User scenario test failed after ${duration}ms:`, error);
     return { success: false, error, duration, targetScore: 89 };
   }
 };
@@ -258,7 +258,7 @@ export const testEnhancedVsBasic = async () => {
   
   const availableBlocks = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
   
-  console.log('🔄 Testing enhanced vs basic algorithm...');
+  console.log(' Testing enhanced vs basic algorithm...');
   const startTime = Date.now();
   
   try {
@@ -274,17 +274,17 @@ export const testEnhancedVsBasic = async () => {
     
     const totalDuration = Date.now() - startTime;
     
-    console.log(`✅ Algorithm comparison completed in ${totalDuration}ms`);
-    console.log(`📊 Basic algorithm: ${basicScore} points in ${basicDuration}ms`);
-    console.log(`📊 Enhanced algorithm: ${enhancedScore} points in ${enhancedDuration}ms`);
+    console.log(` Algorithm comparison completed in ${totalDuration}ms`);
+    console.log(` Basic algorithm: ${basicScore} points in ${basicDuration}ms`);
+    console.log(` Enhanced algorithm: ${enhancedScore} points in ${enhancedDuration}ms`);
     
     const improvement = enhancedScore - basicScore;
     const improvementPercent = ((improvement / basicScore) * 100).toFixed(1);
     
     if (improvement > 0) {
-      console.log(`🚀 Enhancement: +${improvement} points (+${improvementPercent}%)`);
+      console.log(` Enhancement: +${improvement} points (+${improvementPercent}%)`);
     } else if (improvement === 0) {
-      console.log(`🔄 No improvement: Same score achieved`);
+      console.log(` No improvement: Same score achieved`);
     } else {
       console.log(`⚠️ Regression: ${improvement} points (${improvementPercent}%)`);
     }
@@ -300,14 +300,14 @@ export const testEnhancedVsBasic = async () => {
     };
   } catch (error) {
     const duration = Date.now() - startTime;
-    console.error(`❌ Algorithm comparison test failed after ${duration}ms:`, error);
+    console.error(` Algorithm comparison test failed after ${duration}ms:`, error);
     return { success: false, error, duration };
   }
 };
 
 // Run all Blokus rules tests
 export const runAllTests = async () => {
-  console.log('🧪 Starting Blokus Rules OptimalScoreCalculator Tests...\n');
+  console.log(' Starting Blokus Rules OptimalScoreCalculator Tests...\n');
   
   const tests = [
     { name: 'First Block Placement', fn: testFirstBlockPlacement },
@@ -331,36 +331,36 @@ export const runAllTests = async () => {
     results.push(result);
     
     if (result.success) {
-      console.log(`✅ ${test.name}: PASSED`);
+      console.log(` ${test.name}: PASSED`);
     } else {
-      console.log(`❌ ${test.name}: FAILED`);
+      console.log(` ${test.name}: FAILED`);
     }
   }
   
-  console.log('\n📊 Final Test Summary');
+  console.log('\n Final Test Summary');
   console.log('═'.repeat(50));
   
   const successCount = results.filter(r => r.success).length;
   const failCount = results.length - successCount;
   
-  console.log(`✅ Passed: ${successCount}`);
-  console.log(`❌ Failed: ${failCount}`);
-  console.log(`📈 Success Rate: ${((successCount / results.length) * 100).toFixed(1)}%`);
+  console.log(` Passed: ${successCount}`);
+  console.log(` Failed: ${failCount}`);
+  console.log(` Success Rate: ${((successCount / results.length) * 100).toFixed(1)}%`);
   
   const avgDuration = results.reduce((sum, r) => sum + r.duration, 0) / results.length;
   console.log(`⏱️ Average Duration: ${avgDuration.toFixed(2)}ms`);
   
   // Rule compliance check
   const ruleCompliantTests = results.filter(r => r.ruleCompliant !== false);
-  console.log(`🎯 Rule Compliance: ${ruleCompliantTests.length}/${results.length} tests`);
+  console.log(` Rule Compliance: ${ruleCompliantTests.length}/${results.length} tests`);
   
   // Performance check
   const performanceGoodTests = results.filter(r => r.performanceGood !== false);
   console.log(`⚡ Performance Good: ${performanceGoodTests.length}/${results.length} tests`);
   
-  console.log('\n🔍 Detailed Results:');
+  console.log('\n Detailed Results:');
   results.forEach(result => {
-    const status = result.success ? '✅' : '❌';
+    const status = result.success ? '' : '';
     const score = result.score || 'N/A';
     const duration = result.duration || 'N/A';
     console.log(`${status} ${result.testName}: ${score} points in ${duration}ms`);

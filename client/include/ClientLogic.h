@@ -9,13 +9,13 @@ namespace Blokus {
     using GameLogic = Common::GameLogic;
     using GameStateManager = Common::GameStateManager;
 
-    // 🔥 기존 클라이언트 코드 호환성을 위한 래퍼 클래스
+    //  기존 클라이언트 코드 호환성을 위한 래퍼 클래스
     class QtGameLogic : public Common::GameLogic
     {
     public:
         QtGameLogic() : Common::GameLogic() {}
 
-        // 🔥 기존 인터페이스 호환성을 위한 오버로드
+        //  기존 인터페이스 호환성을 위한 오버로드
         bool canPlaceBlock(const Block& block, const Position& position, PlayerColor player) const {
             BlockPlacement placement;
             placement.type = block.getType();

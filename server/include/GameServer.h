@@ -142,7 +142,7 @@ namespace Blokus::Server {
         // 내부 초기화 함수들
         bool initializeConfig();
         bool initializeDatabase();
-        bool initializeServices(); // 🔥 새로 추가: RoomManager, AuthService 초기화
+        bool initializeServices(); //  새로 추가: RoomManager, AuthService 초기화
         bool initializeNetwork();
 
         // 네트워크 처리
@@ -166,14 +166,14 @@ namespace Blokus::Server {
 
         // 정리 작업
         void startHeartbeatTimer();
-        void startCleanupTimer(); // 🔥 새로 추가: 주기적 정리 작업
+        void startCleanupTimer(); //  새로 추가: 주기적 정리 작업
         void handleHeartbeat();
-        void performCleanup(); // 🔥 새로 추가: 통합 정리 작업
+        void performCleanup(); //  새로 추가: 통합 정리 작업
         void cleanupSessions();
-        void cleanupServices(); // 🔥 새로 추가: 서비스 정리
+        void cleanupServices(); //  새로 추가: 서비스 정리
 
         // 통계 및 로깅
-        void logServerStats(); // 🔥 새로 추가: 서버 통계 로그
+        void logServerStats(); //  새로 추가: 서버 통계 로그
 
     private:
         // 기본 상태
@@ -184,14 +184,14 @@ namespace Blokus::Server {
         boost::asio::ip::tcp::acceptor acceptor_;
         std::vector<std::thread> threadPool_;
         
-        // 🔥 핵심 추가: ioContext를 계속 실행 상태로 유지하는 work_guard
+        //  핵심 추가: ioContext를 계속 실행 상태로 유지하는 work_guard
         std::unique_ptr<boost::asio::executor_work_guard<boost::asio::io_context::executor_type>> workGuard_;
 
         // 타이머들
         std::unique_ptr<boost::asio::steady_timer> heartbeatTimer_;
-        std::unique_ptr<boost::asio::steady_timer> cleanupTimer_; // 🔥 새로 추가
+        std::unique_ptr<boost::asio::steady_timer> cleanupTimer_; //  새로 추가
 
-        // 🔥 핵심 서비스들 (새로 추가)
+        //  핵심 서비스들 (새로 추가)
         std::shared_ptr<DatabaseManager> databaseManager_;
         std::unique_ptr<RoomManager> roomManager_;
         std::unique_ptr<AuthenticationService> authService_;

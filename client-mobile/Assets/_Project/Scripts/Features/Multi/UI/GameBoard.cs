@@ -880,14 +880,14 @@ namespace Features.Multi.UI
                 // cellParent를 대신 사용하는 방식으로 시도
                 if (cellParent != null)
                 {
-                    Debug.Log("[MultiGameBoard] 🔄 GameBoard 대신 cellParent에 줌/팬 기능을 추가합니다.");
+                    Debug.Log("[MultiGameBoard]  GameBoard 대신 cellParent에 줌/팬 기능을 추가합니다.");
 
                     // cellParent에 GameBoardZoomPan 추가
                     GameBoardZoomPan cellParentZoomPan = cellParent.GetComponent<GameBoardZoomPan>();
                     if (cellParentZoomPan == null)
                     {
                         cellParentZoomPan = cellParent.gameObject.AddComponent<GameBoardZoomPan>();
-                        Debug.Log("[MultiGameBoard] ✅ cellParent에 GameBoardZoomPan 컴포넌트 추가됨");
+                        Debug.Log("[MultiGameBoard]  cellParent에 GameBoardZoomPan 컴포넌트 추가됨");
                     }
 
                     // 줌 타겟을 cellParent 자기 자신으로 설정
@@ -896,17 +896,17 @@ namespace Features.Multi.UI
                     // 참조 저장 (GameBoard에서 접근할 수 있도록)
                     zoomPanComponent = cellParentZoomPan;
 
-                    Debug.Log("[MultiGameBoard] ✅ cellParent 기반 줌/팬 기능 초기화 완료");
+                    Debug.Log("[MultiGameBoard]  cellParent 기반 줌/팬 기능 초기화 완료");
                     return;
                 }
                 else
                 {
-                    Debug.LogError("[MultiGameBoard] ❌ cellParent도 null이어서 줌/팬 기능을 초기화할 수 없습니다!");
+                    Debug.LogError("[MultiGameBoard]  cellParent도 null이어서 줌/팬 기능을 초기화할 수 없습니다!");
                     return;
                 }
             }
 
-            Debug.Log("[MultiGameBoard] ✅ GameBoard에 RectTransform 발견됨");
+            Debug.Log("[MultiGameBoard]  GameBoard에 RectTransform 발견됨");
 
             // GameBoardZoomPan 컴포넌트가 없으면 추가
             if (zoomPanComponent == null)
@@ -923,11 +923,11 @@ namespace Features.Multi.UI
             if (cellParent != null)
             {
                 zoomPanComponent.SetZoomTarget(cellParent);
-                Debug.Log("[MultiGameBoard] ✅ 줌/팬 기능 초기화 완료 - Target: cellParent");
+                Debug.Log("[MultiGameBoard]  줌/팬 기능 초기화 완료 - Target: cellParent");
             }
             else
             {
-                Debug.LogError("[MultiGameBoard] ❌ cellParent가 null이어서 줌/팬 기능을 초기화할 수 없습니다!");
+                Debug.LogError("[MultiGameBoard]  cellParent가 null이어서 줌/팬 기능을 초기화할 수 없습니다!");
             }
 
             Debug.Log("[MultiGameBoard] ===== 줌/팬 기능 초기화 완료 =====");

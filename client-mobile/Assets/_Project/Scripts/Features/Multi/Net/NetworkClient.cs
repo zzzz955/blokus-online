@@ -149,7 +149,7 @@ namespace Features.Multi.Net
         {
             try
             {
-                SystemMessageManager.ShowToast("🔍 포트 연결 테스트 시작...", Shared.UI.MessagePriority.Info, 2f);
+                SystemMessageManager.ShowToast(" 포트 연결 테스트 시작...", Shared.UI.MessagePriority.Info, 2f);
 
                 // 443 포트 테스트 (HTTPS - 일반적으로 열려있음)
                 bool port443Success = await TestSinglePort(host, 443, 5000);
@@ -160,23 +160,23 @@ namespace Features.Multi.Net
                 // 결과 분석 및 토스트 표시
                 if (port443Success && !port9999Success)
                 {
-                    SystemMessageManager.ShowToast("🚫 포트 9999 차단됨 (방화벽/보안SW)", Shared.UI.MessagePriority.Error, 5f);
-                    UnityMainThreadDispatcher.Enqueue(() => OnError?.Invoke("[포트테스트] 443:✅ 9999:❌ → 방화벽/보안SW에서 9999 포트 차단"));
+                    SystemMessageManager.ShowToast(" 포트 9999 차단됨 (방화벽/보안SW)", Shared.UI.MessagePriority.Error, 5f);
+                    UnityMainThreadDispatcher.Enqueue(() => OnError?.Invoke("[포트테스트] 443: 9999: → 방화벽/보안SW에서 9999 포트 차단"));
                 }
                 else if (!port443Success && !port9999Success)
                 {
-                    SystemMessageManager.ShowToast("🌐 전체 네트워크 연결 문제", Shared.UI.MessagePriority.Error, 5f);
-                    UnityMainThreadDispatcher.Enqueue(() => OnError?.Invoke("[포트테스트] 443:❌ 9999:❌ → 전체 네트워크 연결 문제"));
+                    SystemMessageManager.ShowToast(" 전체 네트워크 연결 문제", Shared.UI.MessagePriority.Error, 5f);
+                    UnityMainThreadDispatcher.Enqueue(() => OnError?.Invoke("[포트테스트] 443: 9999: → 전체 네트워크 연결 문제"));
                 }
                 else if (port443Success && port9999Success)
                 {
-                    SystemMessageManager.ShowToast("✅ 포트 연결 정상 (다른 원인)", Shared.UI.MessagePriority.Warning, 3f);
-                    UnityMainThreadDispatcher.Enqueue(() => OnError?.Invoke("[포트테스트] 443:✅ 9999:✅ → 포트는 정상, 다른 원인 확인 필요"));
+                    SystemMessageManager.ShowToast(" 포트 연결 정상 (다른 원인)", Shared.UI.MessagePriority.Warning, 3f);
+                    UnityMainThreadDispatcher.Enqueue(() => OnError?.Invoke("[포트테스트] 443: 9999: → 포트는 정상, 다른 원인 확인 필요"));
                 }
                 else
                 {
                     SystemMessageManager.ShowToast("⚠️ 443 차단됨 (특이한 환경)", Shared.UI.MessagePriority.Warning, 3f);
-                    UnityMainThreadDispatcher.Enqueue(() => OnError?.Invoke("[포트테스트] 443:❌ 9999:✅ → 특이한 네트워크 환경"));
+                    UnityMainThreadDispatcher.Enqueue(() => OnError?.Invoke("[포트테스트] 443: 9999: → 특이한 네트워크 환경"));
                 }
             }
             catch (Exception ex)
@@ -300,7 +300,7 @@ namespace Features.Multi.Net
 
                 // DNS 해결 및 IPv4 우선 연결 시도
                 Debug.Log($"[NetworkClient] DNS 해결 시작: {serverHost}");
-                SystemMessageManager.ShowToast($"🔍 DNS 해결 중...", Shared.UI.MessagePriority.Info, 2f);
+                SystemMessageManager.ShowToast($" DNS 해결 중...", Shared.UI.MessagePriority.Info, 2f);
 
                 var addresses = await Dns.GetHostAddressesAsync(serverHost);
 
@@ -332,7 +332,7 @@ namespace Features.Multi.Net
                         Debug.Log($"[NetworkClient] 연결 성공: {address}:{serverPort}");
 
                         // 릴리즈 디버깅: 연결 성공 토스트 표시
-                        SystemMessageManager.ShowToast($"✅ 서버 연결 성공!", Shared.UI.MessagePriority.Success, 3f);
+                        SystemMessageManager.ShowToast($" 서버 연결 성공!", Shared.UI.MessagePriority.Success, 3f);
 
                         connected = true;
                         break;
@@ -346,12 +346,12 @@ namespace Features.Multi.Net
                         string errorInfo;
                         if (ex is SocketException se)
                         {
-                            errorInfo = $"❌ {(address.AddressFamily == AddressFamily.InterNetwork ? "IPv4" : "IPv6")} 실패: {se.SocketErrorCode}";
+                            errorInfo = $" {(address.AddressFamily == AddressFamily.InterNetwork ? "IPv4" : "IPv6")} 실패: {se.SocketErrorCode}";
                             UnityMainThreadDispatcher.Enqueue(() => OnError?.Invoke($"[TCP] {address}:{serverPort} 실패 - {se.SocketErrorCode}/{se.ErrorCode}"));
                         }
                         else
                         {
-                            errorInfo = $"❌ {(address.AddressFamily == AddressFamily.InterNetwork ? "IPv4" : "IPv6")} 실패: {ex.GetType().Name}";
+                            errorInfo = $" {(address.AddressFamily == AddressFamily.InterNetwork ? "IPv4" : "IPv6")} 실패: {ex.GetType().Name}";
                             UnityMainThreadDispatcher.Enqueue(() => OnError?.Invoke($"[TCP] {address}:{serverPort} 실패 - {ex.GetType().Name}: {ex.Message}"));
                         }
 
@@ -447,7 +447,7 @@ namespace Features.Multi.Net
 #endif
 
                 // 릴리즈 디버깅: 일반적인 연결 실패 정보 토스트 표시
-                string generalError = $"🚫 서버 연결 실패\n예외: {ex.GetType().Name}";
+                string generalError = $" 서버 연결 실패\n예외: {ex.GetType().Name}";
                 if (ex.InnerException != null)
                 {
                     generalError += $"\n내부 예외: {ex.InnerException.GetType().Name}";

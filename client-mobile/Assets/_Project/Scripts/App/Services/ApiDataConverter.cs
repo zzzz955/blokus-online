@@ -104,7 +104,7 @@ namespace App.Services{
         }
         
         /// <summary>
-        /// 🔥 새로운 메서드: UserProfile API 응답을 UserInfo로 변환
+        ///  새로운 메서드: UserProfile API 응답을 UserInfo로 변환
         /// </summary>
         public static CommonUserInfo ConvertUserProfile(HttpApiClient.UserProfile userProfile)
         {
@@ -115,10 +115,10 @@ namespace App.Services{
                 totalGames = userProfile.total_single_games,
                 wins = 0, // UserProfile에는 승패 정보가 없으므로 기본값
                 losses = 0,
-                averageScore = userProfile.single_player_score, // 🔥 복원: 직접 사용
+                averageScore = userProfile.single_player_score, //  복원: 직접 사용
                 isOnline = true,
                 status = "로비",
-                maxStageCompleted = userProfile.max_stage_completed // 🔥 핵심: 서버에서 받은 최대 클리어 스테이지
+                maxStageCompleted = userProfile.max_stage_completed //  핵심: 서버에서 받은 최대 클리어 스테이지
             };
             
             Debug.Log($"[ApiDataConverter] 프로필 변환 완료: {userProfile.username}, maxStageCompleted={userProfile.max_stage_completed}");

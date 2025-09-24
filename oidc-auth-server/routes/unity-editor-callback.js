@@ -43,7 +43,7 @@ router.get('/', (req, res) => {
           <html>
             <head><title>Unity Editor OAuth - Error</title></head>
             <body>
-              <h3>❌ OAuth Error</h3>
+              <h3> OAuth Error</h3>
               <p>error: ${callback.error}</p>
               <p>Description: ${callback.error_description || 'Unknown error'}</p>
             </body>
@@ -59,7 +59,7 @@ router.get('/', (req, res) => {
           <html>
             <head><title>Unity Editor OAuth - Success</title></head>
             <body>
-              <h3>✅ OAuth Success</h3>
+              <h3> OAuth Success</h3>
               <p>authorization_code: ${callback.code}</p>
               <p>Unity에서 토큰을 교환합니다...</p>
             </body>
@@ -101,7 +101,7 @@ router.get('/', (req, res) => {
           <html>
             <head><title>Unity Editor OAuth - Error</title></head>
             <body style="font-family: Arial; text-align: center; padding: 50px; background: #ffebee; color: #c62828;">
-              <h1>❌ OAuth Error</h1>
+              <h1> OAuth Error</h1>
               <p>에러: ${error}</p>
               <p>설명: ${error_description || 'Unknown error'}</p>
               <div style="margin: 20px; padding: 15px; background: rgba(255,255,255,0.3); border-radius: 10px;">
@@ -133,7 +133,7 @@ router.get('/', (req, res) => {
           <html>
             <head><title>Unity Editor OAuth - Success</title></head>
             <body style="font-family: Arial; text-align: center; padding: 50px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
-              <h1>✅ Google Login Success!</h1>
+              <h1> Google Login Success!</h1>
               <p>인증이 완료되었습니다. Unity Editor로 돌아가주세요.</p>
               <div style="margin: 20px; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 10px;">
                 <small>이 창을 닫고 Unity로 돌아가세요.</small>
@@ -172,7 +172,7 @@ router.get('/', (req, res) => {
       <html>
         <head><title>Unity Editor OAuth - Server Error</title></head>
         <body style="font-family: Arial; text-align: center; padding: 50px;">
-          <h1>🚨 Server Error</h1>
+          <h1> Server Error</h1>
           <p>서버에서 오류가 발생했습니다.</p>
         </body>
       </html>

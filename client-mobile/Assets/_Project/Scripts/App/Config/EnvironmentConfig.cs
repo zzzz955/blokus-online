@@ -73,7 +73,7 @@ namespace App.Config
                             _envVariables[key] = value;
                         }
                     }
-                    Debug.Log($"✅ 환경변수 로드 완료: {_envVariables.Count}개 변수");
+                    Debug.Log($" 환경변수 로드 완료: {_envVariables.Count}개 변수");
                 }
                 else
                 {
@@ -82,7 +82,7 @@ namespace App.Config
             }
             catch (Exception e)
             {
-                Debug.LogError($"❌ 환경변수 로드 실패: {e.Message}");
+                Debug.LogError($" 환경변수 로드 실패: {e.Message}");
             }
 #endif
             _envLoaded = true;

@@ -3,7 +3,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { env } from './env';
 
-// ✅ MIME → 확장자 매핑 (실제 저장은 항상 png로 통일하지만, 참고용)
+//  MIME → 확장자 매핑 (실제 저장은 항상 png로 통일하지만, 참고용)
 const MIME_TO_EXT: Record<string, string> = {
   'image/png': 'png',
   'image/svg+xml': 'svg',

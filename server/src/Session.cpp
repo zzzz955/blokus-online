@@ -57,7 +57,7 @@ namespace Blokus::Server {
 
     void Session::start() {
         if (!active_.load()) {
-            spdlog::warn("❌ 이미 비활성화된 세션 시작 시도: {}", sessionId_);
+            spdlog::warn(" 이미 비활성화된 세션 시작 시도: {}", sessionId_);
             return;
         }
 
@@ -73,7 +73,7 @@ namespace Blokus::Server {
 
         }
         catch (const std::exception& e) {
-            spdlog::error("❌ 세션 시작 중 오류 ({}): {}", sessionId_, e.what());
+            spdlog::error(" 세션 시작 중 오류 ({}): {}", sessionId_, e.what());
             handleError(boost::system::error_code());
         }
     }
@@ -97,7 +97,7 @@ namespace Blokus::Server {
 
         }
         catch (const std::exception& e) {
-            spdlog::error("❌ 세션 중지 중 오류 ({}): {}", sessionId_, e.what());
+            spdlog::error(" 세션 중지 중 오류 ({}): {}", sessionId_, e.what());
         }
     }
 
@@ -116,15 +116,15 @@ namespace Blokus::Server {
                 switch (duplicateType) {
                     case GameServer::DuplicateType::SAME_USER_IP:
                         error = "DUPLICATE_USER_IP:해당 계정이 이미 이 위치에서 로그인되어 있습니다";
-                        spdlog::warn("🚫 중복 로그인 차단: 같은 사용자, 같은 IP - IP={}, UserID={}", remoteIP_, userId);
+                        spdlog::warn(" 중복 로그인 차단: 같은 사용자, 같은 IP - IP={}, UserID={}", remoteIP_, userId);
                         break;
                     case GameServer::DuplicateType::SAME_USER_DIFF_IP:
                         error = "DUPLICATE_USER_DIFFERENT_IP:해당 계정이 이미 다른 위치에서 로그인되어 있습니다";
-                        spdlog::warn("🚫 중복 로그인 차단: 같은 사용자, 다른 IP - IP={}, UserID={}", remoteIP_, userId);
+                        spdlog::warn(" 중복 로그인 차단: 같은 사용자, 다른 IP - IP={}, UserID={}", remoteIP_, userId);
                         break;
                     case GameServer::DuplicateType::DIFF_USER_SAME_IP:
                         error = "DUPLICATE_IP_DIFFERENT_USER:이 위치에서 이미 다른 계정이 로그인되어 있습니다";
-                        spdlog::warn("🚫 중복 로그인 차단: 다른 사용자, 같은 IP - IP={}, UserID={}", remoteIP_, userId);
+                        spdlog::warn(" 중복 로그인 차단: 다른 사용자, 같은 IP - IP={}, UserID={}", remoteIP_, userId);
                         break;
                     default:
                         error = "DUPLICATE_LOGIN:중복 로그인이 감지되었습니다";
@@ -140,7 +140,7 @@ namespace Blokus::Server {
 
             // 등록 시도
             if (!gameServer_->registerActiveSession(remoteIP_, userId)) {
-                spdlog::error("❌ 활성 세션 등록 실패: IP={}, UserID={}", remoteIP_, userId);
+                spdlog::error(" 활성 세션 등록 실패: IP={}, UserID={}", remoteIP_, userId);
                 if (errorMessage) {
                     *errorMessage = "SESSION_REGISTER_FAILED:세션 등록에 실패했습니다";
                 }
@@ -148,7 +148,7 @@ namespace Blokus::Server {
             }
 
             isRegisteredInServer_ = true;
-            spdlog::debug("✅ 활성 세션 등록 성공: IP={}, UserID={}", remoteIP_, userId);
+            spdlog::debug(" 활성 세션 등록 성공: IP={}, UserID={}", remoteIP_, userId);
         }
 
         userId_ = userId;
@@ -157,7 +157,7 @@ namespace Blokus::Server {
         currentRoomId_ = -1;
         updateLastActivity();
 
-        spdlog::info("✅ 세션 인증 완료: {} (사용자: '{}')", sessionId_, username);
+        spdlog::info(" 세션 인증 완료: {} (사용자: '{}')", sessionId_, username);
         return true;  // 인증 성공
     }
 
@@ -192,7 +192,7 @@ namespace Blokus::Server {
     void Session::updateUserAccount(const UserAccount& account) {
         if (userAccount_.has_value()) {
             userAccount_ = account;
-            spdlog::debug("🔄 사용자 계정 정보 업데이트: {} (레벨: {}, 경험치: {})", 
+            spdlog::debug(" 사용자 계정 정보 업데이트: {} (레벨: {}, 경험치: {})", 
                          username_, account.level, account.experiencePoints);
         } else {
             setUserAccount(account);
@@ -218,7 +218,7 @@ namespace Blokus::Server {
         state_ = ConnectionState::Connected;
         updateLastActivity();
 
-        spdlog::debug("✅ 세션 상태 변경: {} -> 로그인 화면", sessionId_);
+        spdlog::debug(" 세션 상태 변경: {} -> 로그인 화면", sessionId_);
     }
 
     void Session::setStateToLobby(bool fromRoom) {
@@ -227,7 +227,7 @@ namespace Blokus::Server {
         justLeftRoom_ = fromRoom;
         updateLastActivity();
 
-        spdlog::debug("🏠 세션 상태 변경: {} -> 로비 (방에서 이동: {})", sessionId_, fromRoom);
+        spdlog::debug(" 세션 상태 변경: {} -> 로비 (방에서 이동: {})", sessionId_, fromRoom);
     }
 
     void Session::setStateToInRoom(int roomId) {
@@ -236,7 +236,7 @@ namespace Blokus::Server {
         justLeftRoom_ = false;  // 방에 입장하면 플래그 리셋
         updateLastActivity();
 
-        spdlog::debug("🏠 세션 상태 변경: {} -> 방 {}", sessionId_, roomId);
+        spdlog::debug(" 세션 상태 변경: {} -> 방 {}", sessionId_, roomId);
     }
 
     void Session::setStateToInGame() {
@@ -251,7 +251,7 @@ namespace Blokus::Server {
             spdlog::debug("🎮 세션 이미 게임 중 상태: {} (방 {})", sessionId_, currentRoomId_);
         }
         else {
-            spdlog::warn("❌ 잘못된 상태에서 게임 상태로 변경 시도: {} (현재: {})",
+            spdlog::warn(" 잘못된 상태에서 게임 상태로 변경 시도: {} (현재: {})",
                 sessionId_, static_cast<int>(state_));
         }
     }
@@ -262,7 +262,7 @@ namespace Blokus::Server {
 
     void Session::sendMessage(const std::string& message) {
         if (!active_.load() || !socket_.is_open()) {
-            spdlog::debug("❌ 비활성 세션에 메시지 전송 시도: {}", sessionId_);
+            spdlog::debug(" 비활성 세션에 메시지 전송 시도: {}", sessionId_);
             return;
         }
 
@@ -282,7 +282,7 @@ namespace Blokus::Server {
 
         }
         catch (const std::exception& e) {
-            spdlog::error("❌ 메시지 전송 준비 중 오류 ({}): {}", sessionId_, e.what());
+            spdlog::error(" 메시지 전송 준비 중 오류 ({}): {}", sessionId_, e.what());
             handleError(boost::system::error_code());
         }
     }
@@ -439,7 +439,7 @@ namespace Blokus::Server {
                 messageHandler_->handleMessage(message);
             }
             catch (const std::exception& e) {
-                spdlog::error("❌ 메시지 핸들러 오류 ({}): {}", sessionId_, e.what());
+                spdlog::error(" 메시지 핸들러 오류 ({}): {}", sessionId_, e.what());
                 sendMessage("ERROR:Message processing failed");
             }
             spdlog::debug("📨 메시지 처리 완료: {}", message);
@@ -452,7 +452,7 @@ namespace Blokus::Server {
     void Session::handleError(const boost::system::error_code& error) {
         if (error && error != boost::asio::error::eof &&
             error != boost::asio::error::connection_reset) {
-            spdlog::error("❌ 세션 오류 ({}): {}", sessionId_, error.message());
+            spdlog::error(" 세션 오류 ({}): {}", sessionId_, error.message());
         }
 
         stop();
@@ -481,17 +481,17 @@ namespace Blokus::Server {
             catch (const std::exception& e) {
                 std::string errorMsg = e.what();
                 
-                // 🔥 데드락 에러 구체적 처리
+                //  데드락 에러 구체적 처리
                 if (errorMsg.find("resource deadlock would occur") != std::string::npos ||
                     errorMsg.find("deadlock") != std::string::npos) {
-                    spdlog::error("🚨 데드락 감지로 콜백 실패 ({}): {}", sessionId_, errorMsg);
+                    spdlog::error(" 데드락 감지로 콜백 실패 ({}): {}", sessionId_, errorMsg);
                     spdlog::warn("⚠️ 세션 {} 정리가 불완전할 수 있음. 수동 정리 또는 서버 재시작 권장", sessionId_);
                     
                     // TODO: 추후 지연된 콜백 큐 또는 재시도 메커니즘 추가 고려
                     // 현재는 로그만 남기고 세션은 계속 진행
                 }
                 else {
-                    spdlog::error("❌ 연결 해제 콜백 오류 ({}): {}", sessionId_, errorMsg);
+                    spdlog::error(" 연결 해제 콜백 오류 ({}): {}", sessionId_, errorMsg);
                 }
             }
         }
@@ -503,7 +503,7 @@ namespace Blokus::Server {
                 messageCallback_(sessionId_, message);
             }
             catch (const std::exception& e) {
-                spdlog::error("❌ 메시지 콜백 오류 ({}): {}", sessionId_, e.what());
+                spdlog::error(" 메시지 콜백 오류 ({}): {}", sessionId_, e.what());
             }
         }
     }

@@ -45,7 +45,7 @@ namespace Blokus {
         }
 
         GameRoom::~GameRoom() {
-            // 🧹 소멸자에서 모든 리소스 정리
+            // 소멸자에서 모든 리소스 정리
             cleanupTimeoutThread();
             cleanupAfkStates();
             
@@ -126,7 +126,7 @@ namespace Blokus {
 
             // 게임 중 이탈자 즉시 패배 처리
             if (wasInGame) {
-                spdlog::debug("🚪 게임 중 플레이어 이탈: {} - 즉시 패배 처리", username);
+                spdlog::debug("게임 중 플레이어 이탈: {} - 즉시 패배 처리", username);
 
                 // DB에 패배 기록 저장
                 if (m_roomManager && m_roomManager->getDatabaseManager()) {
@@ -142,19 +142,19 @@ namespace Blokus {
 
                         bool dbSuccess = dbManager->saveGameResults(dropoutPlayerIds, dropoutScores, dropoutIsWinner, isDraw);
                         if (dbSuccess) {
-                            spdlog::debug("💾 이탈자 {} 패배 기록 DB 저장 완료", username);
+                            spdlog::debug("이탈자 {} 패배 기록 DB 저장 완료", username);
 
                             // 세션이 있으면 즉시 동기화
                             if (dropoutSession) {
                                 auto updatedAccount = dbManager->getUserById(playerId);
                                 if (updatedAccount.has_value()) {
                                     dropoutSession->updateUserAccount(updatedAccount.value());
-                                    spdlog::debug("🔄 이탈자 {} 세션 동기화 완료 (승:{} 패:{} 무:{})",
+                                    spdlog::debug("이탈자 {} 세션 동기화 완료 (승:{} 패:{} 무:{})",
                                                username, updatedAccount->wins, updatedAccount->losses, updatedAccount->draws);
                                 }
                             }
                         } else {
-                            spdlog::error("💾 이탈자 {} 패배 기록 DB 저장 실패", username);
+                            spdlog::error("이탈자 {} 패배 기록 DB 저장 실패", username);
                         }
                     } catch (const std::exception& e) {
                         spdlog::error("이탈자 {} 처리 중 오류: {}", username, e.what());
@@ -580,9 +580,9 @@ namespace Blokus {
             }
             
             // 게임 시작 후 첫 번째 플레이어가 블록을 배치할 수 없다면 자동 스킵 체크
-            spdlog::debug("🔍 게임 시작 후 자동 스킵 체크 시작");
+            spdlog::debug("게임 시작 후 자동 스킵 체크 시작");
             processAutoSkipAfterTurnChange("게임 시작");
-            spdlog::debug("🔍 게임 시작 후 자동 스킵 체크 완료");
+            spdlog::debug("게임 시작 후 자동 스킵 체크 완료");
             
             // CRITICAL: 게임이 여전히 진행 중인 경우에만 타임아웃 스레드 시작
             if (m_state == RoomState::Playing) {
@@ -973,7 +973,7 @@ namespace Blokus {
         void GameRoom::broadcastBlockPlacementLocked(const std::string& playerName, const Common::BlockPlacement& placement, int scoreGained) {
             // 뮤텍스가 이미 잠겨있다고 가정하고 실행 (데드락 방지용)
             
-            spdlog::debug("📦 블록 배치 브로드캐스트 - 방 {}, 플레이어 수: {}", m_roomId, m_players.size());
+            spdlog::debug("블록 배치 브로드캐스트 - 방 {}, 플레이어 수: {}", m_roomId, m_players.size());
             
             // 배치된 셀들의 좌표를 계산
             auto placedCells = m_gameLogic->getBlockShape(placement);
@@ -1007,7 +1007,7 @@ namespace Blokus {
             // systemMsg << "SYSTEM:" << playerName << "님이 " << blockName << " 블록을 배치했습니다. (점수: +" << scoreGained << ")";
             // broadcastMessageLocked(systemMsg.str());
             
-            spdlog::debug("📦 블록 배치 브로드캐스트: 방 {}, 플레이어 {}, 블록 타입 {}, 점유셀 {}개", 
+            spdlog::debug("블록 배치 브로드캐스트: 방 {}, 플레이어 {}, 블록 타입 {}, 점유셀 {}개", 
                 m_roomId, playerName, static_cast<int>(placement.type), placedCells.size());
         }
 
@@ -1245,7 +1245,7 @@ namespace Blokus {
                            player.getUsername(), myRank, myScore, expGained, levelUp);
             }
 
-            spdlog::debug("🎮 모든 플레이어에게 개인화된 게임 결과 전송 완료 (방 {}, 게임시간: {}초)", m_roomId, gameTimeSeconds);
+            spdlog::debug("모든 플레이어에게 개인화된 게임 결과 전송 완료 (방 {}, 게임시간: {}초)", m_roomId, gameTimeSeconds);
             
             // 시스템 메시지로도 결과 알림
             std::ostringstream systemMsg;
@@ -1257,7 +1257,7 @@ namespace Blokus {
                         break;
                     }
                 }
-                systemMsg << "SYSTEM:🎉 게임이 종료되었습니다! 승자: " << winnerDisplayName << "님!";
+                systemMsg << "SYSTEM: 게임이 종료되었습니다! 승자: " << winnerDisplayName << "님!";
             } else if (winners.size() > 1) {
                 // 공동 우승자들의 이름을 수집
                 std::vector<std::string> winnerNames;
@@ -1270,19 +1270,19 @@ namespace Blokus {
                     }
                 }
 
-                systemMsg << "SYSTEM:🎉 게임이 종료되었습니다! 공동 우승: ";
+                systemMsg << "SYSTEM: 게임이 종료되었습니다! 공동 우승: ";
                 for (size_t i = 0; i < winnerNames.size(); ++i) {
                     if (i > 0) systemMsg << ", ";
                     systemMsg << winnerNames[i] << "님";
                 }
                 systemMsg << "!";
             } else {
-                systemMsg << "SYSTEM:🎉 게임이 종료되었습니다!";
+                systemMsg << "SYSTEM: 게임이 종료되었습니다!";
             }
             broadcastMessageLocked(systemMsg.str());
             
             // 즉시 게임 초기화 및 대기 상태로 전환
-            spdlog::debug("🏆 게임 결과 브로드캐스트: 방 {}, 승자 수: {}명, 즉시 초기화 시작", m_roomId, winners.size());
+            spdlog::debug("게임 결과 브로드캐스트: 방 {}, 승자 수: {}명, 즉시 초기화 시작", m_roomId, winners.size());
             
             // 게임 상태 초기화
             m_gameLogic->clearBoard();
@@ -1392,7 +1392,7 @@ namespace Blokus {
             auto it = m_players.begin();
             while (it != m_players.end()) {
                 if (it->needsCleanup()) {
-                    spdlog::debug("🧹 방 {} 연결 끊어진 플레이어 정리: '{}'",
+                    spdlog::debug("방 {} 연결 끊어진 플레이어 정리: '{}'",
                         m_roomId, it->getUsername());
                     broadcastPlayerLeft(it->getUsername());
                     it = m_players.erase(it);
@@ -1483,15 +1483,15 @@ namespace Blokus {
             spdlog::debug("턴 전환 완료: {} -> {}", static_cast<int>(previousPlayer), static_cast<int>(newPlayer));
 
             // 새 플레이어가 블록을 배치할 수 없다면 자동 턴 스킵 체크 (턴 변경 브로드캐스트 전에 실행)
-            spdlog::debug("🔍 자동 스킵 체크 시작: {}", static_cast<int>(newPlayer));
+            spdlog::debug("자동 스킵 체크 시작: {}", static_cast<int>(newPlayer));
             processAutoSkipAfterTurnChange("블록 배치");
             
             // 자동 스킵 후의 실제 현재 플레이어 확인
             Common::PlayerColor finalPlayer = m_gameStateManager->getCurrentPlayer();
-            spdlog::debug("🔍 자동 스킵 체크 완료: {} -> {}", static_cast<int>(newPlayer), static_cast<int>(finalPlayer));
+            spdlog::debug("자동 스킵 체크 완료: {} -> {}", static_cast<int>(newPlayer), static_cast<int>(finalPlayer));
 
             // 턴 브로드캐스트 (자동 스킵을 고려한 최종 플레이어로)
-            spdlog::debug("🔄 턴 변경: {} -> {}", static_cast<int>(previousPlayer), static_cast<int>(finalPlayer));
+            spdlog::debug("턴 변경: {} -> {}", static_cast<int>(previousPlayer), static_cast<int>(finalPlayer));
             
             // 최종 플레이어 이름 찾기
             std::string finalPlayerName = "";
@@ -1504,11 +1504,11 @@ namespace Blokus {
             
             // 턴 브로드캐스트 실행 (항상)
             if (finalPlayerName.empty()) {
-                spdlog::warn("❌ 턴 브로드캐스트 실패: 플레이어 색상 {}에 해당하는 플레이어를 찾을 수 없음", static_cast<int>(finalPlayer));
+                spdlog::warn(" 턴 브로드캐스트 실패: 플레이어 색상 {}에 해당하는 플레이어를 찾을 수 없음", static_cast<int>(finalPlayer));
             } else {
-                spdlog::debug("📤 TURN_CHANGED 브로드캐스트: {} (색상 {})", finalPlayerName, static_cast<int>(finalPlayer));
+                spdlog::debug("TURN_CHANGED 브로드캐스트: {} (색상 {})", finalPlayerName, static_cast<int>(finalPlayer));
                 broadcastTurnChangeLocked(finalPlayer);
-                spdlog::debug("✅ TURN_CHANGED 브로드캐스트 완료");
+                spdlog::debug(" TURN_CHANGED 브로드캐스트 완료");
             }
 
             // 전체 게임 상태 브로드캐스트 (뮤텍스 내에서 안전하게)
@@ -1546,20 +1546,20 @@ namespace Blokus {
                     }
                 }
                 
-                spdlog::debug("🏆 승자 결정 완료: {}명의 승자, 최고 점수={} (방 {})", winners.size(), highestScore, m_roomId);
+                spdlog::debug("승자 결정 완료: {}명의 승자, 최고 점수={} (방 {})", winners.size(), highestScore, m_roomId);
 
                 // 게임 결과를 DB에 저장 (브로드캐스트 전에 먼저 처리)
-                spdlog::debug("💾 [DB_DEBUG] 게임 결과 DB 저장 시작 - 방 {}, 플레이어 {}명, 승자 {}명",
+                spdlog::debug("[DB_DEBUG] 게임 결과 DB 저장 시작 - 방 {}, 플레이어 {}명, 승자 {}명",
                            m_roomId, finalScores.size(), winners.size());
                 saveGameResultsToDatabase(finalScores, winners);
-                spdlog::debug("💾 [DB_DEBUG] 게임 결과 DB 저장 호출 완료 - 방 {}", m_roomId);
+                spdlog::debug("[DB_DEBUG] 게임 결과 DB 저장 호출 완료 - 방 {}", m_roomId);
 
                 // DB/세션 업데이트 완료 후 게임 결과 브로드캐스트
                 broadcastGameResultLocked(finalScores, winners);
                 
                 // 게임 종료 처리는 플레이어 응답 후에 수행하므로 여기서는 하지 않음
             } else if (m_gameStateManager->getGameState() == Common::GameState::Finished) {
-                spdlog::debug("🔚 게임 상태가 Finished로 변경되어 게임 종료 처리 (방 {})", m_roomId);
+                spdlog::debug("게임 상태가 Finished로 변경되어 게임 종료 처리 (방 {})", m_roomId);
                 endGameLocked();
             }
 
@@ -1587,12 +1587,12 @@ namespace Blokus {
             Common::PlayerColor newPlayer = m_gameStateManager->getCurrentPlayer();
             
             // 자동 턴 스킵 체크 (새로운 플레이어도 블록을 배치할 수 없다면)
-            spdlog::debug("🔍 수동 스킵 후 자동 스킵 체크 시작: {}", static_cast<int>(newPlayer));
+            spdlog::debug("수동 스킵 후 자동 스킵 체크 시작: {}", static_cast<int>(newPlayer));
             processAutoSkipAfterTurnChange("수동 스킵");
             
             // 자동 스킵 후의 최종 플레이어 확인
             Common::PlayerColor finalPlayer = m_gameStateManager->getCurrentPlayer();
-            spdlog::debug("🔍 수동 스킵 후 자동 스킵 체크 완료: {} -> {}", static_cast<int>(newPlayer), static_cast<int>(finalPlayer));
+            spdlog::debug("수동 스킵 후 자동 스킵 체크 완료: {} -> {}", static_cast<int>(newPlayer), static_cast<int>(finalPlayer));
             
             // 턴 변경 브로드캐스트 (자동 스킵을 고려한 최종 플레이어로)
             if (finalPlayer != previousPlayer) {
@@ -1770,7 +1770,7 @@ namespace Blokus {
                                     auto updatedAccount = dbManager->getUserById(playerId);
                                     if (updatedAccount.has_value()) {
                                         session->updateUserAccount(updatedAccount.value());
-                                        spdlog::debug("🔄 게임 결과 후 세션 동기화: {} (승:{} 패:{} 무:{})",
+                                        spdlog::debug("게임 결과 후 세션 동기화: {} (승:{} 패:{} 무:{})",
                                                    player.getUsername(),
                                                    updatedAccount->wins,
                                                    updatedAccount->losses,
@@ -1793,7 +1793,7 @@ namespace Blokus {
                                         completedPlayerIds[i], expGained);
                                     
                                     if (expSuccess) {
-                                        spdlog::debug("🎉 플레이어 {} 경험치 획득: +{}", 
+                                        spdlog::debug("플레이어 {} 경험치 획득: +{}", 
                                                    completedPlayerIds[i], expGained);
                                         
                                         // 세션 정보 동기화: DB 업데이트 후 세션의 UserAccount 정보도 갱신
@@ -1922,7 +1922,7 @@ namespace Blokus {
                             << "}";
                         
                         sendToPlayer(userId, afkNotification.str());
-                        spdlog::debug("📱 [AFK_NOTIFICATION] AFK 모드 전환 알림 전송: {} -> {}", 
+                        spdlog::debug("[AFK_NOTIFICATION] AFK 모드 전환 알림 전송: {} -> {}", 
                                    timedOutPlayerName, userId);
                         break;
                     }
@@ -1961,12 +1961,12 @@ namespace Blokus {
                 std::lock_guard<std::mutex> lock(m_playersMutex);
                 
                 // 타임아웃 후 자동 스킵 처리 (새로운 플레이어가 블록을 배치할 수 없다면 계속 스킵)
-                spdlog::debug("🔍 타임아웃 후 자동 스킵 체크 시작: {}", static_cast<int>(nextPlayer));
+                spdlog::debug("타임아웃 후 자동 스킵 체크 시작: {}", static_cast<int>(nextPlayer));
                 processAutoSkipAfterTurnChange("타임아웃");
                 
                 // 자동 스킵 후의 최종 플레이어 확인
                 Common::PlayerColor finalPlayer = m_gameStateManager->getCurrentPlayer();
-                spdlog::debug("🔍 타임아웃 후 자동 스킵 체크 완료: {} -> {}", static_cast<int>(nextPlayer), static_cast<int>(finalPlayer));
+                spdlog::debug("타임아웃 후 자동 스킵 체크 완료: {} -> {}", static_cast<int>(nextPlayer), static_cast<int>(finalPlayer));
                 
                 // 턴 변경 브로드캐스트 (자동 스킵을 고려한 최종 플레이어로)
                 if (finalPlayer != currentPlayer) {
@@ -2052,7 +2052,7 @@ namespace Blokus {
         bool GameRoom::unblockPlayerAfkStatus(const std::string& userId) {
             std::lock_guard<std::mutex> lock(m_playersMutex);
             
-            spdlog::debug("🔓 [AFK_UNBLOCK] AFK 모드 해제 시도: {}", userId);
+            spdlog::debug("[AFK_UNBLOCK] AFK 모드 해제 시도: {}", userId);
             
             // 게임 중이 아니면 해제 불필요
             if (m_state != RoomState::Playing) {
@@ -2214,7 +2214,7 @@ namespace Blokus {
             m_stopTimeoutCheck = true;
             if (m_timeoutCheckThread.joinable()) {
                 m_timeoutCheckThread.join();
-                spdlog::debug("🧹 [CLEANUP] 타임아웃 스레드 정리 완료 (방 {})", m_roomId);
+                spdlog::debug("[CLEANUP] 타임아웃 스레드 정리 완료 (방 {})", m_roomId);
             }
         }
 
@@ -2223,7 +2223,7 @@ namespace Blokus {
                 m_playerTimeoutCounts.clear();
                 m_playerBlockedByTimeout.clear();
                 m_playerAfkVerificationCounts.clear();
-                spdlog::debug("🧹 [CLEANUP] AFK 상태 및 타임아웃 알림 상태 정리 완료 (방 {})", m_roomId);
+                spdlog::debug("[CLEANUP] AFK 상태 및 타임아웃 알림 상태 정리 완료 (방 {})", m_roomId);
             }
         }
 

@@ -1155,7 +1155,7 @@ namespace Features.Multi.Net
                                 occupiedCells // 서버에서 계산된 정확한 좌표 사용
                             );
                             
-                            Debug.Log($"[MessageHandler] ✅ 서버 좌표 직접 사용: {multiPlacement.blockType} at ({multiPlacement.position.x},{multiPlacement.position.y}), 점유셀={multiPlacement.occupiedCells.Count}개");
+                            Debug.Log($"[MessageHandler]  서버 좌표 직접 사용: {multiPlacement.blockType} at ({multiPlacement.position.x},{multiPlacement.position.y}), 점유셀={multiPlacement.occupiedCells.Count}개");
                             OnBlockPlaced?.Invoke(multiPlacement);
                         }
                         else

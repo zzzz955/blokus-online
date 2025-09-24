@@ -54,7 +54,7 @@ namespace App.UI
             base.Awake();
             Debug.Log("LoginPanel 초기화");
             
-            // 🔥 디버깅: GameExitModal 참조 상태 확인
+            //  디버깅: GameExitModal 참조 상태 확인
             if (gameExitModal == null)
             {
                 Debug.LogWarning("[LoginPanel] GameExitModal이 Inspector에서 할당되지 않음 - 자동으로 찾기 시도");
@@ -79,7 +79,7 @@ namespace App.UI
         {
             base.Start();
             
-            // 🔥 릴리즈 빌드 디버깅을 위한 토스트 메시지
+            //  릴리즈 빌드 디버깅을 위한 토스트 메시지
             ShowSystemDiagnostics();
             
             // 버튼 이벤트 설정
@@ -240,7 +240,7 @@ namespace App.UI
 
         private void SetupOidcAuthenticator()
         {
-            // 🔥 글로벌 OIDC Authenticator 사용
+            //  글로벌 OIDC Authenticator 사용
             oidcAuthenticator = App.Core.AppBootstrap.GetGlobalOidcAuthenticator();
             
             if (oidcAuthenticator == null)
@@ -668,7 +668,7 @@ namespace App.UI
             isAuthenticating = false;
             SetLoadingState(false);
 
-            // 🔥 토스트로 서버 응답 확인 (에러일 때만)
+            //  토스트로 서버 응답 확인 (에러일 때만)
             if (!success)
             {
                 SystemMessageManager.ShowToast($"서버 응답 실패: {message?.Substring(0, Math.Min(30, message?.Length ?? 0))}...", 
@@ -779,7 +779,7 @@ namespace App.UI
                 Debug.Log("HttpApiClient에 OAuth 토큰 설정 완료");
             }
 
-            // 🔥 수정: SessionManager에도 OAuth 로그인 상태 동기화
+            //  수정: SessionManager에도 OAuth 로그인 상태 동기화
             if (App.Core.SessionManager.Instance != null)
             {
                 // JWT에서 사용자 정보 추출하여 SessionManager 업데이트
@@ -905,7 +905,7 @@ namespace App.UI
         }
 
         // ==========================================
-        // 🔥 디버깅 및 진단
+        //  디버깅 및 진단
         // ==========================================
         
         /// <summary>

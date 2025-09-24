@@ -16,7 +16,7 @@ namespace App.Core
         [SerializeField] private float loadingDelay = 1f; // 로딩 화면 최소 표시 시간
         [SerializeField] private bool debugMode = true;
         
-        [Header("🔥 Global Services")]
+        [Header(" Global Services")]
         [SerializeField] private bool initializeOidcAuthenticator = true;
         
         private const string MainSceneName = "MainScene";
@@ -41,7 +41,7 @@ namespace App.Core
             if (debugMode)
                 Debug.Log("[AppBootstrap] Loading overlay shown");
             
-            // 🔥 1.5. 글로벌 서비스 초기화
+            //  1.5. 글로벌 서비스 초기화
             yield return InitializeGlobalServices();
             
             // 2. 최소 로딩 시간 대기 (스플래시 효과)
@@ -115,7 +115,7 @@ namespace App.Core
         }
         
         /// <summary>
-        /// 🔥 글로벌 서비스 초기화
+        ///  글로벌 서비스 초기화
         /// </summary>
         private IEnumerator InitializeGlobalServices()
         {
@@ -189,7 +189,7 @@ namespace App.Core
                 Debug.LogWarning("[AppBootstrap] OIDC Authenticator initialization timeout");
                 SystemMessageManager.ShowToast("OAuth 서비스 초기화 시간 초과", Shared.UI.MessagePriority.Warning);
                 
-                // 🔥 타임아웃이어도 객체는 유지 - 나중에 다시 시도할 수 있도록
+                //  타임아웃이어도 객체는 유지 - 나중에 다시 시도할 수 있도록
                 if (debugMode)
                     Debug.Log("[AppBootstrap] OIDC Authenticator object created but not ready");
             }

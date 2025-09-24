@@ -16,7 +16,7 @@ async function createAdminUser() {
     const adminPassword = process.env.ADMIN_PASSWORD;
     
     if (!adminUsername || !adminPassword) {
-      console.error('❌ ADMIN_USERNAME 또는 ADMIN_PASSWORD 환경변수가 설정되지 않았습니다.');
+      console.error(' ADMIN_USERNAME 또는 ADMIN_PASSWORD 환경변수가 설정되지 않았습니다.');
       process.exit(1);
     }
 
@@ -26,7 +26,7 @@ async function createAdminUser() {
     });
 
     if (existingAdmin) {
-      console.log(`✅ 관리자 계정 '${adminUsername}'이 이미 존재합니다.`);
+      console.log(` 관리자 계정 '${adminUsername}'이 이미 존재합니다.`);
       return;
     }
 
@@ -47,13 +47,13 @@ async function createAdminUser() {
       }
     });
 
-    console.log(`✅ 관리자 계정이 성공적으로 생성되었습니다:`);
+    console.log(` 관리자 계정이 성공적으로 생성되었습니다:`);
     console.log(`   사용자명: ${admin.username}`);
     console.log(`   역할: ${admin.role}`);
     console.log(`   생성일시: ${admin.created_at}`);
 
   } catch (error) {
-    console.error('❌ 관리자 계정 생성 중 오류 발생:', error.message);
+    console.error(' 관리자 계정 생성 중 오류 발생:', error.message);
     process.exit(1);
   } finally {
     await prisma.$disconnect();

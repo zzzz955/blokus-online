@@ -21,7 +21,7 @@ namespace Blokus::Server {
     class GameServer;
     class VersionManager;
 
-    // 🔥 채팅 브로드캐스트용 콜백만 유지
+    //  채팅 브로드캐스트용 콜백만 유지
     using ChatCallback = std::function<void(const std::string& sessionId, const std::string& message)>;
 
     // 단순화된 메시지 핸들러 클래스 (직접 처리 방식)
@@ -33,7 +33,7 @@ namespace Blokus::Server {
         // 메시지 처리
         void handleMessage(const std::string& rawMessage);
 
-        // 🔥 채팅 콜백만 유지 (브로드캐스트 필요)
+        //  채팅 콜백만 유지 (브로드캐스트 필요)
         void setChatCallback(ChatCallback callback) { chatCallback_ = callback; }
 
         // 응답 전송 (현재: 텍스트 기반)
@@ -121,7 +121,7 @@ namespace Blokus::Server {
         GameServer* gameServer_;  // GameServer 참조
         VersionManager* versionManager_;
 
-        // 🔥 채팅 콜백만 유지
+        //  채팅 콜백만 유지
         ChatCallback chatCallback_;
     };
 

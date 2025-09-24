@@ -200,11 +200,11 @@ namespace Features.Multi.Net
             
             if (result)
             {
-                Debug.Log("[NetworkSetup] ✅ 서버 연결 진단 성공! 연결 시도를 진행하세요.");
+                Debug.Log("[NetworkSetup]  서버 연결 진단 성공! 연결 시도를 진행하세요.");
             }
             else
             {
-                Debug.LogError("[NetworkSetup] ❌ 서버 연결 진단 실패! 네트워크나 서버 상태를 확인하세요.");
+                Debug.LogError("[NetworkSetup]  서버 연결 진단 실패! 네트워크나 서버 상태를 확인하세요.");
             }
         }
         

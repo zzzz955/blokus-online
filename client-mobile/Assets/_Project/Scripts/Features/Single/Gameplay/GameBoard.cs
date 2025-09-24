@@ -892,7 +892,7 @@ namespace Features.Single.Gameplay
                 // 에디터에서만 Transform → RectTransform 변경 시도
                 if (!Application.isPlaying)
                 {
-                    Debug.Log("[GameBoard] 🔧 에디터에서 Transform을 RectTransform으로 변경 시도");
+                    Debug.Log("[GameBoard]  에디터에서 Transform을 RectTransform으로 변경 시도");
                     // 에디터 스크립트에서 처리해야 하는 부분
                 }
 #endif
@@ -900,14 +900,14 @@ namespace Features.Single.Gameplay
                 // cellParent를 대신 사용하는 방식으로 시도
                 if (cellParent != null)
                 {
-                    Debug.Log("[GameBoard] 🔄 GameBoard 대신 cellParent에 줌/팬 기능을 추가합니다.");
+                    Debug.Log("[GameBoard]  GameBoard 대신 cellParent에 줌/팬 기능을 추가합니다.");
 
                     // cellParent에 GameBoardZoomPan 추가
                     GameBoardZoomPan cellParentZoomPan = cellParent.GetComponent<GameBoardZoomPan>();
                     if (cellParentZoomPan == null)
                     {
                         cellParentZoomPan = cellParent.gameObject.AddComponent<GameBoardZoomPan>();
-                        Debug.Log("[GameBoard] ✅ cellParent에 GameBoardZoomPan 컴포넌트 추가됨");
+                        Debug.Log("[GameBoard]  cellParent에 GameBoardZoomPan 컴포넌트 추가됨");
                     }
 
                     // 줌 타겟을 cellParent 자기 자신으로 설정
@@ -916,17 +916,17 @@ namespace Features.Single.Gameplay
                     // 참조 저장 (GameBoard에서 접근할 수 있도록)
                     zoomPanComponent = cellParentZoomPan;
 
-                    Debug.Log("[GameBoard] ✅ cellParent 기반 줌/팬 기능 초기화 완료");
+                    Debug.Log("[GameBoard]  cellParent 기반 줌/팬 기능 초기화 완료");
                     return;
                 }
                 else
                 {
-                    Debug.LogError("[GameBoard] ❌ cellParent도 null이어서 줌/팬 기능을 초기화할 수 없습니다!");
+                    Debug.LogError("[GameBoard]  cellParent도 null이어서 줌/팬 기능을 초기화할 수 없습니다!");
                     return;
                 }
             }
 
-            Debug.Log("[GameBoard] ✅ GameBoard에 RectTransform 발견됨");
+            Debug.Log("[GameBoard]  GameBoard에 RectTransform 발견됨");
 
             // GameBoardZoomPan 컴포넌트가 없으면 추가
             if (zoomPanComponent == null)
@@ -943,11 +943,11 @@ namespace Features.Single.Gameplay
             if (cellParent != null)
             {
                 zoomPanComponent.SetZoomTarget(cellParent);
-                Debug.Log("[GameBoard] ✅ 줌/팬 기능 초기화 완료 - Target: cellParent");
+                Debug.Log("[GameBoard]  줌/팬 기능 초기화 완료 - Target: cellParent");
             }
             else
             {
-                Debug.LogError("[GameBoard] ❌ cellParent가 null이어서 줌/팬 기능을 초기화할 수 없습니다!");
+                Debug.LogError("[GameBoard]  cellParent가 null이어서 줌/팬 기능을 초기화할 수 없습니다!");
             }
 
             Debug.Log("[GameBoard] ===== 줌/팬 기능 초기화 완료 =====");

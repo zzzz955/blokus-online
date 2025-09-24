@@ -31,11 +31,11 @@ namespace App.UI
         [FormerlySerializedAs("stageSelectPanel")]
         public PanelBase stageSelectPanel;
 
-        // 🔥 추가: 게임 패널 (SingleGameplayScene 전환 시 사용)
+        //  추가: 게임 패널 (SingleGameplayScene 전환 시 사용)
         [Header("Game Integration")]
         [SerializeField] private bool enableGameIntegration = true;
         
-        // 🔥 BlokusUIManager 기능 통합
+        //  BlokusUIManager 기능 통합
         [Header("Debug Settings")]
         [SerializeField] private bool enableDebugLogs = true;
 
@@ -46,7 +46,7 @@ namespace App.UI
         public static UIManager Instance { get; private set; }
         
         /// <summary>
-        /// 🔥 개선: 안전한 UIManager 접근 (MainScene 및 Scene 전환 지원)
+        ///  개선: 안전한 UIManager 접근 (MainScene 및 Scene 전환 지원)
         /// </summary>
         public static UIManager GetInstance()
         {
@@ -67,7 +67,7 @@ namespace App.UI
         }
 
         /// <summary>
-        /// 🔥 추가: Scene 전환 지원을 위한 강화된 Instance 접근
+        ///  추가: Scene 전환 지원을 위한 강화된 Instance 접근
         /// </summary>
         public static UIManager GetInstanceSafe()
         {
@@ -149,7 +149,7 @@ namespace App.UI
         {
             Debug.Log("[UIManager] 자동 로그인 상태 확인 시작");
 
-            // 🔥 수정: SceneFlowController의 자동 로그인 상태를 확인
+            //  수정: SceneFlowController의 자동 로그인 상태를 확인
             var autoLoginState = App.Core.SceneFlowController.GetAutoLoginState();
             Debug.Log($"[UIManager] SceneFlowController 자동 로그인 상태: {autoLoginState}");
 
@@ -356,7 +356,7 @@ namespace App.UI
                 Debug.Log($"현재 패널 활성 상태: {(currentPanel != null ? currentPanel.gameObject.activeInHierarchy.ToString() : "N/A")}");
             }
             
-            // 🔥 수정: 패널이 실제로 활성화되어 있을 때만 early return 
+            //  수정: 패널이 실제로 활성화되어 있을 때만 early return 
             // StageSelect 패널의 경우 씬 간 전환이 있을 수 있으므로 재초기화 허용
             if (currentState == state && currentPanel != null && currentPanel.gameObject.activeInHierarchy && state != UIState.StageSelect) 
             {
@@ -365,7 +365,7 @@ namespace App.UI
                 return;
             }
 
-            // 🔥 추가: currentPanel이 null이 아니지만 gameObject가 파괴된 경우 상태 리셋
+            //  추가: currentPanel이 null이 아니지만 gameObject가 파괴된 경우 상태 리셋
             if (currentPanel != null && currentPanel.gameObject == null)
             {
                 Debug.LogWarning($"[UIManager] currentPanel의 gameObject가 파괴됨 - 상태 리셋");
@@ -435,7 +435,7 @@ namespace App.UI
                  ├── Single → StageSelect → Gameplay
                  └── Multi → Lobby → GameRoom → Gameplay
             
-            🔄 구현할 전환 함수들:
+             구현할 전환 함수들:
             - OnLoginSuccess() → ShowModeSelection()
             - OnSingleModeSelected() → ShowStageSelect()  
             - OnMultiModeSelected() → ShowLobby()
@@ -458,7 +458,7 @@ namespace App.UI
         {
             Debug.Log("[UIManager] OnSingleModeSelected() 호출됨");
             
-            // 🔥 핵심 해결: 스테이지 선택을 먼저 표시하고, 실제 게임플레이는 스테이지 선택 후에
+            //  핵심 해결: 스테이지 선택을 먼저 표시하고, 실제 게임플레이는 스테이지 선택 후에
             if (App.Core.SceneFlowController.Instance != null)
             {
                 Debug.Log("[UIManager] SceneFlowController로 스테이지 선택 모드 진입");
@@ -472,7 +472,7 @@ namespace App.UI
         }
         
         /// <summary>
-        /// 🔥 핵심 수정: 스테이지 선택 화면으로만 진입 (게임플레이 초기화 안함)
+        ///  핵심 수정: 스테이지 선택 화면으로만 진입 (게임플레이 초기화 안함)
         /// </summary>
         private IEnumerator LoadScenesForStageSelection()
         {
@@ -481,7 +481,7 @@ namespace App.UI
             // 1. SingleCore와 SingleGameplayScene을 로드하되, 게임 데이터 없이 스테이지 선택용으로만 사용
             // 2. SingleGameManager.IsInGameplayMode = false 상태로 유지 (스테이지 선택 모드)
             
-            // 🔥 중요: CurrentStage = 0으로 설정하여 테스트 데이터 초기화 방지
+            //  중요: CurrentStage = 0으로 설정하여 테스트 데이터 초기화 방지
             Features.Single.Gameplay.SingleGameManager.SetStageContext(0, null);
             
             // SceneFlowController의 GoSingle을 호출 (하지만 스테이지 데이터는 없음)
@@ -490,11 +490,11 @@ namespace App.UI
             // MainScene 패널들을 조건부로 숨김 (스테이지 선택 모드에서는 MainScene 패널 유지)
             HideMainScenePanelsForStageSelection();
             
-            Debug.Log("[UIManager] ✅ 스테이지 선택 화면 준비 완료 - IsInGameplayMode = false");
+            Debug.Log("[UIManager]  스테이지 선택 화면 준비 완료 - IsInGameplayMode = false");
         }
         
         /// <summary>
-        /// 🔥 추가: 스테이지 선택 모드에 따른 패널 표시/숨김 제어
+        ///  추가: 스테이지 선택 모드에 따른 패널 표시/숨김 제어
         /// </summary>
         private void HideMainScenePanelsForStageSelection()
         {
@@ -527,7 +527,7 @@ namespace App.UI
         }
 
         /// <summary>
-        /// 🔥 핵심 수정: 스테이지 선택 후 실제 게임플레이 모드로 전환
+        ///  핵심 수정: 스테이지 선택 후 실제 게임플레이 모드로 전환
         /// </summary>
         public void OnStageSelected(int stageNumber)
         {
@@ -538,7 +538,7 @@ namespace App.UI
             {
                 Features.Single.Core.StageDataManager.Instance.SelectStage(stageNumber);
                 
-                // 🔥 중요: 게임플레이 모드로 전환하기 위한 스테이지 컨텍스트 설정
+                //  중요: 게임플레이 모드로 전환하기 위한 스테이지 컨텍스트 설정
                 Features.Single.Gameplay.SingleGameManager.SetStageContext(stageNumber, Features.Single.Core.StageDataManager.Instance);
                 Debug.Log($"[UIManager] SingleGameManager 스테이지 컨텍스트 설정: {stageNumber} (IsInGameplayMode=true)");
                 
@@ -552,22 +552,22 @@ namespace App.UI
                 return;
             }
 
-            // 2. 🔥 핵심: 게임플레이 모드로 전환 (Scene은 이미 로드됨)
+            // 2.  핵심: 게임플레이 모드로 전환 (Scene은 이미 로드됨)
             StartCoroutine(TransitionToGameplayMode());
         }
         
         /// <summary>
-        /// 🔥 수정: 스테이지 선택 모드에서 게임플레이 모드로 전환 (StageSelectPanel 유지)
+        ///  수정: 스테이지 선택 모드에서 게임플레이 모드로 전환 (StageSelectPanel 유지)
         /// 기획 의도: StageSelectPanel 비활성화하지 않고 GamePanel만 활성화
         /// </summary>
         private IEnumerator TransitionToGameplayMode()
         {
             Debug.Log("[UIManager] 게임플레이 모드 전환 시작");
             
-            // 🔥 핵심 수정: MainScene 패널들 숨기되, StageSelectPanel은 유지
+            //  핵심 수정: MainScene 패널들 숨기되, StageSelectPanel은 유지
             HideMainScenePanelsForGameplay();
             
-            // 2. 🔥 핵심 수정: SingleGameManager 초기화 + UI 활성화
+            // 2.  핵심 수정: SingleGameManager 초기화 + UI 활성화
             // Scene은 이미 로드되어 있으므로 SingleGameManager 직접 호출
             var singleGameManager = Features.Single.Gameplay.SingleGameManager.Instance;
             if (singleGameManager != null && Features.Single.Gameplay.SingleGameManager.CurrentStage > 0)
@@ -603,11 +603,11 @@ namespace App.UI
                 }
             }
             
-            Debug.Log("[UIManager] ✅ 게임플레이 모드 전환 완료 - 게임 시작!");
+            Debug.Log("[UIManager]  게임플레이 모드 전환 완료 - 게임 시작!");
         }
         
         /// <summary>
-        /// 🔥 신규: 게임플레이 시작 시 MainScene 패널 숨기기 (StageSelectPanel 제외)
+        ///  신규: 게임플레이 시작 시 MainScene 패널 숨기기 (StageSelectPanel 제외)
         /// 기획 의도: StageSelectPanel은 유지하고 다른 패널들만 숨김
         /// </summary>
         private void HideMainScenePanelsForGameplay()
@@ -626,7 +626,7 @@ namespace App.UI
                 Debug.Log("[UIManager] ModeSelection 패널 숨기기");
                 modePanel.Hide();
                 
-                // 🔥 중요: ModeSelection 패널이 숨겨지면 currentState와 currentPanel을 리셋
+                //  중요: ModeSelection 패널이 숨겨지면 currentState와 currentPanel을 리셋
                 // 나중에 ShowPanel(ModeSelection)이 호출될 때 정상적으로 표시되도록 함
                 if (currentState == UIState.ModeSelection && currentPanel == modePanel)
                 {
@@ -636,7 +636,7 @@ namespace App.UI
                 }
             }
             
-            // 🔥 핵심: StageSelect 패널은 유지 (기획 의도)
+            //  핵심: StageSelect 패널은 유지 (기획 의도)
             if (panels.TryGetValue(UIState.StageSelect, out var stagePanel) && stagePanel != null)
             {
                 if (!stagePanel.gameObject.activeSelf)
@@ -650,7 +650,7 @@ namespace App.UI
         }
 
         /// <summary>
-        /// 🔥 기존: MainScene의 모든 패널 숨기기 (완전 게임플레이 모드 또는 씬 전환 시)
+        ///  기존: MainScene의 모든 패널 숨기기 (완전 게임플레이 모드 또는 씬 전환 시)
         /// </summary>
         private void HideAllMainScenePanels()
         {
@@ -823,7 +823,7 @@ namespace App.UI
         }
         
         // ========================================
-        // 🔥 BlokusUIManager 호환성 메서드들
+        //  BlokusUIManager 호환성 메서드들
         // ========================================
         
         /// <summary>

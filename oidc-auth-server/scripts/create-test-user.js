@@ -63,7 +63,7 @@ async function createTestUser() {
           [hashedPassword, userData.email, userData.display_name, userData.username]
         )
         
-        console.log(`✅ User ${userData.username} password updated`)
+        console.log(` User ${userData.username} password updated`)
       } else {
         // 새 사용자 생성
         const result = await client.query(
@@ -98,7 +98,7 @@ async function createTestUser() {
           [userId]
         )
 
-        console.log(`✅ User ${userData.username} created with ID: ${userId}`)
+        console.log(` User ${userData.username} created with ID: ${userId}`)
       }
 
       console.log(`   Username: ${userData.username}`)
@@ -114,7 +114,7 @@ async function createTestUser() {
     console.log('3. Unity 앱으로 자동 복귀')
 
   } catch (error) {
-    console.error('❌ Error creating test user:', error.message)
+    console.error(' Error creating test user:', error.message)
     console.error('Stack:', error.stack)
   } finally {
     await client.end()
@@ -125,11 +125,11 @@ async function createTestUser() {
 if (require.main === module) {
   createTestUser()
     .then(() => {
-      console.log('\n✅ Script completed successfully')
+      console.log('\n Script completed successfully')
       process.exit(0)
     })
     .catch(error => {
-      console.error('❌ Script failed:', error.message)
+      console.error(' Script failed:', error.message)
       process.exit(1)
     })
 }

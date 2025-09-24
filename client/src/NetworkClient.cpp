@@ -92,11 +92,11 @@ namespace Blokus {
             m_socket->disconnect();
             if (m_socket->state() != QAbstractSocket::UnconnectedState) {
                 m_socket->disconnectFromHost();
-                // 🔧 FIX: Remove blocking waitForDisconnected - use async disconnection
+                //  FIX: Remove blocking waitForDisconnected - use async disconnection
                 // The disconnected() signal will be emitted when disconnection completes
                 QTimer::singleShot(3000, this, [this]() {
                     if (m_socket && m_socket->state() != QAbstractSocket::UnconnectedState) {
-                        qDebug() << "🚨 Force aborting connection after timeout";
+                        qDebug() << " Force aborting connection after timeout";
                         m_socket->abort();
                     }
                 });
@@ -1001,7 +1001,7 @@ namespace Blokus {
     
     void NetworkClient::performVersionCheck()
     {
-        qDebug() << QString::fromUtf8("🔍 서버 버전 호환성 검사 시작 - 클라이언트 버전: %1")
+        qDebug() << QString::fromUtf8(" 서버 버전 호환성 검사 시작 - 클라이언트 버전: %1")
                     .arg(QString::fromStdString(ClientConfigManager::VERSION));
         
         // 버전 확인 요청 (텍스트 기반)
@@ -1014,12 +1014,12 @@ namespace Blokus {
     {
         // params[0] = "version", params[1] = "ok" or "mismatch", params[2+] = downloadUrl parts (if mismatch)
         
-        qDebug() << QString::fromUtf8("🔍 버전 응답 파싱: 파라미터 수=%1, 내용=[%2]")
+        qDebug() << QString::fromUtf8(" 버전 응답 파싱: 파라미터 수=%1, 내용=[%2]")
                     .arg(params.size())
                     .arg(params.join(", "));
         
         if (params.size() < 2) {
-            qDebug() << QString::fromUtf8("❌ 버전 응답 형식 오류: %1").arg(params.join(":"));
+            qDebug() << QString::fromUtf8(" 버전 응답 형식 오류: %1").arg(params.join(":"));
             return;
         }
         
@@ -1030,7 +1030,7 @@ namespace Blokus {
         
         if (status == "ok") {
             // 버전 호환 - 정상 연결 완료
-            qDebug() << QString::fromUtf8("✅ 버전 호환성 확인 완료 - 서버 연결 성공");
+            qDebug() << QString::fromUtf8(" 버전 호환성 확인 완료 - 서버 연결 성공");
             emit versionCheckCompleted(true);
             emit connected(); // 이제 진짜 연결 완료 시그널 발송
         } 
@@ -1043,7 +1043,7 @@ namespace Blokus {
                 downloadUrl = "https://blokus-online.mooo.com/download"; // 기본값
             }
             
-            qDebug() << QString::fromUtf8("❌ 버전 불일치 감지 - 다운로드 URL: %1").arg(downloadUrl);
+            qDebug() << QString::fromUtf8(" 버전 불일치 감지 - 다운로드 URL: %1").arg(downloadUrl);
             
             emit versionIncompatible("", downloadUrl);
             
@@ -1059,13 +1059,13 @@ namespace Blokus {
             
             if (msgBox.exec() == QMessageBox::Yes) {
                 // 다운로드 페이지 열기
-                qDebug() << QString::fromUtf8("🌐 다운로드 페이지 열기 시도: %1").arg(downloadUrl);
+                qDebug() << QString::fromUtf8(" 다운로드 페이지 열기 시도: %1").arg(downloadUrl);
                 
                 bool urlOpened = QDesktopServices::openUrl(QUrl(downloadUrl));
                 if (urlOpened) {
-                    qDebug() << QString::fromUtf8("✅ 다운로드 페이지 열기 성공");
+                    qDebug() << QString::fromUtf8(" 다운로드 페이지 열기 성공");
                 } else {
-                    qDebug() << QString::fromUtf8("❌ 다운로드 페이지 열기 실패");
+                    qDebug() << QString::fromUtf8(" 다운로드 페이지 열기 실패");
                     
                     // 수동으로 URL 표시
                     QMessageBox urlBox;
@@ -1079,7 +1079,7 @@ namespace Blokus {
                 qDebug() << QString::fromUtf8("🔚 업데이트를 위해 클라이언트 종료");
                 QApplication::quit();
             } else {
-                qDebug() << QString::fromUtf8("❌ 사용자가 업데이트를 거부 - 클라이언트 종료");
+                qDebug() << QString::fromUtf8(" 사용자가 업데이트를 거부 - 클라이언트 종료");
                 // 연결 종료
                 disconnect();
                 // 클라이언트 종료
@@ -1088,7 +1088,7 @@ namespace Blokus {
             
             emit versionCheckCompleted(false);
         } else {
-            qDebug() << QString::fromUtf8("❌ 알 수 없는 버전 응답: %1").arg(status);
+            qDebug() << QString::fromUtf8(" 알 수 없는 버전 응답: %1").arg(status);
         }
     }
 

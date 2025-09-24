@@ -37,16 +37,16 @@ void ClientConfigManager::loadDefaults() {
     #ifdef _DEBUG
         // Debug 모드: localhost 사용
         server_config_.host = "localhost";
-        qDebug() << QString::fromUtf8("🔧 디버그 모드: localhost 서버 사용");
+        qDebug() << QString::fromUtf8("디버그 모드: localhost 서버 사용");
     #else
         // Release 모드: 프로덕션 서버 사용
         server_config_.host = "blokus-online.mooo.com";
-        qDebug() << QString::fromUtf8("🚀 릴리즈 모드: 프로덕션 서버 사용 (blokus-online.mooo.com)");
+        qDebug() << QString::fromUtf8("릴리즈 모드: 프로덕션 서버 사용 (blokus-online.mooo.com)");
     #endif
     
     // 포트는 항상 9999 사용
     server_config_.port = 9999;
-    qDebug() << QString::fromUtf8("🌐 서버 설정 - 호스트: '%1', 포트: %2").arg(server_config_.host).arg(server_config_.port);
+    qDebug() << QString::fromUtf8("서버 설정 - 호스트: '%1', 포트: %2").arg(server_config_.host).arg(server_config_.port);
     
     server_config_.timeout_ms = 5000;
     server_config_.reconnect_attempts = 3;

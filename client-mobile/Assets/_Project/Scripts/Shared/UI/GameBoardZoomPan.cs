@@ -179,7 +179,7 @@ namespace Shared.UI
                 Debug.LogWarning("[GameBoardZoomPan] ⚠️ GraphicRaycaster가 없습니다. Canvas에 추가해야 합니다.");
             }
 
-            Debug.Log("[GameBoardZoomPan] 🎯 GameBoard 이벤트 우선권 설정 완료 (ActionButtonPanel 가시성 보장)");
+            Debug.Log("[GameBoardZoomPan]  GameBoard 이벤트 우선권 설정 완료 (ActionButtonPanel 가시성 보장)");
         }
 
         /// <summary>
@@ -214,7 +214,7 @@ namespace Shared.UI
                             canvasGroup.interactable = true;
                             canvasGroup.alpha = 1f;
 
-                            Debug.Log("[GameBoardZoomPan] ✅ ActionButtonPanel 가시성 보장 완료");
+                            Debug.Log("[GameBoardZoomPan]  ActionButtonPanel 가시성 보장 완료");
                         }
                         else
                         {
@@ -229,7 +229,7 @@ namespace Shared.UI
             }
             catch (System.Exception ex)
             {
-                Debug.LogError($"[GameBoardZoomPan] ❌ ActionButtonPanel 가시성 설정 중 오류: {ex.Message}");
+                Debug.LogError($"[GameBoardZoomPan]  ActionButtonPanel 가시성 설정 중 오류: {ex.Message}");
             }
         }
 
@@ -278,14 +278,14 @@ namespace Shared.UI
         /// </summary>
         private void ForceEnableEventReception()
         {
-            Debug.Log("[GameBoardZoomPan] 🔧 강제 이벤트 수신 활성화 시작");
+            Debug.Log("[GameBoardZoomPan]  강제 이벤트 수신 활성화 시작");
 
             // Image raycastTarget 강제 활성화
             var image = GetComponent<Image>();
             if (image != null)
             {
                 image.raycastTarget = true;
-                Debug.Log($"[GameBoardZoomPan] 🔧 Image raycastTarget 강제 활성화: {image.raycastTarget}");
+                Debug.Log($"[GameBoardZoomPan]  Image raycastTarget 강제 활성화: {image.raycastTarget}");
             }
             else
             {
@@ -298,7 +298,7 @@ namespace Shared.UI
             {
                 canvasGroup.blocksRaycasts = true;
                 canvasGroup.interactable = true;
-                Debug.Log($"[GameBoardZoomPan] 🔧 자체 CanvasGroup 강제 활성화");
+                Debug.Log($"[GameBoardZoomPan]  자체 CanvasGroup 강제 활성화");
             }
 
             // 모든 부모 CanvasGroup들 활성화
@@ -314,7 +314,7 @@ namespace Shared.UI
 
                     if (wasBlocked)
                     {
-                        Debug.Log($"[GameBoardZoomPan] 🔧 부모 CanvasGroup 강제 활성화: {parent.name}");
+                        Debug.Log($"[GameBoardZoomPan]  부모 CanvasGroup 강제 활성화: {parent.name}");
                     }
                 }
                 parent = parent.parent;
@@ -322,9 +322,9 @@ namespace Shared.UI
 
             // **핵심 수정: 기본 상태에서 셀 raycast 비활성화 (GameBoard가 이벤트를 받을 수 있도록)**
             SetCellRaycastEnabled(false);
-            Debug.Log("[GameBoardZoomPan] 🔧 기본 상태에서 셀 raycast 비활성화 - GameBoard 이벤트 수신 활성화");
+            Debug.Log("[GameBoardZoomPan]  기본 상태에서 셀 raycast 비활성화 - GameBoard 이벤트 수신 활성화");
 
-            Debug.Log("[GameBoardZoomPan] 🔧 강제 이벤트 수신 활성화 완료");
+            Debug.Log("[GameBoardZoomPan]  강제 이벤트 수신 활성화 완료");
         }
 
         /// <summary>
@@ -338,7 +338,7 @@ namespace Shared.UI
             if (image != null)
             {
                 image.raycastTarget = true;
-                Debug.Log("[GameBoardZoomPan] 🔧 지연된 raycastTarget 강제 재설정 완료");
+                Debug.Log("[GameBoardZoomPan]  지연된 raycastTarget 강제 재설정 완료");
             }
         }
 
@@ -371,7 +371,7 @@ namespace Shared.UI
             {
                 bool currentState = singleGameBoard != null; // 임시로 상태 확인
                 SetCellRaycastEnabled(!currentState);
-                Debug.Log($"[GameBoardZoomPan] 🔧 강제 셀 raycast 토글: {!currentState}");
+                Debug.Log($"[GameBoardZoomPan]  강제 셀 raycast 토글: {!currentState}");
                 TestEventReception(); // 바로 테스트
             }
 
@@ -380,15 +380,15 @@ namespace Shared.UI
             // 디버깅용: Ctrl+클릭으로 간단 진단 (로그 폭증 방지)
             if (Input.GetMouseButtonDown(0) && Input.GetKey(KeyCode.LeftControl))
             {
-                Debug.Log($"[GameBoardZoomPan] 🔧 간단 진단: GameObject활성={gameObject.activeInHierarchy}, 컴포넌트활성={enabled}");
+                Debug.Log($"[GameBoardZoomPan]  간단 진단: GameObject활성={gameObject.activeInHierarchy}, 컴포넌트활성={enabled}");
 
                 var image = GetComponent<Image>();
                 if (image != null)
                 {
-                    Debug.Log($"[GameBoardZoomPan] 🔧 Image: raycastTarget={image.raycastTarget}, alpha={image.color.a:F3}");
+                    Debug.Log($"[GameBoardZoomPan]  Image: raycastTarget={image.raycastTarget}, alpha={image.color.a:F3}");
                 }
 
-                Debug.Log($"[GameBoardZoomPan] 🔧 상태: isDragging={isDragging}, isPanModeActive={isPanModeActive}");
+                Debug.Log($"[GameBoardZoomPan]  상태: isDragging={isDragging}, isPanModeActive={isPanModeActive}");
                 // 복잡한 raycast 테스트는 제거하여 로그 폭증 방지
             }
         }
@@ -662,7 +662,7 @@ namespace Shared.UI
 
             // 초기화 시 셀 클릭 모드로 복구
             SetCellRaycastEnabled(true);
-            Debug.Log("[GameBoardZoomPan] 🔄 셀 클릭 모드로 복구");
+            Debug.Log("[GameBoardZoomPan]  셀 클릭 모드로 복구");
         }
 
         /// <summary>
@@ -991,13 +991,13 @@ namespace Shared.UI
             if (singleGameBoard != null)
             {
                 singleGameBoard.SetCellRaycastEnabled(enableCellRaycast);
-                Debug.Log($"[GameBoardZoomPan] ✅ Single GameBoard에 raycast={enableCellRaycast} 설정 완료");
+                Debug.Log($"[GameBoardZoomPan]  Single GameBoard에 raycast={enableCellRaycast} 설정 완료");
 
                 // 설정 후 즉시 Raycast 테스트로 효과 확인
                 if (Input.mousePresent)
                 {
                     var currentMousePos = Input.mousePosition;
-                    Debug.Log($"[GameBoardZoomPan] 🔄 raycast 변경 후 마우스 위치에서 Raycast 재테스트...");
+                    Debug.Log($"[GameBoardZoomPan]  raycast 변경 후 마우스 위치에서 Raycast 재테스트...");
 
                     // 짧은 지연 후 테스트 (다음 프레임에서)
                     StartCoroutine(TestRaycastAfterDelay());
@@ -1008,7 +1008,7 @@ namespace Shared.UI
                 // Multi GameBoard에 동일한 메서드 호출
                 multiGameBoard.SetCellRaycastEnabled(enableCellRaycast);
 
-                Debug.Log($"[GameBoardZoomPan] 🔄 raycast 변경 후 마우스 위치에서 Raycast 재테스트...");
+                Debug.Log($"[GameBoardZoomPan]  raycast 변경 후 마우스 위치에서 Raycast 재테스트...");
 
                 // 짧은 지연 후 테스트 (다음 프레임에서)
                 StartCoroutine(TestRaycastAfterDelay());
@@ -1081,7 +1081,7 @@ namespace Shared.UI
                 if (currentSelectedBlockField != null)
                 {
                     currentSelectedBlockField.SetValue(singleGameManager, null);
-                    Debug.Log("[GameBoardZoomPan] 🎯 SingleGameManager 블록 선택 해제 완료");
+                    Debug.Log("[GameBoardZoomPan]  SingleGameManager 블록 선택 해제 완료");
                 }
 
                 // 2. 게임 보드의 터치 프리뷰 해제
@@ -1089,7 +1089,7 @@ namespace Shared.UI
                 if (gameBoard != null)
                 {
                     gameBoard.ClearTouchPreview();
-                    Debug.Log("[GameBoardZoomPan] 🎯 게임 보드 터치 프리뷰 해제 완료");
+                    Debug.Log("[GameBoardZoomPan]  게임 보드 터치 프리뷰 해제 완료");
                 }
 
                 // 3. BlockPalette의 시각적 선택 상태 해제
@@ -1119,12 +1119,12 @@ namespace Shared.UI
                             selectedBlockField?.SetValue(blockPalette, null);
                             currentSelectedButtonField.SetValue(blockPalette, null);
 
-                            Debug.Log("[GameBoardZoomPan] 🎯 BlockPalette 시각적 선택 해제 완료");
+                            Debug.Log("[GameBoardZoomPan]  BlockPalette 시각적 선택 해제 완료");
                         }
                     }
                 }
 
-                Debug.Log("[GameBoardZoomPan] 🎯 팬 시작으로 인한 완전한 블록 선택 해제 완료");
+                Debug.Log("[GameBoardZoomPan]  팬 시작으로 인한 완전한 블록 선택 해제 완료");
             }
         }
 
@@ -1147,12 +1147,12 @@ namespace Shared.UI
             EventSystem eventSystem = EventSystem.current;
             if (eventSystem == null)
             {
-                Debug.LogError("[GameBoardZoomPan] ❌ EventSystem이 씬에 없습니다! EventSystem을 추가해야 합니다.");
+                Debug.LogError("[GameBoardZoomPan]  EventSystem이 씬에 없습니다! EventSystem을 추가해야 합니다.");
                 return;
             }
             else
             {
-                Debug.Log($"[GameBoardZoomPan] ✅ EventSystem 발견: {eventSystem.name}");
+                Debug.Log($"[GameBoardZoomPan]  EventSystem 발견: {eventSystem.name}");
                 Debug.Log($"[GameBoardZoomPan] 드래그 임계값: {eventSystem.pixelDragThreshold}px");
             }
 
@@ -1163,7 +1163,7 @@ namespace Shared.UI
                 Vector2 size = rectTransform.sizeDelta;
                 Vector2 worldSize = rectTransform.rect.size;
                 Vector3 worldScale = rectTransform.lossyScale;
-                Debug.Log($"[GameBoardZoomPan] 🔍 RectTransform 정보: sizeDelta={size}, worldSize={worldSize}, scale={worldScale}");
+                Debug.Log($"[GameBoardZoomPan]  RectTransform 정보: sizeDelta={size}, worldSize={worldSize}, scale={worldScale}");
 
                 if (worldSize.x < 10f || worldSize.y < 10f)
                 {
@@ -1179,7 +1179,7 @@ namespace Shared.UI
                     Vector2 screenMin = RectTransformUtility.WorldToScreenPoint(parentCanvas.worldCamera, worldCorners[0]);
                     Vector2 screenMax = RectTransformUtility.WorldToScreenPoint(parentCanvas.worldCamera, worldCorners[2]);
                     Vector2 screenSize = screenMax - screenMin;
-                    Debug.Log($"[GameBoardZoomPan] 🔍 화면 크기: {screenSize}, 위치: {screenMin} ~ {screenMax}");
+                    Debug.Log($"[GameBoardZoomPan]  화면 크기: {screenSize}, 위치: {screenMin} ~ {screenMax}");
                 }
             }
             else
@@ -1191,20 +1191,20 @@ namespace Shared.UI
             Canvas canvas = GetComponentInParent<Canvas>();
             if (canvas == null)
             {
-                Debug.LogError("[GameBoardZoomPan] ❌ Canvas를 찾을 수 없습니다!");
+                Debug.LogError("[GameBoardZoomPan]  Canvas를 찾을 수 없습니다!");
             }
             else
             {
-                Debug.Log($"[GameBoardZoomPan] ✅ Canvas 발견: {canvas.name}, renderMode: {canvas.renderMode}");
+                Debug.Log($"[GameBoardZoomPan]  Canvas 발견: {canvas.name}, renderMode: {canvas.renderMode}");
 
                 GraphicRaycaster raycaster = canvas.GetComponent<GraphicRaycaster>();
                 if (raycaster == null)
                 {
-                    Debug.LogError("[GameBoardZoomPan] ❌ Canvas에 GraphicRaycaster가 없습니다!");
+                    Debug.LogError("[GameBoardZoomPan]  Canvas에 GraphicRaycaster가 없습니다!");
                 }
                 else
                 {
-                    Debug.Log($"[GameBoardZoomPan] ✅ GraphicRaycaster 발견");
+                    Debug.Log($"[GameBoardZoomPan]  GraphicRaycaster 발견");
                 }
             }
 
@@ -1212,11 +1212,11 @@ namespace Shared.UI
             Image image = GetComponent<Image>();
             if (image == null)
             {
-                Debug.LogError("[GameBoardZoomPan] ❌ Image 컴포넌트가 없습니다!");
+                Debug.LogError("[GameBoardZoomPan]  Image 컴포넌트가 없습니다!");
             }
             else
             {
-                Debug.Log($"[GameBoardZoomPan] ✅ Image 컴포넌트: raycastTarget={image.raycastTarget}, alpha={image.color.a:F3}");
+                Debug.Log($"[GameBoardZoomPan]  Image 컴포넌트: raycastTarget={image.raycastTarget}, alpha={image.color.a:F3}");
             }
 
             // 4. 인터페이스 구현 확인
@@ -1250,7 +1250,7 @@ namespace Shared.UI
                 }
                 else if (foundSelf)
                 {
-                    Debug.Log("[GameBoardZoomPan] ✅ Raycast 결과에 자기 자신이 포함되어 있습니다.");
+                    Debug.Log("[GameBoardZoomPan]  Raycast 결과에 자기 자신이 포함되어 있습니다.");
                 }
 
                 if (results.Count == 0)
@@ -1345,7 +1345,7 @@ namespace Shared.UI
             var graphicRaycaster = GetComponentInParent<GraphicRaycaster>();
             if (graphicRaycaster == null)
             {
-                Debug.LogError("[GameBoardZoomPan] 🚨 GraphicRaycaster를 찾을 수 없습니다!");
+                Debug.LogError("[GameBoardZoomPan]  GraphicRaycaster를 찾을 수 없습니다!");
                 return;
             }
 
@@ -1359,7 +1359,7 @@ namespace Shared.UI
             var raycastResults = new List<RaycastResult>();
             graphicRaycaster.Raycast(eventData, raycastResults);
 
-            Debug.Log($"[GameBoardZoomPan] 🎯 수동 Raycast 결과 ({raycastResults.Count}개):");
+            Debug.Log($"[GameBoardZoomPan]  수동 Raycast 결과 ({raycastResults.Count}개):");
 
             bool foundSelf = false;
             for (int i = 0; i < raycastResults.Count && i < 5; i++) // 상위 5개만 출력
@@ -1378,10 +1378,10 @@ namespace Shared.UI
             }
             else
             {
-                Debug.Log("[GameBoardZoomPan] ✅ Raycast에서 자기 자신을 발견 - 하지만 이벤트 미수신으로 부모 CanvasGroup 차단 의심");
+                Debug.Log("[GameBoardZoomPan]  Raycast에서 자기 자신을 발견 - 하지만 이벤트 미수신으로 부모 CanvasGroup 차단 의심");
 
                 // 강제 이벤트 테스트
-                Debug.Log("[GameBoardZoomPan] 🧪 강제 OnPointerDown 테스트 실행...");
+                Debug.Log("[GameBoardZoomPan]  강제 OnPointerDown 테스트 실행...");
                 try
                 {
                     PointerEventData testPointer = new PointerEventData(EventSystem.current)
@@ -1390,13 +1390,13 @@ namespace Shared.UI
                         button = PointerEventData.InputButton.Left
                     };
                     OnPointerDown(testPointer);
-                    Debug.Log("[GameBoardZoomPan] ✅ 강제 OnPointerDown 성공 - 컴포넌트 자체는 정상 동작");
+                    Debug.Log("[GameBoardZoomPan]  강제 OnPointerDown 성공 - 컴포넌트 자체는 정상 동작");
                 }
                 catch (System.Exception e)
                 {
-                    Debug.LogError($"[GameBoardZoomPan] ❌ 강제 OnPointerDown 실패: {e.Message}");
+                    Debug.LogError($"[GameBoardZoomPan]  강제 OnPointerDown 실패: {e.Message}");
                 }
-                Debug.Log($"[GameBoardZoomPan] ✅ Raycast에서 자기 자신을 발견 - UI 이벤트 전달 문제");
+                Debug.Log($"[GameBoardZoomPan]  Raycast에서 자기 자신을 발견 - UI 이벤트 전달 문제");
             }
         }
 
@@ -1451,7 +1451,7 @@ namespace Shared.UI
             }
             catch (System.Exception e)
             {
-                Debug.LogError($"[GameBoardZoomPan] ❌ 블록 배치 클릭 처리 실패: {e.Message}");
+                Debug.LogError($"[GameBoardZoomPan]  블록 배치 클릭 처리 실패: {e.Message}");
             }
         }
 
@@ -1648,7 +1648,7 @@ namespace Shared.UI
                                 image.raycastTarget = false;
                             }
 
-                            Debug.Log($"[GameBoardZoomPan] 🔧 액션 버튼 raycast 비활성화 완료 - {buttons.Length}개 버튼, {images.Length}개 이미지");
+                            Debug.Log($"[GameBoardZoomPan]  액션 버튼 raycast 비활성화 완료 - {buttons.Length}개 버튼, {images.Length}개 이미지");
                         }
                         else
                         {
@@ -1665,7 +1665,7 @@ namespace Shared.UI
             }
             catch (System.Exception e)
             {
-                Debug.LogError($"[GameBoardZoomPan] ❌ 액션 버튼 raycast 비활성화 실패: {e.Message}");
+                Debug.LogError($"[GameBoardZoomPan]  액션 버튼 raycast 비활성화 실패: {e.Message}");
             }
         }
 
@@ -1712,7 +1712,7 @@ namespace Shared.UI
                                 }
                             }
 
-                            Debug.Log($"[GameBoardZoomPan] 🔧 액션 버튼 raycast 복원 완료 - {buttons.Length}개 버튼, {images.Length}개 이미지");
+                            Debug.Log($"[GameBoardZoomPan]  액션 버튼 raycast 복원 완료 - {buttons.Length}개 버튼, {images.Length}개 이미지");
 
                             // ActionButtonPanel 가시성 재보장
                             actionButtonPanel.SetAsLastSibling();
@@ -1732,7 +1732,7 @@ namespace Shared.UI
             }
             catch (System.Exception e)
             {
-                Debug.LogError($"[GameBoardZoomPan] ❌ 액션 버튼 raycast 복원 실패: {e.Message}");
+                Debug.LogError($"[GameBoardZoomPan]  액션 버튼 raycast 복원 실패: {e.Message}");
             }
         }
 
@@ -1758,7 +1758,7 @@ namespace Shared.UI
             }
             catch (System.Exception e)
             {
-                Debug.LogError($"[GameBoardZoomPan] ❌ GameBoardZoomPan raycast 제어 실패: {e.Message}");
+                Debug.LogError($"[GameBoardZoomPan]  GameBoardZoomPan raycast 제어 실패: {e.Message}");
             }
         }
 

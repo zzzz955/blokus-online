@@ -2042,7 +2042,7 @@ namespace Features.Multi.Net
                     Debug.LogError("[NetworkManager] 연결 테스트 실패");
                     return false;
                 }
-                Debug.Log("[NetworkManager] ✅ 서버 연결 성공");
+                Debug.Log("[NetworkManager]  서버 연결 성공");
                 
                 // Step 2: 인증 테스트 (JWT 토큰이 있는 경우)
                 if (!string.IsNullOrEmpty(testToken))
@@ -2055,7 +2055,7 @@ namespace Features.Multi.Net
                     }
                     else
                     {
-                        Debug.Log("[NetworkManager] ✅ JWT 인증 성공");
+                        Debug.Log("[NetworkManager]  JWT 인증 성공");
                     }
                 }
                 
@@ -2068,7 +2068,7 @@ namespace Features.Multi.Net
                 }
                 else
                 {
-                    Debug.Log("[NetworkManager] ✅ 게스트 로그인 요청 전송됨");
+                    Debug.Log("[NetworkManager]  게스트 로그인 요청 전송됨");
                 }
                 
                 await Task.Delay(2000); // 응답 대기
@@ -2082,7 +2082,7 @@ namespace Features.Multi.Net
                 }
                 else
                 {
-                    Debug.Log("[NetworkManager] ✅ 로비 입장 요청 전송됨");
+                    Debug.Log("[NetworkManager]  로비 입장 요청 전송됨");
                 }
                 
                 await Task.Delay(2000); // 응답 대기

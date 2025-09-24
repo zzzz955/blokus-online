@@ -20,12 +20,12 @@ if [ -d "$DATA_PATH/conf/live/$DOMAIN" ]; then
   read -p "기존 인증서를 삭제하고 새로 발급하시겠습니까? (y/N) " -n 1 -r
   echo
   if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo "🗑️ 기존 인증서 삭제 중..."
+    echo "기존 인증서 삭제 중..."
     sudo rm -rf "$DATA_PATH/conf/live/$DOMAIN"
     sudo rm -rf "$DATA_PATH/conf/archive/$DOMAIN"
     sudo rm -rf "$DATA_PATH/conf/renewal/$DOMAIN.conf"
   else
-    echo "✅ 기존 인증서를 유지합니다."
+    echo " 기존 인증서를 유지합니다."
     exit 0
   fi
 fi
@@ -37,7 +37,7 @@ mkdir -p "$DATA_PATH/www"
 mkdir -p "./logs/nginx"
 
 # 임시 nginx 설정으로 HTTP 검증 준비
-echo "🔧 임시 nginx 설정 준비 중..."
+echo " 임시 nginx 설정 준비 중..."
 cat > ./nginx/nginx-temp.conf << 'EOF'
 events {
     worker_connections 1024;
@@ -61,7 +61,7 @@ http {
 EOF
 
 # 임시 nginx 컨테이너 실행
-echo "🚀 임시 nginx 컨테이너 실행 중..."
+echo " 임시 nginx 컨테이너 실행 중..."
 docker run -d --name temp-nginx \
   -p 80:80 \
   -v $(pwd)/nginx/nginx-temp.conf:/etc/nginx/nginx.conf:ro \
@@ -69,7 +69,7 @@ docker run -d --name temp-nginx \
   nginx:alpine
 
 # 도메인 연결 확인
-echo "🌐 도메인 연결 확인 중..."
+echo " 도메인 연결 확인 중..."
 if ! curl -s http://$DOMAIN/.well-known/acme-challenge/test > /dev/null; then
   echo "⚠️ 도메인 연결을 확인할 수 없습니다. DNS 설정을 확인해 주세요."
   echo "http://$DOMAIN 에 접근할 수 있는지 확인해 주세요."
@@ -102,7 +102,7 @@ rm -f ./nginx/nginx-temp.conf
 
 # 인증서 발급 확인
 if [ -d "$DATA_PATH/conf/live/$DOMAIN" ]; then
-  echo "✅ SSL 인증서가 성공적으로 발급되었습니다!"
+  echo " SSL 인증서가 성공적으로 발급되었습니다!"
   echo "📁 인증서 위치: $DATA_PATH/conf/live/$DOMAIN/"
   
   # 인증서 정보 출력
@@ -110,7 +110,7 @@ if [ -d "$DATA_PATH/conf/live/$DOMAIN" ]; then
   sudo openssl x509 -in "$DATA_PATH/conf/live/$DOMAIN/fullchain.pem" -text -noout | grep -A 2 "Validity"
   
   echo ""
-  echo "🚀 이제 다음 명령으로 전체 서비스를 시작할 수 있습니다:"
+  echo " 이제 다음 명령으로 전체 서비스를 시작할 수 있습니다:"
   echo "   docker-compose up -d"
   echo ""
   echo "⚠️ staging 인증서로 발급되었습니다. 실제 운영 시에는:"
@@ -119,8 +119,8 @@ if [ -d "$DATA_PATH/conf/live/$DOMAIN" ]; then
   echo "   3. 스크립트 재실행"
   
 else
-  echo "❌ SSL 인증서 발급에 실패했습니다."
-  echo "🔍 다음 사항을 확인해 주세요:"
+  echo " SSL 인증서 발급에 실패했습니다."
+  echo " 다음 사항을 확인해 주세요:"
   echo "   1. 도메인이 올바르게 설정되어 있는지"
   echo "   2. 80번 포트가 열려있고 접근 가능한지"
   echo "   3. 방화벽 설정이 올바른지"

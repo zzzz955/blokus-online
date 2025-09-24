@@ -50,14 +50,14 @@ namespace App.Config
                 var envManager = EnvironmentModeManager.Instance;
                 if (envManager == null)
                 {
-                    errorMessage += "❌ EnvironmentModeManager를 찾을 수 없습니다.\n";
+                    errorMessage += " EnvironmentModeManager를 찾을 수 없습니다.\n";
                     isValid = false;
                 }
                 else
                 {
                     if (logValidationResults)
                     {
-                        Debug.Log($"✅ EnvironmentModeManager 발견: {envManager.CurrentMode} 모드");
+                        Debug.Log($" EnvironmentModeManager 발견: {envManager.CurrentMode} 모드");
                     }
                     
                     // 2. 모드별 설정 검증
@@ -71,12 +71,12 @@ namespace App.Config
                 {
                     if (logValidationResults)
                     {
-                        Debug.Log("✅ [EnvironmentModeValidator] 모든 검증 통과!");
+                        Debug.Log(" [EnvironmentModeValidator] 모든 검증 통과!");
                     }
                 }
                 else
                 {
-                    Debug.LogError($"❌ [EnvironmentModeValidator] 검증 실패:\n{errorMessage}");
+                    Debug.LogError($" [EnvironmentModeValidator] 검증 실패:\n{errorMessage}");
                     
                     if (showErrorDialog)
                     {
@@ -89,7 +89,7 @@ namespace App.Config
             }
             catch (System.Exception e)
             {
-                Debug.LogError($"❌ [EnvironmentModeValidator] 검증 중 예외 발생: {e.Message}");
+                Debug.LogError($" [EnvironmentModeValidator] 검증 중 예외 발생: {e.Message}");
             }
         }
         
@@ -144,7 +144,7 @@ namespace App.Config
             
             if (logValidationResults)
             {
-                Debug.Log("✅ Dev 모드 설정 검증 완료");
+                Debug.Log(" Dev 모드 설정 검증 완료");
             }
         }
         
@@ -167,7 +167,7 @@ namespace App.Config
             
             if (logValidationResults)
             {
-                Debug.Log("✅ Release 모드 설정 검증 완료");
+                Debug.Log(" Release 모드 설정 검증 완료");
             }
         }
         
@@ -198,7 +198,7 @@ namespace App.Config
                 {
                     if (logValidationResults)
                     {
-                        Debug.Log("✅ EnvironmentConfig와 EnvironmentModeManager 설정이 일치합니다.");
+                        Debug.Log(" EnvironmentConfig와 EnvironmentModeManager 설정이 일치합니다.");
                     }
                 }
                 else

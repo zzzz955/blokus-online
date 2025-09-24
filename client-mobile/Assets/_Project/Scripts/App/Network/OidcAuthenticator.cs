@@ -24,12 +24,12 @@ namespace App.Network
         [SerializeField] private string scope = "openid profile email";
         [SerializeField] private bool useProduction = false;
         
-        [Header("🔥 Debugging & Diagnostics")]
+        [Header(" Debugging & Diagnostics")]
         [SerializeField] private bool showDetailedLogs = true;
         [SerializeField] private bool testDeepLinkOnStart = false;
         
         [Header("Development Options")]
-        public bool useHttpCallbackForTesting = true; // 🔥 Editor에서 테스트용 - 기본 활성화
+        public bool useHttpCallbackForTesting = true; //  Editor에서 테스트용 - 기본 활성화
         [SerializeField] private bool useUnityEditorAPI = true; // Unity Editor API 사용 (배포 서버와 직접 연결)
         [SerializeField] private bool enableManualCodeInput = true; // 에디터에서 수동 코드 입력
         
@@ -116,14 +116,14 @@ namespace App.Network
 
         private void Start()
         {
-            // 🔧 원격 로깅 시스템 초기화 (릴리즈 빌드용)
+            //  원격 로깅 시스템 초기화 (릴리즈 빌드용)
             RemoteLogger.Initialize(this);
-            RemoteLogger.LogInfo($"🚀 OidcAuthenticator 시작 - Platform: {Application.platform}, BuildType: {(Debug.isDebugBuild ? "Debug" : "Release")}", "OIDC");
+            RemoteLogger.LogInfo($" OidcAuthenticator 시작 - Platform: {Application.platform}, BuildType: {(Debug.isDebugBuild ? "Debug" : "Release")}", "OIDC");
             
-            // 🔥 SecureStorage 초기화 및 토큰 마이그레이션
+            //  SecureStorage 초기화 및 토큰 마이그레이션
             InitializeSecureStorage();
             
-            // 🔥 시스템 진단 정보 출력
+            //  시스템 진단 정보 출력
             LogDebug($"Unity 버전: {Application.unityVersion}");
             LogDebug($"플랫폼: {Application.platform}");
             LogDebug($"개발 빌드: {Debug.isDebugBuild}");
@@ -132,7 +132,7 @@ namespace App.Network
             // 배포 빌드 방식: Deep Link 사용
             if (Application.isEditor)
             {
-                LogDebug($"✅ Unity Editor: Deep Link URI 사용 ({redirectUri})");
+                LogDebug($" Unity Editor: Deep Link URI 사용 ({redirectUri})");
             }
             else
             {
@@ -151,11 +151,11 @@ namespace App.Network
             // Deep Link 스키마 테스트 (개발용)
             if (testDeepLinkOnStart && Application.isEditor)
             {
-                LogDebug($"🧪 Deep Link 테스트: {redirectUri}");
+                LogDebug($" Deep Link 테스트: {redirectUri}");
                 StartCoroutine(TestDeepLinkSupport());
             }
             
-            // 🔥 Editor용 HTTP 콜백 서버 시작 (배포 빌드 방식 사용 시에는 불필요)
+            //  Editor용 HTTP 콜백 서버 시작 (배포 빌드 방식 사용 시에는 불필요)
             if (Application.isEditor && useHttpCallbackForTesting)
             {
                 LogDebug("⚠️ HTTP 콜백 서버 시작 건너뜀 - 배포 빌드 방식 사용 중");
@@ -179,7 +179,7 @@ namespace App.Network
 
         private void OnDestroy()
         {
-            LogDebug("🗑️ OidcAuthenticator OnDestroy 호출됨");
+            LogDebug("OidcAuthenticator OnDestroy 호출됨");
             
             Application.deepLinkActivated -= OnDeepLinkActivated;
             
@@ -229,11 +229,11 @@ namespace App.Network
                         _httpListenerThread = null;
                     }
                     
-                    LogDebug("✅ HTTP 콜백 서버 정지 완료");
+                    LogDebug(" HTTP 콜백 서버 정지 완료");
                 }
                 catch (System.Exception ex)
                 {
-                    LogDebug($"❌ HTTP 서버 정지 중 오류: {ex.Message}");
+                    LogDebug($" HTTP 서버 정지 중 오류: {ex.Message}");
                 }
                 finally
                 {
@@ -268,16 +268,16 @@ namespace App.Network
             _authCallback = callback;
             _isAuthenticating = true;
 
-            // 🚀 Unity Editor에서 배포 서버의 기존 Google OAuth 직접 사용
+            //  Unity Editor에서 배포 서버의 기존 Google OAuth 직접 사용
             // 모든 환경에서 동일한 배포 빌드 방식 사용
-            LogDebug("🚀 배포 빌드 방식 Google OAuth 사용");
+            LogDebug(" 배포 빌드 방식 Google OAuth 사용");
             StartCoroutine(StartProductionGoogleOAuth(callback));
             return;
 
-            // 🔥 HTTP 콜백 서버 상태 확인 (기존 localhost 방식)
+            //  HTTP 콜백 서버 상태 확인 (기존 localhost 방식)
             if (Application.isEditor && useHttpCallbackForTesting && !_isHttpListening)
             {
-                LogDebug("🔄 HTTP 콜백 서버가 꺼져있어서 다시 시작합니다");
+                LogDebug(" HTTP 콜백 서버가 꺼져있어서 다시 시작합니다");
                 StartHttpCallbackServer();
                 
                 // 서버 시작 대기
@@ -292,24 +292,24 @@ namespace App.Network
             string authUrl = BuildAuthorizationUrl();
             LogDebug($"Opening authorization URL: {authUrl}");
             
-            // 🔥 브라우저 열기 시도 및 에러 처리 강화
+            //  브라우저 열기 시도 및 에러 처리 강화
             try
             {
                 // Open system browser
                 Application.OpenURL(authUrl);
-                LogDebug("✅ 브라우저 열기 성공");
+                LogDebug(" 브라우저 열기 성공");
                 
                 // Start listening for deep link
                 StartDeepLinkListener();
             }
             catch (System.Exception ex)
             {
-                LogDebug($"❌ 브라우저 열기 실패: {ex.Message}");
+                LogDebug($" 브라우저 열기 실패: {ex.Message}");
                 CompleteAuthentication(false, $"브라우저를 열 수 없습니다: {ex.Message}", null);
                 return;
             }
             
-            // 🔥 추가 진단: 플랫폼별 브라우저 지원 확인
+            //  추가 진단: 플랫폼별 브라우저 지원 확인
             #if UNITY_WEBGL
             LogDebug("⚠️ WebGL: 브라우저 새 창 열기가 제한될 수 있음");
             #elif UNITY_ANDROID
@@ -338,7 +338,7 @@ namespace App.Network
             
             if (_isHttpListening)
             {
-                LogDebug("✅ HTTP 서버 재시작 완료, 인증 계속 진행");
+                LogDebug(" HTTP 서버 재시작 완료, 인증 계속 진행");
                 
                 // 인증 다시 시작 (재귀 호출 방지를 위해 상태 리셋)
                 _isAuthenticating = false;
@@ -346,7 +346,7 @@ namespace App.Network
             }
             else
             {
-                LogDebug("❌ HTTP 서버 시작 실패");
+                LogDebug(" HTTP 서버 시작 실패");
                 CompleteAuthentication(false, "HTTP 콜백 서버를 시작할 수 없습니다", null);
             }
         }
@@ -398,9 +398,9 @@ namespace App.Network
             var currentOidcUrl = EnvironmentConfig.OidcServerUrl;
             string discoveryUrl = $"{currentOidcUrl}/.well-known/openid-configuration";
             LogDebug($"Loading OIDC discovery document from: {discoveryUrl}");
-            RemoteLogger.LogInfo($"🌐 OIDC Discovery 요청 시작: {discoveryUrl}", "OIDC");
+            RemoteLogger.LogInfo($" OIDC Discovery 요청 시작: {discoveryUrl}", "OIDC");
 
-            // 🔧 Unity 2021.3+ 방식으로 변경
+            //  Unity 2021.3+ 방식으로 변경
             using (UnityWebRequest request = new UnityWebRequest(discoveryUrl, "GET"))
             {
                 request.downloadHandler = new DownloadHandlerBuffer();
@@ -411,16 +411,16 @@ namespace App.Network
                 request.SetRequestHeader("Accept", "application/json");
                 request.SetRequestHeader("User-Agent", "Unity-Mobile-Client/1.0");
                 
-                LogDebug($"🌐 Sending request to: {discoveryUrl}");
-                RemoteLogger.LogInfo($"📡 UnityWebRequest 전송: {discoveryUrl} (timeout: 10초)", "OIDC");
+                LogDebug($" Sending request to: {discoveryUrl}");
+                RemoteLogger.LogInfo($" UnityWebRequest 전송: {discoveryUrl} (timeout: 10초)", "OIDC");
                 yield return request.SendWebRequest();
 
                 if (request.result != UnityWebRequest.Result.Success)
                 {
                     string errorMsg = $"OIDC Discovery 실패: {request.error} (Response Code: {request.responseCode})";
                     LogDebug($"Failed to load discovery document: {request.error}");
-                    RemoteLogger.LogError($"❌ {errorMsg}", "OIDC");
-                    RemoteLogger.LogError($"🔧 RequestResult: {request.result}, ResponseCode: {request.responseCode}", "OIDC");
+                    RemoteLogger.LogError($" {errorMsg}", "OIDC");
+                    RemoteLogger.LogError($" RequestResult: {request.result}, ResponseCode: {request.responseCode}", "OIDC");
                     _isDiscoveryLoaded = false;
                     yield break;
                 }
@@ -428,17 +428,17 @@ namespace App.Network
                 try
                 {
                     string responseText = request.downloadHandler.text;
-                    RemoteLogger.LogInfo($"✅ OIDC Discovery 응답 수신 (길이: {responseText.Length})", "OIDC");
+                    RemoteLogger.LogInfo($" OIDC Discovery 응답 수신 (길이: {responseText.Length})", "OIDC");
                     
                     _discoveryDocument = JsonConvert.DeserializeObject<OidcDiscoveryDocument>(responseText);
                     _isDiscoveryLoaded = true;
                     LogDebug("OIDC discovery document loaded successfully");
-                    RemoteLogger.LogInfo($"✅ OIDC Discovery 문서 파싱 성공", "OIDC");
+                    RemoteLogger.LogInfo($" OIDC Discovery 문서 파싱 성공", "OIDC");
                 }
                 catch (Exception ex)
                 {
                     LogDebug($"Failed to parse discovery document: {ex.Message}");
-                    RemoteLogger.LogError($"❌ OIDC Discovery 파싱 실패: {ex.Message}", "OIDC");
+                    RemoteLogger.LogError($" OIDC Discovery 파싱 실패: {ex.Message}", "OIDC");
                     _isDiscoveryLoaded = false;
                 }
             }
@@ -729,7 +729,7 @@ namespace App.Network
             {
                 _authCallback = null;
                 
-                // 🔥 인증 완료 후 HTTP 서버 정리 (에디터에서만)
+                //  인증 완료 후 HTTP 서버 정리 (에디터에서만)
                 if (Application.isEditor && useHttpCallbackForTesting)
                 {
                     LogDebug("🧹 인증 완료, HTTP 콜백 서버 정리 예약 (5초 후)");
@@ -970,12 +970,12 @@ namespace App.Network
         {
             try
             {
-                LogDebug("🔧 Initializing SecureStorage...");
+                LogDebug(" Initializing SecureStorage...");
                 
                 // Check SecureStorage availability
                 if (IsSecureStorageAvailable())
                 {
-                    LogDebug("✅ SecureStorage is available");
+                    LogDebug(" SecureStorage is available");
                     
                     // Perform token migration if needed
                     MigratePlayerPrefsToSecureStorage();
@@ -990,7 +990,7 @@ namespace App.Network
             }
             catch (Exception ex)
             {
-                LogDebug($"❌ SecureStorage initialization failed: {ex.Message}");
+                LogDebug($" SecureStorage initialization failed: {ex.Message}");
             }
         }
 
@@ -1018,7 +1018,7 @@ namespace App.Network
                 }
                 else
                 {
-                    LogDebug("✅ No legacy PlayerPrefs tokens found");
+                    LogDebug(" No legacy PlayerPrefs tokens found");
                 }
                 LogDebug("=== End Token Storage Status ===");
             }
@@ -1039,7 +1039,7 @@ namespace App.Network
         }
         #endregion
 
-        #region 🔥 HTTP Callback Server for Editor
+        #region  HTTP Callback Server for Editor
         private System.Net.HttpListener _httpListener;
         private bool _isHttpListening = false;
         private System.Threading.Thread _httpListenerThread;
@@ -1074,10 +1074,10 @@ namespace App.Network
                 _serverStatus = "Running";
                 _requestCount = 0;
                 
-                LogDebug("🌐 HTTP 콜백 서버 성공적으로 시작: http://localhost:7777/");
-                LogDebug("🔄 OAuth 콜백을 대기 중...");
-                LogDebug("🧪 테스트 URL: http://localhost:7777/health");
-                LogDebug("🧪 콜백 URL: http://localhost:7777/auth/callback");
+                LogDebug(" HTTP 콜백 서버 성공적으로 시작: http://localhost:7777/");
+                LogDebug(" OAuth 콜백을 대기 중...");
+                LogDebug(" 테스트 URL: http://localhost:7777/health");
+                LogDebug(" 콜백 URL: http://localhost:7777/auth/callback");
                 
                 // 백그라운드 스레드에서 요청 처리
                 _httpListenerThread = new System.Threading.Thread(HandleHttpRequestsOnBackgroundThread)
@@ -1090,13 +1090,13 @@ namespace App.Network
                 // 메인 스레드 액션 처리를 위한 코루틴 시작
                 StartCoroutine(ProcessMainThreadActions());
                 
-                // 🔥 서버 상태 모니터링 코루틴 시작
+                //  서버 상태 모니터링 코루틴 시작
                 StartCoroutine(MonitorServerStatus());
             }
             catch (System.Exception ex)
             {
-                LogDebug($"❌ HTTP 콜백 서버 시작 실패: {ex.Message}");
-                LogDebug("💡 포트 7777이 이미 사용 중일 수 있습니다. Unity를 재시작해보세요.");
+                LogDebug($" HTTP 콜백 서버 시작 실패: {ex.Message}");
+                LogDebug(" 포트 7777이 이미 사용 중일 수 있습니다. Unity를 재시작해보세요.");
                 _isHttpListening = false;
             }
         }
@@ -1118,7 +1118,7 @@ namespace App.Network
                 try
                 {
                     _serverStatus = "Listening";
-                    LogDebug("🔄 HTTP 요청 대기 중... (GetContext 호출)");
+                    LogDebug(" HTTP 요청 대기 중... (GetContext 호출)");
                     
                     // GetContext()는 동기 호출로 요청을 대기 - 여기서 블로킹됨
                     var context = _httpListener.GetContext();
@@ -1153,13 +1153,13 @@ namespace App.Network
                     
                     if (_isHttpListening)
                     {
-                        LogDebug($"❌ HTTP 콜백 처리 오류 ({consecutiveErrors}/{maxConsecutiveErrors}): {ex.Message}");
-                        LogDebug($"🔧 오류 타입: {ex.GetType().Name}");
-                        LogDebug($"🔧 스택 트레이스: {ex.StackTrace}");
+                        LogDebug($" HTTP 콜백 처리 오류 ({consecutiveErrors}/{maxConsecutiveErrors}): {ex.Message}");
+                        LogDebug($" 오류 타입: {ex.GetType().Name}");
+                        LogDebug($" 스택 트레이스: {ex.StackTrace}");
                         
                         if (consecutiveErrors >= maxConsecutiveErrors)
                         {
-                            LogDebug($"❌ 연속 오류가 {maxConsecutiveErrors}회 발생하여 서버를 중단합니다");
+                            LogDebug($" 연속 오류가 {maxConsecutiveErrors}회 발생하여 서버를 중단합니다");
                             _serverStatus = "Failed";
                             break;
                         }
@@ -1189,14 +1189,14 @@ namespace App.Network
                     try
                     {
                         processedActions++;
-                        LogDebug($"🔄 메인 스레드에서 HTTP 액션 처리 중... ({processedActions})");
+                        LogDebug($" 메인 스레드에서 HTTP 액션 처리 중... ({processedActions})");
                         action.Invoke();
-                        LogDebug($"✅ HTTP 액션 처리 완료 ({processedActions})");
+                        LogDebug($" HTTP 액션 처리 완료 ({processedActions})");
                     }
                     catch (System.Exception ex)
                     {
-                        LogDebug($"❌ 메인 스레드 액션 처리 오류: {ex.Message}");
-                        LogDebug($"❌ 스택 트레이스: {ex.StackTrace}");
+                        LogDebug($" 메인 스레드 액션 처리 오류: {ex.Message}");
+                        LogDebug($" 스택 트레이스: {ex.StackTrace}");
                     }
                 }
                 
@@ -1211,7 +1211,7 @@ namespace App.Network
         /// </summary>
         private IEnumerator MonitorServerStatus()
         {
-            LogDebug("📊 HTTP 서버 상태 모니터링 시작");
+            LogDebug(" HTTP 서버 상태 모니터링 시작");
             
             while (_isHttpListening)
             {
@@ -1220,24 +1220,24 @@ namespace App.Network
                 
                 if (_isHttpListening)
                 {
-                    LogDebug($"📊 HTTP 서버 상태: {_serverStatus}");
-                    LogDebug($"📊 총 요청 수: {_requestCount}");
-                    LogDebug($"📊 마지막 요청: {(_lastRequestTime == System.DateTime.MinValue ? "없음" : _lastRequestTime.ToString("HH:mm:ss"))}");
-                    LogDebug($"📊 대기 중인 액션: {_mainThreadActions.Count}");
+                    LogDebug($" HTTP 서버 상태: {_serverStatus}");
+                    LogDebug($" 총 요청 수: {_requestCount}");
+                    LogDebug($" 마지막 요청: {(_lastRequestTime == System.DateTime.MinValue ? "없음" : _lastRequestTime.ToString("HH:mm:ss"))}");
+                    LogDebug($" 대기 중인 액션: {_mainThreadActions.Count}");
                     
                     // 백그라운드 스레드 상태 확인
                     if (_httpListenerThread != null)
                     {
-                        LogDebug($"📊 백그라운드 스레드 상태: {(_httpListenerThread.IsAlive ? "실행 중" : "중단됨")}");
+                        LogDebug($" 백그라운드 스레드 상태: {(_httpListenerThread.IsAlive ? "실행 중" : "중단됨")}");
                     }
                     else
                     {
-                        LogDebug($"📊 백그라운드 스레드: null");
+                        LogDebug($" 백그라운드 스레드: null");
                     }
                 }
             }
             
-            LogDebug("📊 HTTP 서버 상태 모니터링 종료");
+            LogDebug(" HTTP 서버 상태 모니터링 종료");
         }
         
         /// <summary>
@@ -1248,10 +1248,10 @@ namespace App.Network
             var request = context.Request;
             var response = context.Response;
             
-            LogDebug($"🌐 HTTP 콜백 수신: {request.Url}");
-            LogDebug($"🔍 요청 메소드: {request.HttpMethod}");
-            LogDebug($"🔍 User-Agent: {request.UserAgent}");
-            LogDebug($"🔍 쿼리 스트링: {request.Url.Query}");
+            LogDebug($" HTTP 콜백 수신: {request.Url}");
+            LogDebug($" 요청 메소드: {request.HttpMethod}");
+            LogDebug($" User-Agent: {request.UserAgent}");
+            LogDebug($" 쿼리 스트링: {request.Url.Query}");
             
             try
             {
@@ -1261,10 +1261,10 @@ namespace App.Network
                 LogDebug($"📋 전체 URL: {url}");
                 LogDebug($"📋 경로: {path}");
                 
-                // 🧪 테스트 엔드포인트: /health
+                //  테스트 엔드포인트: /health
                 if (path.Equals("/health", System.StringComparison.OrdinalIgnoreCase))
                 {
-                    LogDebug($"🧪 헬스체크 요청 처리");
+                    LogDebug($" 헬스체크 요청 처리");
                     
                     var healthResponse = new {
                         status = "OK",
@@ -1280,9 +1280,9 @@ namespace App.Network
                     string htmlResponse = $@"
                     <html><head><meta charset='UTF-8'><title>Unity OAuth Server Health</title></head>
                     <body style='font-family: Arial; padding: 20px; background: #f0f8ff;'>
-                        <h1>🚀 Unity OAuth Callback Server</h1>
+                        <h1> Unity OAuth Callback Server</h1>
                         <div style='background: white; padding: 15px; border-radius: 8px; margin: 10px 0;'>
-                            <h2>✅ 서버 상태: 정상</h2>
+                            <h2> 서버 상태: 정상</h2>
                             <p><strong>현재 시각:</strong> {System.DateTime.Now:yyyy-MM-dd HH:mm:ss}</p>
                             <p><strong>총 요청 수:</strong> {_requestCount}</p>
                             <p><strong>서버 상태:</strong> {_serverStatus}</p>
@@ -1297,7 +1297,7 @@ namespace App.Network
                             </ul>
                         </div>
                         <div style='background: #e8f5e8; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 12px;'>
-                            <h3>📊 JSON 응답</h3>
+                            <h3> JSON 응답</h3>
                             <pre>{jsonResponse}</pre>
                         </div>
                     </body></html>";
@@ -1308,18 +1308,18 @@ namespace App.Network
                     response.StatusCode = 200;
                     response.OutputStream.Write(buffer, 0, buffer.Length);
                     
-                    LogDebug($"🧪 헬스체크 응답 전송 완료 (크기: {buffer.Length} bytes)");
+                    LogDebug($" 헬스체크 응답 전송 완료 (크기: {buffer.Length} bytes)");
                 }
-                // 🎯 OAuth 콜백 처리  
+                //  OAuth 콜백 처리  
                 else if (url.Contains("/auth/callback"))
                 {
-                    LogDebug($"✅ OAuth 콜백 감지됨");
+                    LogDebug($" OAuth 콜백 감지됨");
                     
                     // URL에서 파라미터 추출 및 로깅
                     var uri = new System.Uri(url);
                     var queryParams = ParseQueryString(uri.Query);
                     
-                    LogDebug($"📊 URL 파라미터:");
+                    LogDebug($" URL 파라미터:");
                     foreach (var kvp in queryParams)
                     {
                         if (kvp.Key == "code")
@@ -1334,13 +1334,13 @@ namespace App.Network
                     
                     // Deep Link 형태로 변환
                     string deepLinkUrl = url.Replace("http://localhost:7777/auth/callback", "blokus://auth/callback");
-                    LogDebug($"🔄 HTTP → Deep Link 변환: {deepLinkUrl}");
+                    LogDebug($" HTTP → Deep Link 변환: {deepLinkUrl}");
                     
                     // 성공 페이지 응답
                     string responseString = @"
                     <html><head><meta charset='UTF-8'></head>
                     <body style='font-family: Arial; text-align: center; padding: 50px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;'>
-                        <h2>✅ Google Login Success!</h2>
+                        <h2> Google Login Success!</h2>
                         <p>인증이 완료되었습니다. Unity 앱으로 돌아갑니다...</p>
                         <div style='margin: 20px; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 10px;'>
                             <small>이 창은 2초 후 자동으로 닫힙니다.</small>
@@ -1363,13 +1363,13 @@ namespace App.Network
                     LogDebug($"📄 성공 페이지 응답 전송 완료 (크기: {buffer.Length} bytes)");
                     
                     // Deep Link 콜백 처리
-                    LogDebug($"🎯 Deep Link 콜백 처리 시작: {deepLinkUrl}");
+                    LogDebug($" Deep Link 콜백 처리 시작: {deepLinkUrl}");
                     OnDeepLinkActivated(deepLinkUrl);
-                    LogDebug($"🎯 Deep Link 콜백 처리 완료");
+                    LogDebug($" Deep Link 콜백 처리 완료");
                 }
                 else
                 {
-                    LogDebug($"❌ 예상하지 못한 경로: {url}");
+                    LogDebug($" 예상하지 못한 경로: {url}");
                     // 404 응답
                     response.StatusCode = 404;
                     string notFoundResponse = "<html><body><h1>404 Not Found</h1><p>OAuth callback path not found</p></body></html>";
@@ -1381,8 +1381,8 @@ namespace App.Network
             }
             catch (System.Exception ex)
             {
-                LogDebug($"❌ HTTP 콜백 처리 중 심각한 오류: {ex.Message}");
-                LogDebug($"❌ 스택 트레이스: {ex.StackTrace}");
+                LogDebug($" HTTP 콜백 처리 중 심각한 오류: {ex.Message}");
+                LogDebug($" 스택 트레이스: {ex.StackTrace}");
                 
                 try
                 {
@@ -1395,7 +1395,7 @@ namespace App.Network
                 }
                 catch (System.Exception responseEx)
                 {
-                    LogDebug($"❌ 에러 응답 전송 실패: {responseEx.Message}");
+                    LogDebug($" 에러 응답 전송 실패: {responseEx.Message}");
                 }
             }
             finally
@@ -1413,7 +1413,7 @@ namespace App.Network
         }
         #endregion
 
-        #region 🔥 Development & Testing Methods
+        #region  Development & Testing Methods
         /// <summary>
         /// Deep Link 지원 테스트 (개발용)
         /// </summary>
@@ -1444,7 +1444,7 @@ namespace App.Network
         public void TestDeepLinkCallback()
         {
             string testUrl = $"{redirectUri}?code=test_code_12345&state=test_state";
-            LogDebug($"🧪 수동 Deep Link 테스트: {testUrl}");
+            LogDebug($" 수동 Deep Link 테스트: {testUrl}");
             OnDeepLinkActivated(testUrl);
         }
         
@@ -1456,13 +1456,13 @@ namespace App.Network
         {
             if (!IsReady())
             {
-                LogDebug("❌ Discovery document가 로드되지 않았습니다");
+                LogDebug(" Discovery document가 로드되지 않았습니다");
                 return;
             }
             
             GeneratePkceParameters();
             string authUrl = BuildAuthorizationUrl();
-            LogDebug($"🔗 Authorization URL:\n{authUrl}");
+            LogDebug($" Authorization URL:\n{authUrl}");
         }
         #endregion
 
@@ -1536,7 +1536,7 @@ namespace App.Network
             GeneratePkceParameters();
             
             var oidcServerUrl = EnvironmentConfig.OidcServerUrl;
-            LogDebug($"🚀 배포 빌드 방식 Google OAuth: {oidcServerUrl}");
+            LogDebug($" 배포 빌드 방식 Google OAuth: {oidcServerUrl}");
             
             // Google OAuth URL 생성 - 서버 콜백 방식 (자동 Deep Link 리다이렉트)
             var queryParams = new Dictionary<string, string>
@@ -1552,12 +1552,12 @@ namespace App.Network
             string queryString = string.Join("&", queryParams.Select(kv => $"{kv.Key}={UnityWebRequest.EscapeURL(kv.Value)}"));
             string authUrl = $"{oidcServerUrl}/auth/google?{queryString}";
             
-            LogDebug($"🌐 Google OAuth URL: {authUrl}");
-            LogDebug($"🔗 서버 콜백 URI: {oidcServerUrl}/auth/google/callback");
+            LogDebug($" Google OAuth URL: {authUrl}");
+            LogDebug($" 서버 콜백 URI: {oidcServerUrl}/auth/google/callback");
             
             // 브라우저에서 OAuth 수행
             Application.OpenURL(authUrl);
-            LogDebug("✅ Google OAuth 브라우저 열기 성공");
+            LogDebug(" Google OAuth 브라우저 열기 성공");
             
             // Deep Link 콜백 대기
             yield return StartCoroutine(WaitForDeepLinkCallback());
@@ -1568,7 +1568,7 @@ namespace App.Network
         /// </summary>
         private IEnumerator WaitForDeepLinkCallback()
         {
-            LogDebug("🔗 Deep Link 콜백 대기 시작");
+            LogDebug(" Deep Link 콜백 대기 시작");
             
             float startTime = Time.time;
             const float timeout = 300f; // 5분
@@ -1581,7 +1581,7 @@ namespace App.Network
                 // Deep Link에서 authorization code가 수신되었는지 확인
                 if (!string.IsNullOrEmpty(_receivedAuthCode))
                 {
-                    LogDebug($"✅ Deep Link에서 Authorization Code 수신!");
+                    LogDebug($" Deep Link에서 Authorization Code 수신!");
                     
                     string authCode = _receivedAuthCode;
                     _receivedAuthCode = null; // 사용 후 초기화
@@ -1593,7 +1593,7 @@ namespace App.Network
                 // Deep Link 에러 확인
                 if (!string.IsNullOrEmpty(_receivedError))
                 {
-                    LogDebug($"❌ Deep Link 에러: {_receivedError}");
+                    LogDebug($" Deep Link 에러: {_receivedError}");
                     CompleteAuthentication(false, $"OAuth 인증 실패: {_receivedError}", null);
                     yield break;
                 }
@@ -1617,7 +1617,7 @@ namespace App.Network
             Application.deepLinkActivated += OnDeepLinkReceived;
             _deepLinkHandlerRegistered = true;
             
-            LogDebug("🔗 Deep Link 이벤트 리스너 등록 완료");
+            LogDebug(" Deep Link 이벤트 리스너 등록 완료");
         }
 
         /// <summary>
@@ -1625,7 +1625,7 @@ namespace App.Network
         /// </summary>
         private void OnDeepLinkReceived(string deepLinkUrl)
         {
-            LogDebug($"🔗 Deep Link 수신: {deepLinkUrl}");
+            LogDebug($" Deep Link 수신: {deepLinkUrl}");
             
             try
             {
@@ -1643,26 +1643,26 @@ namespace App.Network
                     // State 검증
                     if (state != _state)
                     {
-                        LogDebug($"❌ State 불일치: 예상={_state}, 수신={state}");
+                        LogDebug($" State 불일치: 예상={_state}, 수신={state}");
                         _receivedError = "Invalid state parameter";
                         return;
                     }
                     
                     if (!string.IsNullOrEmpty(error))
                     {
-                        LogDebug($"❌ OAuth 에러: {error}");
+                        LogDebug($" OAuth 에러: {error}");
                         _receivedError = error;
                         return;
                     }
                     
                     if (!string.IsNullOrEmpty(code))
                     {
-                        LogDebug($"✅ Authorization Code 수신: {code.Substring(0, Math.Min(10, code.Length))}...");
+                        LogDebug($" Authorization Code 수신: {code.Substring(0, Math.Min(10, code.Length))}...");
                         _receivedAuthCode = code;
                     }
                     else
                     {
-                        LogDebug("❌ Authorization Code가 없음");
+                        LogDebug(" Authorization Code가 없음");
                         _receivedError = "Missing authorization code";
                     }
                 }
@@ -1673,7 +1673,7 @@ namespace App.Network
             }
             catch (Exception ex)
             {
-                LogDebug($"❌ Deep Link 파싱 오류: {ex.Message}");
+                LogDebug($" Deep Link 파싱 오류: {ex.Message}");
                 _receivedError = $"Deep Link parsing error: {ex.Message}";
             }
         }
@@ -1687,10 +1687,10 @@ namespace App.Network
             {
                 Application.deepLinkActivated -= OnDeepLinkReceived;
                 _deepLinkHandlerRegistered = false;
-                LogDebug("🔗 Deep Link 이벤트 리스너 해제 완료");
+                LogDebug(" Deep Link 이벤트 리스너 해제 완료");
             }
             
-            // LogDebug($"🔄 Unity Editor 콜백 페이지 폴링 시작");
+            // LogDebug($" Unity Editor 콜백 페이지 폴링 시작");
             
             // while (Time.time - startTime < timeout)
             // {
@@ -1708,7 +1708,7 @@ namespace App.Network
             //                 string code = ExtractCodeFromHtml(responseText);
             //                 if (!string.IsNullOrEmpty(code))
             //                 {
-            //                     LogDebug($"✅ Authorization Code 받음!");
+            //                     LogDebug($" Authorization Code 받음!");
             //                     yield return StartCoroutine(ExchangeCodeForTokens(code));
             //                     yield break;
             //                 }
@@ -1718,7 +1718,7 @@ namespace App.Network
             //             if (responseText.Contains("error:"))
             //             {
             //                 string error = ExtractErrorFromHtml(responseText);
-            //                 LogDebug($"❌ OAuth 에러: {error}");
+            //                 LogDebug($" OAuth 에러: {error}");
             //                 CompleteAuthentication(false, $"OAuth 인증 실패: {error}", null);
             //                 yield break;
             //             }

@@ -1,4 +1,4 @@
-name: 🚀 Feature Request
+name:  Feature Request
 description: 새로운 기능이나 개선사항을 제안해주세요
 title: "[FEATURE] "
 labels: ["enhancement", "needs-discussion"]
@@ -45,7 +45,7 @@ body:
   - type: textarea
     id: problem
     attributes:
-      label: 🎯 해결하고자 하는 문제
+      label:  해결하고자 하는 문제
       description: 현재 어떤 문제나 불편함이 있나요?
       placeholder: |
         예: 현재 게임에서 AI 플레이어가 없어서 혼자 연습하기 어렵습니다.
@@ -55,7 +55,7 @@ body:
   - type: textarea
     id: solution
     attributes:
-      label: 💡 제안하는 해결책
+      label:  제안하는 해결책
       description: 어떤 기능이나 개선사항을 제안하시나요?
       placeholder: |
         예: 3단계 난이도의 AI 플레이어를 추가하여 싱글플레이어 모드를 제공합니다.
@@ -68,7 +68,7 @@ body:
   - type: textarea
     id: alternatives
     attributes:
-      label: 🔄 대안
+      label:  대안
       description: 다른 해결 방법을 고려해보셨나요?
       placeholder: |
         - 온라인 매칭 시스템
@@ -78,7 +78,7 @@ body:
   - type: textarea
     id: benefits
     attributes:
-      label: 📈 기대 효과
+      label:  기대 효과
       description: 이 기능이 구현되면 어떤 이점이 있을까요?
       placeholder: |
         - 사용자가 언제든 혼자 연습할 수 있음
@@ -120,7 +120,7 @@ body:
   - type: checkboxes
     id: scope
     attributes:
-      label: 🎯 범위
+      label:  범위
       description: 이 기능과 관련된 영역을 모두 선택해주세요
       options:
         - label: Client (Qt 클라이언트)
@@ -135,7 +135,7 @@ body:
   - type: checkboxes
     id: checklist
     attributes:
-      label: ✅ 체크리스트
+      label:  체크리스트
       description: 제출 전 확인해주세요
       options:
         - label: 기존 이슈에서 중복되지 않는 제안입니다

@@ -47,8 +47,8 @@ async function startServer () {
 
       // 개발 환경에서는 추가 정보 출력
       if (process.env.NODE_ENV !== 'production') {
-        console.log('🚀 Server is running!')
-        console.log(`📍 URL: http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`)
+        console.log(' Server is running!')
+        console.log(` URL: http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`)
         console.log(`📚 API Docs: http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}/api`)
         console.log(`❤️  Health Check: http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}/api/health`)
       }

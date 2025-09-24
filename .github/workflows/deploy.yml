@@ -82,7 +82,7 @@ jobs:
           
           for i in "${!DIFF_STRATEGIES[@]}"; do
             strategy="${DIFF_STRATEGIES[$i]}"
-            echo "🔍 Strategy $((i+1)): $strategy"
+            echo " Strategy $((i+1)): $strategy"
             
             if [ $i -eq 0 ] && ([ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ] || [ -z "${{ github.event.before }}" ]); then
               echo "  ⏭️ Skipping before/after diff (initial push or empty before)"
@@ -96,25 +96,25 @@ jobs:
             echo "  Raw output: \"$CHANGED_FILES\""
             
             if [ $DIFF_STATUS -eq 0 ] && [ -n "$CHANGED_FILES" ]; then
-              echo "  ✅ Strategy $((i+1)) succeeded"
+              echo "   Strategy $((i+1)) succeeded"
               DIFF_SUCCESS=true
               break
             else
-              echo "  ❌ Strategy $((i+1)) failed or empty"
+              echo "   Strategy $((i+1)) failed or empty"
             fi
           done
           
           if [ "$DIFF_SUCCESS" = false ]; then
-            echo "🚨 All diff strategies failed! Using git ls-files as final fallback"
+            echo " All diff strategies failed! Using git ls-files as final fallback"
             CHANGED_FILES=$(git ls-files)
           fi
         else
           CHANGED_FILES=""
-          echo "❌ Not a push event, skipping change detection"
+          echo " Not a push event, skipping change detection"
         fi
         
         echo ""
-        echo "🔍 Raw changed files output:"
+        echo " Raw changed files output:"
         echo "\"$CHANGED_FILES\""
         echo ""
         echo "📋 Changed files list:"
@@ -125,17 +125,17 @@ jobs:
         fi
 
         echo ""
-        echo "🔍 Pattern Matching Analysis:"
+        echo " Pattern Matching Analysis:"
         
         GAME_CHANGED=false
         echo "Testing game-server pattern: '^(server/|common/|CMakeLists\.txt|vcpkg-server\.json|Dockerfile)'"
         GAME_MATCHES=$(echo "$CHANGED_FILES" | grep -E '^(server/|common/|CMakeLists\.txt|vcpkg-server\.json|Dockerfile)' || echo "")
         if [ -n "$GAME_MATCHES" ]; then
           GAME_CHANGED=true
-          echo "  ✅ GAME SERVER matches found:"
+          echo "   GAME SERVER matches found:"
           echo "$GAME_MATCHES" | sed 's/^/    - /'
         else
-          echo "  ❌ No game server matches"
+          echo "   No game server matches"
         fi
 
         WEB_CHANGED=false
@@ -143,10 +143,10 @@ jobs:
         WEB_MATCHES=$(echo "$CHANGED_FILES" | grep -E '^web/' || echo "")
         if [ -n "$WEB_MATCHES" ]; then
           WEB_CHANGED=true
-          echo "  ✅ WEB matches found:"
+          echo "   WEB matches found:"
           echo "$WEB_MATCHES" | sed 's/^/    - /'
         else
-          echo "  ❌ No web matches"
+          echo "   No web matches"
         fi
 
         SINGLE_API_CHANGED=false
@@ -154,10 +154,10 @@ jobs:
         SINGLE_MATCHES=$(echo "$CHANGED_FILES" | grep -E '^single-player-api/' || echo "")
         if [ -n "$SINGLE_MATCHES" ]; then
           SINGLE_API_CHANGED=true
-          echo "  ✅ SINGLE API matches found:"
+          echo "   SINGLE API matches found:"
           echo "$SINGLE_MATCHES" | sed 's/^/    - /'
         else
-          echo "  ❌ No single-api matches"
+          echo "   No single-api matches"
         fi
 
         OIDC_CHANGED=false
@@ -173,12 +173,12 @@ jobs:
         
         if [ -n "$OIDC_MATCHES" ] && [ "$(echo "$OIDC_MATCHES" | tr -d '[:space:]')" != "" ]; then
           OIDC_CHANGED=true
-          echo "  ✅ OIDC matches found:"
+          echo "   OIDC matches found:"
           echo "$OIDC_MATCHES" | sed 's/^/    - /'
         else
-          echo "  ❌ No oidc matches (empty or whitespace-only)"
+          echo "   No oidc matches (empty or whitespace-only)"
           # Additional debug: show all files that start with 'oidc'
-          echo "  🔍 Files starting with 'oidc':"
+          echo "   Files starting with 'oidc':"
           echo "$CHANGED_FILES" | grep -i '^oidc' | sed 's/^/    DEBUG: /' || echo "    DEBUG: None"
         fi
 
@@ -187,17 +187,17 @@ jobs:
         INFRA_MATCHES=$(echo "$CHANGED_FILES" | grep -E '^(docker-compose\.yml|\.github/|\.env\.example|nginx/|\.gitignore|README\.md|LICENSE|package\.json)' || echo "")
         if [ -n "$INFRA_MATCHES" ]; then
           INFRA_CHANGED=true
-          echo "  ✅ INFRASTRUCTURE matches found:"
+          echo "   INFRASTRUCTURE matches found:"
           echo "$INFRA_MATCHES" | sed 's/^/    - /'
         else
-          echo "  ❌ No infrastructure matches"
+          echo "   No infrastructure matches"
         fi
 
         echo ""
         echo "=== Final Pattern Matching Results ==="
         echo "🎮 Game Server: $GAME_CHANGED"
-        echo "🌐 Web Server: $WEB_CHANGED"  
-        echo "🔧 Single API: $SINGLE_API_CHANGED"
+        echo " Web Server: $WEB_CHANGED"  
+        echo " Single API: $SINGLE_API_CHANGED"
         echo "🔐 OIDC Server: $OIDC_CHANGED"
         echo "🏗️ Infrastructure: $INFRA_CHANGED"
         echo ""
@@ -208,7 +208,7 @@ jobs:
         echo "single-api-changed=$SINGLE_API_CHANGED" >> $GITHUB_OUTPUT
         echo "oidc-changed=$OIDC_CHANGED" >> $GITHUB_OUTPUT
         echo "infrastructure-changed=$INFRA_CHANGED" >> $GITHUB_OUTPUT
-        echo "✅ GitHub outputs set successfully"
+        echo " GitHub outputs set successfully"
 
     - name: Generate cache keys
       id: cache-keys
@@ -585,7 +585,7 @@ jobs:
     - name: Sanity check required secrets (runner-side, extended)
       run: |
         set -e
-        check() { local n="$1"; local v="$2"; if [ -z "$v" ]; then echo "❌ Required secret $n is missing or empty"; exit 1; fi; }
+        check() { local n="$1"; local v="$2"; if [ -z "$v" ]; then echo " Required secret $n is missing or empty"; exit 1; fi; }
         check BLOKUS_SERVER_VERSION "${{ secrets.BLOKUS_SERVER_VERSION }}"
         check BLOKUS_DOWNLOAD_URL   "${{ secrets.BLOKUS_DOWNLOAD_URL }}"
         check DB_PORT               "${{ secrets.DB_PORT }}"
@@ -606,7 +606,7 @@ jobs:
         check REFRESH_TOKEN_LIFETIME "${{ secrets.REFRESH_TOKEN_LIFETIME }}"
         check REFRESH_TOKEN_MAX_LIFETIME "${{ secrets.REFRESH_TOKEN_MAX_LIFETIME }}"
         check AUTH_CODE_LIFETIME    "${{ secrets.AUTH_CODE_LIFETIME }}"
-        echo "✅ Required secrets present"
+        echo " Required secrets present"
 
     - name: Sync source code and environment
       run: |
@@ -642,8 +642,8 @@ jobs:
         BLOKUS_DOWNLOAD_URL="${{ secrets.BLOKUS_DOWNLOAD_URL }}"
 
         # 2) enforce required secrets (must not be empty)
-        if [ -z "$BLOKUS_SERVER_VERSION" ]; then echo "❌ BLOKUS_SERVER_VERSION is required"; exit 1; fi
-        if [ -z "$BLOKUS_DOWNLOAD_URL" ]; then echo "❌ BLOKUS_DOWNLOAD_URL is required"; exit 1; fi
+        if [ -z "$BLOKUS_SERVER_VERSION" ]; then echo " BLOKUS_SERVER_VERSION is required"; exit 1; fi
+        if [ -z "$BLOKUS_DOWNLOAD_URL" ]; then echo " BLOKUS_DOWNLOAD_URL is required"; exit 1; fi
 
         # Optionally auto-generate others if empty
         [ -n "$JWT_SECRET" ] || { JWT_SECRET="$(openssl rand -hex 32)"; echo "⚠️ JWT_SECRET auto-generated"; }
@@ -737,17 +737,17 @@ jobs:
         put_kv DOMAIN                "${{ secrets.DOMAIN }}"
         put_kv CERTBOT_EMAIL         "${{ secrets.CERTBOT_EMAIL }}"
 
-        echo '🔍 Validating .env (required non-empty)...'
+        echo ' Validating .env (required non-empty)...'
         awk -F= '
           /^[A-Za-z_][A-Za-z0-9_]*=/ {
             key=$1; val=$0; sub(/^[^=]*=/,"",val);
             if (key ~ /^(DB_USER|DB_PASSWORD|DB_NAME|JWT_SECRET|NEXTAUTH_SECRET|SESSION_SECRET|ADMIN_TOKEN|BLOKUS_SERVER_VERSION|BLOKUS_DOWNLOAD_URL)$/ && length(val)==0) {
-              printf("❌ %s is empty\n", key); bad=1
+              printf(" %s is empty\n", key); bad=1
             }
           }
           END { exit bad }
         ' .env
-        echo '✅ .env integrity OK'
+        echo ' .env integrity OK'
 
         echo "🔒 Dumping .env keys (masked)..."
         awk -F= '/^[A-Za-z_][A-Za-z0-9_]*=/{print $1"=<redacted>"}' .env | sort
@@ -808,7 +808,7 @@ jobs:
         echo 'Starting services with timeout...'
         timeout 600 $COMPOSE_CMD --env-file .env up -d --no-build --remove-orphans --pull always
 
-        # 🔥 서버 변경 감지 시 nginx 재시작 (모든 서버 변경에 대해)
+        #  서버 변경 감지 시 nginx 재시작 (모든 서버 변경에 대해)
         GAME_SUCCESS="${{ needs.build-game-server.result }}"
         WEB_SUCCESS="${{ needs.build-web-server.result }}"
         SINGLE_SUCCESS="${{ needs.build-single-api.result }}"
@@ -817,7 +817,7 @@ jobs:
         
         # 어떤 서버든 변경되었다면 nginx 재시작
         if [[ "$GAME_SUCCESS" == "success" ]] || [[ "$WEB_SUCCESS" == "success" ]] || [[ "$SINGLE_SUCCESS" == "success" ]] || [[ "$OIDC_SUCCESS" == "success" ]] || [[ "$INFRA_CHANGED" == "true" ]]; then
-          echo "🔧 Server changes detected - restarting nginx for proxy updates"
+          echo " Server changes detected - restarting nginx for proxy updates"
           echo "  Game Server: $GAME_SUCCESS"
           echo "  Web Server: $WEB_SUCCESS" 
           echo "  Single API: $SINGLE_SUCCESS"
@@ -840,16 +840,16 @@ jobs:
           # nginx 상태 확인
           $COMPOSE_CMD --env-file .env ps nginx
           
-          echo "✅ nginx restarted successfully for server changes"
+          echo " nginx restarted successfully for server changes"
         else
           echo "ℹ️ No server changes detected - skipping nginx restart"
         fi
         
-        # 🔥 docker-compose.yml 변경 감지 시 전체 서비스 재시작
+        #  docker-compose.yml 변경 감지 시 전체 서비스 재시작
         if echo "${{ github.event.head_commit.modified }}" | grep -q "docker-compose.yml"; then
-          echo "🔧 docker-compose.yml modified - performing full service restart"
+          echo " docker-compose.yml modified - performing full service restart"
           $COMPOSE_CMD --env-file .env up -d --force-recreate
-          echo "✅ Full service restart completed"
+          echo " Full service restart completed"
         fi
 
         echo 'Checking container status...'
@@ -923,7 +923,7 @@ jobs:
     steps:
     - name: Report build failures
       run: |
-        echo "❌ Build Failure Detected!"
+        echo " Build Failure Detected!"
         echo "Game Server: ${{ needs.build-game-server.result }}"
         echo "Web Server: ${{ needs.build-web-server.result }}"
         echo "Single Player API: ${{ needs.build-single-api.result }}"
@@ -948,7 +948,7 @@ jobs:
     steps:
     - name: Display summary
       run: |
-        echo "🚀 Optimized Deployment Summary"
+        echo " Optimized Deployment Summary"
         echo "Changes:"
         echo "  Game Server: ${{ needs.detect-changes.outputs.game-server-changed }}"
         echo "  Web Server: ${{ needs.detect-changes.outputs.web-changed }}"
@@ -962,8 +962,8 @@ jobs:
         echo "  OIDC: ${{ needs.build-oidc-server.result }}"
         echo "Deploy: ${{ needs.deploy-to-server.result }}"
         if [ "${{ needs.deploy-to-server.result }}" = "success" ]; then
-          echo "✅ Deployment completed successfully!"
+          echo " Deployment completed successfully!"
         else
-          echo "❌ Deployment failed!"
+          echo " Deployment failed!"
           exit 1
         fi

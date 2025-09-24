@@ -1,6 +1,6 @@
 ﻿#include "LobbyWindow.h"
 #include "UserInfoDialog.h"
-#include "ClientTypes.h"  // 🔥 UserInfo 등을 위해 추가
+#include "ClientTypes.h"  //  UserInfo 등을 위해 추가
 #include <QApplication>
 #include <QDesktopWidget>
 #include <QHeaderView>
@@ -588,9 +588,9 @@ namespace Blokus {
         QHBoxLayout* controlsLayout = new QHBoxLayout(m_roomControlsWidget);
         controlsLayout->setContentsMargins(0, 0, 0, 0);
 
-        m_createRoomButton = new QPushButton(QString::fromUtf8("🏠 방 만들기"));
-        m_joinRoomButton = new QPushButton(QString::fromUtf8("🚪 입장하기"));
-        m_refreshRoomButton = new QPushButton(QString::fromUtf8("🔄 새로고침"));
+        m_createRoomButton = new QPushButton(QString::fromUtf8("방 만들기"));
+        m_joinRoomButton = new QPushButton(QString::fromUtf8("입장하기"));
+        m_refreshRoomButton = new QPushButton(QString::fromUtf8("새로고침"));
 
         m_createRoomButton->setMinimumHeight(30);  // 더 컴팩트한 버튼 높이
         m_joinRoomButton->setMinimumHeight(30);
@@ -1219,7 +1219,7 @@ namespace Blokus {
     {
         // Lv.N 표시명 (상태) 형식으로 표시
         QString displayName = user.displayName.isEmpty() ? user.username : user.displayName;
-        return QString::fromUtf8("🟢 Lv.%1 %2 (%3)")
+        return QString::fromUtf8("Lv.%1 %2 (%3)")
                .arg(user.level)
                .arg(displayName)
                .arg(user.status);

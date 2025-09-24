@@ -6,7 +6,7 @@ find_package(protobuf CONFIG REQUIRED)
 # 프로토 파일들 수집
 file(GLOB PROTO_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.proto")
 
-# 🔥 최신 protobuf_generate 함수 사용
+#  최신 protobuf_generate 함수 사용
 protobuf_generate(
     LANGUAGE cpp
     OUT_VAR PROTO_GENERATED_FILES

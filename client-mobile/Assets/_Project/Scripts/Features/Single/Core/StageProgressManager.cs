@@ -226,7 +226,7 @@ namespace Features.Single.Core{
         }
         
         /// <summary>
-        /// 🔥 추가: 현재 최대 클리어 스테이지 반환
+        ///  추가: 현재 최대 클리어 스테이지 반환
         /// </summary>
         public int GetMaxStageCompleted()
         {
@@ -306,7 +306,7 @@ namespace Features.Single.Core{
         {
             if (completed && App.Network.HttpApiClient.Instance != null)
             {
-                // ✅ 중복 API 호출 방지: StageDataManager에서 이미 서버 통신을 처리함
+                //  중복 API 호출 방지: StageDataManager에서 이미 서버 통신을 처리함
                 // StageProgressManager는 로컬 상태 관리만 담당하도록 변경
                 Debug.Log($"[StageProgressManager] 스테이지 {stageNumber} 완료 - 서버 통신은 StageDataManager에서 처리됨");
                 

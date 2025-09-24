@@ -222,7 +222,7 @@ namespace Blokus
             auto permanentIt = m_playerBlockedPermanently.find(player);
             if (permanentIt != m_playerBlockedPermanently.end() && permanentIt->second)
             {
-                spdlog::debug("🚫 [BLOCK_DEBUG] 플레이어 {} 영구 차단 상태로 배치 불가", static_cast<int>(player));
+                spdlog::debug(" [BLOCK_DEBUG] 플레이어 {} 영구 차단 상태로 배치 불가", static_cast<int>(player));
                 return false; // 이미 영구적으로 블록을 배치할 수 없는 상태
             }
 
@@ -330,7 +330,7 @@ namespace Blokus
             }
             else
             {
-                spdlog::debug("✅ [BLOCK_DEBUG] 플레이어 {} 블록 배치 가능", static_cast<int>(player));
+                spdlog::debug(" [BLOCK_DEBUG] 플레이어 {} 블록 배치 가능", static_cast<int>(player));
             }
 
             return result;
@@ -378,7 +378,7 @@ namespace Blokus
                 playerStatus += playerName + ":" + (canPlace ? "가능" : "불가");
             }
 
-            spdlog::debug("🎯 [GAME_FINISH_DEBUG] 플레이어 배치 상태: {}", playerStatus);
+            spdlog::debug(" [GAME_FINISH_DEBUG] 플레이어 배치 상태: {}", playerStatus);
 
             return !anyCanPlace;
         }
@@ -645,7 +645,7 @@ namespace Blokus
 
         void GameLogic::invalidateCache() const
         {
-            spdlog::debug("🔄 [CACHE_DEBUG] 캐시 무효화 - 영구 차단 상태는 유지");
+            spdlog::debug(" [CACHE_DEBUG] 캐시 무효화 - 영구 차단 상태는 유지");
             m_cacheValid = false;
             m_canPlaceAnyBlockCache.clear();
             // 영구 차단 상태는 유지 - 다른 플레이어의 블록 배치로 인해

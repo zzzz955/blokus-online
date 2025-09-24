@@ -376,7 +376,7 @@ namespace Blokus {
 
     void DirectionPalette::resetAllBlocks()
     {
-        qDebug() << QString::fromUtf8("🔄 DirectionPalette::resetAllBlocks 시작 (%1)")
+        qDebug() << QString::fromUtf8(" DirectionPalette::resetAllBlocks 시작 (%1)")
             .arg(getDirectionName());
 
         // 1단계: 모든 버튼 안전하게 삭제
@@ -390,7 +390,7 @@ namespace Blokus {
             }
         }
         m_blockButtons.clear();
-        qDebug() << QString::fromUtf8("✅ 모든 버튼 삭제됨");
+        qDebug() << QString::fromUtf8(" 모든 버튼 삭제됨");
 
         // 2단계: 레이아웃 완전히 클리어 (안전하게)
         if (m_blockLayout) {
@@ -399,7 +399,7 @@ namespace Blokus {
                 delete item;
             }
         }
-        qDebug() << QString::fromUtf8("✅ 레이아웃 클리어됨");
+        qDebug() << QString::fromUtf8(" 레이아웃 클리어됨");
 
         // 3단계: 상태 초기화
         m_usedBlocks.clear();
@@ -412,7 +412,7 @@ namespace Blokus {
             for (BlockType type : allTypes) {
                 m_blocks.emplace_back(type, m_player);
             }
-            qDebug() << QString::fromUtf8("✅ 블록 목록 재생성됨: %1개").arg(m_blocks.size());
+            qDebug() << QString::fromUtf8(" 블록 목록 재생성됨: %1개").arg(m_blocks.size());
 
             // 5단계: 버튼 재생성 (지연 실행으로 안전하게)
             QTimer::singleShot(100, this, [this]() {
@@ -436,7 +436,7 @@ namespace Blokus {
     void DirectionPalette::updateBlockButtons()
     {
         if (!m_blockLayout || !m_blockContainer) {
-            qDebug() << QString::fromUtf8("❌ 레이아웃이 초기화되지 않음");
+            qDebug() << QString::fromUtf8(" 레이아웃이 초기화되지 않음");
             return;
         }
 
@@ -486,12 +486,12 @@ namespace Blokus {
                 }
             }
             catch (...) {
-                qDebug() << QString::fromUtf8("❌ 버튼 생성 실패: %1")
+                qDebug() << QString::fromUtf8(" 버튼 생성 실패: %1")
                     .arg(BlockFactory::getBlockName(block.getType()));
             }
         }
 
-        qDebug() << QString::fromUtf8("✅ %1 방향 팔레트: %2개 버튼 생성됨")
+        qDebug() << QString::fromUtf8(" %1 방향 팔레트: %2개 버튼 생성됨")
             .arg(getDirectionName()).arg(createdButtons);
 
         // 안전한 업데이트
@@ -519,17 +519,17 @@ namespace Blokus {
             parentWidget()->update();
         }
 
-        // 🔧 FIX: Replace processEvents with update() to avoid UI blocking
+        //  FIX: Replace processEvents with update() to avoid UI blocking
         // processEvents() can freeze the main thread - use update() for async refresh
         update();
 
-        qDebug() << QString::fromUtf8("✅ %1 방향 팔레트 레이아웃 업데이트 완료")
+        qDebug() << QString::fromUtf8(" %1 방향 팔레트 레이아웃 업데이트 완료")
             .arg(getDirectionName());
     }
 
     void DirectionPalette::reorganizeLayout()
     {
-        qDebug() << QString::fromUtf8("🔄 %1 방향 팔레트 재배치 (크기: %2x%3)")
+        qDebug() << QString::fromUtf8(" %1 방향 팔레트 재배치 (크기: %2x%3)")
             .arg(getDirectionName()).arg(width()).arg(height());
 
         // 현재 존재하는 버튼들 수집
@@ -566,7 +566,7 @@ namespace Blokus {
             }
         }
 
-        qDebug() << QString::fromUtf8("✅ 재배치 완료: %1개 버튼, %2열")
+        qDebug() << QString::fromUtf8(" 재배치 완료: %1개 버튼, %2열")
             .arg(buttons.size()).arg(maxPerRow);
 
         forceLayoutUpdate();
@@ -639,11 +639,11 @@ namespace Blokus {
     {
         // 안전한 재배치 함수
         if (!m_blockLayout || !m_blockContainer) {
-            qDebug() << QString::fromUtf8("❌ 레이아웃이 초기화되지 않음");
+            qDebug() << QString::fromUtf8(" 레이아웃이 초기화되지 않음");
             return;
         }
 
-        qDebug() << QString::fromUtf8("🔄 %1 방향 팔레트 안전 재배치 시작")
+        qDebug() << QString::fromUtf8(" %1 방향 팔레트 안전 재배치 시작")
             .arg(getDirectionName());
 
         // 현재 존재하는 버튼들 수집
@@ -689,7 +689,7 @@ namespace Blokus {
             }
         }
 
-        qDebug() << QString::fromUtf8("✅ 안전 재배치 완료: %1개 버튼, %2열")
+        qDebug() << QString::fromUtf8(" 안전 재배치 완료: %1개 버튼, %2열")
             .arg(validButtons.size()).arg(maxPerRow);
 
         // 강제 업데이트 (안전하게)
@@ -721,13 +721,13 @@ namespace Blokus {
 
         // 상대방 블록은 클릭 불가능
         if (m_direction != Direction::South) {
-            qDebug() << QString::fromUtf8("❌ 상대방 블록 - 클릭 무시");
+            qDebug() << QString::fromUtf8(" 상대방 블록 - 클릭 무시");
             return;
         }
 
         // 사용된 블록은 선택 불가
         if (m_usedBlocks.find(block.getType()) != m_usedBlocks.end()) {
-            qDebug() << QString::fromUtf8("❌ 사용된 블록 - 선택 불가");
+            qDebug() << QString::fromUtf8(" 사용된 블록 - 선택 불가");
             return;
         }
 
@@ -746,7 +746,7 @@ namespace Blokus {
             it->second->setSelected(true);
         }
 
-        qDebug() << QString::fromUtf8("✅ 블록 선택 성공: %1")
+        qDebug() << QString::fromUtf8(" 블록 선택 성공: %1")
             .arg(BlockFactory::getBlockName(block.getType()));
 
         emit blockSelected(block);
@@ -1025,19 +1025,19 @@ namespace Blokus {
 
         // 오직 내 턴이고, 내 블록(파랑)일 때만 선택 가능
         if (m_currentPlayer != m_fixedPlayer) {
-            qDebug() << QString::fromUtf8("❌ 내 턴이 아님 - 선택 불가");
+            qDebug() << QString::fromUtf8(" 내 턴이 아님 - 선택 불가");
             return;
         }
 
         if (block.getPlayer() != m_fixedPlayer) {
-            qDebug() << QString::fromUtf8("❌ 내 블록이 아님 - 선택 불가");
+            qDebug() << QString::fromUtf8(" 내 블록이 아님 - 선택 불가");
             return;
         }
 
         // 남쪽 팔레트(내 블록)에서만 선택 가능
         QObject* sender = QObject::sender();
         if (sender != m_southPalette) {
-            qDebug() << QString::fromUtf8("❌ 내 팔레트가 아님 - 선택 불가");
+            qDebug() << QString::fromUtf8(" 내 팔레트가 아님 - 선택 불가");
             return;
         }
 
@@ -1047,7 +1047,7 @@ namespace Blokus {
         m_selectedBlock = block;
         m_hasSelection = true;
 
-        qDebug() << QString::fromUtf8("✅ 블록 선택 성공: %1")
+        qDebug() << QString::fromUtf8(" 블록 선택 성공: %1")
             .arg(BlockFactory::getBlockName(block.getType()));
 
         emit blockSelected(block);

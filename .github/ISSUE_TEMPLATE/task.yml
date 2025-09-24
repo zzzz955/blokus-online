@@ -13,7 +13,7 @@ body:
   - type: dropdown
     id: phase
     attributes:
-      label: 🚀 개발 단계
+      label:  개발 단계
       description: 현재 어느 개발 단계의 작업인가요?
       options:
         - "클라이언트 개발"
@@ -60,7 +60,7 @@ body:
   - type: textarea
     id: acceptance_criteria
     attributes:
-      label: ✅ 완료 조건
+      label:  완료 조건
       description: 이 작업이 완료되었다고 판단할 수 있는 기준
       placeholder: |
         - [ ] 20x20 격자가 정확히 표시됨
@@ -102,7 +102,7 @@ body:
   - type: textarea
     id: dependencies
     attributes:
-      label: 🔗 의존성
+      label:  의존성
       description: 이 작업을 시작하기 전에 완료되어야 하는 작업들
       placeholder: |
         - #123 프로젝트 기본 구조 설정
@@ -120,7 +120,7 @@ body:
   - type: textarea
     id: technical_notes
     attributes:
-      label: 🔧 기술적 고려사항
+      label:  기술적 고려사항
       description: 구현 시 고려해야 할 기술적 사항들
       placeholder: |
         - QGraphicsView 성능 최적화 필요

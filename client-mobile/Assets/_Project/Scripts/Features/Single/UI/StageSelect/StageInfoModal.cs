@@ -192,7 +192,7 @@ namespace Features.Single.UI.StageSelect
 
             Debug.Log($"[DEBUG] currentStageNumber 설정됨: {currentStageNumber}");
 
-            // ✅ 캐시 우선: 서버 캐시에 저장된 진행도를 먼저 사용
+            //  캐시 우선: 서버 캐시에 저장된 진행도를 먼저 사용
             var cached = Features.Single.Core.UserDataCache.Instance?.GetStageProgress(currentStageNumber); // NetworkUserStageProgress
             if (cached != null)
             {
@@ -296,7 +296,7 @@ namespace Features.Single.UI.StageSelect
 
             int earnedStars = 0;
 
-            // ✅ 1순위: 캐시에 있는 별 수 사용
+            //  1순위: 캐시에 있는 별 수 사용
             var cache = Features.Single.Core.UserDataCache.Instance;
             var cached = cache?.GetStageProgress(currentStageNumber); // NetworkUserStageProgress
             if (cached != null)
@@ -307,7 +307,7 @@ namespace Features.Single.UI.StageSelect
             }
             else if (currentProgress != null)
             {
-                // ✅ 2순위: bestScore/optimal_score 비율로 환산
+                //  2순위: bestScore/optimal_score 비율로 환산
                 if (currentProgress.isCompleted)
                 {
                     int optimal = currentStageData != null ? currentStageData.optimal_score : 0;
@@ -564,7 +564,7 @@ namespace Features.Single.UI.StageSelect
                 return;
             }
 
-            // 🔥 수정: 기존 자식 제거 - 더 안전한 방법
+            //  수정: 기존 자식 제거 - 더 안전한 방법
             // Destroy 사용 (프레임 끝에서 삭제)
             int childCount = availableBlocksParent.childCount;
             var childrenToDestroy = new Transform[childCount];
@@ -648,9 +648,9 @@ namespace Features.Single.UI.StageSelect
             int selectedStageNumber = currentStageNumber;
 
             Debug.Log($"[StageInfoModal] 스테이지 {selectedStageNumber} 게임 시작 준비");
-            // 🔥 수정: SelectStage 중복 호출 제거 - UIManager.OnStageSelected에서 처리
+            //  수정: SelectStage 중복 호출 제거 - UIManager.OnStageSelected에서 처리
 
-            // 🔥 수정: Scene 전환 먼저 실행 (GameObject 활성 상태에서)
+            //  수정: Scene 전환 먼저 실행 (GameObject 활성 상태에서)
             var uiManager = App.UI.UIManager.GetInstanceSafe();
 
             if (uiManager != null)
@@ -658,7 +658,7 @@ namespace Features.Single.UI.StageSelect
                 Debug.Log($"[StageInfoModal] UIManager 발견. 스테이지 {selectedStageNumber} 게임 시작");
                 uiManager.OnStageSelected(selectedStageNumber);
 
-                // 🔥 수정: GameObject 활성 상태 확인 후 코루틴 시작
+                //  수정: GameObject 활성 상태 확인 후 코루틴 시작
                 if (gameObject.activeInHierarchy)
                 {
                     StartCoroutine(HideModalAfterDelay());
@@ -672,10 +672,10 @@ namespace Features.Single.UI.StageSelect
             else
             {
                 Debug.LogError("[StageInfoModal] UIManager를 찾을 수 없습니다! SceneFlowController로 직접 전환");
-                // 🔥 백업: SceneFlowController로 직접 전환 (GameObject 활성 상태에서 실행)
+                //  백업: SceneFlowController로 직접 전환 (GameObject 활성 상태에서 실행)
                 StartSingleGameplaySceneDirectly(selectedStageNumber);
 
-                // 🔥 수정: GameObject 활성 상태 확인 후 코루틴 시작
+                //  수정: GameObject 활성 상태 확인 후 코루틴 시작
                 if (gameObject.activeInHierarchy)
                 {
                     StartCoroutine(HideModalAfterDelay());
@@ -690,7 +690,7 @@ namespace Features.Single.UI.StageSelect
 
 
         /// <summary>
-        /// 🔥 추가: Scene 전환 후 모달 숨기기 (Coroutine 에러 방지)
+        ///  추가: Scene 전환 후 모달 숨기기 (Coroutine 에러 방지)
         /// </summary>
         private System.Collections.IEnumerator HideModalAfterDelay()
         {
@@ -702,13 +702,13 @@ namespace Features.Single.UI.StageSelect
         }
 
         /// <summary>
-        /// 🔥 추가: UIManager 실패 시 SceneFlowController로 직접 전환
+        ///  추가: UIManager 실패 시 SceneFlowController로 직접 전환
         /// </summary>
         private void StartSingleGameplaySceneDirectly(int stageNumber)
         {
             Debug.Log($"[StageInfoModal] 직접 Scene 전환 시작: 스테이지 {stageNumber}");
 
-            // 🔥 수정: SelectStage 중복 호출 제거 - UIManager에서 이미 처리됨
+            //  수정: SelectStage 중복 호출 제거 - UIManager에서 이미 처리됨
             Debug.Log($"[StageInfoModal] SelectStage는 UIManager에서 처리되므로 생략");
 
             // SceneFlowController로 SingleGameplayScene 전환

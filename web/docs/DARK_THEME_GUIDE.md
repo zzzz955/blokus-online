@@ -33,7 +33,7 @@ text-gray-700   /* #374151 - 밝은 배경의 보조 텍스트 */
 ## ⚠️ 주의사항 및 문제 해결
 
 ### 1. 색상 대비 문제
-❌ **잘못된 예시:**
+ **잘못된 예시:**
 ```tsx
 // 밝은 배경 + 밝은 텍스트 = 가독성 문제
 <button className="bg-gray-100 text-white">버튼</button>
@@ -42,7 +42,7 @@ text-gray-700   /* #374151 - 밝은 배경의 보조 텍스트 */
 <div className="bg-dark-bg text-gray-800">텍스트</div>
 ```
 
-✅ **올바른 예시:**
+ **올바른 예시:**
 ```tsx
 // 밝은 배경 + 어두운 텍스트
 <button className="bg-gray-100 text-gray-900">버튼</button>
@@ -52,7 +52,7 @@ text-gray-700   /* #374151 - 밝은 배경의 보조 텍스트 */
 ```
 
 ### 2. 상호작용 요소 색상
-✅ **버튼 상태별 색상:**
+ **버튼 상태별 색상:**
 ```tsx
 // 선택되지 않은 상태
 className="bg-gray-700 text-gray-300 hover:bg-gray-600"
@@ -91,7 +91,7 @@ className="hover:bg-gray-700/30"  // 투명도 활용
 - [ ] 모달: `bg-dark-card border border-dark-border`
 - [ ] 입력 필드: 다크 테마에 맞는 스타일 적용
 
-## 🔧 일반적인 수정 패턴
+##  일반적인 수정 패턴
 
 ### 1. 버튼 색상 수정
 ```tsx
@@ -120,14 +120,14 @@ className={`${selected ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 h
 <div className="bg-dark-card border border-dark-border">
 ```
 
-## 🎯 핵심 원칙
+##  핵심 원칙
 
 1. **대비 원칙**: 밝은 배경 → 어두운 텍스트, 어두운 배경 → 밝은 텍스트
 2. **일관성 원칙**: 동일한 기능의 UI 요소는 동일한 색상 조합 사용
 3. **접근성 원칙**: WCAG 2.1 AA 기준 (4.5:1) 이상의 색상 대비 유지
 4. **사용성 원칙**: 호버, 포커스, 선택 상태가 명확히 구분되어야 함
 
-## 🚀 권장 도구
+##  권장 도구
 
 ### 색상 대비 검사
 - [WebAIM Contrast Checker](https://webaim.org/resources/contrastchecker/)

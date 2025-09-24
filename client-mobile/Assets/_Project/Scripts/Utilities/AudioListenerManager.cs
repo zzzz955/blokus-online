@@ -59,7 +59,7 @@ namespace Utilities
                 }
             }
             
-            Debug.Log($"[AudioListenerManager] ✅ Audio Listener 정리 완료: {removedCount}개 제거");
+            Debug.Log($"[AudioListenerManager]  Audio Listener 정리 완료: {removedCount}개 제거");
         }
     }
 }

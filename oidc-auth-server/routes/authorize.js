@@ -482,12 +482,12 @@ function generateLoginSelectionForm(authParams, hasGoogleOAuth) {
         </div>
 
         <div class="oauth-status ${hasGoogleOAuth ? 'oauth-enabled' : 'oauth-disabled'}">
-            ${hasGoogleOAuth ? '✅ Google OAuth 사용 가능' : '⚠️ Google OAuth 미설정 - 개발 모드'}
+            ${hasGoogleOAuth ? ' Google OAuth 사용 가능' : '⚠️ Google OAuth 미설정 - 개발 모드'}
         </div>
         
         <a href="/auth/google?${paramsQuery}" class="login-option google-login ${hasGoogleOAuth ? '' : 'disabled'}" 
            ${hasGoogleOAuth ? '' : 'onclick="alert(\'Google OAuth 클라이언트가 설정되지 않았습니다.\'); return false;"'}>
-            🚀 Google 계정으로 로그인 ${hasGoogleOAuth ? '' : '(미설정)'}
+             Google 계정으로 로그인 ${hasGoogleOAuth ? '' : '(미설정)'}
         </a>
         
         <div class="divider">

@@ -85,12 +85,12 @@ namespace Features.Single.UI.InGame
         // ==== 이벤트 콜백 ====
         private void HandleGameReady()
         {
-            if (verboseLog) Debug.Log("[GamePanel] ✅ OnGameReady → switch to gameplay UI");
+            if (verboseLog) Debug.Log("[GamePanel]  OnGameReady → switch to gameplay UI");
 
-            // 🔥 수정: 기획 의도에 따라 StageSelectPanel은 비활성화하지 않음 (위에 GamePanel이 레이어링됨)
+            //  수정: 기획 의도에 따라 StageSelectPanel은 비활성화하지 않음 (위에 GamePanel이 레이어링됨)
             // StageSelectPanel 비활성화 제거
 
-            // 🔥 추가: GamePanel이 StageSelectPanel 위에 레이어링되도록 Canvas 정렬 설정
+            //  추가: GamePanel이 StageSelectPanel 위에 레이어링되도록 Canvas 정렬 설정
             EnsureGamePanelOnTop();
 
             // 2) 게임 UI 표시
@@ -130,14 +130,14 @@ namespace Features.Single.UI.InGame
         }
 
         /// <summary>
-        /// 🔥 수정: GamePanel이 StageSelectPanel 위에 레이어링되도록 Canvas 정렬 설정
+        ///  수정: GamePanel이 StageSelectPanel 위에 레이어링되도록 Canvas 정렬 설정
         /// 하위 오브젝트 순서는 에디터 설정 그대로 유지
         /// </summary>
         private void EnsureGamePanelOnTop()
         {
             if (verboseLog) Debug.Log("[GamePanel] GamePanel을 최상단으로 정렬 중...");
             
-            // 🔥 수정: GamePanel 자체만 최상단으로 이동 (하위 오브젝트 순서는 건드리지 않음)
+            //  수정: GamePanel 자체만 최상단으로 이동 (하위 오브젝트 순서는 건드리지 않음)
             this.transform.SetAsLastSibling();
             
             if (verboseLog) Debug.Log("[GamePanel] Canvas 정렬 완료 - GamePanel이 StageSelectPanel 위에 레이어링됨 (하위 오브젝트 순서 유지)");
