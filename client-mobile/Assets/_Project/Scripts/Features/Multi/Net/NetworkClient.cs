@@ -11,6 +11,7 @@ using UnityEngine;
 using Shared.Models;
 using MultiModels = Features.Multi.Models;
 using App.UI;
+using App.Logging;
 
 namespace Features.Multi.Net
 {
@@ -57,6 +58,13 @@ namespace Features.Multi.Net
             {
                 Instance = this;
                 DontDestroyOnLoad(gameObject);
+
+                // 안드로이드 파일 로깅 시스템 초기화
+#if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.Initialize();
+                App.Logging.AndroidLogger.LogInfo("NetworkClient Awake - 안드로이드 릴리즈 빌드");
+#endif
+
                 InitializeFromEnvironment();
             }
             else
@@ -253,7 +261,22 @@ namespace Features.Multi.Net
 
             try
             {
+                // 안드로이드 파일 로깅 시스템 초기화 (가장 먼저)
+#if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.Initialize();
+                App.Logging.AndroidLogger.LogConnection("=== NetworkClient 연결 시도 시작 ===");
+                App.Logging.AndroidLogger.LogConnection($"Unity 버전: {Application.unityVersion}");
+                App.Logging.AndroidLogger.LogConnection($"플랫폼: {Application.platform}");
+                App.Logging.AndroidLogger.LogConnection($"네트워크 도달성: {Application.internetReachability}");
+#endif
+
                 Debug.Log($"[NetworkClient] 서버 연결 시도: {serverHost}:{serverPort}");
+
+                // 안드로이드 파일 로깅
+#if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogConnection($"서버 연결 시도: {serverHost}:{serverPort}");
+                App.Logging.AndroidLogger.LogConnection($"연결 상태 - isConnected: {isConnected}, isConnecting: {isConnecting}");
+#endif
 
                 // 모바일 플랫폼에서 네트워크 상태 확인 (소프트 체크)
                 if (Application.isMobilePlatform)
@@ -364,14 +387,36 @@ namespace Features.Multi.Net
                 isConnected = true;
                 isConnecting = false;
 
+                // 안드로이드 파일 로깅 - 연결 완료
+#if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogConnection($"TCP 연결 및 스트림 설정 완료");
+                App.Logging.AndroidLogger.LogConnection($"최종 연결 상태 - isConnected: {isConnected}, TCP Connected: {tcpClient?.Connected}");
+                App.Logging.AndroidLogger.LogConnection($"스트림 상태 - Reader: {streamReader != null}, Writer: {streamWriter != null}, NetworkStream: {networkStream != null}");
+#endif
+
                 // 수신 스레드 시작
                 receiveThread = new Thread(ReceiveMessagesThread) { IsBackground = true };
                 receiveThread.Start();
 
                 Debug.Log("[NetworkClient] 서버 연결 성공!");
 
+                // 안드로이드 파일 로깅 - 수신 스레드 시작
+#if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogConnection("=== TCP 연결 및 수신 스레드 시작 완료 ===");
+                App.Logging.AndroidLogger.LogConnection($"연결된 주소: {tcpClient.Client.RemoteEndPoint}");
+                App.Logging.AndroidLogger.LogConnection($"로컬 주소: {tcpClient.Client.LocalEndPoint}");
+                App.Logging.AndroidLogger.LogConnection($"스트림 상태 - Reader: {streamReader != null}, Writer: {streamWriter != null}, AutoFlush: {streamWriter?.AutoFlush}");
+                App.Logging.AndroidLogger.LogConnection($"TCP 클라이언트 상태 - Connected: {tcpClient?.Connected}, Available: {tcpClient?.Available}");
+                App.Logging.AndroidLogger.LogConnection($"수신 스레드 상태 - IsBackground: {receiveThread?.IsBackground}, IsAlive: {receiveThread?.IsAlive}");
+#endif
+
                 // 메인스레드에서 연결 이벤트 발생
-                UnityMainThreadDispatcher.Enqueue(() => OnConnectionChanged?.Invoke(true));
+                UnityMainThreadDispatcher.Enqueue(() => {
+#if UNITY_ANDROID && !UNITY_EDITOR
+                    App.Logging.AndroidLogger.LogConnection("메인 스레드에서 OnConnectionChanged 이벤트 발생");
+#endif
+                    OnConnectionChanged?.Invoke(true);
+                });
 
                 return true;
             }
@@ -387,6 +432,19 @@ namespace Features.Multi.Net
                 {
                     Debug.LogError($"[NetworkClient] - 내부 예외: {ex.InnerException.Message}");
                 }
+
+                // 안드로이드 파일 로깅 - 연결 실패
+#if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogError($"=== TCP 연결 실패 ===");
+                App.Logging.AndroidLogger.LogError($"서버: {serverHost}:{serverPort}");
+                App.Logging.AndroidLogger.LogError($"예외 타입: {ex.GetType().Name}");
+                App.Logging.AndroidLogger.LogError($"메시지: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    App.Logging.AndroidLogger.LogError($"내부 예외: {ex.InnerException.GetType().Name} - {ex.InnerException.Message}");
+                }
+                App.Logging.AndroidLogger.LogError($"연결 상태 정리 - isConnected: {isConnected}, isConnecting: {isConnecting}");
+#endif
 
                 // 릴리즈 디버깅: 일반적인 연결 실패 정보 토스트 표시
                 string generalError = $"🚫 서버 연결 실패\n예외: {ex.GetType().Name}";
@@ -514,6 +572,11 @@ namespace Features.Multi.Net
             if (!isConnected || streamWriter == null)
             {
                 Debug.LogWarning("[NetworkClient] 서버에 연결되지 않음");
+
+                // 안드로이드 파일 로깅
+#if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogNetwork($"메시지 전송 실패 - 연결 상태: isConnected={isConnected}, streamWriter={streamWriter != null}");
+#endif
                 return false;
             }
 
@@ -524,6 +587,19 @@ namespace Features.Multi.Net
 
                 string message = string.Join(":", messageParts);
 
+                // 안드로이드 파일 로깅 - 전송 전
+#if UNITY_ANDROID && !UNITY_EDITOR
+                if (messageType == "auth")
+                {
+                    App.Logging.AndroidLogger.LogNetwork($"TCP 메시지 전송 시도: {messageType}:[JWT토큰] (길이: {message.Length})");
+                }
+                else
+                {
+                    App.Logging.AndroidLogger.LogNetwork($"TCP 메시지 전송 시도: {message}");
+                }
+                App.Logging.AndroidLogger.LogNetwork($"연결 상태 재확인 - TCP Connected: {tcpClient?.Connected}, Stream CanWrite: {networkStream?.CanWrite}");
+#endif
+
                 // WriteLine 대신 Write + 단일 \n 사용 (불필요한 \r 제거)
                 streamWriter.Write(message + "\n");
                 streamWriter.Flush(); // 즉시 전송 보장
@@ -533,11 +609,24 @@ namespace Features.Multi.Net
                 {
                     Debug.Log($"[NetworkClient] 깨끗한 메시지 전송: {message}");
                 }
+
+                // 안드로이드 파일 로깅 - 전송 성공
+#if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogNetwork($"TCP 메시지 전송 성공: {messageType}");
+                App.Logging.AndroidLogger.LogNetwork($"전송 후 연결 상태 - TCP Connected: {tcpClient?.Connected}");
+#endif
+
                 return true;
             }
             catch (Exception ex)
             {
                 Debug.LogError($"[NetworkClient] 깨끗한 메시지 전송 실패: {ex.Message}");
+
+                // 안드로이드 파일 로깅 - 전송 실패
+#if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogNetwork($"TCP 메시지 전송 실패: {ex.GetType().Name} - {ex.Message}");
+                App.Logging.AndroidLogger.LogNetwork($"실패 시 연결 상태 - TCP Connected: {tcpClient?.Connected}, isConnected: {isConnected}");
+#endif
 
                 // 메인스레드에서 에러 이벤트 발생
                 UnityMainThreadDispatcher.Enqueue(() => OnError?.Invoke($"전송 실패: {ex.Message}"));
@@ -569,6 +658,12 @@ namespace Features.Multi.Net
                             string message = streamReader.ReadLine();
                             if (!string.IsNullOrEmpty(message))
                             {
+                                // 안드로이드 파일 로깅 - 메시지 수신
+#if UNITY_ANDROID && !UNITY_EDITOR
+                                App.Logging.AndroidLogger.LogNetwork($"TCP 메시지 수신: {message}");
+                                App.Logging.AndroidLogger.LogConnection($"수신 후 연결 상태 - isConnected: {isConnected}, TCP Connected: {tcpClient?.Connected}");
+#endif
+
                                 // 메시지를 큐에 추가 (메인 스레드에서 처리)
                                 lock (messageLock)
                                 {
@@ -586,6 +681,12 @@ namespace Features.Multi.Net
                         if (isConnected)
                         {
                             Debug.LogWarning($"[NetworkClient] 연결 끊어짐: {ioEx.Message}");
+
+                            // 안드로이드 파일 로깅 - 연결 끊어짐
+#if UNITY_ANDROID && !UNITY_EDITOR
+                            App.Logging.AndroidLogger.LogConnection($"연결 끊어짐 감지: {ioEx.GetType().Name} - {ioEx.Message}");
+                            App.Logging.AndroidLogger.LogConnection($"끊어지기 전 상태 - isConnected: {isConnected}, TCP Connected: {tcpClient?.Connected}");
+#endif
 
                             // 연결 상태 정리 및 이벤트 발생
                             CleanupConnection();
@@ -629,6 +730,18 @@ namespace Features.Multi.Net
                 {
                     string message = incomingMessages.Dequeue();
                     Debug.Log($"[NetworkClient] 메시지 수신: {message}");
+
+                    // 안드로이드 파일 로깅 - 메시지 처리
+#if UNITY_ANDROID && !UNITY_EDITOR
+                    App.Logging.AndroidLogger.LogNetwork($"메인 스레드에서 메시지 처리: {message}");
+
+                    // 인증 관련 메시지는 상세 로깅
+                    if (message.Contains("auth") || message.Contains("login") || message.Contains("success") || message.Contains("error"))
+                    {
+                        App.Logging.AndroidLogger.LogAuth($"인증 관련 응답 수신: {message}");
+                    }
+#endif
+
                     OnMessageReceived?.Invoke(message);
                 }
             }
@@ -702,8 +815,31 @@ namespace Features.Multi.Net
         /// </summary>
         public bool SendJwtLoginRequest(string token)
         {
+            // 안드로이드 파일 로깅 - JWT 인증 시작
+#if UNITY_ANDROID && !UNITY_EDITOR
+            App.Logging.AndroidLogger.LogAuth("=== JWT 로그인 요청 시작 ===");
+            App.Logging.AndroidLogger.LogAuth($"JWT 토큰 존재 여부: {!string.IsNullOrEmpty(token)}");
+            App.Logging.AndroidLogger.LogAuth($"JWT 토큰 길이: {token?.Length ?? 0}");
+            App.Logging.AndroidLogger.LogAuth($"연결 상태 확인 - isConnected: {isConnected}");
+            App.Logging.AndroidLogger.LogAuth($"TCP 클라이언트 상태: {tcpClient?.Connected}");
+            App.Logging.AndroidLogger.LogAuth($"스트림 상태 - Writer: {streamWriter != null}, Reader: {streamReader != null}");
+
+            if (!string.IsNullOrEmpty(token) && token.Length > 50)
+            {
+                App.Logging.AndroidLogger.LogAuth($"JWT 토큰 시작: {token.Substring(0, 50)}...");
+            }
+#endif
+
             // 서버에서 예상하는 형식: auth:JWT토큰
-            return SendCleanTCPMessage("auth", token);
+            bool result = SendCleanTCPMessage("auth", token);
+
+            // 안드로이드 파일 로깅 - 결과
+#if UNITY_ANDROID && !UNITY_EDITOR
+            App.Logging.AndroidLogger.LogAuth($"JWT 전송 결과: {result}");
+            App.Logging.AndroidLogger.LogAuth("=== JWT 로그인 요청 완료 ===");
+#endif
+
+            return result;
         }
 
         /// <summary>

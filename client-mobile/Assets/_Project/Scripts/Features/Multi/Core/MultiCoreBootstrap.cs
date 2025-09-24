@@ -486,16 +486,30 @@ namespace Features.Multi.Core
                 {
                     // 만료 여부에 상관없이 저장된 토큰을 가져옴 (ConnectToMultiplayerAsync에서 갱신 처리)
                     string storedToken = App.Security.SecureStorage.GetString("oidc_access_token", "");
-                    
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+                    App.Logging.AndroidLogger.LogAuth($"[MultiCoreBootstrap] SecureStorage에서 토큰 조회 - 존재: {!string.IsNullOrEmpty(storedToken)}");
+                    if (!string.IsNullOrEmpty(storedToken) && storedToken.Length > 50)
+                    {
+                        App.Logging.AndroidLogger.LogAuth($"[MultiCoreBootstrap] 토큰 시작: {storedToken.Substring(0, 50)}...");
+                    }
+#endif
+
                     if (!string.IsNullOrEmpty(storedToken))
                     {
                         if (debugMode)
                             Debug.Log("[MultiCoreBootstrap] AccessToken 획득 (만료 여부는 ConnectToMultiplayerAsync에서 처리)");
+#if UNITY_ANDROID && !UNITY_EDITOR
+                        App.Logging.AndroidLogger.LogAuth("[MultiCoreBootstrap] 저장된 AccessToken 반환");
+#endif
                         return storedToken;
                     }
                     else
                     {
                         Debug.LogWarning("[MultiCoreBootstrap] 저장된 AccessToken이 없습니다.");
+#if UNITY_ANDROID && !UNITY_EDITOR
+                        App.Logging.AndroidLogger.LogAuth("[MultiCoreBootstrap] 실패: 저장된 AccessToken 없음");
+#endif
                     }
                 }
                 else

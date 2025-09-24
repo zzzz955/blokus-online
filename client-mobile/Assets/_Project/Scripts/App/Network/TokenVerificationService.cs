@@ -66,14 +66,30 @@ namespace App.Network
             try
             {
                 Debug.Log($"[TokenVerificationService] 토큰 검증 요청 시작: {baseUrl}{TOKEN_VERIFICATION_ENDPOINT}");
-                
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] 토큰 검증 요청 시작");
+                App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] URL: {baseUrl}{TOKEN_VERIFICATION_ENDPOINT}");
+#endif
+
                 var requestData = new TokenVerificationRequest
                 {
                     ClientId = clientId,
                     AccessToken = currentAccessToken
                 };
 
-                string jsonData = JsonConvert.SerializeObject(requestData);
+                // 다른 HTTP 요청들과 동일하게 Unity JsonUtility 사용 (IL2CPP 호환성)
+                var unityRequestData = new UnityTokenVerificationRequest
+                {
+                    client_id = clientId,
+                    access_token = currentAccessToken
+                };
+                string jsonData = JsonUtility.ToJson(unityRequestData);
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] JSON 직렬화 완료");
+#endif
+
                 byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonData);
 
                 using (UnityWebRequest request = new UnityWebRequest($"{baseUrl}{TOKEN_VERIFICATION_ENDPOINT}", "POST"))
@@ -96,7 +112,12 @@ namespace App.Network
                     {
                         await Task.Delay(50);
                     }
-                    
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+                    App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] HTTP 요청 완료");
+                    App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] 응답 코드: {request.responseCode}");
+#endif
+
                     // 응답 처리
                     return ProcessVerificationResponse(request);
                 }
@@ -104,6 +125,9 @@ namespace App.Network
             catch (Exception ex)
             {
                 Debug.LogError($"[TokenVerificationService] 토큰 검증 중 예외 발생: {ex.Message}");
+#if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] 네트워크 예외 발생");
+#endif
                 return new TokenVerificationResult
                 {
                     Valid = false,
@@ -118,18 +142,29 @@ namespace App.Network
         /// </summary>
         private TokenVerificationResult ProcessVerificationResponse(UnityWebRequest request)
         {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] 응답 처리 시작");
+#endif
             try
             {
                 if (request.result == UnityWebRequest.Result.Success)
                 {
                     string responseText = request.downloadHandler.text;
-                    Debug.Log($"[TokenVerificationService] 토큰 검증 응답: {responseText}");
-                    
-                    var response = JsonConvert.DeserializeObject<TokenVerificationResponse>(responseText);
-                    
+                    Debug.Log($"[TokenVerificationService] 토큰 검증 성공");
+
+                    // 요청과 동일하게 Unity JsonUtility 사용 (IL2CPP 호환성)
+                    TokenVerificationResponse response = JsonUtility.FromJson<TokenVerificationResponse>(responseText);
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+                    App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] 응답 파싱 완료");
+#endif
+
                     if (response != null && response.Valid)
                     {
                         Debug.Log($"[TokenVerificationService] 토큰 검증 성공 (갱신됨: {response.Refreshed})");
+#if UNITY_ANDROID && !UNITY_EDITOR
+                        App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] 토큰 검증 성공");
+#endif
                         return new TokenVerificationResult
                         {
                             Valid = true,
@@ -141,6 +176,9 @@ namespace App.Network
                     else
                     {
                         Debug.LogWarning($"[TokenVerificationService] 토큰 검증 실패: {response?.Error ?? "Unknown error"}");
+#if UNITY_ANDROID && !UNITY_EDITOR
+                        App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] 토큰 검증 실패");
+#endif
                         return new TokenVerificationResult
                         {
                             Valid = false,
@@ -154,14 +192,18 @@ namespace App.Network
                     // HTTP 에러 처리
                     string errorMessage = $"HTTP {request.responseCode}: {request.error}";
                     string responseBody = request.downloadHandler?.text ?? "No response body";
-                    
+
                     Debug.LogError($"[TokenVerificationService] HTTP 에러: {errorMessage}");
-                    Debug.LogError($"[TokenVerificationService] 응답 내용: {responseBody}");
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+                    App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] HTTP 에러 발생");
+                    App.Logging.AndroidLogger.LogAuth($"[TokenVerificationService] 응답 코드: {request.responseCode}");
+#endif
                     
                     // 응답 본문에서 에러 정보 추출 시도
                     try
                     {
-                        var errorResponse = JsonConvert.DeserializeObject<TokenVerificationResponse>(responseBody);
+                        var errorResponse = JsonUtility.FromJson<TokenVerificationResponse>(responseBody);
                         if (errorResponse != null && !string.IsNullOrEmpty(errorResponse.Error))
                         {
                             return new TokenVerificationResult
@@ -199,41 +241,48 @@ namespace App.Network
     }
     
     /// <summary>
-    /// 토큰 검증 요청 데이터
+    /// 토큰 검증 요청 데이터 (Newtonsoft.Json용)
     /// </summary>
     [Serializable]
     public class TokenVerificationRequest
     {
         [JsonProperty("client_id")]
         public string ClientId { get; set; }
-        
+
         [JsonProperty("access_token")]
         public string AccessToken { get; set; }
     }
+
+    /// <summary>
+    /// 토큰 검증 요청 데이터 (Unity JsonUtility용 - IL2CPP 대안)
+    /// </summary>
+    [Serializable]
+    public class UnityTokenVerificationRequest
+    {
+        public string client_id;
+        public string access_token;
+    }
     
     /// <summary>
-    /// 토큰 검증 응답 데이터 (서버 응답 형식)
+    /// 토큰 검증 응답 데이터 (Unity JsonUtility용 - IL2CPP 호환)
     /// </summary>
     [Serializable]
     public class TokenVerificationResponse
     {
-        [JsonProperty("valid")]
-        public bool Valid { get; set; }
-        
-        [JsonProperty("accessToken")]
-        public string AccessToken { get; set; }
-        
-        [JsonProperty("expiresIn")]
-        public int ExpiresIn { get; set; }
-        
-        [JsonProperty("refreshed")]
-        public bool Refreshed { get; set; }
-        
-        [JsonProperty("error")]
-        public string Error { get; set; }
-        
-        [JsonProperty("message")]
-        public string Message { get; set; }
+        public bool valid;
+        public string accessToken;
+        public int expiresIn;
+        public bool refreshed;
+        public string error;
+        public string message;
+
+        // Unity JsonUtility는 필드 기반이므로 Property로 접근
+        public bool Valid => valid;
+        public string AccessToken => accessToken;
+        public int ExpiresIn => expiresIn;
+        public bool Refreshed => refreshed;
+        public string Error => error;
+        public string Message => message;
     }
     
     /// <summary>

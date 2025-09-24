@@ -194,8 +194,6 @@ namespace Blokus::Server {
         spdlog::info("서버가 실행 중입니다. Ctrl+C로 종료하세요");
         spdlog::debug("🔧 [DEBUG] 메인 스레드에서 대기 중...");
 
-        // 🔥 핵심 수정: 메인 스레드에서 ioContext_.run() 중복 호출 제거
-        // 대신 스레드풀이 종료될 때까지 대기
         try {
             for (auto& thread : threadPool_) {
                 if (thread.joinable()) {
@@ -963,7 +961,7 @@ namespace Blokus::Server {
         std::lock_guard<std::mutex> lock(activeSessionsMutex_);
 
         // 이미 활성화된 IP나 사용자 ID인지 확인
-        if (activeIPs_.count(userIP) || activeUserIDs_.count(userID)) {
+        if (!ConfigManager::debugMode && activeIPs_.count(userIP) || activeUserIDs_.count(userID)) {
             spdlog::warn("🚫 중복 로그인 시도 차단: IP={}, UserID={}", userIP, userID);
             return false;
         }
@@ -1003,6 +1001,8 @@ namespace Blokus::Server {
     }
 
     GameServer::DuplicateType GameServer::checkDuplicateType(const std::string& userIP, const std::string& userID) const {
+        // 개발 환경에서는 중복 로그인 허용
+        if (ConfigManager::debugMode) return DuplicateType::NONE;
         std::lock_guard<std::mutex> lock(activeSessionsMutex_);
 
         bool ipExists = activeIPs_.count(userIP) > 0;

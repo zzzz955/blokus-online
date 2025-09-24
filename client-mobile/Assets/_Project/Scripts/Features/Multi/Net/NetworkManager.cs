@@ -392,13 +392,32 @@ namespace Features.Multi.Net
         /// </summary>
         public bool JwtLogin(string token)
         {
+            // 안드로이드 환경에서 JWT 로그인 호출 여부 확인
+#if UNITY_ANDROID && !UNITY_EDITOR
+            App.Logging.AndroidLogger.LogAuth($"[NetworkManager] JwtLogin 호출됨 - 토큰 존재: {!string.IsNullOrEmpty(token)}");
+            App.Logging.AndroidLogger.LogAuth($"[NetworkManager] 연결 상태: {IsConnected()}");
+#endif
+
             if (!IsConnected())
             {
                 Debug.LogWarning("[NetworkManager] 서버에 연결되지 않았습니다.");
+#if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogAuth("[NetworkManager] JWT 로그인 실패: 서버 연결 안됨");
+#endif
                 return false;
             }
-            
-            return networkClient.SendJwtLoginRequest(token);
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+            App.Logging.AndroidLogger.LogAuth("[NetworkManager] SendJwtLoginRequest 호출 시작");
+#endif
+
+            bool result = networkClient.SendJwtLoginRequest(token);
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+            App.Logging.AndroidLogger.LogAuth($"[NetworkManager] JWT 로그인 결과: {result}");
+#endif
+
+            return result;
         }
 
         /// <summary>
@@ -410,17 +429,33 @@ namespace Features.Multi.Net
         /// <returns>연결 및 인증 성공 여부</returns>
         public async Task<bool> ConnectToMultiplayerAsync(string currentAccessToken, string clientId)
         {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            App.Logging.AndroidLogger.LogAuth($"[NetworkManager] ConnectToMultiplayerAsync 호출됨");
+            App.Logging.AndroidLogger.LogAuth($"[NetworkManager] AccessToken 존재: {!string.IsNullOrEmpty(currentAccessToken)}");
+            App.Logging.AndroidLogger.LogAuth($"[NetworkManager] ClientId: {clientId}");
+            App.Logging.AndroidLogger.LogAuth($"[NetworkManager] try 블록 시작");
+#endif
+
             try
             {
+#if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogAuth($"[NetworkManager] 초기화 상태 확인 - isInitialized: {isInitialized}");
+#endif
                 if (!isInitialized)
                 {
                     Debug.LogError("[NetworkManager] NetworkManager가 초기화되지 않았습니다.");
+#if UNITY_ANDROID && !UNITY_EDITOR
+                    App.Logging.AndroidLogger.LogAuth("[NetworkManager] 실패: NetworkManager 초기화 안됨");
+#endif
                     return false;
                 }
 
                 if (string.IsNullOrEmpty(currentAccessToken))
                 {
                     Debug.LogError("[NetworkManager] Access Token이 필요합니다.");
+#if UNITY_ANDROID && !UNITY_EDITOR
+                    App.Logging.AndroidLogger.LogAuth("[NetworkManager] 실패: Access Token 없음");
+#endif
                     return false;
                 }
 
@@ -431,14 +466,34 @@ namespace Features.Multi.Net
                 }
 
                 Debug.Log("[NetworkManager] 모바일 멀티플레이어 연결 시작...");
+#if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogAuth("[NetworkManager] 모바일 멀티플레이어 연결 시작");
+#endif
 
                 // Step 1: 토큰 사전 검증 및 갱신
                 Debug.Log("[NetworkManager] Step 1: 토큰 사전 검증 중...");
+#if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogAuth("[NetworkManager] Step 1: 토큰 사전 검증 시작");
+                App.Logging.AndroidLogger.LogAuth($"[NetworkManager] tokenVerificationService 존재: {tokenVerificationService != null}");
+                App.Logging.AndroidLogger.LogAuth($"[NetworkManager] VerifyTokenForTcpConnection 호출 시작");
+#endif
+
                 var verifyResult = await tokenVerificationService.VerifyTokenForTcpConnection(currentAccessToken, clientId);
-                
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogAuth($"[NetworkManager] VerifyTokenForTcpConnection 호출 완료");
+#endif
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogAuth($"[NetworkManager] 토큰 검증 결과: Valid={verifyResult?.Valid}");
+#endif
+
                 if (!verifyResult.Valid)
                 {
                     Debug.LogError($"[NetworkManager] 토큰 검증 실패: {verifyResult.GetUserFriendlyMessage()}");
+#if UNITY_ANDROID && !UNITY_EDITOR
+                    App.Logging.AndroidLogger.LogAuth($"[NetworkManager] 토큰 검증 실패: {verifyResult.GetUserFriendlyMessage()}");
+#endif
                     OnNetworkError($"인증 실패: {verifyResult.GetUserFriendlyMessage()}");
                     return false;
                 }
@@ -467,27 +522,51 @@ namespace Features.Multi.Net
                 }
 
                 Debug.Log($"[NetworkManager] 토큰 검증 성공 (만료: {verifyResult.ExpiresIn}초 후)");
+#if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogAuth($"[NetworkManager] 토큰 검증 성공 (만료: {verifyResult.ExpiresIn}초 후)");
+#endif
 
                 // Step 2: TCP 서버 연결
                 Debug.Log("[NetworkManager] Step 2: TCP 서버 연결 중...");
+#if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogAuth("[NetworkManager] Step 2: TCP 서버 연결 시작");
+#endif
+
                 bool connected = await networkClient.ConnectToServerAsync();
-                
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogAuth($"[NetworkManager] TCP 서버 연결 결과: {connected}");
+#endif
+
                 if (!connected)
                 {
                     Debug.LogError("[NetworkManager] TCP 서버 연결 실패");
+#if UNITY_ANDROID && !UNITY_EDITOR
+                    App.Logging.AndroidLogger.LogAuth("[NetworkManager] TCP 서버 연결 실패");
+#endif
                     OnNetworkError("서버 연결에 실패했습니다.");
                     return false;
                 }
 
                 Debug.Log("[NetworkManager] TCP 서버 연결 성공");
+#if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogAuth("[NetworkManager] TCP 서버 연결 성공");
+#endif
 
                 // Step 3: 모바일 클라이언트 인증 (중복 방지)
                 Debug.Log("[NetworkManager] Step 3: 모바일 클라이언트 인증 중...");
-                
+#if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogAuth("[NetworkManager] Step 3: 모바일 클라이언트 인증 시작");
+                App.Logging.AndroidLogger.LogAuth($"[NetworkManager] 인증 상태 확인 - isAuthenticated: {isAuthenticated}, lastUsedToken 일치: {validToken == lastUsedToken}");
+#endif
+
                 // 이미 같은 토큰으로 인증된 경우 건너뛰기
                 if (isAuthenticated && validToken == lastUsedToken)
                 {
                     Debug.Log("[NetworkManager] 이미 인증됨 - 중복 인증 방지");
+#if UNITY_ANDROID && !UNITY_EDITOR
+                    App.Logging.AndroidLogger.LogAuth("[NetworkManager] 이미 인증됨 - 중복 인증 방지");
+#endif
                     return true;
                 }
                 
@@ -515,6 +594,10 @@ namespace Features.Multi.Net
             catch (Exception ex)
             {
                 Debug.LogError($"[NetworkManager] 모바일 연결 중 예외 발생: {ex.Message}");
+#if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogAuth($"[NetworkManager] 예외 발생: {ex.Message}");
+                App.Logging.AndroidLogger.LogAuth($"[NetworkManager] 예외 스택트레이스: {ex.StackTrace}");
+#endif
                 DisconnectFromServer();
                 OnNetworkError($"연결 중 오류가 발생했습니다: {ex.Message}");
                 return false;
@@ -526,11 +609,24 @@ namespace Features.Multi.Net
         /// </summary>
         private async Task<bool> SendMobileJwtLoginAsync(string validatedToken)
         {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            App.Logging.AndroidLogger.LogAuth($"[NetworkManager] SendMobileJwtLoginAsync 호출됨 - 토큰 존재: {!string.IsNullOrEmpty(validatedToken)}");
+            App.Logging.AndroidLogger.LogAuth($"[NetworkManager] 연결 상태: {IsConnected()}");
+            App.Logging.AndroidLogger.LogAuth($"[NetworkManager] networkClient 존재: {networkClient != null}");
+#endif
+
             if (!IsConnected())
             {
                 Debug.LogWarning("[NetworkManager] TCP 서버에 연결되지 않았습니다.");
+#if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogAuth("[NetworkManager] SendMobileJwtLoginAsync 실패: 서버 연결 안됨");
+#endif
                 return false;
             }
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+            App.Logging.AndroidLogger.LogAuth("[NetworkManager] TCP 연결 확인됨, 인증 프로세스 시작");
+#endif
             
             // 인증 결과를 기다리기 위한 TaskCompletionSource
             var authCompletionSource = new TaskCompletionSource<bool>();
@@ -566,14 +662,29 @@ namespace Features.Multi.Net
                 OnErrorReceived += tempErrorHandler;
 
                 // 모바일 클라이언트 전용 인증 요청 전송
+#if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogAuth("[NetworkManager] SendProtocolMessage 호출 시작");
+                App.Logging.AndroidLogger.LogAuth($"[NetworkManager] 메시지 타입: auth, 서브타입: mobile_jwt");
+                App.Logging.AndroidLogger.LogAuth($"[NetworkManager] 토큰 길이: {validatedToken?.Length ?? 0}");
+#endif
                 bool sent = networkClient.SendProtocolMessage("auth", "mobile_jwt", validatedToken);
-                
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogAuth($"[NetworkManager] SendProtocolMessage 결과: {sent}");
+#endif
+
                 if (!sent)
                 {
+#if UNITY_ANDROID && !UNITY_EDITOR
+                    App.Logging.AndroidLogger.LogAuth("[NetworkManager] SendProtocolMessage 실패");
+#endif
                     return false;
                 }
 
                 Debug.Log("[NetworkManager] JWT 인증 요청 전송됨, 응답 대기 중...");
+#if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogAuth("[NetworkManager] JWT 인증 요청 전송됨, 응답 대기 중...");
+#endif
 
                 // 서버 응답 대기 (최대 10초로 증가)
                 var timeoutTask = Task.Delay(10000);
