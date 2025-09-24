@@ -465,7 +465,7 @@ namespace Features.Single.Gameplay
                 BoardSize = 20,
                 Difficulty = stageData.difficulty,
                 TimeLimit = stageData.time_limit,
-                MaxUndoCount = stageData.max_undo_count > 0 ? stageData.max_undo_count : 3,
+                MaxUndoCount = stageData.max_undo_count > 0 ? stageData.max_undo_count : maxUndo,
                 ParScore = stageData.optimal_score
             };
 
@@ -953,6 +953,14 @@ namespace Features.Single.Gameplay
             logic = new GameLogic();
             gameBoard.SetGameLogic(logic);
 
+            // 중요: 초기 보드 상태(장애물 등)를 먼저 복원
+            if (payload != null && payload.InitialBoardPositions != null && payload.InitialBoardPositions.Length > 0)
+            {
+                if (verboseLog) Debug.Log($"[SingleGameManager] Undo 중 초기 보드 상태 복원: {payload.InitialBoardPositions.Length}개 위치");
+                logic.SetInitialBoardState(payload.InitialBoardPositions);
+            }
+
+            // 그 다음 사용자 배치 블록들을 복원
             foreach (var p in placements)
                 logic.PlaceBlock(p);
 

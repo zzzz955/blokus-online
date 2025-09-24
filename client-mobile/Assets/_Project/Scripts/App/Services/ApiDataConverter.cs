@@ -54,7 +54,7 @@ namespace App.Services{
                 difficulty = compact.d,
                 optimal_score = compact.o,
                 time_limit = compact.tl,              // null/0 허용 시 StageData 쪽 타입에 맞게 사용
-                max_undo_count = (compact.muc > 0 ? compact.muc : 3),
+                max_undo_count = (compact.muc >= 0 ? compact.muc : 3),
                 available_blocks = compact.ab,
                 initial_board_state = ConvertInitialBoardState(compact.ibs),
                 hints = (compact.h != null && compact.h.Length > 0) ? string.Join("|", compact.h) : "",
