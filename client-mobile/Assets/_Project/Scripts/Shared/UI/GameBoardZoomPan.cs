@@ -22,8 +22,8 @@ namespace Shared.UI
         [SerializeField] private float zoomSensitivity = 1.0f;
 
         [Header("Pan Settings")]
-        [SerializeField] private float panSpeed = 1.0f;
-        [SerializeField] private bool enablePanOnlyWhenZoomed = true;
+        [SerializeField] private float panSpeed = 2.0f;
+        [SerializeField] private bool enablePanOnlyWhenZoomed = false;
         [SerializeField] private float dragThreshold = 10f;
 
         [Header("Delayed Pan Mode")]
@@ -619,19 +619,24 @@ namespace Shared.UI
                 // 디버깅용: 제한 없이 자유롭게 이동
                 clampedPosition = newPosition;
             }
-            else if (currentZoom > 1.0f)
+            else
             {
-                // 확대된 상태에서만 팬 제한 적용 - 더 넓은 범위 허용
-                Vector2 scaledSize = originalSize * currentZoom;
-                Vector2 maxPan = (scaledSize - originalSize) * 0.75f; // 0.5f에서 0.75f로 확대
+                // 줌 레벨에 따른 적절한 팬 제한 적용
+                Vector2 scaledSize = originalSize * Mathf.Max(currentZoom, 1.0f);
+                Vector2 maxPan = (scaledSize - originalSize) * 0.75f;
+
+                // 최소한의 이동 범위 보장 (줌하지 않아도 어느 정도 팬 허용)
+                if (maxPan.x < originalSize.x * 0.3f)
+                {
+                    maxPan.x = originalSize.x * 0.3f;
+                }
+                if (maxPan.y < originalSize.y * 0.3f)
+                {
+                    maxPan.y = originalSize.y * 0.3f;
+                }
 
                 clampedPosition.x = Mathf.Clamp(newPosition.x, -maxPan.x, maxPan.x);
                 clampedPosition.y = Mathf.Clamp(newPosition.y, -maxPan.y, maxPan.y);
-            }
-            else
-            {
-                // 기본 확대 상태에서는 원점으로 고정
-                clampedPosition = originalAnchoredPosition;
             }
 
             zoomTarget.anchoredPosition = clampedPosition;
@@ -885,19 +890,24 @@ namespace Shared.UI
             // 팬 모드에서 팬 적용
             if (isPanModeActive && (currentZoom > 1.0f || !enablePanOnlyWhenZoomed))
             {
-                // 드래그 시작점부터의 전체 이동량으로 팬 계산
-                Vector2 totalDelta = eventData.position - pointerDownPosition;
+                // 프레임간 마우스 이동량 사용 (더 안정적)
+                Vector2 delta = eventData.delta;
 
-                // 스크린 좌표를 로컬 좌표로 변환
+                // Canvas scaleFactor 보정
                 Canvas canvas = GetComponentInParent<Canvas>();
-                if (canvas != null && canvas.renderMode == RenderMode.ScreenSpaceOverlay)
+                if (canvas != null)
                 {
-                    totalDelta = totalDelta / canvas.scaleFactor;
+                    delta /= canvas.scaleFactor;
                 }
 
-                // 드래그 시작 위치 + 드래그 변위 = 새로운 팬 위치
-                Vector2 newPanPosition = dragStartPanPosition + totalDelta;
-                SetPanPosition(newPanPosition);
+                // 민감도 적용
+                delta *= panSpeed;
+
+                // 현재 위치에 상대적으로 적용
+                Vector2 currentPosition = zoomTarget.anchoredPosition;
+                Vector2 newPosition = currentPosition + delta;
+
+                SetPanPosition(newPosition);
             }
         }
 

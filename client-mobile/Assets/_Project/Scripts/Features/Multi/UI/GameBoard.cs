@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
+using System.Reflection;
 using TMPro;
 using App.Services;
 using Shared.Models;
@@ -432,6 +433,8 @@ namespace Features.Multi.UI
             pendingBlock = null;
             pendingPosition = new Position(-1, -1);
             hasPendingPlacement = false;
+
+            Debug.Log("[MultiGameBoard] 터치 미리보기 클리어 - ActionButtonPanel 숨김");
         }
 
         private void SetPreview(Block block, Position position)
@@ -769,6 +772,25 @@ namespace Features.Multi.UI
         public int GetBoardSize() => boardSize;
         public float CellSize => cellSize;
         public RectTransform CellParent => cellParent;
+        public GameBoardZoomPan ZoomPanComponent => zoomPanComponent;
+        public bool CanInteract => isInteractable && isMyTurn;
+
+        /// <summary>
+        /// 스크린 좌표를 보드 좌표로 변환 (줌/팬 상태 고려)
+        /// </summary>
+        public Position ScreenToBoard(Vector2 screenPos)
+        {
+            var cam = GetComponentInParent<Canvas>()?.worldCamera ?? Camera.main;
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(cellParent, screenPos, cam, out var local);
+
+            float x0 = -(boardSize * 0.5f - 0.5f) * cellSize;
+            float y0 = +(boardSize * 0.5f - 0.5f) * cellSize;
+            int col = Mathf.FloorToInt((local.x - x0) / cellSize);
+            int row = Mathf.FloorToInt((y0 - local.y) / cellSize);
+            col = Mathf.Clamp(col, 0, boardSize - 1);
+            row = Mathf.Clamp(row, 0, boardSize - 1);
+            return new Position(row, col);
+        }
 
         /// <summary>
         /// 플레이어 색상 반환 (BlockButton과 색상 통일을 위함)
@@ -933,31 +955,238 @@ namespace Features.Multi.UI
         {
             return zoomPanComponent != null ? zoomPanComponent.GetCurrentPan() : Vector2.zero;
         }
+
+        /// <summary>
+        /// 셀들의 raycastTarget을 조건부로 비활성화하여 드래그 이벤트가 GridContainer에 도달하도록 함
+        /// </summary>
+        /// <param name="enableCellRaycast">true면 셀 raycast 활성화, false면 비활성화</param>
+        public void SetCellRaycastEnabled(bool enableCellRaycast)
+        {
+            if (cellImages == null) return;
+
+            Debug.Log($"[MultiGameBoard] 셀 raycastTarget 설정: {enableCellRaycast}");
+
+            for (int row = 0; row < boardSize; row++)
+            {
+                for (int col = 0; col < boardSize; col++)
+                {
+                    if (cellObjects[row, col] != null)
+                    {
+                        // 메인 셀 이미지
+                        Image mainImage = cellObjects[row, col].GetComponent<Image>();
+                        if (mainImage != null)
+                        {
+                            mainImage.raycastTarget = enableCellRaycast;
+                        }
+
+                        // Border와 Inner 이미지들
+                        Transform border = cellObjects[row, col].transform.Find("Border");
+                        if (border != null)
+                        {
+                            Image borderImage = border.GetComponent<Image>();
+                            if (borderImage != null)
+                            {
+                                borderImage.raycastTarget = enableCellRaycast;
+                            }
+
+                            Transform inner = border.Find("Inner");
+                            if (inner != null)
+                            {
+                                Image innerImage = inner.GetComponent<Image>();
+                                if (innerImage != null)
+                                {
+                                    innerImage.raycastTarget = enableCellRaycast;
+                                }
+                            }
+                        }
+
+                        // Button 컴포넌트는 클릭 기능을 위해 유지하되, interactable로 제어
+                        Button cellButton = cellObjects[row, col].GetComponent<Button>();
+                        if (cellButton != null)
+                        {
+                            cellButton.interactable = enableCellRaycast;
+                        }
+                    }
+                }
+            }
+
+            Debug.Log($"[MultiGameBoard] 모든 셀의 raycastTarget 설정 완료: {enableCellRaycast}");
+        }
     }
 
     /// <summary>
-    /// 보드 셀 컴포넌트 - 클릭/호버 이벤트 전달
+    /// 보드 셀 컴포넌트 - 클릭/호버/드래그 이벤트 전달 (멀티플레이 전용)
+    /// 싱글플레이와 동일한 시간 기반 의도 감지 시스템 구현
     /// </summary>
-    public class BoardCell : MonoBehaviour, UnityEngine.EventSystems.IPointerClickHandler, UnityEngine.EventSystems.IPointerEnterHandler
+    public class BoardCell : MonoBehaviour, UnityEngine.EventSystems.IPointerDownHandler, UnityEngine.EventSystems.IPointerUpHandler,
+                             UnityEngine.EventSystems.IPointerEnterHandler, UnityEngine.EventSystems.IPointerExitHandler,
+                             UnityEngine.EventSystems.IDragHandler, UnityEngine.EventSystems.IBeginDragHandler, UnityEngine.EventSystems.IEndDragHandler
     {
         private int row, col;
         private GameBoard gameBoard;
+        private bool isDragging = false;
+        private Vector2 dragStartPosition;
+        private bool isInitialized = false;
+
+        // 시간 기반 의도 감지 시스템
+        private float clickStartTime;
+        private const float CLICK_TO_PAN_THRESHOLD = 0.3f; // 0.3초 임계값
+        private bool isPanModeActive = false;
 
         public void Initialize(int row, int col, GameBoard board)
         {
             this.row = row;
             this.col = col;
             this.gameBoard = board;
-        }
-
-        public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData)
-        {
-            gameBoard?.OnCellClickedInternal(row, col);
+            isInitialized = true;
         }
 
         public void OnPointerEnter(UnityEngine.EventSystems.PointerEventData eventData)
         {
-            gameBoard?.OnCellHoverInternal(row, col);
+            if (gameBoard != null) gameBoard.OnCellHoverInternal(row, col);
+        }
+
+        public void OnPointerDown(UnityEngine.EventSystems.PointerEventData eventData)
+        {
+            if (!isInitialized || gameBoard == null) return;
+            // 드래그 시작 시점에서는 팬/블록 배치 구분 불가하므로 턴 체크 우회
+
+            dragStartPosition = eventData.position;
+            isDragging = false;
+            clickStartTime = Time.time;
+            isPanModeActive = false;
+        }
+
+        public void OnBeginDrag(UnityEngine.EventSystems.PointerEventData eventData)
+        {
+            if (!isInitialized || gameBoard == null) return;
+            // 드래그 시작 시점에서는 팬/블록 배치 구분 불가하므로 턴 체크 우회
+
+            isDragging = true;
+        }
+
+        public void OnDrag(UnityEngine.EventSystems.PointerEventData eventData)
+        {
+            if (!isDragging || gameBoard == null) return;
+
+            // 시간 기반 의도 감지: 0.3초 이상 드래그 시 팬 모드 활성화
+            float currentTime = Time.time;
+            bool isPanMode = (currentTime - clickStartTime > CLICK_TO_PAN_THRESHOLD);
+
+            // 블록 배치 모드에서만 턴 체크 적용 (팬은 턴 관계없이 허용)
+            if (!isPanMode && !gameBoard.CanInteract) return;
+
+            if (isPanMode)
+            {
+                // 팬 모드: 턴 관계없이 실행
+                if (!isPanModeActive)
+                {
+                    isPanModeActive = true;
+                }
+
+                // 팬 모드 중에는 지속적으로 ZoomPanComponent에 드래그 정보 전달
+                var zoomPan = gameBoard.ZoomPanComponent ?? gameBoard.GetComponent<GameBoardZoomPan>();
+                if (zoomPan != null)
+                {
+                    var onDragMethod = zoomPan.GetType().GetMethod("OnDrag", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                    onDragMethod?.Invoke(zoomPan, new object[] { eventData });
+                }
+            }
+            else
+            {
+                // 블록 배치 모드: 내 턴에서만 실행 (위에서 턴 체크 통과)
+                var pos = GetCellFromScreenPosition(eventData.position);
+                if (ValidationUtility.IsValidPosition(pos))
+                    gameBoard.OnCellClickedInternal(pos.row, pos.col);
+            }
+        }
+
+        public void OnEndDrag(UnityEngine.EventSystems.PointerEventData eventData)
+        {
+            if (!isDragging || gameBoard == null) return;
+
+            // 팬 모드에서는 턴 체크 우회, 블록 배치 모드에서만 턴 체크 적용
+            if (!isPanModeActive && !gameBoard.CanInteract) return;
+
+            isDragging = false;
+
+            // 드래그 종료 시점에서 최종 판정 및 로그
+            float eventDuration = Time.time - clickStartTime;
+
+            if (isPanModeActive)
+            {
+                // 팬 이벤트 완료 로그 (턴 관계없이)
+                Debug.Log($"[MultiGameBoard-BoardCell] 팬 이벤트: ({row}, {col}), 지속시간: {eventDuration:F3}초");
+
+                // 팬 모드였다면 팬 종료 이벤트 전달
+                var zoomPan = gameBoard.ZoomPanComponent ?? gameBoard.GetComponent<GameBoardZoomPan>();
+                if (zoomPan != null)
+                {
+                    var onEndDragMethod = zoomPan.GetType().GetMethod("OnEndDrag", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                    onEndDragMethod?.Invoke(zoomPan, new object[] { eventData });
+                }
+            }
+            else
+            {
+                // 블록 배치 모드: 내 턴에서만 실행 (위에서 턴 체크 통과)
+                Debug.Log($"[MultiGameBoard-BoardCell] 블록 배치 이벤트 (드래그): ({row}, {col}), 지속시간: {eventDuration:F3}초");
+                Position endCell = GetCellFromScreenPosition(eventData.position);
+                if (ValidationUtility.IsValidPosition(endCell))
+                {
+                    gameBoard.OnCellClickedInternal(endCell.row, endCell.col);
+                }
+            }
+        }
+
+        public void OnPointerUp(UnityEngine.EventSystems.PointerEventData eventData)
+        {
+            if (isDragging || gameBoard == null) return; // 드래그 중이면 처리하지 않음
+            if (!gameBoard.CanInteract) return; // 멀티플레이: 내 턴에만 이벤트 처리
+
+            // 단순 탭인 경우 처리 (드래그 거리가 짧은 경우)
+            float dragDistance = Vector2.Distance(dragStartPosition, eventData.position);
+            float eventDuration = Time.time - clickStartTime;
+
+            if (dragDistance < 10f && eventDuration <= CLICK_TO_PAN_THRESHOLD) // 10픽셀 이하 움직임이고 0.3초 이하
+            {
+                Debug.Log($"[MultiGameBoard-BoardCell] 블록 배치 이벤트 (탭): ({row}, {col}), 지속시간: {eventDuration:F3}초");
+                Position cellPosition = new Position(row, col);
+                gameBoard.OnCellClickedInternal(cellPosition.row, cellPosition.col);
+            }
+        }
+
+        public void OnPointerExit(UnityEngine.EventSystems.PointerEventData eventData)
+        {
+            if (!isDragging && gameBoard != null)
+            {
+                // 호버 해제는 드래그가 아닌 경우에만
+            }
+        }
+
+        /// <summary>
+        /// 스크린 좌표에서 보드 셀 위치 찾기
+        /// </summary>
+        private Position GetCellFromScreenPosition(Vector2 screenPos)
+        {
+            if (gameBoard == null) return new Position(-1, -1);
+            // GameBoard의 ScreenToBoard 메서드 사용 (추가 예정)
+            return gameBoard.ScreenToBoard(screenPos);
+        }
+
+        /// <summary>
+        /// 현재 셀의 위치 정보
+        /// </summary>
+        public Position GetPosition()
+        {
+            return new Position(row, col);
+        }
+
+        /// <summary>
+        /// 셀이 초기화되었는지 확인
+        /// </summary>
+        public bool IsInitialized()
+        {
+            return isInitialized;
         }
     }
 }

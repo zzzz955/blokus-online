@@ -56,7 +56,7 @@ namespace Blokus {
                 logDirectory = getEnvString("LOG_DIRECTORY", "logs");
 
                 // 개발 설정
-                debugMode = getEnvBool("DEBUG_MODE", false);
+                debugMode = getEnvBool("DEBUG_MODE", true);
                 enableSqlLogging = getEnvBool("ENABLE_SQL_LOGGING", false);
 
                 // 버전 관리 설정
