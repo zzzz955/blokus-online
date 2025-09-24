@@ -1005,9 +1005,13 @@ namespace Shared.UI
             }
             else if (multiGameBoard != null)
             {
-                // Multi GameBoard에도 동일한 메서드가 있다면 호출
-                // multiGameBoard.SetCellRaycastEnabled(enableCellRaycast);
-                Debug.Log("[GameBoardZoomPan] ⚠️ Multi GameBoard의 셀 raycast 제어는 아직 구현되지 않았습니다.");
+                // Multi GameBoard에 동일한 메서드 호출
+                multiGameBoard.SetCellRaycastEnabled(enableCellRaycast);
+
+                Debug.Log($"[GameBoardZoomPan] 🔄 raycast 변경 후 마우스 위치에서 Raycast 재테스트...");
+
+                // 짧은 지연 후 테스트 (다음 프레임에서)
+                StartCoroutine(TestRaycastAfterDelay());
             }
             else
             {
@@ -1050,13 +1054,14 @@ namespace Shared.UI
                 }
             }
 
-            // MultiGameManager도 확인 (필요 시)
-            // var multiGameManager = FindObjectOfType<Features.Multi.Gameplay.MultiGameManager>();
-            // if (multiGameManager != null)
-            // {
-            //     // Multi 게임의 블록 선택 상태 확인 로직 추가 가능
-            //     Debug.Log("[GameBoardZoomPan] ℹ️ Multi 게임 블록 선택 상태 확인은 구현되지 않음");
-            // }
+            // Multi MyBlockPalette에서 블록 선택 상태 확인
+            var multiBlockPalette = FindObjectOfType<Features.Multi.UI.MyBlockPalette>();
+            if (multiBlockPalette != null)
+            {
+                var selectedBlock = multiBlockPalette.GetSelectedBlock();
+                bool isSelected = selectedBlock != null;
+                return isSelected;
+            }
 
             // GameManager 없음 - 블록 미선택으로 간주 (로그 제거)
             return false; // 확인할 수 없으면 false 반환 (팬 모드 허용)
