@@ -606,6 +606,7 @@ namespace Shared.UI
 
         /// <summary>
         /// 팬 위치 설정 (경계 제한 포함)
+        /// GridContainer가 GameBoard 영역을 완전히 채우도록 가장자리 제약 적용
         /// </summary>
         /// <param name="newPosition">새로운 위치</param>
         private void SetPanPosition(Vector2 newPosition)
@@ -621,22 +622,21 @@ namespace Shared.UI
             }
             else
             {
-                // 줌 레벨에 따른 적절한 팬 제한 적용
-                Vector2 scaledSize = originalSize * Mathf.Max(currentZoom, 1.0f);
-                Vector2 maxPan = (scaledSize - originalSize) * 0.75f;
-
-                // 최소한의 이동 범위 보장 (줌하지 않아도 어느 정도 팬 허용)
-                if (maxPan.x < originalSize.x * 0.3f)
+                // 가장자리 제약 적용: GridContainer가 GameBoard를 완전히 채우도록 제한
+                if (currentZoom <= 1.0f)
                 {
-                    maxPan.x = originalSize.x * 0.3f;
+                    // 100% 이하 줌에서는 팬 불가 (GridContainer가 GameBoard와 같거나 작음)
+                    clampedPosition = originalAnchoredPosition;
                 }
-                if (maxPan.y < originalSize.y * 0.3f)
+                else
                 {
-                    maxPan.y = originalSize.y * 0.3f;
-                }
+                    // 줌 시 정확한 가장자리 제약: GridContainer 가장자리가 GameBoard 가장자리와 인접하도록 제한
+                    Vector2 scaledSize = originalSize * currentZoom;
+                    Vector2 maxPan = (scaledSize - originalSize) * 0.5f;
 
-                clampedPosition.x = Mathf.Clamp(newPosition.x, -maxPan.x, maxPan.x);
-                clampedPosition.y = Mathf.Clamp(newPosition.y, -maxPan.y, maxPan.y);
+                    clampedPosition.x = Mathf.Clamp(newPosition.x, -maxPan.x, maxPan.x);
+                    clampedPosition.y = Mathf.Clamp(newPosition.y, -maxPan.y, maxPan.y);
+                }
             }
 
             zoomTarget.anchoredPosition = clampedPosition;
