@@ -241,17 +241,17 @@ namespace App.Core
             authToken = accessToken;
             refreshToken = refreshTokenValue;
             userId = userIdValue;
-            isLoggedIn = true; // 🔥 핵심 수정: 로그인 상태 플래그 설정
+            isLoggedIn = true; //  핵심 수정: 로그인 상태 플래그 설정
 
             if (IsDebugEnabled)
                 Debug.Log($"[SessionManager] 토큰 설정 완료: User {userId}, Refresh Token: {(!string.IsNullOrEmpty(refreshToken) ? "있음" : "없음")}");
 
-            // 🔥 추가: UserDataCache가 이미 존재한다면 수동으로 사용자 정보 동기화
+            //  추가: UserDataCache가 이미 존재한다면 수동으로 사용자 정보 동기화
             TrySyncUserDataCache();
         }
 
         /// <summary>
-        /// 🔥 추가: UserDataCache와 수동 동기화 (로그인 타이밍 문제 해결)
+        ///  추가: UserDataCache와 수동 동기화 (로그인 타이밍 문제 해결)
         /// </summary>
         private void TrySyncUserDataCache()
         {
@@ -313,7 +313,7 @@ namespace App.Core
             // 메모리 세션 초기화
             ClearMemorySession();
 
-            // 🔥 SecureStorage에서 refresh token 삭제
+            //  SecureStorage에서 refresh token 삭제
             App.Security.SecureStorage.DeleteKey(App.Security.TokenKeys.Refresh);
             App.Security.SecureStorage.DeleteKey("blokus_user_id");
             App.Security.SecureStorage.DeleteKey("blokus_username");
@@ -622,10 +622,10 @@ namespace App.Core
 
         void Start()
         {
-            // 🔥 수정: 메모리 세션만 초기화 (SecureStorage는 보존)
+            //  수정: 메모리 세션만 초기화 (SecureStorage는 보존)
             ClearMemorySession();
             
-            // 🔥 수정: 세션 자동 복구는 SceneFlowController에서 처리
+            //  수정: 세션 자동 복구는 SceneFlowController에서 처리
             // CheckAndRestoreSession();
         }
 

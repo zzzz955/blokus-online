@@ -1,4 +1,4 @@
-﻿// main.cpp - 블로커스 온라인 서버 테스트
+﻿// main.cpp - 블로블로 서버 테스트
 
 #include "GameServer.h"
 #include "ConfigManager.h"
@@ -66,7 +66,7 @@ int main() {
             spdlog::set_level(spdlog::level::info);  // 기본값
         }
 
-        spdlog::info("블로커스 온라인 서버 v{}", Blokus::Server::ConfigManager::serverVersion);
+        spdlog::info("블로블로 서버 v{}", Blokus::Server::ConfigManager::serverVersion);
         spdlog::info("========================================");
         spdlog::info("현재 로그 레벨: {}", logLevel);
         if (!Blokus::Server::ConfigManager::validate()) {

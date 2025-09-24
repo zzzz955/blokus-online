@@ -82,7 +82,7 @@ public static class AndroidBuildConfig
         TryEnableTemplateToggle("useCustomLauncherGradleTemplate", true);
         TryEnableTemplateToggle("useCustomBaseGradleTemplate", true);
 
-        Debug.Log("✅ Blokus Android 권장 설정 적용 완료");
+        Debug.Log(" Blokus Android 권장 설정 적용 완료");
     }
 
     private static void TryEnableTemplateToggle(string propName, bool on)

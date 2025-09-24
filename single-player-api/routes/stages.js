@@ -50,7 +50,7 @@ router.get('/metadata',
         o: stage.o, // optimal_score
         tl: stage.tl, // time_limit
         tu: stage.tu,
-        desc: stage.desc || `${stage.n}번째 블로쿠스 퍼즐에 도전하세요!`,
+        desc: stage.desc || `${stage.n}번째 블로블로 퍼즐에 도전하세요!`,
         ab: stage.ab,
         muc: stage.muc,
         ibs: stage.ibs,
@@ -294,17 +294,17 @@ router.post('/complete',
       // 데이터베이스에서 optimal_score 가져오기
       const optimalScore = stageData.optimal_score
 
-      // 🔥 수정: 별점 계산을 클라이언트 completed 파라미터와 독립적으로 수행
+      //  수정: 별점 계산을 클라이언트 completed 파라미터와 독립적으로 수행
       let starsEarned = 0
       if (score >= optimalScore * 1.0) starsEarned = 3 // 100% 이상: 3별
       else if (score >= optimalScore * 0.9) starsEarned = 2 // 90% 이상: 2별
       else if (score >= optimalScore * 0.8) starsEarned = 1 // 80% 이상: 1별
       // 80% 미만: 0별
       
-      // 🔥 핵심: GameEndResult 규칙 적용 - starsEarned >= 1일 때만 실제 완료로 인정
+      //  핵심: GameEndResult 규칙 적용 - starsEarned >= 1일 때만 실제 완료로 인정
       const isActuallyCompleted = starsEarned >= 1
       
-      // 🔥 서버 측 검증 로그
+      //  서버 측 검증 로그
       if (completed && !isActuallyCompleted) {
         logger.warn('Client sent completed=true but stars=0 detected', {
           stageNumber: stage_number,
@@ -321,22 +321,22 @@ router.post('/complete',
       const existingProgress = await dbService.getStageProgress(username, stage_number)
       const isNewBest = !existingProgress || score > existingProgress.best_score
 
-      // 🔥 수정: 서버에서 검증된 completed 값 사용
+      //  수정: 서버에서 검증된 completed 값 사용
       await dbService.updateStageProgress(
         userId,
         stage_number,
         {
           score,
           completionTime: completion_time,
-          completed: isActuallyCompleted // 🔥 클라이언트 값 대신 서버 검증 값 사용
+          completed: isActuallyCompleted //  클라이언트 값 대신 서버 검증 값 사용
         },
         optimalScore // 실제 스테이지의 optimal_score 전달
       )
 
-      // 🔥 수정: 서버 검증 결과로 사용자 통계 업데이트
+      //  수정: 서버 검증 결과로 사용자 통계 업데이트
       await dbService.updateUserStats(userId, score, isActuallyCompleted)
 
-      // 🔥 수정: 실제 완료 시에만 최대 클리어 스테이지 업데이트 (stars >= 1 규칙)
+      //  수정: 실제 완료 시에만 최대 클리어 스테이지 업데이트 (stars >= 1 규칙)
       if (isActuallyCompleted) {
         const userProfile = await dbService.getUserByUsername(username)
         if (userProfile && stage_number > userProfile.max_stage_completed) {
@@ -352,7 +352,7 @@ router.post('/complete',
           })
         }
       } else if (completed) {
-        // 🔥 클라이언트가 완료했다고 보고했지만 서버에서는 실패로 판정
+        //  클라이언트가 완료했다고 보고했지만 서버에서는 실패로 판정
         logger.info('Stage attempt recorded as failure despite client completed=true', {
           username,
           stageNumber: stage_number,
@@ -370,11 +370,11 @@ router.post('/complete',
         stars_earned: starsEarned,
         is_new_best: isNewBest,
         level_up: levelUp,
-        // 🔥 수정: 서버 검증 결과 기반 메시지
+        //  수정: 서버 검증 결과 기반 메시지
         message: isActuallyCompleted
           ? `Stage ${stage_number} completed successfully with ${starsEarned} stars!`
           : `Stage ${stage_number} attempt recorded (${starsEarned} stars).`,
-        // 🔥 추가: 서버 검증 정보 (디버깅용)
+        //  추가: 서버 검증 정보 (디버깅용)
         server_validated: {
           completed: isActuallyCompleted,
           client_completed: completed,
@@ -604,7 +604,7 @@ router.get('/:stageNumber/preview',
         difficulty: stageData.difficulty,
         optimal_score: stageData.optimal_score,
         time_limit: stageData.time_limit,
-        preview_description: stageData.stage_description || `${stageNumber}번째 블로쿠스 퍼즐에 도전하세요!`,
+        preview_description: stageData.stage_description || `${stageNumber}번째 블로블로 퍼즐에 도전하세요!`,
         category,
         available_blocks: stageData.available_blocks,
         hints,

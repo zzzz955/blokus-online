@@ -36,7 +36,7 @@ namespace Blokus {
         , m_blockSelected(false) 
         , m_afkDialog(nullptr)
     {
-        // 🔥 동적으로 2D 벡터 초기화
+        //  동적으로 2D 벡터 초기화
         m_board.resize(BOARD_SIZE);
         for (int i = 0; i < BOARD_SIZE; ++i) {
             m_board[i].resize(BOARD_SIZE, PlayerColor::None);
@@ -377,7 +377,7 @@ namespace Blokus {
         }
 
         if (!m_hasSelectedBlock || m_selectedBlock.getPlayer() == PlayerColor::None) {
-            qDebug() << QString::fromUtf8("❌ 블록이 선택되지 않음");
+            qDebug() << QString::fromUtf8(" 블록이 선택되지 않음");
             return false;
         }
 
@@ -403,13 +403,13 @@ namespace Blokus {
             }
         }
 
-        qDebug() << QString::fromUtf8("❌ 블록 배치 실패");
+        qDebug() << QString::fromUtf8(" 블록 배치 실패");
         return false;
     }
 
     void GameBoard::setSelectedBlock(const Block& block)
     {
-        qDebug() << QString::fromUtf8("🎯 블록 선택: %1 (%2)")
+        qDebug() << QString::fromUtf8(" 블록 선택: %1 (%2)")
             .arg(BlockFactory::getBlockName(block.getType()))
             .arg(Utils::playerColorToString(block.getPlayer()));
 
@@ -544,7 +544,7 @@ namespace Blokus {
         if (event->button() == Qt::LeftButton) {
             if (isCellValid(boardPos.first, boardPos.second)) {
                 if (tryPlaceCurrentBlock(boardPos)) {
-                    qDebug() << QString::fromUtf8("✅ 블록 배치 성공!");
+                    qDebug() << QString::fromUtf8(" 블록 배치 성공!");
                 }
 
                 emit cellClicked(boardPos.first, boardPos.second);
@@ -1131,7 +1131,7 @@ namespace Blokus {
         m_afkDialog = new Blokus::AfkNotificationDialog(this);
         m_afkDialog->setAfkInfo(jsonObj);
         
-        // 🔥 FIX: 시그널 연결 (AFK 해제 + 방 나가기 + 게임 종료 + 에러 처리)
+        //  FIX: 시그널 연결 (AFK 해제 + 방 나가기 + 게임 종료 + 에러 처리)
         connect(m_afkDialog, &Blokus::AfkNotificationDialog::afkUnblockRequested, 
                 this, &GameBoard::afkUnblockRequested);
         connect(m_afkDialog, &Blokus::AfkNotificationDialog::leaveRoomRequested,
@@ -1145,7 +1145,7 @@ namespace Blokus {
             }
         });
         
-        // 🔥 FIX: non-modal로 표시 (exec() 대신 show() 사용)
+        //  FIX: non-modal로 표시 (exec() 대신 show() 사용)
         m_afkDialog->show();
         m_afkDialog->raise();
         m_afkDialog->activateWindow();
@@ -1165,7 +1165,7 @@ namespace Blokus {
         m_afkDialog = new Blokus::AfkNotificationDialog(this);
         m_afkDialog->setAfkInfo(timeoutCount, maxCount);
         
-        // 🔥 FIX: 시그널 연결 (AFK 해제 + 방 나가기 + 게임 종료 + 에러 처리)
+        //  FIX: 시그널 연결 (AFK 해제 + 방 나가기 + 게임 종료 + 에러 처리)
         connect(m_afkDialog, &Blokus::AfkNotificationDialog::afkUnblockRequested, 
                 this, &GameBoard::afkUnblockRequested);
         connect(m_afkDialog, &Blokus::AfkNotificationDialog::leaveRoomRequested,
@@ -1179,7 +1179,7 @@ namespace Blokus {
             }
         });
         
-        // 🔥 FIX: non-modal로 표시 (exec() 대신 show() 사용)
+        //  FIX: non-modal로 표시 (exec() 대신 show() 사용)
         m_afkDialog->show();
         m_afkDialog->raise();
         m_afkDialog->activateWindow();

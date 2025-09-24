@@ -57,13 +57,13 @@ set(CLIENT_HEADERS
 )
 
 # 실행 파일 생성
-add_executable(BlokusClient 
+add_executable(BlobloClient 
     ${CLIENT_SOURCES} 
     ${CLIENT_HEADERS}
 )
 
 # 인클루드 디렉토리
-target_include_directories(BlokusClient PRIVATE
+target_include_directories(BlobloClient PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
@@ -72,7 +72,7 @@ find_package(SDL2 CONFIG REQUIRED)
 find_package(SDL2_mixer_ext CONFIG REQUIRED)
 
 # 라이브러리 링크
-target_link_libraries(BlokusClient PRIVATE
+target_link_libraries(BlobloClient PRIVATE
     BlokusCommon
     Qt5::Core
     Qt5::Widgets
@@ -87,17 +87,17 @@ target_link_libraries(BlokusClient PRIVATE
 # Windows 설정 - 표준 Qt 애플리케이션
 if(WIN32)
     # 항상 WIN32 애플리케이션으로 설정 (Qt 표준)
-    set_target_properties(BlokusClient PROPERTIES
+    set_target_properties(BlobloClient PROPERTIES
         WIN32_EXECUTABLE TRUE
     )
     
     # Debug 매크로 정의
-    target_compile_definitions(BlokusClient PRIVATE
+    target_compile_definitions(BlobloClient PRIVATE
         $<$<CONFIG:Debug>:DEBUG _DEBUG>
     )
     
     # Windows Credential Manager 라이브러리 링크
-    target_link_libraries(BlokusClient PRIVATE
+    target_link_libraries(BlobloClient PRIVATE
         credui.lib
         crypt32.lib
     )
@@ -107,7 +107,7 @@ endif()
 
 # 컴파일러 플래그
 if(MSVC)
-    target_compile_options(BlokusClient PRIVATE /W4 /permissive-)
+    target_compile_options(BlobloClient PRIVATE /W4 /permissive-)
 endif()
 
 # 소스 그룹
@@ -115,28 +115,28 @@ source_group("Client\\Headers" FILES ${CLIENT_HEADERS})
 source_group("Client\\Sources" FILES ${CLIENT_SOURCES})
 
 # 리소스 파일 복사
-add_custom_command(TARGET BlokusClient POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:BlokusClient>/resource
+add_custom_command(TARGET BlobloClient POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:BlobloClient>/resource
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/resource/my_turn.wav
-        $<TARGET_FILE_DIR:BlokusClient>/resource/my_turn.wav
+        $<TARGET_FILE_DIR:BlobloClient>/resource/my_turn.wav
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/resource/time_out.wav
-        $<TARGET_FILE_DIR:BlokusClient>/resource/time_out.wav
+        $<TARGET_FILE_DIR:BlobloClient>/resource/time_out.wav
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/resource/countdown.wav
-        $<TARGET_FILE_DIR:BlokusClient>/resource/countdown.wav
+        $<TARGET_FILE_DIR:BlobloClient>/resource/countdown.wav
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/resource/login_title.svg
-        $<TARGET_FILE_DIR:BlokusClient>/resource/login_title.svg
-    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:BlokusClient>/resource/lobby
+        $<TARGET_FILE_DIR:BlobloClient>/resource/login_title.svg
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:BlobloClient>/resource/lobby
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_CURRENT_SOURCE_DIR}/resource/lobby
-        $<TARGET_FILE_DIR:BlokusClient>/resource/lobby
-    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:BlokusClient>/resource/gameroom
+        $<TARGET_FILE_DIR:BlobloClient>/resource/lobby
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:BlobloClient>/resource/gameroom
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_CURRENT_SOURCE_DIR}/resource/gameroom
-        $<TARGET_FILE_DIR:BlokusClient>/resource/gameroom
+        $<TARGET_FILE_DIR:BlobloClient>/resource/gameroom
     COMMENT "Copying sound, image, and BGM resource files to output directory"
 )
 
@@ -155,10 +155,10 @@ if(MSVC)
     foreach(DLL_NAME IN LISTS VC_DLLS)
         set(DLL_PATH "${RESOURCE_DIR}/${DLL_NAME}")
         if(EXISTS "${DLL_PATH}")
-            add_custom_command(TARGET BlokusClient POST_BUILD
+            add_custom_command(TARGET BlobloClient POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     "${DLL_PATH}"
-                    "$<TARGET_FILE_DIR:BlokusClient>/${DLL_NAME}"
+                    "$<TARGET_FILE_DIR:BlobloClient>/${DLL_NAME}"
                 COMMENT "Copying ${DLL_NAME} from resource directory to output directory"
             )
             message(STATUS "Will copy ${DLL_NAME} from resource directory")

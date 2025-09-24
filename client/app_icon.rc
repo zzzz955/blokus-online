@@ -1,5 +1,5 @@
 // Blokus Online Client - Application Icon Resource
-// 블로쿠스 온라인 클라이언트 애플리케이션 아이콘 리소스
+// 블로블로 온라인 클라이언트 애플리케이션 아이콘 리소스
 
 #include <windows.h>
 
@@ -8,8 +8,8 @@
 
 // 버전 정보 (선택사항)
 1 VERSIONINFO
-FILEVERSION 1,0,0,0
-PRODUCTVERSION 1,0,0,0
+FILEVERSION 1,6,2,0
+PRODUCTVERSION 1,6,2,0
 FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
 FILEFLAGS 0
 FILEOS VOS_NT_WINDOWS32
@@ -22,11 +22,11 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Blokus Online Team"
             VALUE "FileDescription", "Blokus Online Game Client"
-            VALUE "FileVersion", "1.0.0.0"
-            VALUE "InternalName", "BlokusClient"
-            VALUE "OriginalFilename", "BlokusClient.exe"
+            VALUE "FileVersion", "1.6.2.0"
+            VALUE "InternalName", "BlobloClient"
+            VALUE "OriginalFilename", "BlobloClient.exe"
             VALUE "ProductName", "Blokus Online"
-            VALUE "ProductVersion", "1.0.0.0"
+            VALUE "ProductVersion", "1.6.2.0"
         END
     END
     BLOCK "VarFileInfo"

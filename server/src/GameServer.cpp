@@ -95,10 +95,10 @@ namespace Blokus::Server {
         spdlog::info("GameServer 시작");
         running_.store(true);
 
-        // 🔥 핵심 수정: work_guard 생성으로 ioContext가 계속 실행되도록 보장
+        //  핵심 수정: work_guard 생성으로 ioContext가 계속 실행되도록 보장
         workGuard_ = std::make_unique<boost::asio::executor_work_guard<boost::asio::io_context::executor_type>>(
             boost::asio::make_work_guard(ioContext_));
-        spdlog::debug("🔧 [DEBUG] work_guard 생성 완료");
+        spdlog::debug(" [DEBUG] work_guard 생성 완료");
 
         // 스레드 풀 생성
         int threadCount = ConfigManager::threadPoolSize;
@@ -165,7 +165,7 @@ namespace Blokus::Server {
 
         // 5. work_guard 해제로 ioContext가 자연스럽게 종료되도록 함
         if (workGuard_) {
-            spdlog::debug("🔧 [DEBUG] work_guard 해제");
+            spdlog::debug(" [DEBUG] work_guard 해제");
             workGuard_.reset();
         }
 
@@ -180,19 +180,19 @@ namespace Blokus::Server {
     }
 
     void GameServer::run() {
-        spdlog::debug("🔧 [DEBUG] run() 메서드 시작");
+        spdlog::debug(" [DEBUG] run() 메서드 시작");
 
         if (!initialize()) {
             spdlog::error("서버 초기화 실패");
             return;
         }
-        spdlog::debug("🔧 [DEBUG] 초기화 완료");
+        spdlog::debug(" [DEBUG] 초기화 완료");
 
         start();
-        spdlog::debug("🔧 [DEBUG] start() 완료");
+        spdlog::debug(" [DEBUG] start() 완료");
 
         spdlog::info("서버가 실행 중입니다. Ctrl+C로 종료하세요");
-        spdlog::debug("🔧 [DEBUG] 메인 스레드에서 대기 중...");
+        spdlog::debug(" [DEBUG] 메인 스레드에서 대기 중...");
 
         try {
             for (auto& thread : threadPool_) {
@@ -200,13 +200,13 @@ namespace Blokus::Server {
                     thread.join();
                 }
             }
-            spdlog::debug("🔧 [DEBUG] 모든 스레드 종료 완료");
+            spdlog::debug(" [DEBUG] 모든 스레드 종료 완료");
         }
         catch (const std::exception& e) {
             spdlog::error("스레드 대기 중 예외: {}", e.what());
         }
 
-        spdlog::debug("🔧 [DEBUG] run() 메서드 종료");
+        spdlog::debug(" [DEBUG] run() 메서드 종료");
     }
 
     // ========================================
@@ -331,7 +331,7 @@ namespace Blokus::Server {
 
         // Session에 MessageHandler가 없으면 생성
         if (!session->getMessageHandler()) {
-            // spdlog::info("🔧 [addSession] MessageHandler 생성 - SessionId: {}", sessionId);
+            // spdlog::info(" [addSession] MessageHandler 생성 - SessionId: {}", sessionId);
 
             // MessageHandler 생성 및 설정
             auto messageHandler = std::make_unique<MessageHandler>(
@@ -346,7 +346,7 @@ namespace Blokus::Server {
             // Session에 MessageHandler 설정
             session->setMessageHandler(std::move(messageHandler));
 
-            // spdlog::info("✅ [addSession] MessageHandler 생성 완료 - SessionId: {}", sessionId);
+            // spdlog::info(" [addSession] MessageHandler 생성 완료 - SessionId: {}", sessionId);
         }
 
         // 세션 기본 콜백만 설정 (연결 해제, 메시지 수신)
@@ -357,7 +357,7 @@ namespace Blokus::Server {
         session->setMessageCallback([this](const std::string& id, const std::string& msg) {
             onSessionMessage(id, msg);
             });
-        // spdlog::info("✅ [addSession] 세션 설정 완료 (콜백 없음) - SessionId: {}", sessionId);
+        // spdlog::info(" [addSession] 세션 설정 완료 (콜백 없음) - SessionId: {}", sessionId);
     }
 
     void GameServer::removeSession(const std::string& sessionId) {
@@ -588,7 +588,7 @@ namespace Blokus::Server {
     // ========================================
 
     void GameServer::handleSessionExit(const std::string& sessionId) {
-        // 🔥 데드락 방지: 세션 정보만 추출, 즉시 잠금 해제
+        //  데드락 방지: 세션 정보만 추출, 즉시 잠금 해제
         std::string username;
         std::string userId;
         bool wasInLobby = false;
@@ -610,18 +610,18 @@ namespace Blokus::Server {
             }
         }
         
-        // 🔥 데드락 방지: 잠금 해제 후 방 정리 (데드락 위험 제거)
+        //  데드락 방지: 잠금 해제 후 방 정리 (데드락 위험 제거)
         if ((wasInRoom || wasInGame) && !userId.empty() && roomManager_) {
             try {
                 if (wasInGame) {
                     spdlog::warn("🎮 게임 중 세션 강제 종료로 인한 방 {} 나가기: {} (좀비방 방지)", roomId, username);
                 } else {
-                    spdlog::debug("🏠 방 대기 중 세션 연결 해제로 인한 방 {} 나가기: {}", roomId, username);
+                    spdlog::debug(" 방 대기 중 세션 연결 해제로 인한 방 {} 나가기: {}", roomId, username);
                 }
                 roomManager_->leaveRoom(userId);
             }
             catch (const std::exception& e) {
-                spdlog::error("❌ 방 나가기 처리 중 오류 ({}): {}", sessionId, e.what());
+                spdlog::error(" 방 나가기 처리 중 오류 ({}): {}", sessionId, e.what());
             }
         }
         
@@ -631,7 +631,7 @@ namespace Blokus::Server {
                 broadcastLobbyUserLeft(username);
             }
             catch (const std::exception& e) {
-                spdlog::error("❌ 로비 브로드캐스트 중 오류 ({}): {}", sessionId, e.what());
+                spdlog::error(" 로비 브로드캐스트 중 오류 ({}): {}", sessionId, e.what());
             }
         }
     }
@@ -683,7 +683,7 @@ namespace Blokus::Server {
         try {
             auto lobbyUsers = getLobbyUsers();
             if (lobbyUsers.empty()) {
-                spdlog::debug("🔄 주기적 브로드캐스트: 로비 사용자 없음");
+                spdlog::debug(" 주기적 브로드캐스트: 로비 사용자 없음");
                 return; // 로비 사용자가 없으면 브로드캐스트하지 않음
             }
             
@@ -782,7 +782,7 @@ namespace Blokus::Server {
     }
 
     void GameServer::cleanupSessions() {
-        // 🔥 타임아웃된 세션 정보를 담는 구조체 (방 정보 포함)
+        //  타임아웃된 세션 정보를 담는 구조체 (방 정보 포함)
         struct TimeoutSessionInfo {
             std::string sessionId;
             std::shared_ptr<Session> session;
@@ -796,7 +796,7 @@ namespace Blokus::Server {
         
         std::vector<TimeoutSessionInfo> timeoutSessions;
         
-        // 🔥 데드락 방지: 1단계 - 타임아웃된 세션 식별 및 세션 정보 추출 (잠금 보유 시간 최소화)
+        //  데드락 방지: 1단계 - 타임아웃된 세션 식별 및 세션 정보 추출 (잠금 보유 시간 최소화)
         {
             std::lock_guard<std::mutex> lock(sessionsMutex_);
             auto it = sessions_.begin();
@@ -829,7 +829,7 @@ namespace Blokus::Server {
                             spdlog::info("세션 타임아웃: {} ({}분)", sessionId, timeoutDuration.count() / 60);
                         }
                         
-                        // 🔥 중요: 세션 정보를 미리 추출해서 저장 (맵에서 제거되기 전에)
+                        //  중요: 세션 정보를 미리 추출해서 저장 (맵에서 제거되기 전에)
                         TimeoutSessionInfo info;
                         info.sessionId = sessionId;
                         info.session = it->second;
@@ -854,7 +854,7 @@ namespace Blokus::Server {
                             }
                         }
                         
-                        spdlog::debug("🔄 [ASYNC_CLEANUP] 타임아웃 세션 {} 비동기 정리 예약", sessionId);
+                        spdlog::debug(" [ASYNC_CLEANUP] 타임아웃 세션 {} 비동기 정리 예약", sessionId);
                     }
                     else {
                         ++it;
@@ -863,24 +863,24 @@ namespace Blokus::Server {
             }
         }
         
-        // 🔥 데드락 방지: 2단계 - 잠금 해제 후 비동기로 세션 정리 (세션 정보를 이미 추출했으므로 안전)
+        //  데드락 방지: 2단계 - 잠금 해제 후 비동기로 세션 정리 (세션 정보를 이미 추출했으므로 안전)
         for (auto& info : timeoutSessions) {
             boost::asio::post(ioContext_, [this, info]() {
-                spdlog::debug("🔄 [ASYNC_CLEANUP] 비동기 타임아웃 정리 실행: {}", info.sessionId);
+                spdlog::debug(" [ASYNC_CLEANUP] 비동기 타임아웃 정리 실행: {}", info.sessionId);
                 
                 try {
-                    // 🔥 방 퇴장 처리 (미리 추출된 세션 정보 사용)
+                    //  방 퇴장 처리 (미리 추출된 세션 정보 사용)
                     if ((info.wasInRoom || info.wasInGame) && !info.userId.empty() && roomManager_) {
                         try {
                             if (info.wasInGame) {
                                 spdlog::warn("🎮 게임 중 세션 타임아웃으로 인한 방 {} 나가기: {} (좀비방 방지)", info.roomId, info.username);
                             } else {
-                                spdlog::info("🏠 방 대기 중 세션 타임아웃으로 인한 방 {} 나가기: {}", info.roomId, info.username);
+                                spdlog::info(" 방 대기 중 세션 타임아웃으로 인한 방 {} 나가기: {}", info.roomId, info.username);
                             }
                             roomManager_->leaveRoom(info.userId);
                         }
                         catch (const std::exception& e) {
-                            spdlog::error("❌ 방 나가기 처리 중 오류 ({}): {}", info.sessionId, e.what());
+                            spdlog::error(" 방 나가기 처리 중 오류 ({}): {}", info.sessionId, e.what());
                         }
                     }
                     
@@ -890,7 +890,7 @@ namespace Blokus::Server {
                             broadcastLobbyUserLeft(info.username);
                         }
                         catch (const std::exception& e) {
-                            spdlog::error("❌ 로비 브로드캐스트 중 오류 ({}): {}", info.sessionId, e.what());
+                            spdlog::error(" 로비 브로드캐스트 중 오류 ({}): {}", info.sessionId, e.what());
                         }
                     }
                     
@@ -898,7 +898,7 @@ namespace Blokus::Server {
                     info.session->stop();
                 }
                 catch (const std::exception& e) {
-                    spdlog::error("❌ 비동기 세션 정리 중 오류 ({}): {}", info.sessionId, e.what());
+                    spdlog::error(" 비동기 세션 정리 중 오류 ({}): {}", info.sessionId, e.what());
                 }
             });
         }
@@ -962,7 +962,7 @@ namespace Blokus::Server {
 
         // 이미 활성화된 IP나 사용자 ID인지 확인
         if (!ConfigManager::debugMode && activeIPs_.count(userIP) || activeUserIDs_.count(userID)) {
-            spdlog::warn("🚫 중복 로그인 시도 차단: IP={}, UserID={}", userIP, userID);
+            spdlog::warn("중복 로그인 시도 차단: IP={}, UserID={}", userIP, userID);
             return false;
         }
 
@@ -971,7 +971,7 @@ namespace Blokus::Server {
         activeUserIDs_.insert(userID);
         ipToUserMap_[userIP] = userID;
 
-        spdlog::debug("✅ 활성 세션 등록: IP={}, UserID={}", userIP, userID);
+        spdlog::debug("활성 세션 등록: IP={}, UserID={}", userIP, userID);
         return true;
     }
 
@@ -983,7 +983,7 @@ namespace Blokus::Server {
         activeUserIDs_.erase(userID);
         ipToUserMap_.erase(userIP);
 
-        spdlog::debug("🗑️ 활성 세션 해제: IP={}, UserID={}", userIP, userID);
+        spdlog::debug("활성 세션 해제: IP={}, UserID={}", userIP, userID);
     }
 
     bool GameServer::isIPActive(const std::string& userIP) const {
@@ -1016,21 +1016,21 @@ namespace Blokus::Server {
             // IP와 사용자 모두 존재 - 매핑 확인
             auto it = ipToUserMap_.find(userIP);
             if (it != ipToUserMap_.end() && it->second == userID) {
-                spdlog::info("🚫 중복 로그인 감지: 같은 사용자가 같은 IP에서 재로그인 - IP={}, UserID={}", userIP, userID);
+                spdlog::info("중복 로그인 감지: 같은 사용자가 같은 IP에서 재로그인 - IP={}, UserID={}", userIP, userID);
                 return DuplicateType::SAME_USER_IP;
             } else {
-                spdlog::info("🚫 중복 로그인 감지: 복합 상황 - IP={}, UserID={}", userIP, userID);
+                spdlog::info("중복 로그인 감지: 복합 상황 - IP={}, UserID={}", userIP, userID);
                 return DuplicateType::DIFF_USER_SAME_IP;  // 보수적 접근
             }
         }
 
         if (userExists && !ipExists) {
-            spdlog::info("🚫 중복 로그인 감지: 같은 사용자가 다른 IP에서 로그인 - IP={}, UserID={}", userIP, userID);
+            spdlog::info("중복 로그인 감지: 같은 사용자가 다른 IP에서 로그인 - IP={}, UserID={}", userIP, userID);
             return DuplicateType::SAME_USER_DIFF_IP;
         }
 
         if (ipExists && !userExists) {
-            spdlog::info("🚫 중복 로그인 감지: 다른 사용자가 같은 IP에서 로그인 - IP={}, UserID={}", userIP, userID);
+            spdlog::info("중복 로그인 감지: 다른 사용자가 같은 IP에서 로그인 - IP={}, UserID={}", userIP, userID);
             return DuplicateType::DIFF_USER_SAME_IP;
         }
 

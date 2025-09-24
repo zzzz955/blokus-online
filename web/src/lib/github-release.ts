@@ -86,7 +86,7 @@ export async function fetchGitHubRelease(version?: string): Promise<GitHubReleas
 export function transformToClientVersion(release: GitHubRelease): ClientVersion {
   const version = release.tag_name.startsWith('v') ? release.tag_name.slice(1) : release.tag_name;
   const downloadAsset = release.assets?.find(asset => 
-    asset.name.includes('BlokusClient') && asset.name.endsWith('.zip')
+    asset.name.includes('BlobloClient') && asset.name.endsWith('.zip')
   );
   
   const bodyLines: string[] = (release.body || '').split('\n');
@@ -198,13 +198,13 @@ function transformAssetToPlatform(asset: GitHubRelease['assets'][0], platform: P
 export function transformToMultiPlatformRelease(release: GitHubRelease): MultiPlatformRelease {
   const version = release.tag_name.startsWith('v') ? release.tag_name.slice(1) : release.tag_name;
   
-  // 데스크톱 클라이언트 에셋 찾기 (BlokusClient-Desktop 또는 BlokusClient.zip)
+  // 데스크톱 클라이언트 에셋 찾기 (BlobloClient-Desktop 또는 BlobloClient.zip)
   const desktopAsset = release.assets?.find(asset => 
-    (asset.name.includes('Desktop') || asset.name.includes('BlokusClient')) && 
+    (asset.name.includes('Desktop') || asset.name.includes('BlobloClient')) && 
     asset.name.endsWith('.zip')
   );
   
-  // 모바일 클라이언트 에셋 찾기 (BlokusClient-Mobile.apk)
+  // 모바일 클라이언트 에셋 찾기 (BlobloClient-Mobile.apk)
   const mobileAsset = release.assets?.find(asset => 
     asset.name.includes('Mobile') && asset.name.endsWith('.apk')
   );
@@ -265,7 +265,7 @@ export function getDefaultMultiPlatformVersion(envVersion?: string): MultiPlatfo
     platforms: {
       desktop: {
         platform: 'desktop',
-        filename: `BlokusClient-Desktop-v${version}.zip`,
+        filename: `BlobloClient-Desktop-v${version}.zip`,
         downloadUrl: "/api/download/client/desktop",
         size: 15670931,
         available: true,
@@ -273,7 +273,7 @@ export function getDefaultMultiPlatformVersion(envVersion?: string): MultiPlatfo
       },
       mobile: {
         platform: 'mobile', 
-        filename: `BlokusClient-Mobile-v${version}.apk`,
+        filename: `BlobloClient-Mobile-v${version}.apk`,
         downloadUrl: "/api/download/client/mobile",
         size: 45000000, // 약 45MB 예상
         available: true,

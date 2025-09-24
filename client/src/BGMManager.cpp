@@ -32,9 +32,9 @@ BGMManager::BGMManager()
     m_initialized = initializeSDL();
     
     if (m_initialized) {
-        qDebug() << "✅ BGMManager initialized successfully";
+        qDebug() << " BGMManager initialized successfully";
     } else {
-        qWarning() << "❌ BGMManager initialization failed - BGM disabled";
+        qWarning() << " BGMManager initialization failed - BGM disabled";
     }
 }
 
@@ -153,7 +153,7 @@ void BGMManager::loadAndPlayBGM(GameState state)
     
     m_currentMusic = Mix_LoadMUS(musicPath.c_str());
     if (!m_currentMusic) {
-        qWarning() << "❌ BGM file load failed:" << musicPath.c_str();
+        qWarning() << " BGM file load failed:" << musicPath.c_str();
         qWarning() << "   SDL_mixer error:" << Mix_GetError();
         qWarning() << "   File exists:" << QFile::exists(QString::fromStdString(musicPath));
         qWarning() << "   Continuing without background music...";
@@ -267,14 +267,14 @@ void BGMManager::playSoundEffect(SoundEffect effect)
     
     int effectIndex = static_cast<int>(effect);
     if (effectIndex < 0 || effectIndex >= 3 || !m_soundEffects[effectIndex]) {
-        qWarning() << "❌ Invalid sound effect:" << soundEffectToString(effect);
+        qWarning() << " Invalid sound effect:" << soundEffectToString(effect);
         return;
     }
     
     // 현재 볼륨 적용해서 재생 (-1은 첫 번째 빈 채널을 찾아서 재생)
     int channel = Mix_PlayChannel(-1, m_soundEffects[effectIndex], 0);
     if (channel == -1) {
-        qWarning() << "❌ Failed to play sound effect:" << Mix_GetError();
+        qWarning() << " Failed to play sound effect:" << Mix_GetError();
     } else {
         qDebug() << "🎵 Playing sound effect:" << soundEffectToString(effect);
     }
@@ -299,9 +299,9 @@ void BGMManager::loadSoundEffect(Mix_Chunk** chunk, const char* filename, SoundE
     
     *chunk = Mix_LoadWAV(fullPath.c_str());
     if (*chunk) {
-        qDebug() << "✅ Loaded sound effect:" << soundEffectToString(effect) << "from" << QString::fromStdString(fullPath);
+        qDebug() << " Loaded sound effect:" << soundEffectToString(effect) << "from" << QString::fromStdString(fullPath);
     } else {
-        qWarning() << "❌ Failed to load sound effect:" << soundEffectToString(effect) << "-" << Mix_GetError();
+        qWarning() << " Failed to load sound effect:" << soundEffectToString(effect) << "-" << Mix_GetError();
     }
 }
 

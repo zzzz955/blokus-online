@@ -229,7 +229,7 @@ namespace Features.Multi.UI
 
         private void CreateCellBorder(GameObject cellObj)
         {
-            float overflow = 5f;
+            float overflow = 0f;
             var borderObj = new GameObject("Border", typeof(RectTransform));
             borderObj.transform.SetParent(cellObj.transform, false);
 
@@ -776,6 +776,11 @@ namespace Features.Multi.UI
         public bool CanInteract => isInteractable && isMyTurn;
 
         /// <summary>
+        /// Single GameBoard 호환용 - BoardSize 속성
+        /// </summary>
+        public int BoardSize => boardSize;
+
+        /// <summary>
         /// 스크린 좌표를 보드 좌표로 변환 (줌/팬 상태 고려)
         /// </summary>
         public Position ScreenToBoard(Vector2 screenPos)
@@ -875,14 +880,14 @@ namespace Features.Multi.UI
                 // cellParent를 대신 사용하는 방식으로 시도
                 if (cellParent != null)
                 {
-                    Debug.Log("[MultiGameBoard] 🔄 GameBoard 대신 cellParent에 줌/팬 기능을 추가합니다.");
+                    Debug.Log("[MultiGameBoard]  GameBoard 대신 cellParent에 줌/팬 기능을 추가합니다.");
 
                     // cellParent에 GameBoardZoomPan 추가
                     GameBoardZoomPan cellParentZoomPan = cellParent.GetComponent<GameBoardZoomPan>();
                     if (cellParentZoomPan == null)
                     {
                         cellParentZoomPan = cellParent.gameObject.AddComponent<GameBoardZoomPan>();
-                        Debug.Log("[MultiGameBoard] ✅ cellParent에 GameBoardZoomPan 컴포넌트 추가됨");
+                        Debug.Log("[MultiGameBoard]  cellParent에 GameBoardZoomPan 컴포넌트 추가됨");
                     }
 
                     // 줌 타겟을 cellParent 자기 자신으로 설정
@@ -891,17 +896,17 @@ namespace Features.Multi.UI
                     // 참조 저장 (GameBoard에서 접근할 수 있도록)
                     zoomPanComponent = cellParentZoomPan;
 
-                    Debug.Log("[MultiGameBoard] ✅ cellParent 기반 줌/팬 기능 초기화 완료");
+                    Debug.Log("[MultiGameBoard]  cellParent 기반 줌/팬 기능 초기화 완료");
                     return;
                 }
                 else
                 {
-                    Debug.LogError("[MultiGameBoard] ❌ cellParent도 null이어서 줌/팬 기능을 초기화할 수 없습니다!");
+                    Debug.LogError("[MultiGameBoard]  cellParent도 null이어서 줌/팬 기능을 초기화할 수 없습니다!");
                     return;
                 }
             }
 
-            Debug.Log("[MultiGameBoard] ✅ GameBoard에 RectTransform 발견됨");
+            Debug.Log("[MultiGameBoard]  GameBoard에 RectTransform 발견됨");
 
             // GameBoardZoomPan 컴포넌트가 없으면 추가
             if (zoomPanComponent == null)
@@ -918,11 +923,11 @@ namespace Features.Multi.UI
             if (cellParent != null)
             {
                 zoomPanComponent.SetZoomTarget(cellParent);
-                Debug.Log("[MultiGameBoard] ✅ 줌/팬 기능 초기화 완료 - Target: cellParent");
+                Debug.Log("[MultiGameBoard]  줌/팬 기능 초기화 완료 - Target: cellParent");
             }
             else
             {
-                Debug.LogError("[MultiGameBoard] ❌ cellParent가 null이어서 줌/팬 기능을 초기화할 수 없습니다!");
+                Debug.LogError("[MultiGameBoard]  cellParent가 null이어서 줌/팬 기능을 초기화할 수 없습니다!");
             }
 
             Debug.Log("[MultiGameBoard] ===== 줌/팬 기능 초기화 완료 =====");
@@ -1013,180 +1018,5 @@ namespace Features.Multi.UI
             Debug.Log($"[MultiGameBoard] 모든 셀의 raycastTarget 설정 완료: {enableCellRaycast}");
         }
     }
-
-    /// <summary>
-    /// 보드 셀 컴포넌트 - 클릭/호버/드래그 이벤트 전달 (멀티플레이 전용)
-    /// 싱글플레이와 동일한 시간 기반 의도 감지 시스템 구현
-    /// </summary>
-    public class BoardCell : MonoBehaviour, UnityEngine.EventSystems.IPointerDownHandler, UnityEngine.EventSystems.IPointerUpHandler,
-                             UnityEngine.EventSystems.IPointerEnterHandler, UnityEngine.EventSystems.IPointerExitHandler,
-                             UnityEngine.EventSystems.IDragHandler, UnityEngine.EventSystems.IBeginDragHandler, UnityEngine.EventSystems.IEndDragHandler
-    {
-        private int row, col;
-        private GameBoard gameBoard;
-        private bool isDragging = false;
-        private Vector2 dragStartPosition;
-        private bool isInitialized = false;
-
-        // 시간 기반 의도 감지 시스템
-        private float clickStartTime;
-        private const float CLICK_TO_PAN_THRESHOLD = 0.3f; // 0.3초 임계값
-        private bool isPanModeActive = false;
-
-        public void Initialize(int row, int col, GameBoard board)
-        {
-            this.row = row;
-            this.col = col;
-            this.gameBoard = board;
-            isInitialized = true;
-        }
-
-        public void OnPointerEnter(UnityEngine.EventSystems.PointerEventData eventData)
-        {
-            if (gameBoard != null) gameBoard.OnCellHoverInternal(row, col);
-        }
-
-        public void OnPointerDown(UnityEngine.EventSystems.PointerEventData eventData)
-        {
-            if (!isInitialized || gameBoard == null) return;
-            // 드래그 시작 시점에서는 팬/블록 배치 구분 불가하므로 턴 체크 우회
-
-            dragStartPosition = eventData.position;
-            isDragging = false;
-            clickStartTime = Time.time;
-            isPanModeActive = false;
-        }
-
-        public void OnBeginDrag(UnityEngine.EventSystems.PointerEventData eventData)
-        {
-            if (!isInitialized || gameBoard == null) return;
-            // 드래그 시작 시점에서는 팬/블록 배치 구분 불가하므로 턴 체크 우회
-
-            isDragging = true;
-        }
-
-        public void OnDrag(UnityEngine.EventSystems.PointerEventData eventData)
-        {
-            if (!isDragging || gameBoard == null) return;
-
-            // 시간 기반 의도 감지: 0.3초 이상 드래그 시 팬 모드 활성화
-            float currentTime = Time.time;
-            bool isPanMode = (currentTime - clickStartTime > CLICK_TO_PAN_THRESHOLD);
-
-            // 블록 배치 모드에서만 턴 체크 적용 (팬은 턴 관계없이 허용)
-            if (!isPanMode && !gameBoard.CanInteract) return;
-
-            if (isPanMode)
-            {
-                // 팬 모드: 턴 관계없이 실행
-                if (!isPanModeActive)
-                {
-                    isPanModeActive = true;
-                }
-
-                // 팬 모드 중에는 지속적으로 ZoomPanComponent에 드래그 정보 전달
-                var zoomPan = gameBoard.ZoomPanComponent ?? gameBoard.GetComponent<GameBoardZoomPan>();
-                if (zoomPan != null)
-                {
-                    var onDragMethod = zoomPan.GetType().GetMethod("OnDrag", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                    onDragMethod?.Invoke(zoomPan, new object[] { eventData });
-                }
-            }
-            else
-            {
-                // 블록 배치 모드: 내 턴에서만 실행 (위에서 턴 체크 통과)
-                var pos = GetCellFromScreenPosition(eventData.position);
-                if (ValidationUtility.IsValidPosition(pos))
-                    gameBoard.OnCellClickedInternal(pos.row, pos.col);
-            }
-        }
-
-        public void OnEndDrag(UnityEngine.EventSystems.PointerEventData eventData)
-        {
-            if (!isDragging || gameBoard == null) return;
-
-            // 팬 모드에서는 턴 체크 우회, 블록 배치 모드에서만 턴 체크 적용
-            if (!isPanModeActive && !gameBoard.CanInteract) return;
-
-            isDragging = false;
-
-            // 드래그 종료 시점에서 최종 판정 및 로그
-            float eventDuration = Time.time - clickStartTime;
-
-            if (isPanModeActive)
-            {
-                // 팬 이벤트 완료 로그 (턴 관계없이)
-                Debug.Log($"[MultiGameBoard-BoardCell] 팬 이벤트: ({row}, {col}), 지속시간: {eventDuration:F3}초");
-
-                // 팬 모드였다면 팬 종료 이벤트 전달
-                var zoomPan = gameBoard.ZoomPanComponent ?? gameBoard.GetComponent<GameBoardZoomPan>();
-                if (zoomPan != null)
-                {
-                    var onEndDragMethod = zoomPan.GetType().GetMethod("OnEndDrag", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                    onEndDragMethod?.Invoke(zoomPan, new object[] { eventData });
-                }
-            }
-            else
-            {
-                // 블록 배치 모드: 내 턴에서만 실행 (위에서 턴 체크 통과)
-                Debug.Log($"[MultiGameBoard-BoardCell] 블록 배치 이벤트 (드래그): ({row}, {col}), 지속시간: {eventDuration:F3}초");
-                Position endCell = GetCellFromScreenPosition(eventData.position);
-                if (ValidationUtility.IsValidPosition(endCell))
-                {
-                    gameBoard.OnCellClickedInternal(endCell.row, endCell.col);
-                }
-            }
-        }
-
-        public void OnPointerUp(UnityEngine.EventSystems.PointerEventData eventData)
-        {
-            if (isDragging || gameBoard == null) return; // 드래그 중이면 처리하지 않음
-            if (!gameBoard.CanInteract) return; // 멀티플레이: 내 턴에만 이벤트 처리
-
-            // 단순 탭인 경우 처리 (드래그 거리가 짧은 경우)
-            float dragDistance = Vector2.Distance(dragStartPosition, eventData.position);
-            float eventDuration = Time.time - clickStartTime;
-
-            if (dragDistance < 10f && eventDuration <= CLICK_TO_PAN_THRESHOLD) // 10픽셀 이하 움직임이고 0.3초 이하
-            {
-                Debug.Log($"[MultiGameBoard-BoardCell] 블록 배치 이벤트 (탭): ({row}, {col}), 지속시간: {eventDuration:F3}초");
-                Position cellPosition = new Position(row, col);
-                gameBoard.OnCellClickedInternal(cellPosition.row, cellPosition.col);
-            }
-        }
-
-        public void OnPointerExit(UnityEngine.EventSystems.PointerEventData eventData)
-        {
-            if (!isDragging && gameBoard != null)
-            {
-                // 호버 해제는 드래그가 아닌 경우에만
-            }
-        }
-
-        /// <summary>
-        /// 스크린 좌표에서 보드 셀 위치 찾기
-        /// </summary>
-        private Position GetCellFromScreenPosition(Vector2 screenPos)
-        {
-            if (gameBoard == null) return new Position(-1, -1);
-            // GameBoard의 ScreenToBoard 메서드 사용 (추가 예정)
-            return gameBoard.ScreenToBoard(screenPos);
-        }
-
-        /// <summary>
-        /// 현재 셀의 위치 정보
-        /// </summary>
-        public Position GetPosition()
-        {
-            return new Position(row, col);
-        }
-
-        /// <summary>
-        /// 셀이 초기화되었는지 확인
-        /// </summary>
-        public bool IsInitialized()
-        {
-            return isInitialized;
-        }
-    }
 }
+

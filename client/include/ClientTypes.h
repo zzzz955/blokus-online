@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-// 🔥 Common 라이브러리의 모든 타입들을 가져옴
+//  Common 라이브러리의 모든 타입들을 가져옴
 #include "Types.h"
 #include "Block.h"
 #include "GameLogic.h"
@@ -28,7 +28,7 @@ namespace Blokus {
     using BlockPlacement = Common::BlockPlacement;
     using GameSettings = Common::GameSettings;
 
-    // 🔥 Block과 관련 클래스들도 가져오기 (서버와 동일한 로직)
+    //  Block과 관련 클래스들도 가져오기 (서버와 동일한 로직)
     using Block = Common::Block;
     using GameLogic = Common::GameLogic;
     using GameStateManager = Common::GameStateManager;

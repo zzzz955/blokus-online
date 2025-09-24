@@ -23,7 +23,7 @@ namespace Blokus::Server
     MessageHandler::MessageHandler(Session *session, RoomManager *roomManager, AuthenticationService *authService, DatabaseManager *databaseManager, GameServer *gameServer, VersionManager *versionManager)
         : session_(session), roomManager_(roomManager), authService_(authService), databaseManager_(databaseManager), gameServer_(gameServer), versionManager_(versionManager)
     {
-        // 🔥 enum 기반 핸들러 등록
+        //  enum 기반 핸들러 등록
         handlers_[MessageType::Ping] = [this](const auto &params)
         { handlePing(params); };
 
@@ -358,22 +358,22 @@ namespace Blokus::Server
             {
                 std::string statsResponse = generateUserStatsResponse();
                 sendResponse(statsResponse);
-                spdlog::debug("✅ 로그인 후 사용자 통계 전송 완료: '{}'", result.username);
+                spdlog::debug(" 로그인 후 사용자 통계 전송 완료: '{}'", result.username);
             }
             catch (const std::exception &e)
             {
                 spdlog::warn("로그인 후 사용자 통계 전송 실패: {}", e.what());
             }
 
-            spdlog::info("✅ 로그인 성공: {} ({}) - 로비 진입 및 정보 전송 완료", result.username, session_->getSessionId());
+            spdlog::info(" 로그인 성공: {} ({}) - 로비 진입 및 정보 전송 완료", result.username, session_->getSessionId());
         }
         else
         {
             sendError(result.message);
-            spdlog::warn("❌ 로그인 실패: {} - {}", result.username.empty() ? "알 수 없음" : result.username, result.message);
+            spdlog::warn(" 로그인 실패: {} - {}", result.username.empty() ? "알 수 없음" : result.username, result.message);
         }
 
-        // 🔥 콜백 제거: 직접 처리 완료
+        //  콜백 제거: 직접 처리 완료
     }
 
     void MessageHandler::handleRegister(const std::vector<std::string> &params)
@@ -419,10 +419,10 @@ namespace Blokus::Server
         else
         {
             sendError(result.message);
-            spdlog::error("❌ 회원가입 실패: {} - {}", username, result.message);
+            spdlog::error(" 회원가입 실패: {} - {}", username, result.message);
         }
 
-        // 🔥 콜백 제거: 직접 처리 완료
+        //  콜백 제거: 직접 처리 완료
     }
 
     void MessageHandler::handleLoginGuest(const std::vector<std::string> &params)
@@ -483,7 +483,7 @@ namespace Blokus::Server
             {
                 std::string statsResponse = generateUserStatsResponse();
                 sendResponse(statsResponse);
-                spdlog::debug("✅ 게스트 로그인 후 사용자 통계 전송 완료: '{}'", result.username);
+                spdlog::debug(" 게스트 로그인 후 사용자 통계 전송 완료: '{}'", result.username);
             }
             catch (const std::exception &e)
             {
@@ -549,25 +549,25 @@ namespace Blokus::Server
         // 1. 상태 검증
         if (!session_->canCreateRoom())
         {
-            spdlog::warn("🚫 방 생성 거부됨 - 상태 검증 실패");
+            spdlog::warn(" 방 생성 거부됨 - 상태 검증 실패");
 
             if (session_->isInRoom())
             {
-                spdlog::warn("🚫 이유: 이미 방에 참여 중");
+                spdlog::warn(" 이유: 이미 방에 참여 중");
                 sendError("이미 방에 참여 중입니다. 먼저 방을 나가주세요");
             }
             else if (session_->isInGame())
             {
-                spdlog::warn("🚫 이유: 게임 중");
+                spdlog::warn(" 이유: 게임 중");
                 sendError("게임 중에는 방을 만들 수 없습니다");
             }
             else
             {
-                spdlog::warn("🚫 이유: 기타 (상태: {})", static_cast<int>(session_->getState()));
+                spdlog::warn(" 이유: 기타 (상태: {})", static_cast<int>(session_->getState()));
                 sendError("현재 상태에서는 방을 만들 수 없습니다");
             }
 
-            spdlog::warn("🚫 return 실행");
+            spdlog::warn(" return 실행");
             return;
         }
 
@@ -594,7 +594,7 @@ namespace Blokus::Server
             std::string userId = session_->getUserId();
             std::string username = session_->getUsername();
 
-            spdlog::debug("🏠 방 생성 요청: '{}' by '{}' (비공개: {})",
+            spdlog::debug(" 방 생성 요청: '{}' by '{}' (비공개: {})",
                          roomName, username, isPrivate);
 
             // 4. RoomManager를 통한 방 생성
@@ -623,14 +623,14 @@ namespace Blokus::Server
                     // 9. 방 정보 전체 동기화 전솥
                     sendRoomInfo(room);
 
-                    spdlog::debug("✅ 방 생성 성공: '{}' by '{}' (ID: {})", roomName, username, roomId);
+                    spdlog::debug(" 방 생성 성공: '{}' by '{}' (ID: {})", roomName, username, roomId);
                 }
                 else
                 {
                     // 방 생성은 되었지만 호스트 추가 실패 - 방 제거
                     roomManager_->removeRoom(roomId);
                     sendError("방 생성 후 호스트 추가에 실패했습니다");
-                    spdlog::error("❌ 방 {} 호스트 추가 실패", roomId);
+                    spdlog::error(" 방 {} 호스트 추가 실패", roomId);
                 }
             }
             else
@@ -651,7 +651,7 @@ namespace Blokus::Server
                     sendError("방 생성에 실패했습니다");
                     break;
                 }
-                spdlog::error("❌ 방 생성 실패: '{}' (코드: {})", roomName, roomId);
+                spdlog::error(" 방 생성 실패: '{}' (코드: {})", roomName, roomId);
             }
         }
         catch (const std::exception &e)
@@ -703,7 +703,7 @@ namespace Blokus::Server
             std::string userId = session_->getUserId();
             std::string username = session_->getUsername();
 
-            spdlog::debug("🏠 방 참여 요청: '{}' -> 방 {}", username, roomId);
+            spdlog::debug(" 방 참여 요청: '{}' -> 방 {}", username, roomId);
 
             // 4. 방 존재 확인
             auto room = roomManager_->getRoom(roomId);
@@ -751,16 +751,16 @@ namespace Blokus::Server
                 {
                     session_->sendMessage("GAME_RESET");
                     session_->sendMessage("SYSTEM:새로운 게임을 시작할 수 있습니다!");
-                    spdlog::debug("🔄 새 플레이어 {}에게 게임 리셋 상태 동기화 완료", username);
+                    spdlog::debug(" 새 플레이어 {}에게 게임 리셋 상태 동기화 완료", username);
                 }
 
-                spdlog::debug("✅ 방 참여 성공: '{}' -> 방 {} ({}명)",
+                spdlog::debug(" 방 참여 성공: '{}' -> 방 {} ({}명)",
                              username, roomId, room->getPlayerCount());
             }
             else
             {
                 sendError("방 참여에 실패했습니다");
-                spdlog::warn("❌ 방 참여 실패: '{}' -> 방 {}", username, roomId);
+                spdlog::warn(" 방 참여 실패: '{}' -> 방 {}", username, roomId);
             }
         }
         catch (const std::invalid_argument &e)
@@ -805,7 +805,7 @@ namespace Blokus::Server
             std::string username = session_->getUsername();
             int currentRoomId = session_->getCurrentRoomId();
 
-            spdlog::debug("🏠 방 나가기 요청: '{}' <- 방 {}", username, currentRoomId);
+            spdlog::debug(" 방 나가기 요청: '{}' <- 방 {}", username, currentRoomId);
 
             if (roomManager_->leaveRoom(userId))
             {
@@ -818,9 +818,9 @@ namespace Blokus::Server
                 }
 
                 sendResponse("ROOM_LEFT:OK");
-                spdlog::debug("✅ 방 나가기 성공: '{}'", username);
+                spdlog::debug(" 방 나가기 성공: '{}'", username);
 
-                // 🎯 방 나간 후 DB에서 최신 스탯 정보 강제 조회하여 전송
+                //  방 나간 후 DB에서 최신 스탯 정보 강제 조회하여 전송
                 try
                 {
                     // DB에서 최신 사용자 정보 강제 조회 (게임 결과 반영 보장)
@@ -831,13 +831,13 @@ namespace Blokus::Server
                         if (updatedAccount.has_value())
                         {
                             session_->setUserAccount(updatedAccount.value());
-                            spdlog::debug("🔄 방 나가기 후 세션 정보 DB 강제 동기화: '{}'", username);
+                            spdlog::debug(" 방 나가기 후 세션 정보 DB 강제 동기화: '{}'", username);
                         }
                     }
 
                     std::string statsResponse = generateUserStatsResponse();
                     sendResponse(statsResponse);
-                    spdlog::debug("✅ 방 나가기 후 사용자 통계 전송 완료: '{}'", username);
+                    spdlog::debug(" 방 나가기 후 사용자 통계 전송 완료: '{}'", username);
                 }
                 catch (const std::exception &e)
                 {
@@ -847,7 +847,7 @@ namespace Blokus::Server
             else
             {
                 sendError("방 나가기에 실패했습니다");
-                spdlog::warn("❌ 방 나가기 실패: '{}'", username);
+                spdlog::warn(" 방 나가기 실패: '{}'", username);
             }
         }
         catch (const std::exception &e)
@@ -926,12 +926,12 @@ namespace Blokus::Server
                 std::string readyStatus = ready ? "1" : "0";
                 sendResponse("PLAYER_READY:" + readyStatus);
 
-                spdlog::debug("✅ 플레이어 준비 상태 변경 성공: '{}'", username);
+                spdlog::debug(" 플레이어 준비 상태 변경 성공: '{}'", username);
             }
             else
             {
                 sendError("준비 상태 변경에 실패했습니다");
-                spdlog::warn("❌ 플레이어 준비 상태 변경 실패: '{}'", username);
+                spdlog::warn(" 플레이어 준비 상태 변경 실패: '{}'", username);
             }
         }
         catch (const std::exception &e)
@@ -1001,18 +1001,18 @@ namespace Blokus::Server
             if (roomManager_->startGame(userId))
             {
                 // 게임 시작 성공 - 세션 상태는 이미 startGame()에서 설정됨
-                spdlog::debug("✅ 게임 시작 성공: 사용자 {}", userId);
+                spdlog::debug(" 게임 시작 성공: 사용자 {}", userId);
 
                 // 8. 성공 응답
                 sendResponse("GAME_START_SUCCESS");
 
-                spdlog::debug("✅ 게임 시작 성공: '{}' (방 {}, {}명)",
+                spdlog::debug(" 게임 시작 성공: '{}' (방 {}, {}명)",
                              username, roomId, room->getPlayerCount());
             }
             else
             {
                 sendError("게임 시작에 실패했습니다");
-                spdlog::warn("❌ 게임 시작 실패: '{}' (방 {})", username, roomId);
+                spdlog::warn(" 게임 시작 실패: '{}' (방 {})", username, roomId);
             }
         }
         catch (const std::exception &e)
@@ -1076,12 +1076,12 @@ namespace Blokus::Server
                 // 7. 성공 응답
                 sendResponse("GAME_END_SUCCESS");
 
-                spdlog::debug("✅ 게임 종료 성공: '{}' (방 {})", username, roomId);
+                spdlog::debug(" 게임 종료 성공: '{}' (방 {})", username, roomId);
             }
             else
             {
                 sendError("게임 종료에 실패했습니다");
-                spdlog::warn("❌ 게임 종료 실패: '{}' (방 {})", username, roomId);
+                spdlog::warn(" 게임 종료 실패: '{}' (방 {})", username, roomId);
             }
         }
         catch (const std::exception &e)
@@ -1141,13 +1141,13 @@ namespace Blokus::Server
                 // 6. 성공 응답
                 sendResponse("HOST_TRANSFER_SUCCESS:" + newHostId);
 
-                spdlog::debug("✅ 호스트 이양 성공: '{}' -> '{}' (방 {})",
+                spdlog::debug(" 호스트 이양 성공: '{}' -> '{}' (방 {})",
                              currentHostId, newHostId, roomId);
             }
             else
             {
                 sendError("호스트 이양에 실패했습니다");
-                spdlog::warn("❌ 호스트 이양 실패: '{}' -> '{}' (방 {})",
+                spdlog::warn(" 호스트 이양 실패: '{}' -> '{}' (방 {})",
                              currentHostId, newHostId, roomId);
             }
         }
@@ -1308,7 +1308,7 @@ namespace Blokus::Server
             // 6. 방에서 나온 플래그 리셋 (로비 입장 처리 완료 후)
             session_->clearJustLeftRoomFlag();
 
-            spdlog::debug("✅ 로비 입장/새로고침 완료: '{}'", username);
+            spdlog::debug(" 로비 입장/새로고침 완료: '{}'", username);
         }
         catch (const std::exception &e)
         {
@@ -1328,7 +1328,7 @@ namespace Blokus::Server
             broadcastLobbyUserLeft(username);
 
             sendResponse("LOBBY_LEAVE_SUCCESS");
-            spdlog::debug("✅ 로비 퇴장 완료: '{}'", username);
+            spdlog::debug(" 로비 퇴장 완료: '{}'", username);
         }
         catch (const std::exception &e)
         {
@@ -1657,7 +1657,7 @@ namespace Blokus::Server
 
             // 플레이어 데이터 추가 (userId,username,displayName,isHost,isReady,colorIndex)
             auto playerList = room->getPlayerList();
-            spdlog::debug("🔍 방 {} 플레이어 목록 생성 중: {}명", room->getRoomId(), playerList.size());
+            spdlog::debug(" 방 {} 플레이어 목록 생성 중: {}명", room->getRoomId(), playerList.size());
             for (const auto &player : playerList)
             {
                 // Get display name from session if available, fallback to username
@@ -1756,7 +1756,7 @@ namespace Blokus::Server
             }
 
             std::string targetUsername = params[0];
-            spdlog::debug("🔍 사용자 정보 요청: '{}'", targetUsername);
+            spdlog::debug(" 사용자 정보 요청: '{}'", targetUsername);
 
             // RoomManager를 통해 해당 사용자의 세션을 찾기
             if (!gameServer_)
@@ -1847,7 +1847,7 @@ namespace Blokus::Server
             response << "}";
 
             sendResponse(response.str());
-            spdlog::debug("✅ 사용자 정보 응답 전송 완료: '{}' -> '{}'", 
+            spdlog::debug(" 사용자 정보 응답 전송 완료: '{}' -> '{}'", 
                          targetUsername, session_->getUsername());
         }
         catch (const std::exception& e)
@@ -1862,7 +1862,7 @@ namespace Blokus::Server
     {
         try
         {
-            spdlog::debug("🔍 AFK 검증 요청: 세션 {}", session_->getSessionId());
+            spdlog::debug(" AFK 검증 요청: 세션 {}", session_->getSessionId());
 
             // 세션 상태 검증
             if (!session_ || !session_->isActive())
@@ -1916,7 +1916,7 @@ namespace Blokus::Server
             if (success)
             {
                 sendResponse("AFK_VERIFY_SUCCESS");
-                spdlog::info("✅ AFK 검증 성공: {} ({})", username, userId);
+                spdlog::info(" AFK 검증 성공: {} ({})", username, userId);
                 
                 // 방 내 다른 플레이어들에게 AFK 해제 알림
                 room->broadcastMessage("AFK_STATUS_RESET:" + username, userId);
@@ -1924,7 +1924,7 @@ namespace Blokus::Server
             else
             {
                 sendError("AFK 검증에 실패했습니다");
-                spdlog::warn("❌ AFK 검증 실패: {} ({})", username, userId);
+                spdlog::warn(" AFK 검증 실패: {} ({})", username, userId);
             }
         }
         catch (const std::exception& e)
@@ -1970,7 +1970,7 @@ namespace Blokus::Server
                 return;
             }
 
-            // 🔥 CRITICAL: 게임 상태 검증 추가 (crash 방지)
+            //  CRITICAL: 게임 상태 검증 추가 (crash 방지)
             if (!room->isPlaying())
             {
                 sendResponse("AFK_UNBLOCK_ERROR:{\"reason\":\"game_not_active\",\"message\":\"게임이 이미 종료되었습니다\"}");
@@ -1992,7 +1992,7 @@ namespace Blokus::Server
             else
             {
                 sendError("AFK 모드 해제에 실패했습니다");
-                spdlog::warn("❌ AFK 모드 해제 실패: {} ({})", username, userId);
+                spdlog::warn(" AFK 모드 해제 실패: {} ({})", username, userId);
             }
         }
         catch (const std::exception& e)
@@ -2015,18 +2015,18 @@ namespace Blokus::Server
         
         const VersionManager::Version& version = versionManager_->getServerVersion();
         std::string clientVersion = params[0];
-        spdlog::debug("🔍 버전 체크: 클라이언트={}, 서버={}", clientVersion, version.version);
+        spdlog::debug(" 버전 체크: 클라이언트={}, 서버={}", clientVersion, version.version);
 
         // 버전 호환성 체크
         bool compatible = version.isCompatibleWith(clientVersion);
         
         if (compatible) {
             sendTextMessage("version:ok");
-            spdlog::debug("✅ 버전 호환: {} <-> {}", clientVersion, ConfigManager::serverVersion);
+            spdlog::debug(" 버전 호환: {} <-> {}", clientVersion, ConfigManager::serverVersion);
         } else {
             std::string response = "version:mismatch:" + versionManager_->getDownloadURL();
             sendTextMessage(response);
-            spdlog::warn("❌ 버전 불일치: 클라이언트={}, 서버={}, 리다이렉트={}",
+            spdlog::warn(" 버전 불일치: 클라이언트={}, 서버={}, 리다이렉트={}",
                         clientVersion, ConfigManager::serverVersion, versionManager_->getDownloadURL());
         }
     }
@@ -2173,7 +2173,7 @@ namespace Blokus::Server
             std::string sessionId = session_ ? session_->getSessionId() : "unknown";
             std::string messageTypeStr = messageTypeToString(messageType);
 
-            spdlog::warn("🚨 보안 위반: 세션 {} - 메시지 타입 {} - {}",
+            spdlog::warn(" 보안 위반: 세션 {} - 메시지 타입 {} - {}",
                         sessionId, messageTypeStr, details);
 
             // 추가 보안 로깅이 필요한 경우 여기에 구현

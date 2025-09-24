@@ -85,14 +85,14 @@ namespace App.Network
         public event System.Action<UserProfile> OnUserProfileReceived;
         public event System.Action<CompactStageMetadata[]> OnStageMetadataReceived;
         public event System.Action<CompactUserProgress[]> OnBatchProgressReceived;
-        public event System.Action<CurrentStatus> OnCurrentStatusReceived; // 🔥 추가: current_status 전달용
+        public event System.Action<CurrentStatus> OnCurrentStatusReceived; //  추가: current_status 전달용
 
         // 인증 이벤트 
         public event System.Action<bool, string, string> OnAuthResponse; // success, message, token
         public event System.Action<AuthUserData> OnUserInfoReceived;
         public event System.Action<string> OnOAuthRegisterRedirect;
-        public event System.Action OnLogoutComplete; // 🔥 추가: 로그아웃 전용 이벤트
-        public event System.Action<bool, string> OnAutoLoginComplete; // 🔥 추가: 자동 로그인 완료 이벤트
+        public event System.Action OnLogoutComplete; //  추가: 로그아웃 전용 이벤트
+        public event System.Action<bool, string> OnAutoLoginComplete; //  추가: 자동 로그인 완료 이벤트
 
         void Awake()
         {
@@ -116,7 +116,7 @@ namespace App.Network
 
         void Start()
         {
-            // 🔥 제거: DelayedAutoLogin는 AppPersistent에서 호출하도록 변경
+            //  제거: DelayedAutoLogin는 AppPersistent에서 호출하도록 변경
             // SessionManager 초기화는 이제 AppPersistent/SceneFlowController에서 처리
         }
 
@@ -431,7 +431,7 @@ namespace App.Network
                         Debug.Log($"SetAuthToken 호출 시작: token={response.access_token.Substring(0, 20)}..., userId={response.user.user_id}");
                         SetAuthToken(response.access_token, response.user.user_id);
 
-                        // 🔥 수정: refresh token을 SecureStorage에 저장
+                        //  수정: refresh token을 SecureStorage에 저장
                         if (!string.IsNullOrEmpty(response.refresh_token))
                         {
                             App.Security.SecureStorage.StoreString(App.Security.TokenKeys.Refresh, response.refresh_token);
@@ -882,12 +882,12 @@ namespace App.Network
         /// </summary>
         public void Logout()
         {
-            // 🔥 수정: 서버에 logout 엔드포인트가 없으므로 클라이언트에서만 토큰 클리어
+            //  수정: 서버에 logout 엔드포인트가 없으므로 클라이언트에서만 토큰 클리어
             Debug.Log("[HttpApiClient] 로그아웃 - 로컬 토큰 클리어 시작");
 
             ClearAuthToken();
 
-            // 🔥 수정: OnAuthResponse 대신 OnLogoutComplete 이벤트 사용
+            //  수정: OnAuthResponse 대신 OnLogoutComplete 이벤트 사용
             OnLogoutComplete?.Invoke();
 
             Debug.Log("[HttpApiClient] 로그아웃 완료 - 토큰 클리어됨");
@@ -931,10 +931,10 @@ namespace App.Network
                 response =>
                 {
                     OnBatchProgressReceived?.Invoke(response.progress);
-                    // 🔥 추가: current_status도 전달
+                    //  추가: current_status도 전달
                     if (response.current_status != null)
                     {
-                        Debug.Log($"[HttpApiClient] 🔥 OnCurrentStatusReceived 이벤트 발생! max_stage_completed={response.current_status.max_stage_completed}");
+                        Debug.Log($"[HttpApiClient]  OnCurrentStatusReceived 이벤트 발생! max_stage_completed={response.current_status.max_stage_completed}");
                         OnCurrentStatusReceived?.Invoke(response.current_status);
                     }
                     else
@@ -1313,7 +1313,7 @@ namespace App.Network
             public int single_player_level;
             public int max_stage_completed;
             public int total_single_games;
-            public int single_player_score; // 🔥 복원: DB가 bigint이므로 int로 복원
+            public int single_player_score; //  복원: DB가 bigint이므로 int로 복원
         }
 
         [System.Serializable]

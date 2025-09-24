@@ -29,7 +29,7 @@ namespace Blokus {
         setupUI();
         setupConnections();
         
-        // 🔥 FIX: 비모달 설정으로 변경 (게임 종료 이벤트 수신 가능)
+        //  FIX: 비모달 설정으로 변경 (게임 종료 이벤트 수신 가능)
         setModal(false);
         setWindowFlags(Qt::Dialog | Qt::WindowTitleHint | Qt::CustomizeWindowHint | Qt::WindowStaysOnTopHint);
         setAttribute(Qt::WA_DeleteOnClose, false); // 수동으로 삭제 관리
@@ -188,7 +188,7 @@ namespace Blokus {
 
     void AfkNotificationDialog::onContinueGameClicked()
     {
-        // 🔥 CRITICAL: 게임 종료 상태에서는 AFK 해제 요청 차단
+        //  CRITICAL: 게임 종료 상태에서는 AFK 해제 요청 차단
         if (m_gameEnded) {
             qDebug() << "게임이 이미 종료되어 AFK 해제 요청을 차단합니다.";
             accept(); // 그냥 다이얼로그만 닫기
@@ -204,7 +204,7 @@ namespace Blokus {
 
     void AfkNotificationDialog::onLeaveGameClicked()
     {
-        // 🔥 FIX: 실제 방 나가기 시그널 발생
+        //  FIX: 실제 방 나가기 시그널 발생
         emit leaveRoomRequested();
         
         // 대화상자 닫기 (reject로 처리)
@@ -213,7 +213,7 @@ namespace Blokus {
 
     void AfkNotificationDialog::closeEvent(QCloseEvent* event)
     {
-        // 🔥 FIX: 게임 종료 상태에서는 닫기 허용
+        //  FIX: 게임 종료 상태에서는 닫기 허용
         if (m_gameEnded) {
             event->accept();
             return;
@@ -225,7 +225,7 @@ namespace Blokus {
 
     void AfkNotificationDialog::keyPressEvent(QKeyEvent* event)
     {
-        // 🔥 FIX: 게임 종료 상태에서는 ESC 키로 닫기 허용
+        //  FIX: 게임 종료 상태에서는 ESC 키로 닫기 허용
         if (event->key() == Qt::Key_Escape) {
             if (m_gameEnded) {
                 accept();
@@ -267,7 +267,7 @@ namespace Blokus {
         m_leaveButton->setText("확인");
         m_leaveButton->setFocus();
         
-        // 🔥 CRITICAL: 즉시 닫기 (게임 종료 시 모달을 자동으로 닫아 원활한 UX 제공)
+        //  CRITICAL: 즉시 닫기 (게임 종료 시 모달을 자동으로 닫아 원활한 UX 제공)
         QTimer::singleShot(100, this, [this]() {
             this->accept();
         });

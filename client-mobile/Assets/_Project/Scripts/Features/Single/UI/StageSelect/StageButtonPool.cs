@@ -143,7 +143,7 @@ namespace Features.Single.UI.StageSelect{
             // 사용 중 리스트에서 제거
             if (usedButtons.Remove(button))
             {
-                // 🔥 수정: 버튼 상태 완전 초기화 후 비활성화
+                //  수정: 버튼 상태 완전 초기화 후 비활성화
                 try
                 {
                     // 버튼을 잠김 상태로 초기화 (UpdateState 사용)
@@ -278,7 +278,7 @@ namespace Features.Single.UI.StageSelect{
         }
 
         /// <summary>
-        /// 🔥 추가: 활성 버튼 수를 특정 개수로 설정 (증가/감소 모두 지원)
+        ///  추가: 활성 버튼 수를 특정 개수로 설정 (증가/감소 모두 지원)
         /// 사용자 진행도 변화에 따른 UI 동기화를 위해 사용
         /// </summary>
         public void SetActiveCount(int targetCount)

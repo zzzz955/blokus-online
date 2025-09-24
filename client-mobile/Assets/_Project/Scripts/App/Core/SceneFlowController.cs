@@ -29,7 +29,7 @@ namespace App.Core
         [Header("Debug")]
         [SerializeField] private bool debugMode = true;
 
-        // 🔥 추가: 자동 로그인 상태
+        //  추가: 자동 로그인 상태
         public enum AutoLoginState
         {
             NotChecked,      // 아직 체크 안함
@@ -98,7 +98,7 @@ namespace App.Core
             if (debugMode)
                 Debug.Log("[SceneFlowController] Systems ready, continuing boot sequence");
 
-            // 🔥 추가: 자동 로그인 체크
+            //  추가: 자동 로그인 체크
             yield return CheckAutoLogin();
 
             // Wait a moment more for loading overlay to show
@@ -230,7 +230,7 @@ namespace App.Core
         }
 
         /// <summary>
-        /// 🔥 사용자 변경 확인 및 강제 데이터 재로딩
+        ///  사용자 변경 확인 및 강제 데이터 재로딩
         /// </summary>
         private IEnumerator CheckAndReloadForUserChange()
         {
@@ -278,7 +278,7 @@ namespace App.Core
         }
 
         /// <summary>
-        /// 🔥 SingleCore 데이터 로딩 완료까지 대기
+        ///  SingleCore 데이터 로딩 완료까지 대기
         /// </summary>
         private IEnumerator WaitForSingleCoreDataLoading()
         {
@@ -354,7 +354,7 @@ namespace App.Core
                 {
                     Debug.LogWarning("[SceneFlowController] 완전한 동기화 타임아웃. 게임플레이는 계속 진행됩니다.");
                     
-                    // 🔥 추가: 동기화 상태 디버그 로그
+                    //  추가: 동기화 상태 디버그 로그
                     if (bootstrap.GetUserDataCache() != null)
                     {
                         bool syncCompleted = bootstrap.GetUserDataCache().IsInitialSyncCompleted;
@@ -363,7 +363,7 @@ namespace App.Core
                 }
                 else if (debugMode)
                 {
-                    Debug.Log("[SceneFlowController] ✅ 완전한 동기화 완료!");
+                    Debug.Log("[SceneFlowController]  완전한 동기화 완료!");
                 }
             }
             finally
@@ -419,7 +419,7 @@ namespace App.Core
             // SingleGameplayScene 언로드
             yield return UnloadIfLoaded(SingleGameplayScene);
             
-            // 🔥 수정: SingleCore도 언로드 (메인 복귀 시 완전 정리)
+            //  수정: SingleCore도 언로드 (메인 복귀 시 완전 정리)
             yield return UnloadIfLoaded(SingleCoreScene);
 
             // MainScene 활성

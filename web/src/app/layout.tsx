@@ -18,12 +18,12 @@ if (typeof window === 'undefined' && env.NODE_ENV === 'production' && !isBuildTi
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: '블로커스 온라인 - 공식 웹사이트',
-  description: '블로커스 온라인 게임의 공식 웹사이트입니다. 최신 클라이언트 다운로드, 게임 가이드, 공지사항을 확인하세요.',
-  keywords: '블로커스, 온라인게임, 보드게임, 전략게임',
+  title: '블로블로 - 공식 웹사이트',
+  description: '블로블로 게임의 공식 웹사이트입니다. 최신 클라이언트 다운로드, 게임 가이드, 공지사항을 확인하세요.',
+  keywords: '블로블로, 온라인게임, 보드게임, 전략게임',
   openGraph: {
-    title: '블로커스 온라인 - 공식 웹사이트',
-    description: '블로커스 온라인 게임의 공식 웹사이트입니다.',
+    title: '블로블로 - 공식 웹사이트',
+    description: '블로블로 게임의 공식 웹사이트입니다.',
     type: 'website',
     locale: 'ko_KR',
   },

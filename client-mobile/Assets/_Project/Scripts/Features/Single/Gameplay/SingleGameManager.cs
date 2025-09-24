@@ -17,13 +17,13 @@ namespace Features.Single.Gameplay
     public class SingleGameManager : MonoBehaviour
     {
         // ====== 이벤트 (GamePanel이 구독) ======
-        public static event Action OnGameReady; // ✅ 게임 준비 완료 브로드캐스트
+        public static event Action OnGameReady; //  게임 준비 완료 브로드캐스트
 
         // ===== Singleton & Legacy statics =====
         public static SingleGameManager Instance { get; private set; }
         public static int CurrentStage { get; private set; } = 0;
         public static Features.Single.Core.StageDataManager StageManager { get; private set; }
-        public static bool IsInGameplayMode { get; private set; } = false; // 🔥 게임플레이 모드 플래그
+        public static bool IsInGameplayMode { get; private set; } = false; //  게임플레이 모드 플래그
 
         public static void SetStageContext(int stageNumber, Features.Single.Core.StageDataManager stageManager)
         {
@@ -33,7 +33,7 @@ namespace Features.Single.Gameplay
         }
 
         /// <summary>
-        /// 🔥 추가: IsInGameplayMode를 명시적으로 제어하는 SetStageContext 오버로드
+        ///  추가: IsInGameplayMode를 명시적으로 제어하는 SetStageContext 오버로드
         /// </summary>
         public static void SetStageContext(int stageNumber, Features.Single.Core.StageDataManager stageManager, bool gameplayMode)
         {
@@ -100,7 +100,7 @@ namespace Features.Single.Gameplay
             if (Instance == null)
             {
                 Instance = this;
-                if (verboseLog) Debug.Log("[SingleGameManager] ✅ 첫 번째 싱글톤 인스턴스 설정 완료");
+                if (verboseLog) Debug.Log("[SingleGameManager]  첫 번째 싱글톤 인스턴스 설정 완료");
             }
             else if (Instance != this)
             {
@@ -131,11 +131,11 @@ namespace Features.Single.Gameplay
                 if (replace)
                 {
                     Instance = this;
-                    if (verboseLog) Debug.Log("[SingleGameManager] ✅ 기존 인스턴스 교체 완료");
+                    if (verboseLog) Debug.Log("[SingleGameManager]  기존 인스턴스 교체 완료");
                 }
                 else
                 {
-                    if (verboseLog) Debug.Log("[SingleGameManager] ❌ 유효한 기존 인스턴스 존재 → 현재 인스턴스 제거");
+                    if (verboseLog) Debug.Log("[SingleGameManager]  유효한 기존 인스턴스 존재 → 현재 인스턴스 제거");
                     Destroy(gameObject);
                     return;
                 }
@@ -176,12 +176,12 @@ namespace Features.Single.Gameplay
                 var stageData = StageManager.GetCurrentStageData();
                 if (stageData != null)
                 {
-                    if (verboseLog) Debug.Log($"[SingleGameManager] ✅ 기존 CurrentStageData로 즉시 초기화");
+                    if (verboseLog) Debug.Log($"[SingleGameManager]  기존 CurrentStageData로 즉시 초기화");
                     Init(ConvertStageDataToPayload(stageData), emitReadyEvent: true);
                 }
                 else
                 {
-                    // 🔥 수정: CurrentStage가 지정되어 있어도 GameplayMode일 때만 자동 시작
+                    //  수정: CurrentStage가 지정되어 있어도 GameplayMode일 때만 자동 시작
                     if (CurrentStage > 0 && IsInGameplayMode)
                     {
                         if (verboseLog) Debug.Log($"[SingleGameManager] CurrentStage({CurrentStage}) + GameplayMode - SelectStage 시도");
@@ -200,7 +200,7 @@ namespace Features.Single.Gameplay
                     }
                     else if (CurrentStage > 0)
                     {
-                        // 🔥 추가: CurrentStage는 있지만 GameplayMode가 아닌 경우 (스테이지 선택 모드)
+                        //  추가: CurrentStage는 있지만 GameplayMode가 아닌 경우 (스테이지 선택 모드)
                         if (verboseLog) Debug.Log($"[SingleGameManager] CurrentStage({CurrentStage}) 참조용 - 스테이지 선택 모드 대기");
                         IsInGameplayMode = false;
                     }
@@ -389,11 +389,11 @@ namespace Features.Single.Gameplay
             // UI 활성화(핵심 2개 이상 존재하면 플레이 가능)
             ActivateGameUI();
 
-            if (verboseLog) Debug.Log("[SingleGameManager] ✅ 게임 초기화 완전 완료 - 플레이 가능 상태");
+            if (verboseLog) Debug.Log("[SingleGameManager]  게임 초기화 완전 완료 - 플레이 가능 상태");
 
             if (emitReadyEvent)
             {
-                // ✅ GamePanel이 이 이벤트를 구독하여 StageSelectPanel을 숨기고 인터랙션을 열어준다
+                //  GamePanel이 이 이벤트를 구독하여 StageSelectPanel을 숨기고 인터랙션을 열어준다
                 OnGameReady?.Invoke();
             }
         }
@@ -580,7 +580,7 @@ namespace Features.Single.Gameplay
             }
             else
             {
-                Debug.LogError("[SingleGameManager] ❌ 게임 UI 활성화 실패 - 필수 컴포넌트 부족");
+                Debug.LogError("[SingleGameManager]  게임 UI 활성화 실패 - 필수 컴포넌트 부족");
             }
         }
 
@@ -626,7 +626,7 @@ namespace Features.Single.Gameplay
             int currentScore = (scores != null && scores.ContainsKey(playerColor)) ? scores[playerColor] : 0;
             int optimalScore = payload?.ParScore ?? 0;
 
-            // 🔥 Exit 시에도 GameEndResult 기반 처리 (stars 계산으로 정확한 실패/성공 판정)
+            //  Exit 시에도 GameEndResult 기반 처리 (stars 계산으로 정확한 실패/성공 판정)
             int stars = App.Services.ApiDataConverter.CalculateStars(currentScore, optimalScore);
             var gameResult = new GameEndResult(
                 stageNumber: CurrentStage,
@@ -644,7 +644,7 @@ namespace Features.Single.Gameplay
         }
 
         /// <summary>
-        /// 🔥 GameEndResult 기반 완료 보고 - 단일 진실원천 패턴
+        ///  GameEndResult 기반 완료 보고 - 단일 진실원천 패턴
         /// </summary>
         private void ReportStageCompletion(GameEndResult gameResult)
         {
@@ -660,36 +660,36 @@ namespace Features.Single.Gameplay
                 return;
             }
 
-            // 🔥 GameEndResult 기반 올바른 API 호출 분리
+            //  GameEndResult 기반 올바른 API 호출 분리
             if (gameResult.isCleared) // stars >= 1
             {
-                // ✅ 클리어 성공: 완료 API만 호출
+                //  클리어 성공: 완료 API만 호출
                 StageManager.CompleteStage(gameResult.stageNumber, gameResult.finalScore, 
                                          gameResult.stars, Mathf.FloorToInt(gameResult.elapsedTime));
                 
                 if (verboseLog) 
-                    Debug.Log($"[SingleGame] ✅ 완료 보고: stage={gameResult.stageNumber}, " +
+                    Debug.Log($"[SingleGame]  완료 보고: stage={gameResult.stageNumber}, " +
                              $"score={gameResult.finalScore}, stars={gameResult.stars}, " +
                              $"t={gameResult.elapsedTime:F1}s");
             }
             else // stars == 0
             {
-                // ❌ 클리어 실패: 실패 처리 (완료 API 호출 금지)
+                //  클리어 실패: 실패 처리 (완료 API 호출 금지)
                 StageManager.FailStage(gameResult.stageNumber);
                 
                 if (verboseLog) 
-                    Debug.Log($"[SingleGame] ❌ 실패 보고: stage={gameResult.stageNumber}, " +
+                    Debug.Log($"[SingleGame]  실패 보고: stage={gameResult.stageNumber}, " +
                              $"score={gameResult.finalScore}, stars={gameResult.stars}, " +
                              $"t={gameResult.elapsedTime:F1}s");
                 
-                // 🚨 중요: 완료 API를 호출하지 않음으로써 서버에서 completed=true 응답 방지
+                //  중요: 완료 API를 호출하지 않음으로써 서버에서 completed=true 응답 방지
                 Debug.Log($"[SingleGame] 스테이지 {gameResult.stageNumber} 실패 처리: 완료 API 호출 금지됨 (0별)");
             }
 
-            // 🚨 규칙 위반 재검증
+            //  규칙 위반 재검증
             if (gameResult.stars == 0 && gameResult.isCleared)
             {
-                Debug.LogError($"[SingleGame] 🚨 심각한 규칙 위반: GameEndResult가 0별인데 isCleared=true");
+                Debug.LogError($"[SingleGame]  심각한 규칙 위반: GameEndResult가 0별인데 isCleared=true");
             }
         }
 
@@ -714,7 +714,7 @@ namespace Features.Single.Gameplay
 
                 if (removedBlockScore > 0)
                 {
-                    _currentScore -= removedBlockScore; // 🔥 총점 차감
+                    _currentScore -= removedBlockScore; //  총점 차감
                     OnScoreChanged?.Invoke(-removedBlockScore, $"Undo {lastPlacement.type}");
                     OnTotalScoreUpdated?.Invoke(_currentScore);
                 }
@@ -781,13 +781,13 @@ namespace Features.Single.Gameplay
 
             blockPalette.MarkBlockAsUsed(block.Type);
 
-            // 🔥 점수 가산
+            //  점수 가산
             int gain = logic?.GetBlockScore(block.Type) ?? 0;
             _currentScore += gain;
             OnScoreChanged?.Invoke(gain, $"Place {block.Type}");
             OnTotalScoreUpdated?.Invoke(_currentScore);
 
-            // 🔥 Undo 버튼 상태 갱신 트리거 (값은 그대로여도 알림)
+            //  Undo 버튼 상태 갱신 트리거 (값은 그대로여도 알림)
             OnUndoCountChanged?.Invoke(RemainingUndo);
 
             blockPalette.MarkBlockAsUsed(block.Type);
@@ -834,7 +834,7 @@ namespace Features.Single.Gameplay
             int optimalScore = payload?.ParScore ?? 0;
             float elapsedTime = ElapsedSeconds;
 
-            // 🔥 단일 진실원천: GameEndResult 생성 (별점 기반 클리어 판정)
+            //  단일 진실원천: GameEndResult 생성 (별점 기반 클리어 판정)
             int stars = App.Services.ApiDataConverter.CalculateStars(myScore, optimalScore);
             var gameResult = new GameEndResult(
                 stageNumber: CurrentStage,
@@ -849,19 +849,19 @@ namespace Features.Single.Gameplay
 
             Debug.Log($"[SingleGame] 게임 종료: {gameResult}");
 
-            // 🚨 규칙 위반 검사: 0별인데 완료 처리하려는 경우 경고
+            //  규칙 위반 검사: 0별인데 완료 처리하려는 경우 경고
             if (gameResult.stars == 0 && gameResult.isCleared)
             {
-                Debug.LogError($"[SingleGame] 🚨 규칙 위반 감지: 0별인데 완료 처리 시도 - Stage {CurrentStage}");
+                Debug.LogError($"[SingleGame]  규칙 위반 감지: 0별인데 완료 처리 시도 - Stage {CurrentStage}");
             }
 
-            // 🔥 (2) StageSelectPanel을 먼저 켜서, 비활성 코루틴 에러 방지
+            //  (2) StageSelectPanel을 먼저 켜서, 비활성 코루틴 에러 방지
             EnsureStageSelectPanelActive();
 
-            // 🔥 완료 보고: GameEndResult 기반으로 올바른 API 호출
+            //  완료 보고: GameEndResult 기반으로 올바른 API 호출
             ReportStageCompletion(gameResult);
 
-            // 🔥 (3) 결과 모달 표시: GameEndResult 전달
+            //  (3) 결과 모달 표시: GameEndResult 전달
             ShowGameResult(gameResult,
                 onClosed: () =>
                 {
@@ -888,7 +888,7 @@ namespace Features.Single.Gameplay
         }
 
         /// <summary>
-        /// 🔥 GameEndResult 기반 결과 모달 표시
+        ///  GameEndResult 기반 결과 모달 표시
         /// </summary>
         private void ShowGameResult(GameEndResult gameResult, System.Action onClosed = null)
         {

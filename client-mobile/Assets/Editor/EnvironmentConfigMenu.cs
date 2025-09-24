@@ -11,7 +11,7 @@ public class EnvironmentConfigMenu
     [MenuItem("Tools/Environment Config/Copy .env to StreamingAssets")]
     public static void CopyEnvToStreamingAssets()
     {
-        Debug.Log("🔧 수동으로 .env 파일을 StreamingAssets에 복사합니다...");
+        Debug.Log(" 수동으로 .env 파일을 StreamingAssets에 복사합니다...");
         
         try
         {
@@ -83,7 +83,7 @@ public class EnvironmentConfigMenu
     [MenuItem("Tools/Environment Config/Show Current Config")]
     public static void ShowCurrentConfig()
     {
-        Debug.Log("🔧 현재 환경변수 설정:");
+        Debug.Log(" 현재 환경변수 설정:");
         Debug.Log($"   WebServerUrl: {App.Config.EnvironmentConfig.WebServerUrl}");
         Debug.Log($"   ApiServerUrl: {App.Config.EnvironmentConfig.ApiServerUrl}");
         Debug.Log($"   OidcServerUrl: {App.Config.EnvironmentConfig.OidcServerUrl}");
@@ -124,7 +124,7 @@ public class EnvironmentConfigMenu
         // Inspector에서 선택
         Selection.activeGameObject = envManagerObj;
         
-        Debug.Log("✅ EnvironmentModeManager가 생성되었습니다!");
+        Debug.Log(" EnvironmentModeManager가 생성되었습니다!");
         EditorUtility.DisplayDialog("생성 완료", 
             "EnvironmentModeManager가 생성되었습니다.\n\n" +
             "Inspector에서 dev/release 모드를 설정할 수 있습니다.", "확인");
@@ -137,7 +137,7 @@ public class EnvironmentConfigMenu
         if (envManager != null)
         {
             envManager.SetDevelopmentMode();
-            Debug.Log("🔧 Development 모드로 설정됨");
+            Debug.Log(" Development 모드로 설정됨");
             EditorUtility.DisplayDialog("모드 변경", "Development 모드로 설정되었습니다.", "확인");
         }
         else
@@ -155,7 +155,7 @@ public class EnvironmentConfigMenu
         if (envManager != null)
         {
             envManager.SetReleaseMode();
-            Debug.Log("🔧 Release 모드로 설정됨");
+            Debug.Log(" Release 모드로 설정됨");
             EditorUtility.DisplayDialog("모드 변경", "Release 모드로 설정되었습니다.", "확인");
         }
         else
@@ -173,7 +173,7 @@ public class EnvironmentConfigMenu
         if (envManager != null)
         {
             envManager.ToggleDevelopmentMode();
-            Debug.Log($"🔧 모드가 {envManager.CurrentMode}로 변경됨");
+            Debug.Log($" 모드가 {envManager.CurrentMode}로 변경됨");
             EditorUtility.DisplayDialog("모드 토글", 
                 $"모드가 {envManager.CurrentMode}로 변경되었습니다.", "확인");
         }

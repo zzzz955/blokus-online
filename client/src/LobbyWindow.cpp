@@ -1,6 +1,6 @@
 ﻿#include "LobbyWindow.h"
 #include "UserInfoDialog.h"
-#include "ClientTypes.h"  // 🔥 UserInfo 등을 위해 추가
+#include "ClientTypes.h"  //  UserInfo 등을 위해 추가
 #include <QApplication>
 #include <QDesktopWidget>
 #include <QHeaderView>
@@ -258,7 +258,7 @@ namespace Blokus {
             connect(m_buttonCooldownTimer, &QTimer::timeout, this, &LobbyWindow::onCooldownTimerTick);
 
             // 창 설정 - 스크롤바 없이 모든 요소가 보이는 최소 크기
-            setWindowTitle(QString::fromUtf8("블로커스 온라인 - 로비 (%1님)").arg(username));
+            setWindowTitle(QString::fromUtf8("블로블로 - 로비 (%1님)").arg(username));
             setMinimumSize(1280, 800);  // 계산된 실제 최소 크기
             resize(1280, 800);         // 초기 진입 시 진짜 최소 크기로 시작
 
@@ -270,7 +270,7 @@ namespace Blokus {
 
             // 환영 메시지
             qDebug() << QString::fromUtf8("환영 메시지 추가...");
-            addSystemMessage(QString::fromUtf8("안녕하세요, %1님! 블로커스 온라인에 오신 것을 환영합니다.").arg(displayname));
+            addSystemMessage(QString::fromUtf8("안녕하세요, %1님! 블로블로에 오신 것을 환영합니다.").arg(displayname));
             qDebug() << QString::fromUtf8("LobbyWindow 생성자 완료");
         }
         catch (const std::exception& e) {
@@ -588,9 +588,9 @@ namespace Blokus {
         QHBoxLayout* controlsLayout = new QHBoxLayout(m_roomControlsWidget);
         controlsLayout->setContentsMargins(0, 0, 0, 0);
 
-        m_createRoomButton = new QPushButton(QString::fromUtf8("🏠 방 만들기"));
-        m_joinRoomButton = new QPushButton(QString::fromUtf8("🚪 입장하기"));
-        m_refreshRoomButton = new QPushButton(QString::fromUtf8("🔄 새로고침"));
+        m_createRoomButton = new QPushButton(QString::fromUtf8("방 만들기"));
+        m_joinRoomButton = new QPushButton(QString::fromUtf8("입장하기"));
+        m_refreshRoomButton = new QPushButton(QString::fromUtf8("새로고침"));
 
         m_createRoomButton->setMinimumHeight(30);  // 더 컴팩트한 버튼 높이
         m_joinRoomButton->setMinimumHeight(30);
@@ -944,7 +944,7 @@ namespace Blokus {
     void LobbyWindow::closeEvent(QCloseEvent* event)
     {
         int result = QMessageBox::question(this, QString::fromUtf8("종료"),
-            QString::fromUtf8("블로커스 온라인을 종료하시겠습니까?"),
+            QString::fromUtf8("블로블로을 종료하시겠습니까?"),
             QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
 
         if (result == QMessageBox::Yes) {
@@ -1219,7 +1219,7 @@ namespace Blokus {
     {
         // Lv.N 표시명 (상태) 형식으로 표시
         QString displayName = user.displayName.isEmpty() ? user.username : user.displayName;
-        return QString::fromUtf8("🟢 Lv.%1 %2 (%3)")
+        return QString::fromUtf8("Lv.%1 %2 (%3)")
                .arg(user.level)
                .arg(displayName)
                .arg(user.status);

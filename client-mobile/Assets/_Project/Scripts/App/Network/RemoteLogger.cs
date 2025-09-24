@@ -136,7 +136,7 @@ namespace App.Network
         /// </summary>
         private static IEnumerator NetworkSmokeTest()
         {
-            Debug.Log("[SmokeTest] 🔍 네트워크 연결 진단 시작");
+            Debug.Log("[SmokeTest]  네트워크 연결 진단 시작");
 
             // A) HTTPS 기본 동작
             using (var req = UnityWebRequest.Get("https://www.google.com/generate_204"))
@@ -189,7 +189,7 @@ namespace App.Network
                 Debug.Log($"[SmokeTest] F(웹서버 헬스): {req.result}/{req.responseCode} {req.error}");
             }
 
-            Debug.Log("[SmokeTest] ✅ 네트워크 진단 완료 - adb logcat으로 상세 로그 확인");
+            Debug.Log("[SmokeTest]  네트워크 진단 완료 - adb logcat으로 상세 로그 확인");
         }
 
         /// <summary>

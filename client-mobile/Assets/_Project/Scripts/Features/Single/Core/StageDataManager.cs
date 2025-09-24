@@ -168,7 +168,7 @@ namespace Features.Single.Core
             Debug.Log($"[SelectStage] 1단계: 서버 데이터 시도 (useServerData={useServerData})");
             if (useServerData && TryLoadServerStageData(stageNumber))
             {
-                Debug.Log($"[SelectStage] ✅ 1단계 성공 - 서버 데이터로 완료");
+                Debug.Log($"[SelectStage]  1단계 성공 - 서버 데이터로 완료");
                 return;
             }
 
@@ -176,7 +176,7 @@ namespace Features.Single.Core
             Debug.Log($"[SelectStage] 2단계: 로컬 데이터 시도 (fallbackToLocalData={fallbackToLocalData})");
             if (fallbackToLocalData && TryLoadLocalStageData(stageNumber))
             {
-                Debug.Log($"[SelectStage] ✅ 2단계 성공 - 로컬 데이터로 완료");
+                Debug.Log($"[SelectStage]  2단계 성공 - 로컬 데이터로 완료");
                 return;
             }
 
@@ -184,12 +184,12 @@ namespace Features.Single.Core
             Debug.Log($"[SelectStage] 3단계: API 서버 요청 (autoRequestMissingStages={autoRequestMissingStages})");
             if (autoRequestMissingStages && RequestStageDataFromServer(stageNumber))
             {
-                Debug.Log($"[SelectStage] ✅ 3단계 성공 - 서버 요청 완료");
+                Debug.Log($"[SelectStage]  3단계 성공 - 서버 요청 완료");
                 return;
             }
 
             // 4. 최후의 수단: 테스트 스테이지 생성
-            Debug.LogWarning($"[SelectStage] ❌ 모든 단계 실패 - 스테이지 {stageNumber} 데이터를 찾을 수 없습니다.");
+            Debug.LogWarning($"[SelectStage]  모든 단계 실패 - 스테이지 {stageNumber} 데이터를 찾을 수 없습니다.");
         }
 
         /// <summary>
@@ -207,7 +207,7 @@ namespace Features.Single.Core
                 // 메타데이터를 기반으로 StageData 생성 (이미 변환됨)
                 currentSelectedStage = ApiDataConverter.ConvertCompactMetadata(metadata);
 
-                Debug.Log($"[TryLoadServerStageData] ✅ API 메타데이터에서 스테이지 {stageNumber} 선택 - return true");
+                Debug.Log($"[TryLoadServerStageData]  API 메타데이터에서 스테이지 {stageNumber} 선택 - return true");
                 return true;
             }
 
@@ -463,14 +463,14 @@ namespace Features.Single.Core
                 bool isNewBest = score > cacheProgress.bestScore;
                 bool isFirstComplete = !cacheProgress.isCompleted;
 
-                // 🔥 수정: GameEndResult 규칙 적용 - stars >= 1일 때만 isCompleted = true
+                //  수정: GameEndResult 규칙 적용 - stars >= 1일 때만 isCompleted = true
                 bool isActuallyCompleted = stars >= 1;
                 
                 // 진행도 업데이트
                 var updatedProgress = new NetworkUserStageProgress
                 {
                     stageNumber = stageNumber,
-                    isCompleted = isActuallyCompleted, // 🔥 별점 기반 클리어 판정
+                    isCompleted = isActuallyCompleted, //  별점 기반 클리어 판정
                     starsEarned = Mathf.Max(stars, cacheProgress.starsEarned),
                     bestScore = Mathf.Max(score, cacheProgress.bestScore),
                     bestCompletionTime = (completionTime > 0 && (cacheProgress.bestCompletionTime == 0 || completionTime < cacheProgress.bestCompletionTime)) ? completionTime : cacheProgress.bestCompletionTime,
@@ -481,14 +481,14 @@ namespace Features.Single.Core
 
                 UserDataCache.Instance.SetStageProgress(updatedProgress);
                 
-                // 🔥 규칙 검증 로그
+                //  규칙 검증 로그
                 if (stars == 0 && isActuallyCompleted)
                 {
-                    Debug.LogError($"🚨 [StageDataManager] 규칙 위반: Stage {stageNumber}에서 0별인데 isCompleted=true");
+                    Debug.LogError($" [StageDataManager] 규칙 위반: Stage {stageNumber}에서 0별인데 isCompleted=true");
                 }
                 if (stars > 0 && !isActuallyCompleted)
                 {
-                    Debug.LogError($"🚨 [StageDataManager] 규칙 위반: Stage {stageNumber}에서 {stars}별인데 isCompleted=false");
+                    Debug.LogError($" [StageDataManager] 규칙 위반: Stage {stageNumber}에서 {stars}별인데 isCompleted=false");
                 }
                 
                 Debug.Log($"[StageDataManager] 로컬 스테이지 진행도 업데이트: Stage {stageNumber}, Stars {stars}, Completed {isActuallyCompleted}, Score {score}");
@@ -689,7 +689,7 @@ namespace Features.Single.Core
 
             int maxStage = 0;
 
-            // 🔥 수정: 실제 메타데이터 기반으로 상한선 설정
+            //  수정: 실제 메타데이터 기반으로 상한선 설정
             int totalStages = 14; // 기본값
             if (UserDataCache.Instance != null)
             {

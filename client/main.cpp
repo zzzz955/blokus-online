@@ -259,11 +259,11 @@ private slots:
         if (m_networkClient && m_networkClient->isConnected())
         {
             m_networkClient->sendMessage(gameMessage);
-            qDebug() << QString::fromUtf8("✅ 서버에 블록 배치 메시지 전송 완료");
+            qDebug() << QString::fromUtf8(" 서버에 블록 배치 메시지 전송 완료");
         }
         else
         {
-            qWarning() << QString::fromUtf8("❌ 서버 연결이 없어 블록 배치 메시지를 보낼 수 없습니다");
+            qWarning() << QString::fromUtf8(" 서버 연결이 없어 블록 배치 메시지를 보낼 수 없습니다");
         }
     }
 
@@ -336,7 +336,7 @@ private slots:
         QJsonDocument doc = QJsonDocument::fromJson(userInfoJson.toUtf8(), &error);
         
         if (error.error != QJsonParseError::NoError) {
-            qDebug() << QString::fromUtf8("❌ 사용자 프로필 JSON 파싱 오류: %1").arg(error.errorString());
+            qDebug() << QString::fromUtf8(" 사용자 프로필 JSON 파싱 오류: %1").arg(error.errorString());
             return;
         }
         
@@ -364,7 +364,7 @@ private slots:
             m_lobbyWindow->setMyUserInfo(userInfo);
         }
         
-        qDebug() << QString::fromUtf8("✅ 사용자 프로필 캐싱 완료: %1 (표시명: %2)")
+        qDebug() << QString::fromUtf8(" 사용자 프로필 캐싱 완료: %1 (표시명: %2)")
                     .arg(userInfo.username).arg(userInfo.displayName);
     }
 
@@ -454,7 +454,7 @@ private slots:
         QJsonDocument doc = QJsonDocument::fromJson(statsJson.toUtf8(), &error);
         
         if (error.error != QJsonParseError::NoError) {
-            qDebug() << QString::fromUtf8("❌ 사용자 통계 JSON 파싱 오류: %1").arg(error.errorString());
+            qDebug() << QString::fromUtf8(" 사용자 통계 JSON 파싱 오류: %1").arg(error.errorString());
             return;
         }
         
@@ -510,7 +510,7 @@ private slots:
         QJsonDocument doc = QJsonDocument::fromJson(statsJson.toUtf8(), &error);
         
         if (error.error != QJsonParseError::NoError) {
-            qDebug() << QString::fromUtf8("❌ 내 통계 JSON 파싱 오류: %1").arg(error.errorString());
+            qDebug() << QString::fromUtf8(" 내 통계 JSON 파싱 오류: %1").arg(error.errorString());
             return;
         }
         
@@ -888,7 +888,7 @@ private slots:
                     PlayerColor playerColor = static_cast<PlayerColor>(normalizedColorIndex);
                     int slotIndex = normalizedColorIndex - 1; // PlayerColor 1-4를 배열 인덱스 0-3으로 변환
 
-                    qDebug() << QString::fromUtf8("🔧 슬롯 %1에 플레이어 배치: %2 [%3] (색상=%4)")
+                    qDebug() << QString::fromUtf8(" 슬롯 %1에 플레이어 배치: %2 [%3] (색상=%4)")
                                     .arg(slotIndex)
                                     .arg(displayName)
                                     .arg(username)
@@ -920,7 +920,7 @@ private slots:
                     PlayerColor playerColor = static_cast<PlayerColor>(normalizedColorIndex);
                     int slotIndex = normalizedColorIndex - 1; // PlayerColor 1-4를 배열 인덱스 0-3으로 변환
 
-                    qDebug() << QString::fromUtf8("🔧 슬롯 %1에 플레이어 배치: %2 (색상=%3)")
+                    qDebug() << QString::fromUtf8(" 슬롯 %1에 플레이어 배치: %2 (색상=%3)")
                                     .arg(slotIndex)
                                     .arg(username)
                                     .arg(colorIndex);
@@ -1089,35 +1089,35 @@ private slots:
 
     void onGameResult(const QString &resultJson)
     {
-        qDebug() << QString::fromUtf8("🎯 게임 결과 수신됨");
+        qDebug() << QString::fromUtf8(" 게임 결과 수신됨");
         qDebug() << QString::fromUtf8("📦 데이터 크기: %1 바이트").arg(resultJson.size());
         qDebug() << QString::fromUtf8("📄 게임룸창 상태: %1").arg(m_gameRoomWindow ? "활성" : "비활성");
 
         if (m_gameRoomWindow)
         {
-            qDebug() << QString::fromUtf8("✅ 게임 결과 다이얼로그 표시 진행");
+            qDebug() << QString::fromUtf8(" 게임 결과 다이얼로그 표시 진행");
             // JSON 파싱 및 게임 결과 다이얼로그 표시
             showGameResultDialog(resultJson);
         }
         else
         {
-            qDebug() << QString::fromUtf8("❌ 게임룸창이 없어서 다이얼로그를 표시할 수 없음");
+            qDebug() << QString::fromUtf8(" 게임룸창이 없어서 다이얼로그를 표시할 수 없음");
         }
     }
 
     void onGameReset()
     {
-        qDebug() << QString::fromUtf8("🔄 게임 리셋 신호 수신됨");
+        qDebug() << QString::fromUtf8(" 게임 리셋 신호 수신됨");
 
         if (m_gameRoomWindow)
         {
-            qDebug() << QString::fromUtf8("✅ 게임룸 UI 리셋 진행");
+            qDebug() << QString::fromUtf8(" 게임룸 UI 리셋 진행");
             // 게임룸 창의 모든 게임 관련 UI를 리셋
             m_gameRoomWindow->resetGameState();
         }
         else
         {
-            qDebug() << QString::fromUtf8("❌ 게임룸창이 없어서 리셋할 수 없음");
+            qDebug() << QString::fromUtf8(" 게임룸창이 없어서 리셋할 수 없음");
         }
     }
 
@@ -1191,28 +1191,28 @@ private:
 
             if (error.error != QJsonParseError::NoError)
             {
-                qDebug() << QString::fromUtf8("❌ JSON 파싱 오류: %1").arg(error.errorString());
-                qDebug() << QString::fromUtf8("❌ 오류 위치: offset %1").arg(error.offset);
+                qDebug() << QString::fromUtf8(" JSON 파싱 오류: %1").arg(error.errorString());
+                qDebug() << QString::fromUtf8(" 오류 위치: offset %1").arg(error.offset);
 
                 // 파싱 오류가 있어도 기본 메시지 표시
                 showFallbackGameResult();
                 return;
             }
 
-            qDebug() << QString::fromUtf8("✅ JSON 파싱 성공");
+            qDebug() << QString::fromUtf8(" JSON 파싱 성공");
 
             QJsonObject result = doc.object();
             QJsonObject scores = result["scores"].toObject();
             QJsonArray winners = result["winners"].toArray();
 
-            qDebug() << QString::fromUtf8("📊 점수 데이터: %1개").arg(scores.size());
+            qDebug() << QString::fromUtf8(" 점수 데이터: %1개").arg(scores.size());
             qDebug() << QString::fromUtf8("🏆 승자 데이터: %1명").arg(winners.size());
 
             // 결과 메시지 생성
             QString resultMessage = QString::fromUtf8("🎉 게임이 종료되었습니다!\n\n");
 
             // 점수 표시
-            resultMessage += QString::fromUtf8("📊 최종 점수:\n");
+            resultMessage += QString::fromUtf8(" 최종 점수:\n");
             for (auto it = scores.begin(); it != scores.end(); ++it)
             {
                 QString playerName = it.key();
@@ -1267,23 +1267,23 @@ private:
             msgBox->show();
             autoCloseTimer->start();
 
-            qDebug() << QString::fromUtf8("✅ 비모달 게임 결과 다이얼로그 표시됨 (10초 후 자동 닫기)");
+            qDebug() << QString::fromUtf8(" 비모달 게임 결과 다이얼로그 표시됨 (10초 후 자동 닫기)");
         }
         catch (const std::exception &e)
         {
-            qDebug() << QString::fromUtf8("❌ 게임 결과 처리 중 예외 발생: %1").arg(e.what());
+            qDebug() << QString::fromUtf8(" 게임 결과 처리 중 예외 발생: %1").arg(e.what());
             showFallbackGameResult();
         }
         catch (...)
         {
-            qDebug() << QString::fromUtf8("❌ 게임 결과 처리 중 알 수 없는 예외 발생");
+            qDebug() << QString::fromUtf8(" 게임 결과 처리 중 알 수 없는 예외 발생");
             showFallbackGameResult();
         }
     }
 
     void showFallbackGameResult()
     {
-        qDebug() << QString::fromUtf8("🔄 기본 게임 결과 다이얼로그 표시");
+        qDebug() << QString::fromUtf8(" 기본 게임 결과 다이얼로그 표시");
 
         try
         {
@@ -1322,13 +1322,13 @@ private:
         }
         catch (...)
         {
-            qDebug() << QString::fromUtf8("❌ 기본 다이얼로그 표시 중에도 예외 발생");
+            qDebug() << QString::fromUtf8(" 기본 다이얼로그 표시 중에도 예외 발생");
         }
     }
 
     void initializeApplication()
     {
-        qDebug() << QString::fromUtf8("=== 블로커스 온라인 초기화 ===");
+        qDebug() << QString::fromUtf8("=== 블로블로 초기화 ===");
     }
 
     void initializeConfiguration()
@@ -1590,15 +1590,15 @@ private:
             connect(m_gameRoomWindow, &Blokus::GameRoomWindow::afkUnblockRequested,
                     m_networkClient, &Blokus::NetworkClient::sendAfkUnblock, Qt::QueuedConnection);
             
-            // 🔥 FIX: 게임 종료 시 AFK 모달 처리 - Qt::QueuedConnection으로 스레드 안전 보장
+            //  FIX: 게임 종료 시 AFK 모달 처리 - Qt::QueuedConnection으로 스레드 안전 보장
             connect(m_networkClient, &Blokus::NetworkClient::gameEnded,
                     m_gameRoomWindow, &Blokus::GameRoomWindow::onGameEndedForAfk, Qt::QueuedConnection);
             
-            // 🔥 FIX: AFK 해제 에러 처리 - Qt::QueuedConnection으로 스레드 안전 보장
+            //  FIX: AFK 해제 에러 처리 - Qt::QueuedConnection으로 스레드 안전 보장
             connect(m_networkClient, &Blokus::NetworkClient::afkUnblockError,
                     m_gameRoomWindow, &Blokus::GameRoomWindow::onAfkUnblockErrorForAfk, Qt::QueuedConnection);
             
-            qDebug() << QString::fromUtf8("🚨 AFK 관련 시그널 연결 완료 (게임 종료 & 에러 처리 포함)");
+            qDebug() << QString::fromUtf8("AFK 관련 시그널 연결 완료 (게임 종료 & 에러 처리 포함)");
 
             // 게임룸 채팅은 이미 전역적으로 연결되어 있음 (중복 연결 제거)
 
@@ -1724,7 +1724,7 @@ int main(int argc, char *argv[])
 #endif
 
     // 애플리케이션 설정
-    app.setApplicationName(QString::fromUtf8("블로커스 온라인"));
+    app.setApplicationName(QString::fromUtf8("블로블로"));
     app.setApplicationVersion("1.2.0");
     app.setOrganizationName("Blokus Online");
 
@@ -1754,7 +1754,7 @@ int main(int argc, char *argv[])
     AppController controller;
     controller.start();
 
-    qDebug() << QString::fromUtf8("블로커스 온라인 시작됨 - 클래식 모드 전용");
+    qDebug() << QString::fromUtf8("블로블로 시작됨 - 클래식 모드 전용");
 
     return app.exec();
 }

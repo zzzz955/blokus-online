@@ -18,7 +18,7 @@ namespace Blokus {
             , m_eventCallback(nullptr)
             , m_databaseManager(nullptr)
         {
-            spdlog::debug("🏠 RoomManager 초기화 (최대 방: {}, 최대 플레이어/방: {})",
+            spdlog::debug(" RoomManager 초기화 (최대 방: {}, 최대 플레이어/방: {})",
                 m_maxRooms, m_maxPlayersPerRoom);
         }
         
@@ -29,13 +29,13 @@ namespace Blokus {
             , m_eventCallback(nullptr)
             , m_databaseManager(dbManager)
         {
-            spdlog::debug("🏠 RoomManager 초기화 with DB (최대 방: {}, 최대 플레이어/방: {})",
+            spdlog::debug(" RoomManager 초기화 with DB (최대 방: {}, 최대 플레이어/방: {})",
                 m_maxRooms, m_maxPlayersPerRoom);
         }
 
         RoomManager::~RoomManager() {
             removeAllRooms();
-            spdlog::debug("🏠 RoomManager 소멸");
+            spdlog::debug(" RoomManager 소멸");
         }
         
         void RoomManager::setDatabaseManager(std::shared_ptr<DatabaseManager> dbManager) {
@@ -56,13 +56,13 @@ namespace Blokus {
 
             // 1. 입력 검증
             if (!validateRoomCreation(roomName)) {
-                spdlog::warn("❌ 방 생성 실패: 유효하지 않은 방 이름 '{}'", roomName);
+                spdlog::warn(" 방 생성 실패: 유효하지 않은 방 이름 '{}'", roomName);
                 return -1;
             }
 
             // 2. 호스트가 이미 다른 방에 있는지 확인
             if (isPlayerInRoom(hostId)) {
-                spdlog::warn("❌ 방 생성 실패: 호스트 '{}' 이미 다른 방에 참여 중", hostId);
+                spdlog::warn(" 방 생성 실패: 호스트 '{}' 이미 다른 방에 참여 중", hostId);
                 return -2;
             }
 
@@ -70,7 +70,7 @@ namespace Blokus {
 
             // 3. 방 개수 제한 확인
             if (m_rooms.size() >= m_maxRooms) {
-                spdlog::warn("❌ 방 생성 실패: 최대 방 개수 도달 ({}/{})", m_rooms.size(), m_maxRooms);
+                spdlog::warn(" 방 생성 실패: 최대 방 개수 도달 ({}/{})", m_rooms.size(), m_maxRooms);
                 return -3;
             }
 
@@ -80,7 +80,7 @@ namespace Blokus {
 
             m_rooms[roomId] = room;
 
-            spdlog::info("✅ 방 생성 성공: ID={}, Name='{}', Host='{}', Private={}",
+            spdlog::info(" 방 생성 성공: ID={}, Name='{}', Host='{}', Private={}",
                 roomId, roomName, hostUsername, isPrivate);
 
             // 5. 이벤트 발생
@@ -94,7 +94,7 @@ namespace Blokus {
 
             auto it = m_rooms.find(roomId);
             if (it == m_rooms.end()) {
-                spdlog::warn("❌ 방 제거 실패: 방 ID {} 없음", roomId);
+                spdlog::warn(" 방 제거 실패: 방 ID {} 없음", roomId);
                 return false;
             }
 
@@ -108,7 +108,7 @@ namespace Blokus {
 
             m_rooms.erase(it);
 
-            spdlog::info("✅ 방 제거: ID={}, Name='{}'", roomId, room->getRoomName());
+            spdlog::info(" 방 제거: ID={}, Name='{}'", roomId, room->getRoomName());
             triggerRoomEvent(roomId, "ROOM_REMOVED", room->getRoomName());
 
             return true;
@@ -162,27 +162,27 @@ namespace Blokus {
 
             // 2. 이미 다른 방에 있는지 확인
             if (isPlayerInRoom(userId)) {
-                spdlog::warn("❌ 방 참여 실패: 플레이어 '{}' 이미 다른 방에 참여 중", userId);
+                spdlog::warn(" 방 참여 실패: 플레이어 '{}' 이미 다른 방에 참여 중", userId);
                 return false;
             }
 
             // 3. 방 찾기
             auto room = getRoom(roomId);
             if (!room) {
-                spdlog::warn("❌ 방 참여 실패: 방 ID {} 없음", roomId);
+                spdlog::warn(" 방 참여 실패: 방 ID {} 없음", roomId);
                 return false;
             }
 
             // 4. 방에 플레이어 추가
             if (!room->addPlayer(session, userId, username)) {
-                spdlog::warn("❌ 방 참여 실패: 방 {} 플레이어 추가 거부", roomId);
+                spdlog::warn(" 방 참여 실패: 방 {} 플레이어 추가 거부", roomId);
                 return false;
             }
 
             // 5. 플레이어-방 매핑 업데이트
             updatePlayerMapping(userId, roomId);
 
-            spdlog::debug("✅ 방 참여 성공: 플레이어 '{}' -> 방 {} ({}명)",
+            spdlog::debug(" 방 참여 성공: 플레이어 '{}' -> 방 {} ({}명)",
                 username, roomId, room->getPlayerCount());
 
             // displayName 포함하여 이벤트 전송
@@ -196,7 +196,7 @@ namespace Blokus {
             // 플레이어가 속한 방 찾기
             int roomId = getPlayerRoomId(userId);
             if (roomId == -1) {
-                spdlog::warn("❌ 방 나가기 실패: 플레이어 '{}' 방에 없음", userId);
+                spdlog::warn(" 방 나가기 실패: 플레이어 '{}' 방에 없음", userId);
                 return false;
             }
 
@@ -206,14 +206,14 @@ namespace Blokus {
         bool RoomManager::leaveRoom(int roomId, const std::string& userId) {
             auto room = getRoom(roomId);
             if (!room) {
-                spdlog::warn("❌ 방 나가기 실패: 방 ID {} 없음", roomId);
+                spdlog::warn(" 방 나가기 실패: 방 ID {} 없음", roomId);
                 return false;
             }
 
             // 플레이어 정보 가져오기 (제거 전에)
             const PlayerInfo* player = room->getPlayer(userId);
             if (!player) {
-                spdlog::warn("❌ 방 나가기 실패: 플레이어 '{}' 방 {}에 없음", userId, roomId);
+                spdlog::warn(" 방 나가기 실패: 플레이어 '{}' 방 {}에 없음", userId, roomId);
                 return false;
             }
 
@@ -222,14 +222,14 @@ namespace Blokus {
 
             // 방에서 플레이어 제거
             if (!room->removePlayer(userId)) {
-                spdlog::warn("❌ 방 나가기 실패: 방 {} 플레이어 제거 거부", roomId);
+                spdlog::warn(" 방 나가기 실패: 방 {} 플레이어 제거 거부", roomId);
                 return false;
             }
 
             // 플레이어-방 매핑 제거
             removePlayerMapping(userId);
 
-            spdlog::debug("✅ 방 나가기 성공: 플레이어 '{}' <- 방 {} ({}명)",
+            spdlog::debug(" 방 나가기 성공: 플레이어 '{}' <- 방 {} ({}명)",
                 username, roomId, room->getPlayerCount());
 
             // displayName 포함하여 이벤트 전송
@@ -255,12 +255,12 @@ namespace Blokus {
         bool RoomManager::setPlayerReady(const std::string& userId, bool ready) {
             auto room = findPlayerRoom(userId);
             if (!room) {
-                spdlog::warn("❌ 플레이어 준비 상태 변경 실패: 플레이어 '{}' 방에 없음", userId);
+                spdlog::warn(" 플레이어 준비 상태 변경 실패: 플레이어 '{}' 방에 없음", userId);
                 return false;
             }
 
             if (!room->setPlayerReady(userId, ready)) {
-                spdlog::warn("❌ 플레이어 준비 상태 변경 실패: 방에서 거부");
+                spdlog::warn(" 플레이어 준비 상태 변경 실패: 방에서 거부");
                 return false;
             }
 
@@ -273,22 +273,22 @@ namespace Blokus {
         bool RoomManager::startGame(const std::string& hostId) {
             auto room = findPlayerRoom(hostId);
             if (!room) {
-                spdlog::warn("❌ 게임 시작 실패: 호스트 '{}' 방에 없음", hostId);
+                spdlog::warn(" 게임 시작 실패: 호스트 '{}' 방에 없음", hostId);
                 return false;
             }
 
             // 호스트 권한 확인
             if (!room->isHost(hostId)) {
-                spdlog::warn("❌ 게임 시작 실패: '{}' 호스트 권한 없음", hostId);
+                spdlog::warn(" 게임 시작 실패: '{}' 호스트 권한 없음", hostId);
                 return false;
             }
 
             if (!room->startGame()) {
-                spdlog::warn("❌ 게임 시작 실패: 방 {} 시작 조건 미충족", room->getRoomId());
+                spdlog::warn(" 게임 시작 실패: 방 {} 시작 조건 미충족", room->getRoomId());
                 return false;
             }
 
-            spdlog::info("✅ 게임 시작: 방 {} (호스트: '{}')", room->getRoomId(), hostId);
+            spdlog::info(" 게임 시작: 방 {} (호스트: '{}')", room->getRoomId(), hostId);
             triggerRoomEvent(room->getRoomId(), "GAME_STARTED", hostId);
 
             return true;
@@ -297,16 +297,16 @@ namespace Blokus {
         bool RoomManager::endGame(int roomId) {
             auto room = getRoom(roomId);
             if (!room) {
-                spdlog::warn("❌ 게임 종료 실패: 방 ID {} 없음", roomId);
+                spdlog::warn(" 게임 종료 실패: 방 ID {} 없음", roomId);
                 return false;
             }
 
             if (!room->endGame()) {
-                spdlog::warn("❌ 게임 종료 실패: 방 {} 종료 조건 미충족", roomId);
+                spdlog::warn(" 게임 종료 실패: 방 {} 종료 조건 미충족", roomId);
                 return false;
             }
 
-            spdlog::info("✅ 게임 종료: 방 {}", roomId);
+            spdlog::info(" 게임 종료: 방 {}", roomId);
             triggerRoomEvent(roomId, "GAME_ENDED", "");
 
             return true;
@@ -319,22 +319,22 @@ namespace Blokus {
         bool RoomManager::transferHost(int roomId, const std::string& currentHostId, const std::string& newHostId) {
             auto room = getRoom(roomId);
             if (!room) {
-                spdlog::warn("❌ 호스트 이양 실패: 방 ID {} 없음", roomId);
+                spdlog::warn(" 호스트 이양 실패: 방 ID {} 없음", roomId);
                 return false;
             }
 
             // 현재 호스트 권한 확인
             if (!room->isHost(currentHostId)) {
-                spdlog::warn("❌ 호스트 이양 실패: '{}' 호스트 권한 없음", currentHostId);
+                spdlog::warn(" 호스트 이양 실패: '{}' 호스트 권한 없음", currentHostId);
                 return false;
             }
 
             if (!room->transferHost(newHostId)) {
-                spdlog::warn("❌ 호스트 이양 실패: 방 {} 이양 거부", roomId);
+                spdlog::warn(" 호스트 이양 실패: 방 {} 이양 거부", roomId);
                 return false;
             }
 
-            spdlog::debug("✅ 호스트 이양: 방 {} ('{}' -> '{}')", roomId, currentHostId, newHostId);
+            spdlog::debug(" 호스트 이양: 방 {} ('{}' -> '{}')", roomId, currentHostId, newHostId);
             triggerRoomEvent(roomId, "HOST_TRANSFERRED", currentHostId + ":" + newHostId);
 
             return true;
@@ -630,7 +630,7 @@ namespace Blokus {
                     m_eventCallback(roomId, event, data);
                 }
                 catch (const std::exception& e) {
-                    spdlog::error("❌ 방 이벤트 콜백 실행 중 예외: {}", e.what());
+                    spdlog::error(" 방 이벤트 콜백 실행 중 예외: {}", e.what());
                 }
             }
         }

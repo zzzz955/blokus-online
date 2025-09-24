@@ -28,7 +28,7 @@
  * - Window 생명주기와 완전 분리
  * - 시그널 성공 시점에 상태 전환
  * 
- * 🔥 핵심 메서드: transitionToState() - 상태 전환 시 자동 BGM 교체
+ *  핵심 메서드: transitionToState() - 상태 전환 시 자동 BGM 교체
  * 🎵 효과음 메서드: playSoundEffect() - 효과음 즉시 재생
  */
 class BGMManager : public QObject
@@ -53,10 +53,10 @@ public:
 
     static BGMManager& getInstance();
     
-    // 🔥 핵심: 이벤트 기반 상태 전환 (Window 생명주기와 분리)
+    //  핵심: 이벤트 기반 상태 전환 (Window 생명주기와 분리)
     void transitionToState(GameState newState);
     
-    // 💡 편의 메서드 (시그널 성공 지점에서 호출)
+    //  편의 메서드 (시그널 성공 지점에서 호출)
     void onLobbyEntered()    { transitionToState(GameState::LOBBY); }
     void onGameRoomEntered() { transitionToState(GameState::GAME_ROOM); }
     void onGameStarted()     { transitionToState(GameState::IN_GAME); }
@@ -84,7 +84,7 @@ public:
     void setSFXMuted(bool muted);
     bool isSFXMuted() const { return m_sfxMuted; }
     
-    // 🔄 하위 호환성 (기존 API)
+    //  하위 호환성 (기존 API)
     void setVolume(float volume);
     float getVolume() const { return getBGMVolume(); }
     void setMuted(bool muted);

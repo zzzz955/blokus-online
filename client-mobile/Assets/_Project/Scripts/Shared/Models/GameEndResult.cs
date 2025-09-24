@@ -5,7 +5,7 @@ using UnityEngine;
 namespace Shared.Models
 {
     /// <summary>
-    /// 🔥 GameEndResult - 단일 진실원천 (Single Source of Truth)
+    ///  GameEndResult - 단일 진실원천 (Single Source of Truth)
     /// 
     /// 게임 종료 시 최종 결과를 한 번만 계산하고, 모든 UI/네트워크/진행도 업데이트가
     /// 이 객체의 데이터를 참조하도록 하여 일관성을 보장합니다.
@@ -49,7 +49,7 @@ namespace Shared.Models
             this.elapsedTime = elapsedTime;
             this.stars = Mathf.Clamp(stars, 0, 3);
             
-            // 🔥 핵심 규칙: 별점 기반 클리어 상태 결정 (절대 변경 금지)
+            //  핵심 규칙: 별점 기반 클리어 상태 결정 (절대 변경 금지)
             this.isCleared = this.stars >= 1;
             
             this.isNewBest = isNewBest;
@@ -60,14 +60,14 @@ namespace Shared.Models
             Debug.Log($"[GameEndResult] 생성: Stage={stageNumber}, Score={finalScore}, Stars={this.stars}, " +
                      $"IsCleared={this.isCleared}, Reason='{endReason}'");
                      
-            // 🚨 규칙 위반 검사
+            //  규칙 위반 검사
             if (this.stars == 0 && this.isCleared)
             {
-                Debug.LogError($"[GameEndResult] 🚨 규칙 위반: 0별인데 isCleared=true - Stage {stageNumber}");
+                Debug.LogError($"[GameEndResult]  규칙 위반: 0별인데 isCleared=true - Stage {stageNumber}");
             }
             if (this.stars > 0 && !this.isCleared)
             {
-                Debug.LogError($"[GameEndResult] 🚨 규칙 위반: {this.stars}별인데 isCleared=false - Stage {stageNumber}");
+                Debug.LogError($"[GameEndResult]  규칙 위반: {this.stars}별인데 isCleared=false - Stage {stageNumber}");
             }
         }
 

@@ -39,13 +39,13 @@ OidcAuthenticator::OidcAuthenticator(QObject* parent)
         m_config.issuer = "https://blokus-online.mooo.com/oidc";
         m_config.authorizationEndpoint = "https://blokus-online.mooo.com/oidc/authorize";
         m_config.tokenEndpoint = "https://blokus-online.mooo.com/oidc/token";
-        qDebug() << QString::fromUtf8("🔧 디버그 모드: localhost OIDC 서버 사용");
+        qDebug() << QString::fromUtf8(" 디버그 모드: localhost OIDC 서버 사용");
     #else
         // Release 모드: 프로덕션 서버 사용 (Nginx 서브패스 프록시)
         m_config.issuer = "https://blokus-online.mooo.com/oidc";
         m_config.authorizationEndpoint = "https://blokus-online.mooo.com/oidc/authorize";
         m_config.tokenEndpoint = "https://blokus-online.mooo.com/oidc/token";
-        qDebug() << QString::fromUtf8("🚀 릴리즈 모드: 프로덕션 OIDC 서버 사용 (https://blokus-online.mooo.com/oidc)");
+        qDebug() << QString::fromUtf8(" 릴리즈 모드: 프로덕션 OIDC 서버 사용 (https://blokus-online.mooo.com/oidc)");
     #endif
     m_config.clientId = "blokus-desktop-client";
     m_config.redirectUri = "http://localhost:{PORT}/callback"; // PORT는 동적으로 설정
@@ -60,7 +60,7 @@ OidcAuthenticator::OidcAuthenticator(QObject* parent)
     connect(m_loopbackServer, &QTcpServer::newConnection, 
             this, &OidcAuthenticator::onLoopbackServerNewConnection, Qt::QueuedConnection);
     connect(m_authTimeoutTimer, &QTimer::timeout, this, [this]() {
-        qDebug() << "🚨 [THREAD-SAFE] 인증 타임아웃 - Thread ID:" << QThread::currentThreadId();
+        qDebug() << " [THREAD-SAFE] 인증 타임아웃 - Thread ID:" << QThread::currentThreadId();
         
         // UI 업데이트를 메인 스레드에서 실행
         QMetaObject::invokeMethod(this, [this]() {
@@ -85,12 +85,12 @@ void OidcAuthenticator::setConfig(const OidcConfig& config)
 
 void OidcAuthenticator::startAuthenticationFlow()
 {
-    qDebug() << "🚀 [DEBUG] OIDC 인증 플로우 시작";
-    qDebug() << "🚀 [DEBUG] Thread ID:" << QThread::currentThreadId();
+    qDebug() << " [DEBUG] OIDC 인증 플로우 시작";
+    qDebug() << " [DEBUG] Thread ID:" << QThread::currentThreadId();
 
     // 로컬 서버 시작
     if (!startLoopbackServer()) {
-        qDebug() << "❌ [DEBUG] 로컬 서버 시작 실패 - 인증 중단";
+        qDebug() << " [DEBUG] 로컬 서버 시작 실패 - 인증 중단";
         emit authenticationFailed("로컬 서버 시작 실패");
         return;
     }
@@ -235,24 +235,24 @@ QUrl OidcAuthenticator::buildAuthorizationUrl()
 // 로컬 HTTP 서버 관련
 bool OidcAuthenticator::startLoopbackServer()
 {
-    qDebug() << "🌐 [DEBUG] 로컬 서버 시작 시도...";
+    qDebug() << " [DEBUG] 로컬 서버 시작 시도...";
     
     // 임의의 포트에서 서버 시작
     if (!m_loopbackServer->listen(QHostAddress::LocalHost)) {
-        qDebug() << "❌ [DEBUG] 로컬 서버 시작 실패:" << m_loopbackServer->errorString();
-        qDebug() << "❌ [DEBUG] 서버 상태:" << m_loopbackServer->serverError();
+        qDebug() << " [DEBUG] 로컬 서버 시작 실패:" << m_loopbackServer->errorString();
+        qDebug() << " [DEBUG] 서버 상태:" << m_loopbackServer->serverError();
         return false;
     }
     
     m_loopbackPort = m_loopbackServer->serverPort();
-    qDebug() << "✅ [DEBUG] 로컬 서버 시작됨, 포트:" << m_loopbackPort;
-    qDebug() << "✅ [DEBUG] 서버 주소:" << m_loopbackServer->serverAddress().toString();
-    qDebug() << "✅ [DEBUG] 리스닝 상태:" << m_loopbackServer->isListening();
-    qDebug() << "✅ [DEBUG] 최대 대기 연결:" << m_loopbackServer->maxPendingConnections();
+    qDebug() << " [DEBUG] 로컬 서버 시작됨, 포트:" << m_loopbackPort;
+    qDebug() << " [DEBUG] 서버 주소:" << m_loopbackServer->serverAddress().toString();
+    qDebug() << " [DEBUG] 리스닝 상태:" << m_loopbackServer->isListening();
+    qDebug() << " [DEBUG] 최대 대기 연결:" << m_loopbackServer->maxPendingConnections();
     
     // 서버가 실제로 바인딩되었는지 확인
     if (!m_loopbackServer->isListening()) {
-        qDebug() << "❌ [DEBUG] 서버가 리스닝 상태가 아님!";
+        qDebug() << " [DEBUG] 서버가 리스닝 상태가 아님!";
         return false;
     }
     
@@ -261,74 +261,74 @@ bool OidcAuthenticator::startLoopbackServer()
 
 void OidcAuthenticator::stopLoopbackServer()
 {
-    qDebug() << "🔧 [THREAD-SAFE] 로컬 서버 안전 정리 시작 - Thread ID:" << QThread::currentThreadId();
+    qDebug() << " [THREAD-SAFE] 로컬 서버 안전 정리 시작 - Thread ID:" << QThread::currentThreadId();
     
     // 1단계: 타이머 중지 (새 연결 방지)
     if (m_authTimeoutTimer->isActive()) {
         m_authTimeoutTimer->stop();
-        qDebug() << "🔧 [THREAD-SAFE] 인증 타이머 중지";
+        qDebug() << " [THREAD-SAFE] 인증 타이머 중지";
     }
     
     // 2단계: 서버 리스닝 중지 (새 연결 방지)
     if (m_loopbackServer && m_loopbackServer->isListening()) {
         m_loopbackServer->close();
-        qDebug() << "🔧 [THREAD-SAFE] 로컬 서버 리스닝 중지";
+        qDebug() << " [THREAD-SAFE] 로컬 서버 리스닝 중지";
     }
     
     // 3단계: 소켓 안전 정리 (비동기)
     if (m_currentSocket) {
-        qDebug() << "🔧 [THREAD-SAFE] 현재 소켓 안전 해제 시작";
+        qDebug() << " [THREAD-SAFE] 현재 소켓 안전 해제 시작";
         
         // 소켓 연결 해제 (즉시 강제 종료하지 않고 큐에서 처리)
         QMetaObject::invokeMethod(this, [this]() {
             if (m_currentSocket) {
-                qDebug() << "🔧 [THREAD-SAFE] 소켓 연결 해제 실행";
+                qDebug() << " [THREAD-SAFE] 소켓 연결 해제 실행";
                 m_currentSocket->disconnectFromHost();
                 m_currentSocket->deleteLater();  // 안전한 삭제
                 m_currentSocket = nullptr;
-                qDebug() << "🔧 [THREAD-SAFE] 소켓 정리 완료";
+                qDebug() << " [THREAD-SAFE] 소켓 정리 완료";
             }
         }, Qt::QueuedConnection);
     }
     
-    qDebug() << "🔧 [THREAD-SAFE] 로컬 서버 안전 정리 완료";
+    qDebug() << " [THREAD-SAFE] 로컬 서버 안전 정리 완료";
 }
 
 void OidcAuthenticator::onLoopbackServerNewConnection()
 {
-    qDebug() << "🔗 [DEBUG] 새 연결 수신!";
+    qDebug() << " [DEBUG] 새 연결 수신!";
     
     m_currentSocket = m_loopbackServer->nextPendingConnection();
     if (!m_currentSocket) {
-        qDebug() << "❌ [DEBUG] nextPendingConnection()이 null 반환!";
+        qDebug() << " [DEBUG] nextPendingConnection()이 null 반환!";
         return;
     }
     
-    qDebug() << "✅ [DEBUG] 소켓 연결됨:" << m_currentSocket->peerAddress().toString() << ":" << m_currentSocket->peerPort();
-    qDebug() << "✅ [DEBUG] 로컬 주소:" << m_currentSocket->localAddress().toString() << ":" << m_currentSocket->localPort();
+    qDebug() << " [DEBUG] 소켓 연결됨:" << m_currentSocket->peerAddress().toString() << ":" << m_currentSocket->peerPort();
+    qDebug() << " [DEBUG] 로컬 주소:" << m_currentSocket->localAddress().toString() << ":" << m_currentSocket->localPort();
     
     connect(m_currentSocket, &QTcpSocket::readyRead, this, &OidcAuthenticator::onLoopbackSocketReadyRead);
     connect(m_currentSocket, &QTcpSocket::disconnected, m_currentSocket, &QTcpSocket::deleteLater);
     
     // 소켓 상태 확인
-    qDebug() << "✅ [DEBUG] 소켓 상태:" << m_currentSocket->state();
-    qDebug() << "✅ [DEBUG] 소켓 오류:" << m_currentSocket->errorString();
+    qDebug() << " [DEBUG] 소켓 상태:" << m_currentSocket->state();
+    qDebug() << " [DEBUG] 소켓 오류:" << m_currentSocket->errorString();
 }
 
 void OidcAuthenticator::onLoopbackSocketReadyRead()
 {
-    qDebug() << "🌐 [THREAD-SAFE] HTTP 요청 처리 시작 - Thread ID:" << QThread::currentThreadId();
+    qDebug() << " [THREAD-SAFE] HTTP 요청 처리 시작 - Thread ID:" << QThread::currentThreadId();
     
     QTcpSocket* socket = qobject_cast<QTcpSocket*>(sender());
     if (!socket) {
-        qDebug() << "🌐 [THREAD-SAFE] 소켓이 null - 무시";
+        qDebug() << " [THREAD-SAFE] 소켓이 null - 무시";
         return;
     }
 
     QByteArray data = socket->readAll();
     QString request = QString::fromUtf8(data);
     
-    qDebug() << "🌐 [THREAD-SAFE] HTTP 요청 수신:" << request.left(100);
+    qDebug() << " [THREAD-SAFE] HTTP 요청 수신:" << request.left(100);
 
     // HTTP 요청에서 경로 추출
     QStringList lines = request.split("\r\n");
@@ -348,7 +348,7 @@ void OidcAuthenticator::onLoopbackSocketReadyRead()
     
     // 콜백 처리를 비동기로 실행 (스레드 안전성)
     QMetaObject::invokeMethod(this, [this, socket, path]() {
-        qDebug() << "🌐 [THREAD-SAFE] 비동기 콜백 처리 시작";
+        qDebug() << " [THREAD-SAFE] 비동기 콜백 처리 시작";
         QString response = handleAuthCodeResponse(path);
         
         if (response.isEmpty()) {
@@ -356,7 +356,7 @@ void OidcAuthenticator::onLoopbackSocketReadyRead()
         } else {
             sendHttpResponse(socket, 200, response);
         }
-        qDebug() << "🌐 [THREAD-SAFE] 비동기 콜백 처리 완료";
+        qDebug() << " [THREAD-SAFE] 비동기 콜백 처리 완료";
     }, Qt::QueuedConnection);
 }
 
@@ -435,17 +435,17 @@ void OidcAuthenticator::exchangeCodeForTokens(const QString& authCode)
 
 void OidcAuthenticator::onTokenExchangeFinished()
 {
-    qDebug() << "🚀 [THREAD-SAFE] === onTokenExchangeFinished 호출됨 === Thread ID:" << QThread::currentThreadId();
+    qDebug() << " [THREAD-SAFE] === onTokenExchangeFinished 호출됨 === Thread ID:" << QThread::currentThreadId();
     
     // 재진입 방지 가드
     if (m_authenticationCompleted.exchange(true)) {
-        qDebug() << "🚀 [THREAD-SAFE] 이미 인증 완료됨 - 중복 처리 방지";
+        qDebug() << " [THREAD-SAFE] 이미 인증 완료됨 - 중복 처리 방지";
         return;
     }
     
     QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
     if (!reply) {
-        qDebug() << "🚀 [THREAD-SAFE] reply가 null - 인증 상태 리셋";
+        qDebug() << " [THREAD-SAFE] reply가 null - 인증 상태 리셋";
         m_authenticationCompleted = false;
         return;
     }
@@ -458,8 +458,8 @@ void OidcAuthenticator::onTokenExchangeFinished()
         
         qDebug() << "에러 체크 중...";
         if (reply->error() != QNetworkReply::NoError) {
-            qDebug() << "🚀 [THREAD-SAFE] 토큰 교환 네트워크 오류:" << reply->errorString();
-            qDebug() << "🚀 [THREAD-SAFE] 에러 코드:" << reply->error();
+            qDebug() << " [THREAD-SAFE] 토큰 교환 네트워크 오류:" << reply->errorString();
+            qDebug() << " [THREAD-SAFE] 에러 코드:" << reply->error();
             reply->deleteLater();
             
             // 인증 실패 시그널을 메인 스레드에서 발송
@@ -482,7 +482,7 @@ void OidcAuthenticator::onTokenExchangeFinished()
         QJsonDocument doc = QJsonDocument::fromJson(responseData);
         
         if (!doc.isObject()) {
-            qDebug() << "🚀 [THREAD-SAFE] JSON 파싱 실패 - 유효한 객체가 아님";
+            qDebug() << " [THREAD-SAFE] JSON 파싱 실패 - 유효한 객체가 아님";
             
             // JSON 파싱 실패 시그널을 메인 스레드에서 발송
             QMetaObject::invokeMethod(this, [this]() {
@@ -498,7 +498,7 @@ void OidcAuthenticator::onTokenExchangeFinished()
         if (obj.contains("error")) {
             QString error = obj["error"].toString();
             QString errorDescription = obj.value("error_description").toString();
-            qDebug() << "🚀 [THREAD-SAFE] 토큰 교환 서버 오류:" << error << "-" << errorDescription;
+            qDebug() << " [THREAD-SAFE] 토큰 교환 서버 오류:" << error << "-" << errorDescription;
             
             // 서버 오류 시그널을 메인 스레드에서 발송
             QMetaObject::invokeMethod(this, [this, error, errorDescription]() {
@@ -513,7 +513,7 @@ void OidcAuthenticator::onTokenExchangeFinished()
         
         qDebug() << "Access Token 길이:" << m_currentTokens.accessToken.length();
         if (m_currentTokens.accessToken.isEmpty()) {
-            qDebug() << "🚀 [THREAD-SAFE] Access Token이 비어있음!";
+            qDebug() << " [THREAD-SAFE] Access Token이 비어있음!";
             
             // Access Token 빈 시그널을 메인 스레드에서 발송
             QMetaObject::invokeMethod(this, [this]() {
@@ -534,31 +534,31 @@ void OidcAuthenticator::onTokenExchangeFinished()
         }
 
         qDebug() << "토큰 교환 성공";
-        qDebug() << "🚀 [THREAD-SAFE] authenticationSucceeded 시그널 emit 중... Thread ID:" << QThread::currentThreadId();
+        qDebug() << " [THREAD-SAFE] authenticationSucceeded 시그널 emit 중... Thread ID:" << QThread::currentThreadId();
         
         // 즉시 시그널 emit (Qt::QueuedConnection으로 연결되어 안전)
         emit authenticationSucceeded(m_currentTokens.accessToken, m_currentTokens);
-        qDebug() << "🚀 [THREAD-SAFE] authenticationSucceeded 시그널 emit 완료";
+        qDebug() << " [THREAD-SAFE] authenticationSucceeded 시그널 emit 완료";
         
         // 로컬 서버 정리를 충분한 지연 후 실행 (시그널 처리 완료 대기)
-        qDebug() << "🔧 [THREAD-SAFE] 로컬 서버 안전 정리 예약 (1초 지연)...";
+        qDebug() << " [THREAD-SAFE] 로컬 서버 안전 정리 예약 (1초 지연)...";
         QTimer::singleShot(1000, [this]() {
-            qDebug() << "🔧 [THREAD-SAFE] 지연된 로컬 서버 정리 시작... Thread ID:" << QThread::currentThreadId();
+            qDebug() << " [THREAD-SAFE] 지연된 로컬 서버 정리 시작... Thread ID:" << QThread::currentThreadId();
             try {
                 // 메인 스레드에서 정리 실행 보장
                 QMetaObject::invokeMethod(this, [this]() {
                     stopLoopbackServer();
-                    qDebug() << "🔧 [THREAD-SAFE] 지연된 로컬 서버 정리 완료";
+                    qDebug() << " [THREAD-SAFE] 지연된 로컬 서버 정리 완료";
                 }, Qt::QueuedConnection);
             } catch (const std::exception& e) {
-                qDebug() << "🔧 [THREAD-SAFE] 지연된 로컬 서버 정리 중 예외:" << e.what();
+                qDebug() << " [THREAD-SAFE] 지연된 로컬 서버 정리 중 예외:" << e.what();
             } catch (...) {
-                qDebug() << "🔧 [THREAD-SAFE] 지연된 로컬 서버 정리 중 알 수 없는 예외 (무시됨)";
+                qDebug() << " [THREAD-SAFE] 지연된 로컬 서버 정리 중 알 수 없는 예외 (무시됨)";
             }
         });
         
     } catch (const std::exception& e) {
-        qDebug() << "🚀 [THREAD-SAFE] onTokenExchangeFinished 예외 발생:" << e.what();
+        qDebug() << " [THREAD-SAFE] onTokenExchangeFinished 예외 발생:" << e.what();
         
         // 예외 시그널을 메인 스레드에서 발송
         QMetaObject::invokeMethod(this, [this, error = QString(e.what())]() {
@@ -566,7 +566,7 @@ void OidcAuthenticator::onTokenExchangeFinished()
             emit authenticationFailed("토큰 처리 중 예외 발생: " + error);
         }, Qt::QueuedConnection);
     } catch (...) {
-        qDebug() << "🚀 [THREAD-SAFE] onTokenExchangeFinished 알 수 없는 예외 발생";
+        qDebug() << " [THREAD-SAFE] onTokenExchangeFinished 알 수 없는 예외 발생";
         
         // 알 수 없는 예외 시그널을 메인 스레드에서 발송
         QMetaObject::invokeMethod(this, [this]() {
@@ -772,22 +772,22 @@ void OidcAuthenticator::clearStoredTokens()
 
 void OidcAuthenticator::cleanupWithGuard()
 {
-    qDebug() << "🔧 [THREAD-SAFE] cleanupWithGuard 호출 - Thread ID:" << QThread::currentThreadId();
+    qDebug() << " [THREAD-SAFE] cleanupWithGuard 호출 - Thread ID:" << QThread::currentThreadId();
     
     // 이미 정리 중이면 무시
     if (m_isCleaningUp.exchange(true)) {
-        qDebug() << "🔧 [THREAD-SAFE] 이미 정리 중 - 중복 호출 방지";
+        qDebug() << " [THREAD-SAFE] 이미 정리 중 - 중복 호출 방지";
         return;
     }
     
     // 정리 작업 수행
     try {
         stopLoopbackServer();
-        qDebug() << "🔧 [THREAD-SAFE] cleanupWithGuard 완료";
+        qDebug() << " [THREAD-SAFE] cleanupWithGuard 완료";
     } catch (const std::exception& e) {
-        qDebug() << "🔧 [THREAD-SAFE] cleanupWithGuard 예외:" << e.what();
+        qDebug() << " [THREAD-SAFE] cleanupWithGuard 예외:" << e.what();
     } catch (...) {
-        qDebug() << "🔧 [THREAD-SAFE] cleanupWithGuard 알 수 없는 예외";
+        qDebug() << " [THREAD-SAFE] cleanupWithGuard 알 수 없는 예외";
     }
     
     // 정리 상태 리셋

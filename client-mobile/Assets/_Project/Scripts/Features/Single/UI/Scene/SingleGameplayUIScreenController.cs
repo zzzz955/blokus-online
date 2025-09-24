@@ -27,7 +27,7 @@ namespace Features.Single.UI.Scene
             if (!stageSelectPanelRoot) stageSelectPanelRoot = GameObject.Find("StageSelectPanel");
             if (!gamePanelRoot) gamePanelRoot = GameObject.Find("GamePanel");
 
-            // ✅ 씬 진입 초기 상태 강제
+            //  씬 진입 초기 상태 강제
             if (stageSelectPanelRoot && !stageSelectPanelRoot.activeSelf) stageSelectPanelRoot.SetActive(true);
             if (gamePanelRoot && gamePanelRoot.activeSelf) gamePanelRoot.SetActive(false);
 
@@ -173,7 +173,7 @@ namespace Features.Single.UI.Scene
                 var modeSelectionPanel = GameObject.Find("ModeSelectionPanel");
                 if (modeSelectionPanel != null && modeSelectionPanel.activeInHierarchy)
                 {
-                    Debug.Log("[SingleGameplayUIScreenController] ✅ ModeSelectionPanel 활성화 확인됨");
+                    Debug.Log("[SingleGameplayUIScreenController]  ModeSelectionPanel 활성화 확인됨");
                 }
                 else
                 {
@@ -189,7 +189,7 @@ namespace Features.Single.UI.Scene
                 Debug.LogError("[SingleGameplayUIScreenController] UIManager를 찾을 수 없습니다!");
             }
             
-            Debug.Log("[SingleGameplayUIScreenController] ✅ MainScene 복귀 및 ModeSelectionPanel 표시 완료");
+            Debug.Log("[SingleGameplayUIScreenController]  MainScene 복귀 및 ModeSelectionPanel 표시 완료");
         }
 
         /// <summary>
@@ -297,11 +297,11 @@ namespace Features.Single.UI.Scene
         }
 
         /// <summary>
-        /// 🔥 수정: 외부에서 '선택 화면'으로 복귀할 때 사용 (GamePanel만 OFF, UI 안정화 보장)
+        ///  수정: 외부에서 '선택 화면'으로 복귀할 때 사용 (GamePanel만 OFF, UI 안정화 보장)
         /// </summary>
         public void ShowSelection()
         {
-            // 🔥 수정: StageSelectPanel 강제 활성화 우선 처리
+            //  수정: StageSelectPanel 강제 활성화 우선 처리
             if (stageSelectPanelRoot)
             {
                 if (!stageSelectPanelRoot.activeSelf)
@@ -310,7 +310,7 @@ namespace Features.Single.UI.Scene
                     if (verboseLog) Debug.Log("[UIScreenController] ShowSelection → StageSelectPanel 강제 활성화");
                 }
                 
-                // 🔥 추가: CandyCrushStageMapView 컴포넌트 즉시 활성화 확인
+                //  추가: CandyCrushStageMapView 컴포넌트 즉시 활성화 확인
                 var stageMapView = stageSelectPanelRoot.GetComponent<Features.Single.UI.StageSelect.CandyCrushStageMapView>();
                 if (stageMapView != null && !stageMapView.gameObject.activeSelf)
                 {
@@ -328,12 +328,12 @@ namespace Features.Single.UI.Scene
             
             if (verboseLog) Debug.Log("[UIScreenController] ShowSelection → GamePanel OFF, StageSelect ON");
             
-            // 🔥 추가: UI 안정화를 위한 코루틴 시작
+            //  추가: UI 안정화를 위한 코루틴 시작
             StartCoroutine(EnsureUIStabilityAfterShowSelection());
         }
         
         /// <summary>
-        /// 🔥 신규: ShowSelection 후 UI 안정화 보장 코루틴
+        ///  신규: ShowSelection 후 UI 안정화 보장 코루틴
         /// </summary>
         private System.Collections.IEnumerator EnsureUIStabilityAfterShowSelection()
         {
@@ -347,7 +347,7 @@ namespace Features.Single.UI.Scene
                 stageSelectPanelRoot.SetActive(true);
             }
             
-            // 🔥 추가: CandyCrushStageMapView의 버튼 위치 재검증
+            //  추가: CandyCrushStageMapView의 버튼 위치 재검증
             if (stageSelectPanelRoot)
             {
                 var stageMapView = stageSelectPanelRoot.GetComponent<Features.Single.UI.StageSelect.CandyCrushStageMapView>();
@@ -385,7 +385,7 @@ namespace Features.Single.UI.Scene
         public void EnsureStageSelectVisible()
         {
             if (stageSelectPanelRoot && !stageSelectPanelRoot.activeSelf)
-                stageSelectPanelRoot.SetActive(true); // 🔥 강제로 켜기
+                stageSelectPanelRoot.SetActive(true); //  강제로 켜기
         }
     }
 }

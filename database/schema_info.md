@@ -255,12 +255,12 @@ Table: refresh_tokens
 
 Indexes: idx_refresh_tokens_jti, idx_refresh_tokens_family, idx_refresh_tokens_status, idx_refresh_tokens_expires, idx_refresh_tokens_prev_jti
 
-## 🔧 OIDC Database Functions
+##  OIDC Database Functions
 
 **update_updated_at_column()**: Trigger function to auto-update last_used_at timestamps
 **cleanup_expired_tokens()**: Utility function to clean expired authorization codes and refresh tokens
 
-🔗 관계 요약 (외래키)
+ 관계 요약 (외래키)
 
 **Core User Relations:**
 - user_stats.user_id → users.user_id

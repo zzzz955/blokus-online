@@ -26,7 +26,7 @@ async function main() {
     },
   });
 
-  console.log('✅ 관리자 계정 생성:', admin.username);
+  console.log(' 관리자 계정 생성:', admin.username);
   console.log('🎉 데이터베이스 시딩 완료!');
 }
 
@@ -35,7 +35,7 @@ main()
     await prisma.$disconnect();
   })
   .catch(async (e) => {
-    console.error('❌ 시딩 중 오류 발생:', e);
+    console.error(' 시딩 중 오류 발생:', e);
     await prisma.$disconnect();
     process.exit(1);
   });

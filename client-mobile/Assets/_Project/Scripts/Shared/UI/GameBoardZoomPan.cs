@@ -179,7 +179,7 @@ namespace Shared.UI
                 Debug.LogWarning("[GameBoardZoomPan] ⚠️ GraphicRaycaster가 없습니다. Canvas에 추가해야 합니다.");
             }
 
-            Debug.Log("[GameBoardZoomPan] 🎯 GameBoard 이벤트 우선권 설정 완료 (ActionButtonPanel 가시성 보장)");
+            Debug.Log("[GameBoardZoomPan]  GameBoard 이벤트 우선권 설정 완료 (ActionButtonPanel 가시성 보장)");
         }
 
         /// <summary>
@@ -214,7 +214,7 @@ namespace Shared.UI
                             canvasGroup.interactable = true;
                             canvasGroup.alpha = 1f;
 
-                            Debug.Log("[GameBoardZoomPan] ✅ ActionButtonPanel 가시성 보장 완료");
+                            Debug.Log("[GameBoardZoomPan]  ActionButtonPanel 가시성 보장 완료");
                         }
                         else
                         {
@@ -229,7 +229,7 @@ namespace Shared.UI
             }
             catch (System.Exception ex)
             {
-                Debug.LogError($"[GameBoardZoomPan] ❌ ActionButtonPanel 가시성 설정 중 오류: {ex.Message}");
+                Debug.LogError($"[GameBoardZoomPan]  ActionButtonPanel 가시성 설정 중 오류: {ex.Message}");
             }
         }
 
@@ -278,14 +278,14 @@ namespace Shared.UI
         /// </summary>
         private void ForceEnableEventReception()
         {
-            Debug.Log("[GameBoardZoomPan] 🔧 강제 이벤트 수신 활성화 시작");
+            Debug.Log("[GameBoardZoomPan]  강제 이벤트 수신 활성화 시작");
 
             // Image raycastTarget 강제 활성화
             var image = GetComponent<Image>();
             if (image != null)
             {
                 image.raycastTarget = true;
-                Debug.Log($"[GameBoardZoomPan] 🔧 Image raycastTarget 강제 활성화: {image.raycastTarget}");
+                Debug.Log($"[GameBoardZoomPan]  Image raycastTarget 강제 활성화: {image.raycastTarget}");
             }
             else
             {
@@ -298,7 +298,7 @@ namespace Shared.UI
             {
                 canvasGroup.blocksRaycasts = true;
                 canvasGroup.interactable = true;
-                Debug.Log($"[GameBoardZoomPan] 🔧 자체 CanvasGroup 강제 활성화");
+                Debug.Log($"[GameBoardZoomPan]  자체 CanvasGroup 강제 활성화");
             }
 
             // 모든 부모 CanvasGroup들 활성화
@@ -314,7 +314,7 @@ namespace Shared.UI
 
                     if (wasBlocked)
                     {
-                        Debug.Log($"[GameBoardZoomPan] 🔧 부모 CanvasGroup 강제 활성화: {parent.name}");
+                        Debug.Log($"[GameBoardZoomPan]  부모 CanvasGroup 강제 활성화: {parent.name}");
                     }
                 }
                 parent = parent.parent;
@@ -322,9 +322,9 @@ namespace Shared.UI
 
             // **핵심 수정: 기본 상태에서 셀 raycast 비활성화 (GameBoard가 이벤트를 받을 수 있도록)**
             SetCellRaycastEnabled(false);
-            Debug.Log("[GameBoardZoomPan] 🔧 기본 상태에서 셀 raycast 비활성화 - GameBoard 이벤트 수신 활성화");
+            Debug.Log("[GameBoardZoomPan]  기본 상태에서 셀 raycast 비활성화 - GameBoard 이벤트 수신 활성화");
 
-            Debug.Log("[GameBoardZoomPan] 🔧 강제 이벤트 수신 활성화 완료");
+            Debug.Log("[GameBoardZoomPan]  강제 이벤트 수신 활성화 완료");
         }
 
         /// <summary>
@@ -338,7 +338,7 @@ namespace Shared.UI
             if (image != null)
             {
                 image.raycastTarget = true;
-                Debug.Log("[GameBoardZoomPan] 🔧 지연된 raycastTarget 강제 재설정 완료");
+                Debug.Log("[GameBoardZoomPan]  지연된 raycastTarget 강제 재설정 완료");
             }
         }
 
@@ -371,7 +371,7 @@ namespace Shared.UI
             {
                 bool currentState = singleGameBoard != null; // 임시로 상태 확인
                 SetCellRaycastEnabled(!currentState);
-                Debug.Log($"[GameBoardZoomPan] 🔧 강제 셀 raycast 토글: {!currentState}");
+                Debug.Log($"[GameBoardZoomPan]  강제 셀 raycast 토글: {!currentState}");
                 TestEventReception(); // 바로 테스트
             }
 
@@ -380,15 +380,15 @@ namespace Shared.UI
             // 디버깅용: Ctrl+클릭으로 간단 진단 (로그 폭증 방지)
             if (Input.GetMouseButtonDown(0) && Input.GetKey(KeyCode.LeftControl))
             {
-                Debug.Log($"[GameBoardZoomPan] 🔧 간단 진단: GameObject활성={gameObject.activeInHierarchy}, 컴포넌트활성={enabled}");
+                Debug.Log($"[GameBoardZoomPan]  간단 진단: GameObject활성={gameObject.activeInHierarchy}, 컴포넌트활성={enabled}");
 
                 var image = GetComponent<Image>();
                 if (image != null)
                 {
-                    Debug.Log($"[GameBoardZoomPan] 🔧 Image: raycastTarget={image.raycastTarget}, alpha={image.color.a:F3}");
+                    Debug.Log($"[GameBoardZoomPan]  Image: raycastTarget={image.raycastTarget}, alpha={image.color.a:F3}");
                 }
 
-                Debug.Log($"[GameBoardZoomPan] 🔧 상태: isDragging={isDragging}, isPanModeActive={isPanModeActive}");
+                Debug.Log($"[GameBoardZoomPan]  상태: isDragging={isDragging}, isPanModeActive={isPanModeActive}");
                 // 복잡한 raycast 테스트는 제거하여 로그 폭증 방지
             }
         }
@@ -606,6 +606,7 @@ namespace Shared.UI
 
         /// <summary>
         /// 팬 위치 설정 (경계 제한 포함)
+        /// GridContainer가 GameBoard 영역을 완전히 채우도록 가장자리 제약 적용
         /// </summary>
         /// <param name="newPosition">새로운 위치</param>
         private void SetPanPosition(Vector2 newPosition)
@@ -621,22 +622,21 @@ namespace Shared.UI
             }
             else
             {
-                // 줌 레벨에 따른 적절한 팬 제한 적용
-                Vector2 scaledSize = originalSize * Mathf.Max(currentZoom, 1.0f);
-                Vector2 maxPan = (scaledSize - originalSize) * 0.75f;
-
-                // 최소한의 이동 범위 보장 (줌하지 않아도 어느 정도 팬 허용)
-                if (maxPan.x < originalSize.x * 0.3f)
+                // 가장자리 제약 적용: GridContainer가 GameBoard를 완전히 채우도록 제한
+                if (currentZoom <= 1.0f)
                 {
-                    maxPan.x = originalSize.x * 0.3f;
+                    // 100% 이하 줌에서는 팬 불가 (GridContainer가 GameBoard와 같거나 작음)
+                    clampedPosition = originalAnchoredPosition;
                 }
-                if (maxPan.y < originalSize.y * 0.3f)
+                else
                 {
-                    maxPan.y = originalSize.y * 0.3f;
-                }
+                    // 줌 시 정확한 가장자리 제약: GridContainer 가장자리가 GameBoard 가장자리와 인접하도록 제한
+                    Vector2 scaledSize = originalSize * currentZoom;
+                    Vector2 maxPan = (scaledSize - originalSize) * 0.5f;
 
-                clampedPosition.x = Mathf.Clamp(newPosition.x, -maxPan.x, maxPan.x);
-                clampedPosition.y = Mathf.Clamp(newPosition.y, -maxPan.y, maxPan.y);
+                    clampedPosition.x = Mathf.Clamp(newPosition.x, -maxPan.x, maxPan.x);
+                    clampedPosition.y = Mathf.Clamp(newPosition.y, -maxPan.y, maxPan.y);
+                }
             }
 
             zoomTarget.anchoredPosition = clampedPosition;
@@ -662,7 +662,7 @@ namespace Shared.UI
 
             // 초기화 시 셀 클릭 모드로 복구
             SetCellRaycastEnabled(true);
-            Debug.Log("[GameBoardZoomPan] 🔄 셀 클릭 모드로 복구");
+            Debug.Log("[GameBoardZoomPan]  셀 클릭 모드로 복구");
         }
 
         /// <summary>
@@ -991,13 +991,13 @@ namespace Shared.UI
             if (singleGameBoard != null)
             {
                 singleGameBoard.SetCellRaycastEnabled(enableCellRaycast);
-                Debug.Log($"[GameBoardZoomPan] ✅ Single GameBoard에 raycast={enableCellRaycast} 설정 완료");
+                Debug.Log($"[GameBoardZoomPan]  Single GameBoard에 raycast={enableCellRaycast} 설정 완료");
 
                 // 설정 후 즉시 Raycast 테스트로 효과 확인
                 if (Input.mousePresent)
                 {
                     var currentMousePos = Input.mousePosition;
-                    Debug.Log($"[GameBoardZoomPan] 🔄 raycast 변경 후 마우스 위치에서 Raycast 재테스트...");
+                    Debug.Log($"[GameBoardZoomPan]  raycast 변경 후 마우스 위치에서 Raycast 재테스트...");
 
                     // 짧은 지연 후 테스트 (다음 프레임에서)
                     StartCoroutine(TestRaycastAfterDelay());
@@ -1005,9 +1005,13 @@ namespace Shared.UI
             }
             else if (multiGameBoard != null)
             {
-                // Multi GameBoard에도 동일한 메서드가 있다면 호출
-                // multiGameBoard.SetCellRaycastEnabled(enableCellRaycast);
-                Debug.Log("[GameBoardZoomPan] ⚠️ Multi GameBoard의 셀 raycast 제어는 아직 구현되지 않았습니다.");
+                // Multi GameBoard에 동일한 메서드 호출
+                multiGameBoard.SetCellRaycastEnabled(enableCellRaycast);
+
+                Debug.Log($"[GameBoardZoomPan]  raycast 변경 후 마우스 위치에서 Raycast 재테스트...");
+
+                // 짧은 지연 후 테스트 (다음 프레임에서)
+                StartCoroutine(TestRaycastAfterDelay());
             }
             else
             {
@@ -1050,13 +1054,14 @@ namespace Shared.UI
                 }
             }
 
-            // MultiGameManager도 확인 (필요 시)
-            // var multiGameManager = FindObjectOfType<Features.Multi.Gameplay.MultiGameManager>();
-            // if (multiGameManager != null)
-            // {
-            //     // Multi 게임의 블록 선택 상태 확인 로직 추가 가능
-            //     Debug.Log("[GameBoardZoomPan] ℹ️ Multi 게임 블록 선택 상태 확인은 구현되지 않음");
-            // }
+            // Multi MyBlockPalette에서 블록 선택 상태 확인
+            var multiBlockPalette = FindObjectOfType<Features.Multi.UI.MyBlockPalette>();
+            if (multiBlockPalette != null)
+            {
+                var selectedBlock = multiBlockPalette.GetSelectedBlock();
+                bool isSelected = selectedBlock != null;
+                return isSelected;
+            }
 
             // GameManager 없음 - 블록 미선택으로 간주 (로그 제거)
             return false; // 확인할 수 없으면 false 반환 (팬 모드 허용)
@@ -1076,7 +1081,7 @@ namespace Shared.UI
                 if (currentSelectedBlockField != null)
                 {
                     currentSelectedBlockField.SetValue(singleGameManager, null);
-                    Debug.Log("[GameBoardZoomPan] 🎯 SingleGameManager 블록 선택 해제 완료");
+                    Debug.Log("[GameBoardZoomPan]  SingleGameManager 블록 선택 해제 완료");
                 }
 
                 // 2. 게임 보드의 터치 프리뷰 해제
@@ -1084,7 +1089,7 @@ namespace Shared.UI
                 if (gameBoard != null)
                 {
                     gameBoard.ClearTouchPreview();
-                    Debug.Log("[GameBoardZoomPan] 🎯 게임 보드 터치 프리뷰 해제 완료");
+                    Debug.Log("[GameBoardZoomPan]  게임 보드 터치 프리뷰 해제 완료");
                 }
 
                 // 3. BlockPalette의 시각적 선택 상태 해제
@@ -1114,12 +1119,12 @@ namespace Shared.UI
                             selectedBlockField?.SetValue(blockPalette, null);
                             currentSelectedButtonField.SetValue(blockPalette, null);
 
-                            Debug.Log("[GameBoardZoomPan] 🎯 BlockPalette 시각적 선택 해제 완료");
+                            Debug.Log("[GameBoardZoomPan]  BlockPalette 시각적 선택 해제 완료");
                         }
                     }
                 }
 
-                Debug.Log("[GameBoardZoomPan] 🎯 팬 시작으로 인한 완전한 블록 선택 해제 완료");
+                Debug.Log("[GameBoardZoomPan]  팬 시작으로 인한 완전한 블록 선택 해제 완료");
             }
         }
 
@@ -1142,12 +1147,12 @@ namespace Shared.UI
             EventSystem eventSystem = EventSystem.current;
             if (eventSystem == null)
             {
-                Debug.LogError("[GameBoardZoomPan] ❌ EventSystem이 씬에 없습니다! EventSystem을 추가해야 합니다.");
+                Debug.LogError("[GameBoardZoomPan]  EventSystem이 씬에 없습니다! EventSystem을 추가해야 합니다.");
                 return;
             }
             else
             {
-                Debug.Log($"[GameBoardZoomPan] ✅ EventSystem 발견: {eventSystem.name}");
+                Debug.Log($"[GameBoardZoomPan]  EventSystem 발견: {eventSystem.name}");
                 Debug.Log($"[GameBoardZoomPan] 드래그 임계값: {eventSystem.pixelDragThreshold}px");
             }
 
@@ -1158,7 +1163,7 @@ namespace Shared.UI
                 Vector2 size = rectTransform.sizeDelta;
                 Vector2 worldSize = rectTransform.rect.size;
                 Vector3 worldScale = rectTransform.lossyScale;
-                Debug.Log($"[GameBoardZoomPan] 🔍 RectTransform 정보: sizeDelta={size}, worldSize={worldSize}, scale={worldScale}");
+                Debug.Log($"[GameBoardZoomPan]  RectTransform 정보: sizeDelta={size}, worldSize={worldSize}, scale={worldScale}");
 
                 if (worldSize.x < 10f || worldSize.y < 10f)
                 {
@@ -1174,7 +1179,7 @@ namespace Shared.UI
                     Vector2 screenMin = RectTransformUtility.WorldToScreenPoint(parentCanvas.worldCamera, worldCorners[0]);
                     Vector2 screenMax = RectTransformUtility.WorldToScreenPoint(parentCanvas.worldCamera, worldCorners[2]);
                     Vector2 screenSize = screenMax - screenMin;
-                    Debug.Log($"[GameBoardZoomPan] 🔍 화면 크기: {screenSize}, 위치: {screenMin} ~ {screenMax}");
+                    Debug.Log($"[GameBoardZoomPan]  화면 크기: {screenSize}, 위치: {screenMin} ~ {screenMax}");
                 }
             }
             else
@@ -1186,20 +1191,20 @@ namespace Shared.UI
             Canvas canvas = GetComponentInParent<Canvas>();
             if (canvas == null)
             {
-                Debug.LogError("[GameBoardZoomPan] ❌ Canvas를 찾을 수 없습니다!");
+                Debug.LogError("[GameBoardZoomPan]  Canvas를 찾을 수 없습니다!");
             }
             else
             {
-                Debug.Log($"[GameBoardZoomPan] ✅ Canvas 발견: {canvas.name}, renderMode: {canvas.renderMode}");
+                Debug.Log($"[GameBoardZoomPan]  Canvas 발견: {canvas.name}, renderMode: {canvas.renderMode}");
 
                 GraphicRaycaster raycaster = canvas.GetComponent<GraphicRaycaster>();
                 if (raycaster == null)
                 {
-                    Debug.LogError("[GameBoardZoomPan] ❌ Canvas에 GraphicRaycaster가 없습니다!");
+                    Debug.LogError("[GameBoardZoomPan]  Canvas에 GraphicRaycaster가 없습니다!");
                 }
                 else
                 {
-                    Debug.Log($"[GameBoardZoomPan] ✅ GraphicRaycaster 발견");
+                    Debug.Log($"[GameBoardZoomPan]  GraphicRaycaster 발견");
                 }
             }
 
@@ -1207,11 +1212,11 @@ namespace Shared.UI
             Image image = GetComponent<Image>();
             if (image == null)
             {
-                Debug.LogError("[GameBoardZoomPan] ❌ Image 컴포넌트가 없습니다!");
+                Debug.LogError("[GameBoardZoomPan]  Image 컴포넌트가 없습니다!");
             }
             else
             {
-                Debug.Log($"[GameBoardZoomPan] ✅ Image 컴포넌트: raycastTarget={image.raycastTarget}, alpha={image.color.a:F3}");
+                Debug.Log($"[GameBoardZoomPan]  Image 컴포넌트: raycastTarget={image.raycastTarget}, alpha={image.color.a:F3}");
             }
 
             // 4. 인터페이스 구현 확인
@@ -1245,7 +1250,7 @@ namespace Shared.UI
                 }
                 else if (foundSelf)
                 {
-                    Debug.Log("[GameBoardZoomPan] ✅ Raycast 결과에 자기 자신이 포함되어 있습니다.");
+                    Debug.Log("[GameBoardZoomPan]  Raycast 결과에 자기 자신이 포함되어 있습니다.");
                 }
 
                 if (results.Count == 0)
@@ -1340,7 +1345,7 @@ namespace Shared.UI
             var graphicRaycaster = GetComponentInParent<GraphicRaycaster>();
             if (graphicRaycaster == null)
             {
-                Debug.LogError("[GameBoardZoomPan] 🚨 GraphicRaycaster를 찾을 수 없습니다!");
+                Debug.LogError("[GameBoardZoomPan]  GraphicRaycaster를 찾을 수 없습니다!");
                 return;
             }
 
@@ -1354,7 +1359,7 @@ namespace Shared.UI
             var raycastResults = new List<RaycastResult>();
             graphicRaycaster.Raycast(eventData, raycastResults);
 
-            Debug.Log($"[GameBoardZoomPan] 🎯 수동 Raycast 결과 ({raycastResults.Count}개):");
+            Debug.Log($"[GameBoardZoomPan]  수동 Raycast 결과 ({raycastResults.Count}개):");
 
             bool foundSelf = false;
             for (int i = 0; i < raycastResults.Count && i < 5; i++) // 상위 5개만 출력
@@ -1373,10 +1378,10 @@ namespace Shared.UI
             }
             else
             {
-                Debug.Log("[GameBoardZoomPan] ✅ Raycast에서 자기 자신을 발견 - 하지만 이벤트 미수신으로 부모 CanvasGroup 차단 의심");
+                Debug.Log("[GameBoardZoomPan]  Raycast에서 자기 자신을 발견 - 하지만 이벤트 미수신으로 부모 CanvasGroup 차단 의심");
 
                 // 강제 이벤트 테스트
-                Debug.Log("[GameBoardZoomPan] 🧪 강제 OnPointerDown 테스트 실행...");
+                Debug.Log("[GameBoardZoomPan]  강제 OnPointerDown 테스트 실행...");
                 try
                 {
                     PointerEventData testPointer = new PointerEventData(EventSystem.current)
@@ -1385,13 +1390,13 @@ namespace Shared.UI
                         button = PointerEventData.InputButton.Left
                     };
                     OnPointerDown(testPointer);
-                    Debug.Log("[GameBoardZoomPan] ✅ 강제 OnPointerDown 성공 - 컴포넌트 자체는 정상 동작");
+                    Debug.Log("[GameBoardZoomPan]  강제 OnPointerDown 성공 - 컴포넌트 자체는 정상 동작");
                 }
                 catch (System.Exception e)
                 {
-                    Debug.LogError($"[GameBoardZoomPan] ❌ 강제 OnPointerDown 실패: {e.Message}");
+                    Debug.LogError($"[GameBoardZoomPan]  강제 OnPointerDown 실패: {e.Message}");
                 }
-                Debug.Log($"[GameBoardZoomPan] ✅ Raycast에서 자기 자신을 발견 - UI 이벤트 전달 문제");
+                Debug.Log($"[GameBoardZoomPan]  Raycast에서 자기 자신을 발견 - UI 이벤트 전달 문제");
             }
         }
 
@@ -1423,19 +1428,36 @@ namespace Shared.UI
                     }
                 }
 
-                // Multi GameBoard도 동일하게 처리 (필요시)
-                // var multiGameBoard = FindObjectOfType<Features.Multi.UI.GameBoard>();
-                // if (multiGameBoard != null) { ... }
+                // Multi GameBoard도 동일하게 처리
+                var multiGameBoard = FindObjectOfType<Features.Multi.UI.GameBoard>();
+                if (multiGameBoard != null)
+                {
+                    // Multi GameBoard용 좌표 변환
+                    Position cellPosition = DirectScreenToBoardMulti(screenPosition, multiGameBoard);
+
+                    // 유효한 위치인지 확인
+                    if (cellPosition.row >= 0 && cellPosition.col >= 0 && cellPosition.row < 20 && cellPosition.col < 20)
+                    {
+                        // Multi GameBoard의 OnCellClicked 이벤트 직접 호출
+                        multiGameBoard.OnCellClicked?.Invoke(cellPosition);
+
+                        Debug.Log($"[GameBoardZoomPan] Multi 블록 배치: ({cellPosition.row}, {cellPosition.col}) [스크린:{screenPosition}]");
+                    }
+                    else
+                    {
+                        Debug.Log($"[GameBoardZoomPan] ⚠️ Multi 유효하지 않은 셀 위치: ({cellPosition.row}, {cellPosition.col}) [스크린:{screenPosition}]");
+                    }
+                }
             }
             catch (System.Exception e)
             {
-                Debug.LogError($"[GameBoardZoomPan] ❌ 블록 배치 클릭 처리 실패: {e.Message}");
+                Debug.LogError($"[GameBoardZoomPan]  블록 배치 클릭 처리 실패: {e.Message}");
             }
         }
 
         /// <summary>
-        /// 스크린 좌표를 줌/팬이 적용된 GridContainer 기준으로 직접 보드 좌표 변환
-        /// GameBoard.ScreenToBoard()를 우회하여 현재 변환 상태에서 정확한 변환 수행
+        /// 스크린 좌표를 줌/팬이 적용된 상태에서 정확한 보드 좌표로 변환 (Single GameBoard용)
+        /// 단계별 역변환으로 정확도 보장: GameBoard 컨테이너 기준 → 팬 제거 → 스케일 제거 → 보드 좌표
         /// </summary>
         private Position DirectScreenToBoard(Vector2 screenPosition, Features.Single.Gameplay.GameBoard gameBoard)
         {
@@ -1454,22 +1476,28 @@ namespace Shared.UI
                 return new Position(-1, -1);
             }
 
-            // 2. 스크린 좌표를 현재 변환된 GridContainer 로컬 좌표로 변환
+            // 2. 스크린 좌표를 GameBoard 컨테이너 기준 로컬 좌표로 변환
             Canvas canvas = GetComponentInParent<Canvas>();
             Vector2 localPosition;
 
             if (canvas != null && canvas.renderMode == RenderMode.ScreenSpaceOverlay)
             {
                 RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                    cellParentRect, screenPosition, null, out localPosition);
+                    containerRect, screenPosition, null, out localPosition);
             }
             else
             {
                 RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                    cellParentRect, screenPosition, canvas?.worldCamera, out localPosition);
+                    containerRect, screenPosition, canvas?.worldCamera, out localPosition);
             }
 
-            // 3. GameBoard 설정값 가져오기 (reflection 필요할 수 있음)
+            // 3. 단계별 역변환: 팬 오프셋 제거
+            localPosition -= cellParentRect.anchoredPosition;
+
+            // 4. 단계별 역변환: 스케일 제거 (원본 크기 기준으로 복원)
+            localPosition /= currentZoom;
+
+            // 5. GameBoard 설정값 가져오기 (reflection 필요할 수 있음)
             int boardSize = 20; // 기본값
             float cellSize = 25f; // 기본값
 
@@ -1489,17 +1517,94 @@ namespace Shared.UI
                 Debug.LogWarning($"[GameBoardZoomPan] GameBoard 설정값 가져오기 실패, 기본값 사용: {e.Message}");
             }
 
-            // 4. 로컬 좌표를 보드 좌표로 변환 (GameBoard.ScreenToBoard()와 동일한 로직)
+            // 6. 로컬 좌표를 보드 좌표로 변환 (GameBoard.ScreenToBoard()와 동일한 로직)
             float x0 = -(boardSize * 0.5f - 0.5f) * cellSize;
             float y0 = +(boardSize * 0.5f - 0.5f) * cellSize;
 
-            int col = Mathf.FloorToInt((localPosition.x - x0) / cellSize);
-            int row = Mathf.FloorToInt((y0 - localPosition.y) / cellSize);
+            int col = Mathf.RoundToInt((localPosition.x - x0) / cellSize);
+            int row = Mathf.RoundToInt((y0 - localPosition.y) / cellSize);
 
             col = Mathf.Clamp(col, 0, boardSize - 1);
             row = Mathf.Clamp(row, 0, boardSize - 1);
 
             Debug.Log($"[GameBoardZoomPan] 좌표 변환: 스크린{screenPosition} → 로컬{localPosition} → 셀({row},{col}) [boardSize:{boardSize}, cellSize:{cellSize}]");
+
+            return new Position(row, col);
+        }
+
+        /// <summary>
+        /// 스크린 좌표를 줌/팬이 적용된 상태에서 정확한 보드 좌표로 변환 (Multi GameBoard용)
+        /// 단계별 역변환으로 정확도 보장: GameBoard 컨테이너 기준 → 팬 제거 → 스케일 제거 → 보드 좌표
+        /// </summary>
+        private Position DirectScreenToBoardMulti(Vector2 screenPosition, Features.Multi.UI.GameBoard gameBoard)
+        {
+            // 1. GameBoard의 GridContainer(cellParent) 찾기
+            Transform cellParent = gameBoard.transform.Find("GridContainer");
+            if (cellParent == null)
+            {
+                Debug.LogError("[GameBoardZoomPan] Multi GridContainer를 찾을 수 없습니다!");
+                return new Position(-1, -1);
+            }
+
+            RectTransform cellParentRect = cellParent.GetComponent<RectTransform>();
+            if (cellParentRect == null)
+            {
+                Debug.LogError("[GameBoardZoomPan] Multi GridContainer에 RectTransform이 없습니다!");
+                return new Position(-1, -1);
+            }
+
+            // 2. 스크린 좌표를 GameBoard 컨테이너 기준 로컬 좌표로 변환
+            Canvas canvas = GetComponentInParent<Canvas>();
+            Vector2 localPosition;
+
+            if (canvas != null && canvas.renderMode == RenderMode.ScreenSpaceOverlay)
+            {
+                RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    containerRect, screenPosition, null, out localPosition);
+            }
+            else
+            {
+                RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    containerRect, screenPosition, canvas?.worldCamera, out localPosition);
+            }
+
+            // 3. 단계별 역변환: 팬 오프셋 제거
+            localPosition -= cellParentRect.anchoredPosition;
+
+            // 4. 단계별 역변환: 스케일 제거 (원본 크기 기준으로 복원)
+            localPosition /= currentZoom;
+
+            // 5. GameBoard 설정값 가져오기 (reflection 필요할 수 있음)
+            int boardSize = 20; // 기본값
+            float cellSize = 45f; // Multi 기본값
+
+            try
+            {
+                // GameBoard에서 실제 값 가져오기
+                var boardSizeField = gameBoard.GetType().GetField("boardSize",
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                var cellSizeField = gameBoard.GetType().GetField("cellSize",
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+                if (boardSizeField != null) boardSize = (int)boardSizeField.GetValue(gameBoard);
+                if (cellSizeField != null) cellSize = (float)cellSizeField.GetValue(gameBoard);
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[GameBoardZoomPan] Multi GameBoard 설정값 가져오기 실패, 기본값 사용: {e.Message}");
+            }
+
+            // 6. 로컬 좌표를 보드 좌표로 변환 (GameBoard.ScreenToBoard()와 동일한 로직)
+            float x0 = -(boardSize * 0.5f - 0.5f) * cellSize;
+            float y0 = +(boardSize * 0.5f - 0.5f) * cellSize;
+
+            int col = Mathf.RoundToInt((localPosition.x - x0) / cellSize);
+            int row = Mathf.RoundToInt((y0 - localPosition.y) / cellSize);
+
+            col = Mathf.Clamp(col, 0, boardSize - 1);
+            row = Mathf.Clamp(row, 0, boardSize - 1);
+
+            Debug.Log($"[GameBoardZoomPan] Multi 좌표 변환: 스크린{screenPosition} → 로컬{localPosition} → 셀({row},{col}) [boardSize:{boardSize}, cellSize:{cellSize}]");
 
             return new Position(row, col);
         }
@@ -1543,7 +1648,7 @@ namespace Shared.UI
                                 image.raycastTarget = false;
                             }
 
-                            Debug.Log($"[GameBoardZoomPan] 🔧 액션 버튼 raycast 비활성화 완료 - {buttons.Length}개 버튼, {images.Length}개 이미지");
+                            Debug.Log($"[GameBoardZoomPan]  액션 버튼 raycast 비활성화 완료 - {buttons.Length}개 버튼, {images.Length}개 이미지");
                         }
                         else
                         {
@@ -1560,7 +1665,7 @@ namespace Shared.UI
             }
             catch (System.Exception e)
             {
-                Debug.LogError($"[GameBoardZoomPan] ❌ 액션 버튼 raycast 비활성화 실패: {e.Message}");
+                Debug.LogError($"[GameBoardZoomPan]  액션 버튼 raycast 비활성화 실패: {e.Message}");
             }
         }
 
@@ -1607,7 +1712,7 @@ namespace Shared.UI
                                 }
                             }
 
-                            Debug.Log($"[GameBoardZoomPan] 🔧 액션 버튼 raycast 복원 완료 - {buttons.Length}개 버튼, {images.Length}개 이미지");
+                            Debug.Log($"[GameBoardZoomPan]  액션 버튼 raycast 복원 완료 - {buttons.Length}개 버튼, {images.Length}개 이미지");
 
                             // ActionButtonPanel 가시성 재보장
                             actionButtonPanel.SetAsLastSibling();
@@ -1627,7 +1732,7 @@ namespace Shared.UI
             }
             catch (System.Exception e)
             {
-                Debug.LogError($"[GameBoardZoomPan] ❌ 액션 버튼 raycast 복원 실패: {e.Message}");
+                Debug.LogError($"[GameBoardZoomPan]  액션 버튼 raycast 복원 실패: {e.Message}");
             }
         }
 
@@ -1653,7 +1758,7 @@ namespace Shared.UI
             }
             catch (System.Exception e)
             {
-                Debug.LogError($"[GameBoardZoomPan] ❌ GameBoardZoomPan raycast 제어 실패: {e.Message}");
+                Debug.LogError($"[GameBoardZoomPan]  GameBoardZoomPan raycast 제어 실패: {e.Message}");
             }
         }
 

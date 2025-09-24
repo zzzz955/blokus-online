@@ -2,7 +2,7 @@
 # Unified Deployment Script for Blokus Online
 # Uses pre-built images from GitHub Container Registry
 
-echo "🚀 Blokus Online Unified Deployment"
+echo " Blokus Online Unified Deployment"
 echo "===================================="
 
 # Git 변경사항 확인
@@ -19,7 +19,7 @@ DEPLOY_NGINX=false
 # 변경된 파일에 따라 배포 대상 결정
 if echo "$CHANGED_FILES" | grep -q "^web/"; then
     DEPLOY_WEB=true
-    echo "🌐 Web changes detected"
+    echo " Web changes detected"
 fi
 
 if echo "$CHANGED_FILES" | grep -q "^server/\|^common/\|^proto/"; then
@@ -41,11 +41,11 @@ if [ "$DEPLOY_WEB" = false ] && [ "$DEPLOY_SERVER" = false ] && [ "$DEPLOY_NGINX
 fi
 
 echo ""
-echo "🎯 Deployment Plan:"
+echo " Deployment Plan:"
 echo "==================="
-[ "$DEPLOY_WEB" = true ] && echo "✅ Web Service (blokus-web)"
-[ "$DEPLOY_SERVER" = true ] && echo "✅ Game Server (blokus-server)"  
-[ "$DEPLOY_NGINX" = true ] && echo "✅ Nginx (blokus-nginx)"
+[ "$DEPLOY_WEB" = true ] && echo " Web Service (blokus-web)"
+[ "$DEPLOY_SERVER" = true ] && echo " Game Server (blokus-server)"  
+[ "$DEPLOY_NGINX" = true ] && echo " Nginx (blokus-nginx)"
 echo ""
 
 # 이미지 태그 설정 (기본값: latest, 환경변수로 SHA 기반 태그 사용 가능)
@@ -64,21 +64,21 @@ if [ "$DEPLOY_SERVER" = true ]; then
     GAME_SERVER_IMAGE="ghcr.io/zzzz955/blokus-online/blokus-game-server:$IMAGE_TAG" \
     docker-compose pull blokus-server
     docker-compose up -d blokus-server
-    echo "✅ Game Server deployed"
+    echo " Game Server deployed"
 fi
 
 if [ "$DEPLOY_WEB" = true ]; then
-    echo "🌐 Deploying Web Service with image tag: $IMAGE_TAG..."
+    echo " Deploying Web Service with image tag: $IMAGE_TAG..."
     WEB_SERVER_IMAGE="ghcr.io/zzzz955/blokus-online/blokus-web-server:$IMAGE_TAG" \
     docker-compose pull blokus-web
     docker-compose up -d blokus-web
-    echo "✅ Web Service deployed"
+    echo " Web Service deployed"
 fi
 
 if [ "$DEPLOY_NGINX" = true ]; then
     echo "⚙️ Restarting Nginx..."
     docker-compose restart nginx
-    echo "✅ Nginx restarted"
+    echo " Nginx restarted"
 fi
 
 # SSL 인증서 확인 (첫 배포 시)
@@ -93,7 +93,7 @@ fi
 
 echo ""
 echo "🎉 Deployment completed!"
-echo "📊 Service Status:"
+echo " Service Status:"
 docker-compose ps
 
 # 간단한 헬스체크
@@ -101,7 +101,7 @@ echo ""
 echo "🩺 Health Check:"
 sleep 10  # 서비스 시작 대기
 if docker-compose ps --filter health=healthy | grep -q healthy; then
-    echo "✅ Services are healthy"
+    echo " Services are healthy"
 else
     echo "⚠️ Some services may still be starting or have issues"
     echo "Run 'docker-compose logs' to check details"

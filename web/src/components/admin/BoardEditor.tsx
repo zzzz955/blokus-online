@@ -859,7 +859,7 @@ export default function BoardEditor({ boardState, onChange }: BoardEditorProps) 
                   className="w-4 h-4 text-yellow-600 bg-dark-bg border-gray-600 rounded focus:ring-yellow-500"
                 />
                 <label htmlFor="avoidBlue" className="text-yellow-300 text-sm">
-                  🚫 파란색 피하기 (모바일 플레이어 블록과 충돌 방지)
+                   파란색 피하기 (모바일 플레이어 블록과 충돌 방지)
                 </label>
               </div>
               

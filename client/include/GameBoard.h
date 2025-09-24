@@ -13,7 +13,7 @@
 #include <vector>
 #include <map>
 
-#include "ClientTypes.h"      // 🔥 이 줄 추가 (BOARD_SIZE 포함)
+#include "ClientTypes.h"      //  이 줄 추가 (BOARD_SIZE 포함)
 #include "ClientBlock.h"
 #include "ClientLogic.h"
 
@@ -29,7 +29,7 @@ namespace Blokus {
         Q_OBJECT
 
     public:
-        // 🔥 BOARD_SIZE 상수 명시적 정의 (Types.h에서 가져오지 못하는 경우 대비)
+        //  BOARD_SIZE 상수 명시적 정의 (Types.h에서 가져오지 못하는 경우 대비)
         static constexpr int BOARD_SIZE = 20;  // 또는 Common::BOARD_SIZE 사용
         static constexpr qreal DEFAULT_CELL_SIZE = 25.0;
 
@@ -156,7 +156,7 @@ namespace Blokus {
         QGraphicsScene* m_scene;
         QGraphicsRectItem* m_boardRect;
 
-        // 🔥 보드 상태 - 동적 배열로 변경 (크기 문제 해결)
+        //  보드 상태 - 동적 배열로 변경 (크기 문제 해결)
         std::vector<std::vector<PlayerColor>> m_board;  // 2D vector 사용
         bool m_readOnly;
 

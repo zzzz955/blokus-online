@@ -154,7 +154,7 @@ function earlyInfeasible(board:Grid, remainingSizes:number[]): boolean {
   return false;
 }
 
-/** ✅ 단일 색 최적해 계산(완전성 유지 + 안전 가지치기) */
+/**  단일 색 최적해 계산(완전성 유지 + 안전 가지치기) */
 export function solveOptimalScoreSingleColor(
   boardState: BoardState,
   availableBlockIds: number[],

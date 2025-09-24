@@ -1103,10 +1103,10 @@ namespace Features.Multi.UI
                 {
                     var playerColor = (SharedPlayerColor)i;
                     bool hasPlaced = gameLogic.HasPlayerPlacedFirstBlock(playerColor);
-                    Debug.Log($"[GameRoomPanel] 🔍 초기화 검증: {playerColor} hasPlacedFirstBlock = {hasPlaced}");
+                    Debug.Log($"[GameRoomPanel]  초기화 검증: {playerColor} hasPlacedFirstBlock = {hasPlaced}");
                     if (hasPlaced)
                     {
-                        Debug.LogError($"[GameRoomPanel] ❌ 초기화 실패: {playerColor}의 hasPlacedFirstBlock이 여전히 True입니다!");
+                        Debug.LogError($"[GameRoomPanel]  초기화 실패: {playerColor}의 hasPlacedFirstBlock이 여전히 True입니다!");
                     }
                 }
             }
@@ -1383,23 +1383,23 @@ namespace Features.Multi.UI
                         // [DEBUG] 게임 로직 상태 확인
                         var playerColor = ConvertToSharedPlayerColor(placement.playerColor);
                         bool hasPlacedFirstBlock = gameLogic.HasPlayerPlacedFirstBlock(playerColor);
-                        Debug.Log($"[GameRoomPanel] 🔍 게임로직 배치 전 상태: {playerColor}, 첫블록배치여부: {hasPlacedFirstBlock}");
+                        Debug.Log($"[GameRoomPanel]  게임로직 배치 전 상태: {playerColor}, 첫블록배치여부: {hasPlacedFirstBlock}");
                         
                         bool placed = gameLogic.PlaceBlock(blockPlacement);
                         if (placed)
                         {
                             bool hasPlacedFirstBlockAfter = gameLogic.HasPlayerPlacedFirstBlock(playerColor);
-                            Debug.Log($"[GameRoomPanel] ✅ 로컬 게임 로직 상태 동기화 완료: {placement.blockType} at ({position.row},{position.col})");
-                            Debug.Log($"[GameRoomPanel] 🔍 게임로직 배치 후 상태: {playerColor}, 첫블록배치여부: {hasPlacedFirstBlockAfter}");
+                            Debug.Log($"[GameRoomPanel]  로컬 게임 로직 상태 동기화 완료: {placement.blockType} at ({position.row},{position.col})");
+                            Debug.Log($"[GameRoomPanel]  게임로직 배치 후 상태: {playerColor}, 첫블록배치여부: {hasPlacedFirstBlockAfter}");
                         }
                         else
                         {
-                            Debug.LogWarning($"[GameRoomPanel] ❌ 로컬 게임 로직 동기화 실패: {placement.blockType} at ({position.row},{position.col})");
-                            Debug.LogWarning($"[GameRoomPanel] 🔍 실패 원인 분석 - 첫블록여부: {hasPlacedFirstBlock}, 플레이어: {playerColor}");
+                            Debug.LogWarning($"[GameRoomPanel]  로컬 게임 로직 동기화 실패: {placement.blockType} at ({position.row},{position.col})");
+                            Debug.LogWarning($"[GameRoomPanel]  실패 원인 분석 - 첫블록여부: {hasPlacedFirstBlock}, 플레이어: {playerColor}");
                             
                             // 배치 실패 원인 상세 분석
                             bool canPlace = gameLogic.CanPlaceBlock(blockPlacement);
-                            Debug.LogWarning($"[GameRoomPanel] 🔍 CanPlaceBlock 결과: {canPlace}");
+                            Debug.LogWarning($"[GameRoomPanel]  CanPlaceBlock 결과: {canPlace}");
                         }
                     }
                 }

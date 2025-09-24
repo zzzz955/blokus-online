@@ -30,7 +30,7 @@ namespace Blokus {
      * - 실시간 미리보기: 설정 변경 시 즉시 적용
      * - 변경 감지: 실제 변경된 설정만 서버 전송
      * 
-     * 🔥 핵심 기능: BGMManager 연동, 테마 시스템 통합
+     *  핵심 기능: BGMManager 연동, 테마 시스템 통합
      */
     class UserSettingsDialog : public QDialog
     {

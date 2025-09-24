@@ -3,7 +3,7 @@
 #include "ServerTypes.h"
 #include "GameLogic.h"
 #include "Session.h"
-#include "PlayerInfo.h"  // 🔥 새로 추가: 별도 헤더 사용
+#include "PlayerInfo.h"  //  새로 추가: 별도 헤더 사용
 #include <vector>
 #include <unordered_map>
 #include <mutex>
@@ -41,7 +41,7 @@ namespace Blokus {
             bool removePlayer(const std::string& userId);
             bool hasPlayer(const std::string& userId) const;
 
-            // 🔥 변경: PlayerInfo 클래스 반환
+            //  변경: PlayerInfo 클래스 반환
             PlayerInfo* getPlayer(const std::string& userId);
             const PlayerInfo* getPlayer(const std::string& userId) const;
 
@@ -115,7 +115,7 @@ namespace Blokus {
             // 방 정보 생성
             Common::RoomInfo getRoomInfo() const;
 
-            // 🔥 변경: PlayerInfo 벡터 반환
+            //  변경: PlayerInfo 벡터 반환
             std::vector<PlayerInfo> getPlayerList() const;
 
             // 유틸리티
@@ -156,7 +156,7 @@ namespace Blokus {
             std::string m_hostId;
             RoomState m_state;
 
-            // 🔥 변경: PlayerInfo 클래스 사용
+            //  변경: PlayerInfo 클래스 사용
             std::vector<PlayerInfo> m_players;
             mutable std::mutex m_playersMutex;
 

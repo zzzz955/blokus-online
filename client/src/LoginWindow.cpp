@@ -51,7 +51,7 @@ namespace Blokus
         connect(m_oidcAuthenticator, &OidcAuthenticator::tokensRefreshed,
                 this, &LoginWindow::onOidcTokensRefreshed, Qt::QueuedConnection);
 
-        setWindowTitle(QString::fromUtf8("블로커스 온라인 - 로그인"));
+        setWindowTitle(QString::fromUtf8("블로블로 - 로그인"));
         setFixedSize(400, 600);
 
         // 화면 중앙에 배치
@@ -125,7 +125,7 @@ namespace Blokus
         m_titleSvgWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
         
         // 메인 타이틀 - 36px 고정 크기 (숨김 처리)
-        m_titleLabel = new QLabel(QString::fromUtf8("Blokus-Online"));
+        m_titleLabel = new QLabel(QString::fromUtf8("Bloblo"));
         m_titleLabel->setAlignment(Qt::AlignCenter);
         m_titleLabel->setVisible(false); // SVG로 대체되므로 숨김
         // 타이틀 폰트 36px 고정 크기 설정

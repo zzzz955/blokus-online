@@ -5,7 +5,7 @@ using Features.Single.Core;
 using Shared.UI;
 namespace App.UI{
     /// <summary>
-    /// Unity 블로쿠스 UI 아키텍처 설계 (Migration Plan)
+    /// Unity 블로블로 UI 아키텍처 설계 (Migration Plan)
     /// 씬 구조 변경: AppPersistent → MainScene(additive) → Single/Multi Scene flows
     /// </summary>
     public class UIArchitecture : MonoBehaviour

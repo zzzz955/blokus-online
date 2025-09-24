@@ -11,7 +11,7 @@
 namespace Blokus {
     namespace Server {
 
-        // 🔥 사용자 정보 구조체
+        //  사용자 정보 구조체
         struct UserAccount {
             uint32_t userId;
             std::string username;
@@ -32,7 +32,7 @@ namespace Blokus {
             double getAverageScore() const;
         };
 
-        // 🔥 시스템 통계 구조체
+        //  시스템 통계 구조체
         struct DatabaseStats {
             int totalUsers;
             int activeUsers;
@@ -41,10 +41,10 @@ namespace Blokus {
             int totalStats;
         };
 
-        // 🔥 전방 선언 (구현부 숨김)
+        //  전방 선언 (구현부 숨김)
         class ConnectionPool;
 
-        // 🔥 DatabaseManager 클래스
+        //  DatabaseManager 클래스
         class DatabaseManager {
         public:
             DatabaseManager();

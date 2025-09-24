@@ -72,13 +72,13 @@ namespace App.UI
         {
             if (modalPanel != null)
             {
-                // 🔥 핵심 수정: 부모 계층부터 모두 활성화
+                //  핵심 수정: 부모 계층부터 모두 활성화
                 EnsureParentHierarchyActive();
                 
                 modalPanel.SetActive(true);
                 Debug.Log("[GameExitModal] 게임 종료 확인 모달 표시");
                 
-                // 🔥 디버깅: 모달 상태 확인
+                //  디버깅: 모달 상태 확인
                 Debug.Log($"[GameExitModal] modalPanel active: {modalPanel.activeSelf}");
                 Debug.Log($"[GameExitModal] modalPanel activeInHierarchy: {modalPanel.activeInHierarchy}");
                 Debug.Log($"[GameExitModal] modalPanel position: {modalPanel.transform.position}");
@@ -95,17 +95,17 @@ namespace App.UI
                     Debug.LogWarning("[GameExitModal] Canvas not found in parent hierarchy!");
                 }
                 
-                // 🔥 강제 최상단 이동 시도
+                //  강제 최상단 이동 시도
                 EnsureModalOnTop();
                 
-                // 🔥 최종 상태 재확인
+                //  최종 상태 재확인
                 Debug.Log($"[GameExitModal] 최종 상태 - active: {modalPanel.activeSelf}, activeInHierarchy: {modalPanel.activeInHierarchy}");
             }
             else
             {
                 Debug.LogError("[GameExitModal] modalPanel is null! Inspector에서 modalPanel이 할당되지 않았습니다.");
                 
-                // 🔥 자동 복구 시도: GameExitModal이라는 이름의 GameObject 찾기
+                //  자동 복구 시도: GameExitModal이라는 이름의 GameObject 찾기
                 var foundModal = GameObject.Find("GameExitModal");
                 if (foundModal != null)
                 {
@@ -152,7 +152,7 @@ namespace App.UI
         }
 
         /// <summary>
-        /// 🔥 추가: 부모 계층구조 전체 활성화 보장
+        ///  추가: 부모 계층구조 전체 활성화 보장
         /// </summary>
         private void EnsureParentHierarchyActive()
         {
@@ -191,7 +191,7 @@ namespace App.UI
         }
 
         /// <summary>
-        /// 🔥 수정: 모달을 최상단에 표시되도록 보장 (크기/위치 조정 제거)
+        ///  수정: 모달을 최상단에 표시되도록 보장 (크기/위치 조정 제거)
         /// </summary>
         private void EnsureModalOnTop()
         {
@@ -226,7 +226,7 @@ namespace App.UI
                     Debug.Log("[GameExitModal] GraphicRaycaster 컴포넌트 추가됨");
                 }
 
-                // 🔥 크기/위치 조정 코드 제거 - Unity Inspector에서 설정한 기본값 사용
+                //  크기/위치 조정 코드 제거 - Unity Inspector에서 설정한 기본값 사용
                 Debug.Log("[GameExitModal] Unity Inspector 설정값 사용 - 크기/위치 조정하지 않음");
             }
             catch (System.Exception ex)

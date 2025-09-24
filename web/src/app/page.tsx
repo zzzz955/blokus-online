@@ -95,10 +95,10 @@ export default function HomePage() {
             <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
               <span className="block">전략적 사고와</span>
               <span className="block gaming-text">창의성이 만나는</span>
-              <span className="block">블로커스 온라인</span>
+              <span className="block">블로블로</span>
             </h1>
             <p className="text-xl text-gray-200 mb-8 max-w-3xl mx-auto">
-              친구들과 함께 즐기는 온라인 블로커스 게임입니다. 
+              친구들과 함께 즐기는 온라인 블로블로 게임입니다. 
               전략적 사고력을 기르고 창의적인 플레이를 통해 승리를 쟁취하세요!
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -151,7 +151,7 @@ export default function HomePage() {
               게임 특징
             </h2>
             <p className="text-xl text-gray-400 max-w-3xl mx-auto">
-              블로커스 온라인만의 특별한 기능들을 만나보세요
+              블로블로만의 특별한 기능들을 만나보세요
             </p>
           </div>
           
@@ -183,7 +183,7 @@ export default function HomePage() {
               플레이어 후기
             </h2>
             <p className="text-xl text-gray-400 mb-6">
-              블로커스 온라인을 즐기고 있는 플레이어들의 생생한 후기
+              블로블로를 즐기고 있는 플레이어들의 생생한 후기
             </p>
             <div className="flex justify-center space-x-4">
               <Button
@@ -341,8 +341,8 @@ export default function HomePage() {
           </h2>
           <p className="text-xl text-gray-200 mb-8 max-w-2xl mx-auto">
             {session?.user 
-              ? "게임을 다운로드하고 친구들과 함께 블로커스 온라인의 재미를 경험해보세요."
-              : "회원가입하고 무료로 다운로드하여 친구들과 함께 블로커스 온라인의 재미를 경험해보세요."
+              ? "게임을 다운로드하고 친구들과 함께 블로블로의 재미를 경험해보세요."
+              : "회원가입하고 무료로 다운로드하여 친구들과 함께 블로블로의 재미를 경험해보세요."
             }
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">

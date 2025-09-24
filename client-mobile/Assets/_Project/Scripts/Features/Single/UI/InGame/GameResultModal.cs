@@ -72,7 +72,7 @@ namespace Features.Single.UI.InGame
         // ---------------- Public API ----------------
 
         /// <summary>
-        /// 🔥 GameEndResult 기반 결과 표시 (단일 진실원천)
+        ///  GameEndResult 기반 결과 표시 (단일 진실원천)
         /// </summary>
         public void ShowResult(GameEndResult gameResult, Action onClosed = null)
         {
@@ -85,15 +85,15 @@ namespace Features.Single.UI.InGame
 
             _onClosed = onClosed;
 
-            // 🚨 규칙 위반 검사
+            //  규칙 위반 검사
             if (gameResult.stars == 0 && gameResult.isCleared)
             {
-                Debug.LogError($"[GameResultModal] 🚨 규칙 위반: GameEndResult가 0별인데 isCleared=true - Stage {gameResult.stageNumber}");
+                Debug.LogError($"[GameResultModal]  규칙 위반: GameEndResult가 0별인데 isCleared=true - Stage {gameResult.stageNumber}");
             }
 
             Debug.Log($"[GameResultModal] 결과 표시 요청: {gameResult}");
 
-            // 🔥 디버깅 코드 추가
+            //  디버깅 코드 추가
             Debug.Log($"[GameResultModal] modalPanel null check: {modalPanel == null}");
             if (modalPanel != null)
             {
@@ -114,7 +114,7 @@ namespace Features.Single.UI.InGame
                     Debug.Log($"[GameResultModal] CanvasGroup alpha: {cg.alpha}, interactable: {cg.interactable}");
             }
 
-            // 🔥 부모 GameObject 먼저 활성화 (핵심 수정!)
+            //  부모 GameObject 먼저 활성화 (핵심 수정!)
             if (!this.gameObject.activeSelf)
             {
                 this.gameObject.SetActive(true);
@@ -126,11 +126,11 @@ namespace Features.Single.UI.InGame
             if (modalPanel && !modalPanel.activeSelf)
                 modalPanel.SetActive(true);
                 
-            // 🔥 활성화 후 재확인
+            //  활성화 후 재확인
             if (modalPanel != null)
                 Debug.Log($"[GameResultModal] After SetActive - activeSelf: {modalPanel.activeSelf}, activeInHierarchy: {modalPanel.activeInHierarchy}");
 
-            // 🔥 GameEndResult 기반 UI 업데이트 (하드코딩 제거)
+            //  GameEndResult 기반 UI 업데이트 (하드코딩 제거)
             UpdateUI(gameResult);
             
             Debug.Log($"[GameResultModal] 표시 완료: {gameResult}");
@@ -172,7 +172,7 @@ namespace Features.Single.UI.InGame
         // ---------------- Internals ----------------
 
         /// <summary>
-        /// 🔥 GameEndResult 기반 UI 업데이트 (단일 진실원천)
+        ///  GameEndResult 기반 UI 업데이트 (단일 진실원천)
         /// </summary>
         private void UpdateUI(GameEndResult gameResult)
         {
@@ -195,10 +195,10 @@ namespace Features.Single.UI.InGame
                 timeText.text = $"소요 시간: {m:00}:{s:00}";
             }
 
-            // 🔥 별점 표시: GameEndResult의 정확한 stars 값 사용 (하드코딩 제거)
+            //  별점 표시: GameEndResult의 정확한 stars 값 사용 (하드코딩 제거)
             DisplayStars(gameResult.stars);
 
-            // 🔥 서버 진행도 업데이트: GameEndResult 기반
+            //  서버 진행도 업데이트: GameEndResult 기반
             UpdateStageProgress(gameResult);
 
             Debug.Log($"[GameResultModal] UI 업데이트 완료: {gameResult}");
@@ -248,7 +248,7 @@ namespace Features.Single.UI.InGame
                 Debug.Log($"[GameResultModal] 별 {i}: on={on}, sprite={targetSprite?.name}, color={targetColor}");
             }
 
-            // 🔥 추가 검증: 스프라이트가 올바르게 설정되었는지 확인
+            //  추가 검증: 스프라이트가 올바르게 설정되었는지 확인
             if (activeStarSprite == null)
                 Debug.LogError("[GameResultModal] activeStarSprite가 Inspector에서 할당되지 않았습니다!");
             if (inactiveStarSprite == null)
@@ -267,14 +267,14 @@ namespace Features.Single.UI.InGame
                      $"done={gameResult.isCleared}, stars={gameResult.stars}, score={gameResult.finalScore}, " +
                      $"t={gameResult.elapsedTime:F1}s");
 
-            // 🚨 규칙 위반 재검증 (로깅용)
+            //  규칙 위반 재검증 (로깅용)
             if (gameResult.stars == 0 && gameResult.isCleared)
             {
-                Debug.LogError($"[GameResultModal] 🚨 규칙 위반 감지: 0별인데 completed=true - Stage {gameResult.stageNumber}");
+                Debug.LogError($"[GameResultModal]  규칙 위반 감지: 0별인데 completed=true - Stage {gameResult.stageNumber}");
             }
 
-            // ✅ 중복 API 호출 제거: SingleGame에서 이미 서버 통신 완료됨
-            // ✅ UI 리프레시만 수행하여 스테이지 버튼 상태 업데이트
+            //  중복 API 호출 제거: SingleGame에서 이미 서버 통신 완료됨
+            //  UI 리프레시만 수행하여 스테이지 버튼 상태 업데이트
             RefreshStageUI();
         }
 
@@ -308,20 +308,20 @@ namespace Features.Single.UI.InGame
             if (modalPanel && modalPanel.activeSelf)
                 modalPanel.SetActive(false);
 
-            // 🔥 수정: UI 안정화를 위한 지연된 처리
+            //  수정: UI 안정화를 위한 지연된 처리
             StartCoroutine(DelayedCloseToSelection());
         }
 
         /// <summary>
-        /// 🔥 수정: UI 안정화를 위한 지연된 화면 전환 (StageSelectPanel 강제 활성화 보장)
+        ///  수정: UI 안정화를 위한 지연된 화면 전환 (StageSelectPanel 강제 활성화 보장)
         /// </summary>
         private System.Collections.IEnumerator DelayedCloseToSelection()
         {
-            // 🔥 수정: 2프레임 대기로 UI 상태 완전 안정화
+            //  수정: 2프레임 대기로 UI 상태 완전 안정화
             yield return null;
             yield return null;
 
-            // 🔥 수정: StageSelectPanel 먼저 강제 활성화 (우선순위 최고)
+            //  수정: StageSelectPanel 먼저 강제 활성화 (우선순위 최고)
             var stageSelectPanel = GameObject.Find("StageSelectPanel");
             if (stageSelectPanel != null)
             {
@@ -331,7 +331,7 @@ namespace Features.Single.UI.InGame
                     stageSelectPanel.SetActive(true);
                 }
                 
-                // 🔥 추가: StageSelectPanel의 CandyCrushStageMapView 강제 리프레시 (throttling 무시)
+                //  추가: StageSelectPanel의 CandyCrushStageMapView 강제 리프레시 (throttling 무시)
                 var stageMapView = stageSelectPanel.GetComponent<Features.Single.UI.StageSelect.CandyCrushStageMapView>();
                 if (stageMapView != null)
                 {
@@ -354,10 +354,10 @@ namespace Features.Single.UI.InGame
                 Debug.Log("[GameResultModal] UIController 발견 - ShowSelection 호출");
                 uiController.ShowSelection(); // GamePanel OFF, StageSelect ON
                 
-                // 🔥 수정: ShowSelection 후 더 긴 대기 시간으로 UI 업데이트 완료 보장
+                //  수정: ShowSelection 후 더 긴 대기 시간으로 UI 업데이트 완료 보장
                 yield return new WaitForSeconds(0.2f);
                 
-                // 🔥 추가: 최종 검증 - StageSelectPanel 활성화 재확인
+                //  추가: 최종 검증 - StageSelectPanel 활성화 재확인
                 if (stageSelectPanel != null && !stageSelectPanel.activeSelf)
                 {
                     Debug.LogWarning("[GameResultModal] 최종 검증 실패 - StageSelectPanel 재활성화");

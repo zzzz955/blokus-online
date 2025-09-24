@@ -58,16 +58,16 @@ export async function POST(request: NextRequest) {
       
       switch (log.level) {
         case 'ERROR':
-          console.error(`🔴 ${prefix} ${log.message}`, log.stackTrace || '');
+          console.error(`${prefix} ${log.message}`, log.stackTrace || '');
           break;
         case 'WARN':
-          console.warn(`🟡 ${prefix} ${log.message}`);
+          console.warn(`${prefix} ${log.message}`);
           break;
         case 'INFO':
-          console.info(`🔵 ${prefix} ${log.message}`);
+          console.info(`${prefix} ${log.message}`);
           break;
         default:
-          console.log(`⚪ ${prefix} ${log.message}`);
+          console.log(`${prefix} ${log.message}`);
       }
     });
     

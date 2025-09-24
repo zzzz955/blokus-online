@@ -440,7 +440,7 @@ namespace Blokus {
         }
 
         // 창 설정
-        setWindowTitle(QString::fromUtf8("블로커스 온라인 - %1 (%2님)").arg(roomInfo.roomName, myUsername));
+        setWindowTitle(QString::fromUtf8("블로블로 - %1 (%2님)").arg(roomInfo.roomName, myUsername));
         setMinimumSize(1280, 800);  // 더 작은 최소 크기 설정
         resize(1280, 800);         // 초기 진입 시 최소 크기로 시작
 
@@ -538,7 +538,7 @@ namespace Blokus {
         m_settingsButton->setToolTip("환경 설정");
         
         // 방 나가기 버튼을 우측 상단에 배치
-        m_leaveRoomButton = new QPushButton(QString::fromUtf8("🚪 방 나가기"));
+        m_leaveRoomButton = new QPushButton(QString::fromUtf8("방 나가기"));
         m_leaveRoomButton->setFixedSize(120, 25);
         m_leaveRoomButton->setStyleSheet(
             "QPushButton { "
@@ -927,7 +927,7 @@ namespace Blokus {
 
     void GameRoomWindow::updatePlayerSlotsDisplay()
     {
-        qDebug() << QString::fromUtf8("🔄 플레이어 슬롯 디스플레이 업데이트 시작");
+        qDebug() << QString::fromUtf8(" 플레이어 슬롯 디스플레이 업데이트 시작");
         for (int i = 0; i < m_playerSlotWidgets.size() && i < m_roomInfo.playerSlots.size(); ++i) {
             const auto& slot = m_roomInfo.playerSlots[i];
             qDebug() << QString::fromUtf8("  슬롯 %1 업데이트: %2 (빈슬롯=%3)")
@@ -936,7 +936,7 @@ namespace Blokus {
             m_playerSlotWidgets[i]->updatePlayerSlot(m_roomInfo.playerSlots[i]);
             m_playerSlotWidgets[i]->setMySlot(m_roomInfo.playerSlots[i].username == m_myUsername);
         }
-        qDebug() << QString::fromUtf8("✅ 플레이어 슬롯 디스플레이 업데이트 완료");
+        qDebug() << QString::fromUtf8(" 플레이어 슬롯 디스플레이 업데이트 완료");
     }
 
     void GameRoomWindow::updateGameControlsState()
@@ -1059,7 +1059,7 @@ namespace Blokus {
             m_gameBoard->setBoardReadOnly(false);
             m_gameBoard->clearSelection();
 
-            qDebug() << QString::fromUtf8("✅ 게임보드 초기화 완료 - 20x20 크기");
+            qDebug() << QString::fromUtf8(" 게임보드 초기화 완료 - 20x20 크기");
         }
 
         // 내 팔레트 설정
@@ -1074,7 +1074,7 @@ namespace Blokus {
             bool isMyTurn = (currentPlayer == myColor);
             m_myBlockPalette->setEnabled(isMyTurn);
 
-            qDebug() << QString::fromUtf8("✅ 내 팔레트 설정 완료 - 색상: %1, 현재턴: %2, 활성화: %3")
+            qDebug() << QString::fromUtf8(" 내 팔레트 설정 완료 - 색상: %1, 현재턴: %2, 활성화: %3")
                 .arg(Utils::playerColorToString(myColor))
                 .arg(Utils::playerColorToString(currentPlayer))
                 .arg(isMyTurn);
@@ -1298,7 +1298,7 @@ namespace Blokus {
 
     void GameRoomWindow::resetGameState()
     {
-        qDebug() << QString::fromUtf8("🔄 게임 상태 완전 리셋 시작");
+        qDebug() << QString::fromUtf8(" 게임 상태 완전 리셋 시작");
         
         // 기본 리셋 먼저 수행
         resetGameToWaitingState();
@@ -1326,7 +1326,7 @@ namespace Blokus {
         updatePlayerSlotsDisplay();
         updateGameControlsState();
         
-        qDebug() << QString::fromUtf8("✅ 게임 상태 완전 리셋 완료");
+        qDebug() << QString::fromUtf8(" 게임 상태 완전 리셋 완료");
     }
 
     // 턴 스킵 처리 (블록이 없는 플레이어)
@@ -1490,12 +1490,12 @@ namespace Blokus {
 
     void GameRoomWindow::onBlockSelected(const Block& block)
     {
-        qDebug() << QString::fromUtf8("🎯 GameRoomWindow::onBlockSelected 호출: %1")
+        qDebug() << QString::fromUtf8(" GameRoomWindow::onBlockSelected 호출: %1")
             .arg(BlockFactory::getBlockName(block.getType()));
 
         // 게임이 시작되지 않았으면 선택 불가
         if (!m_isGameStarted) {
-            qDebug() << QString::fromUtf8("❌ 게임이 시작되지 않아 블록 선택 불가");
+            qDebug() << QString::fromUtf8(" 게임이 시작되지 않아 블록 선택 불가");
             return;
         }
 
@@ -1504,17 +1504,17 @@ namespace Blokus {
         PlayerColor myColor = m_roomInfo.getMyColor(m_myUsername);
 
         if (currentPlayer != myColor) {
-            qDebug() << QString::fromUtf8("❌ 내 턴이 아님 - 현재: %1, 내 색상: %2")
+            qDebug() << QString::fromUtf8(" 내 턴이 아님 - 현재: %1, 내 색상: %2")
                 .arg(Utils::playerColorToString(currentPlayer))
                 .arg(Utils::playerColorToString(myColor));
             return;
         }
 
-        // 🔥 현재 플레이어 색상으로 블록 설정
+        //  현재 플레이어 색상으로 블록 설정
         Block selectedBlock = block;
         selectedBlock.setPlayer(currentPlayer);
 
-        qDebug() << QString::fromUtf8("🎯 게임보드에 블록 선택 전달: %1 (%2 플레이어)")
+        qDebug() << QString::fromUtf8(" 게임보드에 블록 선택 전달: %1 (%2 플레이어)")
             .arg(BlockFactory::getBlockName(selectedBlock.getType()))
             .arg(Utils::playerColorToString(selectedBlock.getPlayer()));
 
@@ -1758,7 +1758,7 @@ namespace Blokus {
                 }
             }
 
-            QString rankIcon = (rank == 1) ? "🥇" : (rank == 2) ? "🥈" : (rank == 3) ? "🥉" : "🏅";
+            QString rankIcon = (rank == 1) ? "1위" : (rank == 2) ? "2위" : (rank == 3) ? "3위" : "";
             resultText += QString("%1 %2등: %3 (%4점)\n")
                 .arg(rankIcon).arg(rank).arg(playerName).arg(pair.second);
             rank++;
@@ -2102,7 +2102,7 @@ namespace Blokus {
         const int maxCols = 3; // 3열로 배치
 
         for (const Block& block : m_availableBlocks) {
-            // 🔥 커스텀 블록 모양 버튼 사용
+            //  커스텀 블록 모양 버튼 사용
             BlockShapeButton* shapeButton = new BlockShapeButton(block, cellSize, m_blockContainer);
             shapeButton->setProperty("blockType", static_cast<int>(block.getType()));
 
@@ -2201,7 +2201,7 @@ namespace Blokus {
 
         BlockType blockType = static_cast<BlockType>(button->property("blockType").toInt());
 
-        qDebug() << QString::fromUtf8("🎯 시각적 블록 클릭: %1").arg(BlockFactory::getBlockName(blockType));
+        qDebug() << QString::fromUtf8(" 시각적 블록 클릭: %1").arg(BlockFactory::getBlockName(blockType));
 
         // 이전 선택 해제
         clearSelection();
@@ -2219,10 +2219,10 @@ namespace Blokus {
                 m_selectedBlock = block;
                 m_hasSelection = true;
 
-                qDebug() << QString::fromUtf8("✅ 시각적 블록 선택됨: %1, 시그널 발생")
+                qDebug() << QString::fromUtf8(" 시각적 블록 선택됨: %1, 시그널 발생")
                     .arg(BlockFactory::getBlockName(blockType));
 
-                // 🔥 중요: 시그널 발생
+                //  중요: 시그널 발생
                 emit blockSelected(block);
                 break;
             }
@@ -2242,7 +2242,7 @@ namespace Blokus {
 
     void MyBlockPalette::setEnabled(bool enabled)
     {
-        // ✅ QWidget::setEnabled() 호출 (override가 아님)
+        //  QWidget::setEnabled() 호출 (override가 아님)
         QWidget::setEnabled(enabled);
 
         // 모든 블록 버튼들도 함께 활성화/비활성화
@@ -2508,7 +2508,7 @@ namespace Blokus {
             .arg(rotation)                     // 회전도
             .arg(flip);                        // 뒤집기
 
-        qDebug() << QString::fromUtf8("🚀 서버에 블록 배치 메시지 전송: %1 (위치: %2,%3, 회전: %4, 뒤집기: %5)")
+        qDebug() << QString::fromUtf8("서버에 블록 배치 메시지 전송: %1 (위치: %2,%3, 회전: %4, 뒤집기: %5)")
             .arg(gameMessage).arg(row).arg(col).arg(rotation).arg(flip);
         
         // 시그널을 통해 AppController로 전달하여 NetworkClient를 통해 서버에 전송
@@ -2640,7 +2640,7 @@ namespace Blokus {
 
     void GameRoomWindow::onAfkModeActivated(const QString& jsonData)
     {
-        qDebug() << QString::fromUtf8("🚨 AFK 모드 활성화 알림 수신: %1").arg(jsonData);
+        qDebug() << QString::fromUtf8("AFK 모드 활성화 알림 수신: %1").arg(jsonData);
         
         // GameBoard에 AFK 알림 표시 요청
         if (m_gameBoard) {
@@ -2669,7 +2669,7 @@ namespace Blokus {
 
     void GameRoomWindow::onAfkUnblockErrorForAfk(const QString& reason, const QString& message)
     {
-        qDebug() << QString::fromUtf8("❌ AFK 해제 에러로 인한 모달 처리: %1 - %2").arg(reason, message);
+        qDebug() << QString::fromUtf8(" AFK 해제 에러로 인한 모달 처리: %1 - %2").arg(reason, message);
         
         // GameBoard에 AFK 에러 알림
         if (m_gameBoard) {
