@@ -28,7 +28,7 @@ interface AdminSupportTicket extends SupportTicket {
 export default function AdminSupportTicketDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const ticketId = params.id as string;
+  const ticketId = params?.id as string;
 
   const [ticket, setTicket] = useState<AdminSupportTicket | null>(null);
   const [loading, setLoading] = useState(true);
@@ -40,14 +40,14 @@ export default function AdminSupportTicketDetailPage() {
   const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
-    if (!ticketId || isNaN(Number(ticketId))) {
+    if (!params?.id || !ticketId || isNaN(Number(ticketId))) {
       setError('잘못된 문의 ID입니다.');
       setLoading(false);
       return;
     }
 
     fetchTicket();
-  }, [ticketId]);
+  }, [params?.id, ticketId]);
 
   const fetchTicket = async () => {
     try {

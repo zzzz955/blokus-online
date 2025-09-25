@@ -26,7 +26,7 @@ export default function SupportTicketDetailPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const params = useParams();
-  const ticketId = params.id as string;
+  const ticketId = params?.id as string;
 
   const [ticket, setTicket] = useState<SupportTicket | null>(null);
   const [loading, setLoading] = useState(true);
@@ -40,21 +40,21 @@ export default function SupportTicketDetailPage() {
       return;
     }
 
-    if (!ticketId || isNaN(Number(ticketId))) {
+    if (!params?.id || !ticketId || isNaN(Number(ticketId))) {
       setError('잘못된 문의 ID입니다.');
       setLoading(false);
       return;
     }
 
     fetchTicket();
-  }, [session, status, router, ticketId]);
+  }, [session, status, router, params?.id, ticketId]);
 
   const fetchTicket = async () => {
     try {
       setLoading(true);
       const response = await api.getFull(`/api/support/${ticketId}`);
       if (response.success) {
-        setTicket(response.data);
+        setTicket(response.data as SupportTicket);
       } else {
         setError(response.error || '문의를 불러올 수 없습니다.');
       }
