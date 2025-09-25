@@ -2583,6 +2583,8 @@ MonoBehaviour:
   skin: {fileID: 0}
   cellSpriteProvider: {fileID: 1023241789}
   zoomPanComponent: {fileID: 0}
+  particleEffect: {fileID: 0}
+  simpleDustEffect: {fileID: 0}
 --- !u!1 &291476091
 GameObject:
   m_ObjectHideFlags: 0
@@ -7061,7 +7063,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0.00033569336}
-  m_SizeDelta: {x: 0, y: -200}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 1}
 --- !u!114 &860214808
 MonoBehaviour:
@@ -8453,19 +8455,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 06cc6396a0fd3354e9b6a2f3b0b47026, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  bubbleSprite: {fileID: 21300000, guid: 2c7f8376f4876f94b95c985fd278ba75, type: 3}
+  bubbleSprite: {fileID: 21300000, guid: 736e260bbd8e62849ae945c60e288713, type: 3}
   blueStoneSprite: {fileID: 21300000, guid: c2f38c4522c6cb2418e1e818cede3cdb, type: 3}
   redStoneSprite: {fileID: 21300000, guid: 5b3a1c4f2d2e1f846a6e76cd2c5aa23b, type: 3}
   yellowStoneSprite: {fileID: 21300000, guid: d4d464255adb8b3489f667a17e72b2a3, type: 3}
   greenStoneSprite: {fileID: 21300000, guid: 77d5df1666ec9af4eac2e164b4b087da, type: 3}
-  brownStoneSprite: {fileID: 21300000, guid: 736e260bbd8e62849ae945c60e288713, type: 3}
+  brownStoneSprite: {fileID: 21300000, guid: 2c7f8376f4876f94b95c985fd278ba75, type: 3}
   useDiamondVariant: 0
   blueDiamondSprite: {fileID: 21300000, guid: 1fb82d9783c752c45b2a08cb9ca490bd, type: 3}
   redDiamondSprite: {fileID: 21300000, guid: 73be31b43671a48419b4262ad1d3a869, type: 3}
   yellowDiamondSprite: {fileID: 21300000, guid: e442f0de696f2f244acb118d31a4194b, type: 3}
   greenDiamondSprite: {fileID: 21300000, guid: aedb725fc2a139d4ba1384d06a0badd6, type: 3}
   brownDiamondSprite: {fileID: 21300000, guid: 9fbbc68c97e29144ca41f02e2273eb5b, type: 3}
-  fallbackSprite: {fileID: 21300000, guid: 2c7f8376f4876f94b95c985fd278ba75, type: 3}
+  fallbackSprite: {fileID: 21300000, guid: 736e260bbd8e62849ae945c60e288713, type: 3}
 --- !u!4 &1023241790
 Transform:
   m_ObjectHideFlags: 0
@@ -10918,7 +10920,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1467396574
 RectTransform:
   m_ObjectHideFlags: 0
@@ -12658,7 +12660,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 0.19607843}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -12877,7 +12879,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1701576316
 RectTransform:
   m_ObjectHideFlags: 0
