@@ -474,30 +474,19 @@ namespace Features.Single.Gameplay
             if (previewBlock == null) return;
 
             var cells = previewBlock.GetAbsolutePositions(previewPosition);
-            bool canPlace = gameLogic.CanPlaceBlock(previewBlock, previewPosition);
-            var col = canPlace ? previewColor : invalidColor;
 
             foreach (var pos in cells)
             {
                 if (!ValidationUtility.IsValidPosition(pos)) continue;
                 if (pos.row >= boardSize || pos.col >= boardSize) continue;
 
-                // 빈 칸만 프리뷰 컬러
-                if (gameLogic.GetCellColor(pos) == PlayerColor.None)
+                // 셀별 배치 상태 분석 및 호버 효과 적용
+                CellHoverEffect.HoverState cellState = AnalyzeCellPlacementState(pos);
+
+                var cellHoverEffect = GetCellHoverEffect(pos.row, pos.col);
+                if (cellHoverEffect != null)
                 {
-                    var img = cellImages[pos.row, pos.col];
-                    if (img != null)
-                    {
-                        // 스프라이트 시스템에서는 색상 틴트로 프리뷰 표현
-                        if (cellSpriteProvider != null)
-                        {
-                            img.color = col; // 스프라이트에 색상 틴트 적용
-                        }
-                        else
-                        {
-                            img.color = col; // 기존 방식 유지
-                        }
-                    }
+                    cellHoverEffect.SetHoverState(cellState);
                 }
             }
             // PositionActionButtonsAtBlock() 제거 - ShowActionButtons에서 이미 처리됨
@@ -513,22 +502,11 @@ namespace Features.Single.Gameplay
                 if (!ValidationUtility.IsValidPosition(pos)) continue;
                 if (pos.row >= boardSize || pos.col >= boardSize) continue;
 
-                if (gameLogic.GetCellColor(pos) == PlayerColor.None)
+                // 호버 효과 제거
+                var cellHoverEffect = GetCellHoverEffect(pos.row, pos.col);
+                if (cellHoverEffect != null)
                 {
-                    var img = cellImages[pos.row, pos.col];
-                    if (img != null)
-                    {
-                        // 스프라이트 시스템에서는 빈 칸 스프라이트로 복원
-                        if (cellSpriteProvider != null)
-                        {
-                            img.sprite = cellSpriteProvider.GetSprite(PlayerColor.None);
-                            img.color = Color.white;
-                        }
-                        else
-                        {
-                            img.color = emptyColor; // 기존 방식 유지
-                        }
-                    }
+                    cellHoverEffect.SetHoverState(CellHoverEffect.HoverState.None);
                 }
             }
 
@@ -909,6 +887,86 @@ namespace Features.Single.Gameplay
             }
 
             Debug.Log($"[GameBoard] 모든 셀의 raycastTarget 설정 완료: {enableCellRaycast}");
+        }
+
+        // ========================================
+        // 새로운 호버링 시스템 메서드들
+        // ========================================
+
+        /// <summary>
+        /// 셀의 배치 상태를 분석하여 호버 상태를 반환
+        /// </summary>
+        /// <param name="pos">분석할 셀 위치</param>
+        /// <returns>해당 셀의 호버 상태</returns>
+        private CellHoverEffect.HoverState AnalyzeCellPlacementState(Position pos)
+        {
+            // 해당 셀이 이미 점유되어 있는지 확인
+            PlayerColor cellColor = gameLogic.GetCellColor(pos);
+            if (cellColor != PlayerColor.None)
+            {
+                return CellHoverEffect.HoverState.Occupied;
+            }
+
+            // 현재 블록이 해당 위치에 배치 가능한지 전체적으로 확인
+            if (previewBlock != null)
+            {
+                bool canPlace = gameLogic.CanPlaceBlock(previewBlock, previewPosition);
+
+                // 전체 블록이 배치 불가능하면 이 셀도 규칙 위반
+                if (!canPlace)
+                {
+                    return CellHoverEffect.HoverState.RuleViolation;
+                }
+            }
+
+            // 배치 가능한 상태
+            return CellHoverEffect.HoverState.Placeable;
+        }
+
+        /// <summary>
+        /// 특정 셀의 CellHoverEffect 컴포넌트를 반환
+        /// </summary>
+        /// <param name="row">행</param>
+        /// <param name="col">열</param>
+        /// <returns>CellHoverEffect 컴포넌트 (없으면 null)</returns>
+        private CellHoverEffect GetCellHoverEffect(int row, int col)
+        {
+            if (cellObjects == null || row < 0 || row >= boardSize || col < 0 || col >= boardSize)
+                return null;
+
+            var cellObject = cellObjects[row, col];
+            if (cellObject == null)
+                return null;
+
+            // CellHoverEffect 컴포넌트가 없으면 자동으로 추가
+            var hoverEffect = cellObject.GetComponent<CellHoverEffect>();
+            if (hoverEffect == null)
+            {
+                hoverEffect = cellObject.AddComponent<CellHoverEffect>();
+                Debug.Log($"[GameBoard] CellHoverEffect 컴포넌트를 셀 ({row},{col})에 자동 추가함");
+            }
+
+            return hoverEffect;
+        }
+
+        /// <summary>
+        /// 모든 셀의 호버 효과를 클리어
+        /// </summary>
+        public void ClearAllHoverEffects()
+        {
+            if (cellObjects == null) return;
+
+            for (int row = 0; row < boardSize; row++)
+            {
+                for (int col = 0; col < boardSize; col++)
+                {
+                    var hoverEffect = GetCellHoverEffect(row, col);
+                    if (hoverEffect != null)
+                    {
+                        hoverEffect.SetHoverState(CellHoverEffect.HoverState.None);
+                    }
+                }
+            }
         }
     }
 }
