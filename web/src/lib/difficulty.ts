@@ -11,21 +11,81 @@ export interface DifficultyInfo {
 }
 
 /**
- * 난이도 레벨별 표준 매핑 (1-10)
- * StageEditor.tsx의 매핑을 기준으로 색상 정보 추가
+ * 난이도별 그라데이션 색상 생성 함수 (초록->노랑->주황->빨강->보라)
  */
-export const DIFFICULTY_MAPPING: Record<number, DifficultyInfo> = {
-  1: { level: 1, label: '매우 쉬움', color: '#22c55e', cssClass: 'text-green-400' },
-  2: { level: 2, label: '쉬움', color: '#84cc16', cssClass: 'text-lime-400' },
-  3: { level: 3, label: '보통', color: '#eab308', cssClass: 'text-yellow-400' },
-  4: { level: 4, label: '어려움', color: '#f97316', cssClass: 'text-orange-400' },
-  5: { level: 5, label: '매우 어려움', color: '#ef4444', cssClass: 'text-red-400' },
-  6: { level: 6, label: '극한', color: '#dc2626', cssClass: 'text-red-500' },
-  7: { level: 7, label: '악몽', color: '#b91c1c', cssClass: 'text-red-600' },
-  8: { level: 8, label: '지옥', color: '#991b1b', cssClass: 'text-red-700' },
-  9: { level: 9, label: '전설', color: '#7c2d12', cssClass: 'text-red-800' },
-  10: { level: 10, label: '신화', color: '#451a03', cssClass: 'text-red-900' }
-};
+function getGradientColor(difficulty: number): { color: string; cssClass: string } {
+  // 난이도를 0-1 범위로 정규화
+  const t = (difficulty - 1) / 9;
+
+  // 5단계 색상 포인트 정의 (RGB 0-255)
+  const colorPoints = [
+    { r: 0, g: 204, b: 0 },     // 밝은 초록
+    { r: 127, g: 255, b: 0 },   // 연두
+    { r: 255, g: 255, b: 0 },   // 노랑
+    { r: 255, g: 127, b: 0 },   // 주황
+    { r: 255, g: 0, b: 0 },     // 빨강
+    { r: 204, g: 0, b: 204 }    // 보라
+  ];
+
+  // t 값에 따라 적절한 색상 구간에서 보간
+  const scaledT = t * (colorPoints.length - 1);
+  const index = Math.floor(scaledT);
+  const localT = scaledT - index;
+
+  // 마지막 색상을 넘지 않도록 제한
+  if (index >= colorPoints.length - 1) {
+    const lastColor = colorPoints[colorPoints.length - 1];
+    return {
+      color: `#${lastColor.r.toString(16).padStart(2, '0')}${lastColor.g.toString(16).padStart(2, '0')}${lastColor.b.toString(16).padStart(2, '0')}`,
+      cssClass: 'text-purple-400'
+    };
+  }
+
+  // 두 색상 사이에서 보간
+  const color1 = colorPoints[index];
+  const color2 = colorPoints[index + 1];
+
+  const r = Math.round(color1.r + (color2.r - color1.r) * localT);
+  const g = Math.round(color1.g + (color2.g - color1.g) * localT);
+  const b = Math.round(color1.b + (color2.b - color1.b) * localT);
+
+  // CSS 클래스는 대략적인 색상 구간으로 매핑
+  let cssClass = 'text-gray-400';
+  if (difficulty <= 2) cssClass = 'text-green-400';
+  else if (difficulty <= 4) cssClass = 'text-yellow-400';
+  else if (difficulty <= 6) cssClass = 'text-orange-400';
+  else if (difficulty <= 8) cssClass = 'text-red-400';
+  else cssClass = 'text-purple-400';
+
+  return {
+    color: `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`,
+    cssClass
+  };
+}
+
+/**
+ * 난이도 레벨별 표준 매핑 (1-10)
+ * 동적 그라데이션 색상 생성
+ */
+export const DIFFICULTY_MAPPING: Record<number, DifficultyInfo> = (() => {
+  const mapping: Record<number, DifficultyInfo> = {};
+  const labels = [
+    '매우 쉬움', '쉬움', '보통', '어려움', '매우 어려움',
+    '극한', '악몽', '지옥', '전설', '신화'
+  ];
+
+  for (let i = 1; i <= 10; i++) {
+    const { color, cssClass } = getGradientColor(i);
+    mapping[i] = {
+      level: i,
+      label: labels[i - 1],
+      color,
+      cssClass
+    };
+  }
+
+  return mapping;
+})();
 
 /**
  * 난이도 레벨에 따른 라벨 반환

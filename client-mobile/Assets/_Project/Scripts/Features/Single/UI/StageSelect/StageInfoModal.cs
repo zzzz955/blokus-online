@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine.Networking;
 using UnityEngine;
 using UnityEngine.UI;
@@ -58,19 +59,9 @@ namespace Features.Single.UI.StageSelect
         [Header("색상 설정 (Fallback)")]
         [SerializeField] private Color activeStarColor = Color.yellow;
         [SerializeField] private Color inactiveStarColor = Color.gray;
-        // 웹과 동기화된 난이도별 색상 (1-10 레벨)
-        [SerializeField] private Color[] difficultyColors = {
-            new Color(0x22/255f, 0xc5/255f, 0x5e/255f), // 1: 매우 쉬움 - Green-400
-            new Color(0x84/255f, 0xcc/255f, 0x16/255f), // 2: 쉬움 - Lime-400
-            new Color(0xea/255f, 0xb3/255f, 0x08/255f), // 3: 보통 - Yellow-400
-            new Color(0xf9/255f, 0x73/255f, 0x16/255f), // 4: 어려움 - Orange-400
-            new Color(0xef/255f, 0x44/255f, 0x44/255f), // 5: 매우 어려움 - Red-400
-            new Color(0xdc/255f, 0x26/255f, 0x26/255f), // 6: 극한 - Red-500
-            new Color(0xb9/255f, 0x1c/255f, 0x1c/255f), // 7: 악몽 - Red-600
-            new Color(0x99/255f, 0x1b/255f, 0x1b/255f), // 8: 지옥 - Red-700
-            new Color(0x7c/255f, 0x2d/255f, 0x12/255f), // 9: 전설 - Red-800
-            new Color(0x45/255f, 0x1a/255f, 0x03/255f)  // 10: 신화 - Red-900
-        };
+
+        // 난이도별 색상 배열 (코드에서 자동 생성됨)
+        private Color[] difficultyColors;
 
         // 현재 표시 중인 스테이지 정보
         private StageData currentStageData;
@@ -148,6 +139,9 @@ namespace Features.Single.UI.StageSelect
                 // else: 기존 인스턴스를 유지. 현재 오브젝트는 그대로 두되 파괴하지 않음.
                 // (씬 구성에 따라 StageSelectPanel 하위/외부 여러 개가 공존해도 안전)
             }
+
+            // 난이도 색상 배열 초기화 보장 (Unity Inspector 동기화 문제 해결)
+            InitializeDifficultyColors();
 
             // 버튼 이벤트 연결
             if (backgroundButton != null)
@@ -287,11 +281,9 @@ namespace Features.Single.UI.StageSelect
                 string difficultyStr = GetDifficultyString(currentStageData.difficulty);
                 difficultyText.text = $"난이도: {difficultyStr}";
 
-                // 난이도별 색상 적용
-                if (currentStageData.difficulty > 0 && currentStageData.difficulty <= difficultyColors.Length)
-                {
-                    difficultyText.color = difficultyColors[currentStageData.difficulty - 1];
-                }
+                // 난이도별 색상 적용 (안전장치 포함)
+                Color difficultyColor = GetDifficultyColor(currentStageData.difficulty);
+                difficultyText.color = difficultyColor;
             }
         }
 
@@ -757,6 +749,87 @@ namespace Features.Single.UI.StageSelect
         // ========================================
         // 헬퍼 함수들
         // ========================================
+
+        /// <summary>
+        /// 난이도 색상 배열 초기화 (Inspector 설정 무관하게 항상 코드에서 생성)
+        /// </summary>
+        private void InitializeDifficultyColors()
+        {
+            Debug.Log($"[StageInfoModal] 난이도 색상 배열 초기화 - 코드에서 10색 그라데이션 생성");
+
+            // Inspector 설정 무관하게 항상 코드에서 10색 그라데이션 생성
+            // 초록(1-2) -> 노랑(3-4) -> 주황(5-6) -> 빨강(7-8) -> 보라(9-10)
+            var difficultyColorsList = new List<Color>();
+
+            for (int i = 1; i <= 10; i++)
+            {
+                Color color = GetGradientColor(i);
+                difficultyColorsList.Add(color);
+                Debug.Log($"[StageInfoModal] 난이도 {i}: RGB({(int)(color.r*255)}, {(int)(color.g*255)}, {(int)(color.b*255)})");
+            }
+
+            difficultyColors = difficultyColorsList.ToArray();
+        }
+
+        /// <summary>
+        /// 난이도별 그라데이션 색상 생성 (1-10: 초록->노랑->주황->빨강->보라)
+        /// </summary>
+        private Color GetGradientColor(int difficulty)
+        {
+            // 난이도를 0-1 범위로 정규화
+            float t = (difficulty - 1) / 9f;
+
+            // 5단계 색상 포인트 정의
+            Color[] colorPoints = {
+                new Color(0.0f, 0.8f, 0.0f),   // 밝은 초록
+                new Color(0.5f, 1.0f, 0.0f),   // 연두
+                new Color(1.0f, 1.0f, 0.0f),   // 노랑
+                new Color(1.0f, 0.5f, 0.0f),   // 주황
+                new Color(1.0f, 0.0f, 0.0f),   // 빨강
+                new Color(0.8f, 0.0f, 0.8f)    // 보라
+            };
+
+            // t 값에 따라 적절한 색상 구간에서 보간
+            float scaledT = t * (colorPoints.Length - 1);
+            int index = Mathf.FloorToInt(scaledT);
+            float localT = scaledT - index;
+
+            // 마지막 색상을 넘지 않도록 제한
+            if (index >= colorPoints.Length - 1)
+            {
+                return colorPoints[colorPoints.Length - 1];
+            }
+
+            // 두 색상 사이에서 보간
+            return Color.Lerp(colorPoints[index], colorPoints[index + 1], localT);
+        }
+
+        /// <summary>
+        /// 난이도에 따른 색상 반환 (안전장치 포함)
+        /// </summary>
+        private Color GetDifficultyColor(int difficulty)
+        {
+            // difficultyColors 배열이 없으면 즉시 그라데이션 색상 계산
+            if (difficultyColors == null || difficultyColors.Length != 10)
+            {
+                Debug.LogWarning($"[StageInfoModal] difficultyColors 배열 문제 - 직접 그라데이션 색상 계산");
+                if (difficulty >= 1 && difficulty <= 10)
+                {
+                    return GetGradientColor(difficulty);
+                }
+                return Color.gray;
+            }
+
+            // 유효한 범위 체크
+            if (difficulty >= 1 && difficulty <= 10)
+            {
+                return difficultyColors[difficulty - 1];
+            }
+
+            // 폴백 색상 (회색)
+            Debug.LogWarning($"[StageInfoModal] 유효하지 않은 난이도: {difficulty}");
+            return Color.gray;
+        }
 
         /// <summary>
         /// 난이도 문자열 반환 (웹과 동기화된 1-10 매핑)
