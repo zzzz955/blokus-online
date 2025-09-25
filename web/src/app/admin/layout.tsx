@@ -70,7 +70,11 @@ export default function AdminLayout({
   return (
     <Layout>
       <div className="admin-layout" data-admin={JSON.stringify(admin)}>
-        {children}
+        <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+          <div className="border-4 border-dashed border-dark-border rounded-lg p-6 bg-dark-card">
+            {children}
+          </div>
+        </div>
       </div>
     </Layout>
   );

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useSession } from 'next-auth/react';
 import { useForm } from 'react-hook-form';
 import Button from '@/components/ui/Button';
 import { api } from '@/utils/api';
@@ -11,6 +12,7 @@ interface ContactFormProps {
 }
 
 export default function ContactForm({ onSuccess }: ContactFormProps) {
+  const { data: session } = useSession();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -22,11 +24,25 @@ export default function ContactForm({ onSuccess }: ContactFormProps) {
   } = useForm<ContactFormType>();
 
   const onSubmit = async (data: ContactFormType) => {
+    if (!session?.user) {
+      setSubmitMessage({
+        type: 'error',
+        message: '로그인이 필요합니다.',
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitMessage(null);
 
     try {
-      await api.post('/api/support', data);
+      // Include user email from session
+      const ticketData = {
+        ...data,
+        email: session.user.email,
+      };
+
+      await api.post('/api/support', ticketData);
       setSubmitMessage({
         type: 'success',
         message: '문의가 성공적으로 접수되었습니다. 빠른 시일 내에 답변드리겠습니다.',
@@ -43,29 +59,24 @@ export default function ContactForm({ onSuccess }: ContactFormProps) {
     }
   };
 
+  if (!session?.user) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-gray-400 mb-4">문의를 작성하려면 로그인이 필요합니다.</p>
+        <Button onClick={() => window.location.href = '/auth/signin?callbackUrl=/support'}>
+          로그인하기
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      {/* 이메일 */}
-      <div>
-        <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
-          이메일 주소 *
-        </label>
-        <input
-          type="email"
-          id="email"
-          {...register('email', {
-            required: '이메일 주소를 입력해주세요.',
-            pattern: {
-              value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-              message: '올바른 이메일 형식이 아닙니다.',
-            },
-          })}
-          className="input-field bg-dark-card border-dark-border text-white"
-          placeholder="your@email.com"
-        />
-        {errors.email && (
-          <p className="mt-1 text-sm text-red-400">{errors.email.message}</p>
-        )}
+      {/* 문의자 정보 표시 */}
+      <div className="bg-dark-card border border-dark-border rounded-lg p-4">
+        <h4 className="text-sm font-medium text-gray-300 mb-2">문의자 정보</h4>
+        <p className="text-white font-medium">{session.user.name || session.user.email}</p>
+        <p className="text-gray-400 text-sm">{session.user.email}</p>
       </div>
 
       {/* 제목 */}
@@ -83,7 +94,7 @@ export default function ContactForm({ onSuccess }: ContactFormProps) {
               message: '제목은 200자 이하로 입력해주세요.',
             },
           })}
-          className="input-field bg-dark-card border-dark-border text-white"
+          className="w-full px-4 py-3 bg-dark-card border border-dark-border rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
           placeholder="문의 제목을 입력해주세요"
         />
         {errors.subject && (
@@ -106,7 +117,7 @@ export default function ContactForm({ onSuccess }: ContactFormProps) {
               message: '메시지는 2000자 이하로 입력해주세요.',
             },
           })}
-          className="input-field bg-dark-card border-dark-border text-white resize-none"
+          className="w-full px-4 py-3 bg-dark-card border border-dark-border rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 resize-none"
           placeholder="문의하실 내용을 자세히 작성해주세요..."
         />
         {errors.message && (
@@ -138,7 +149,7 @@ export default function ContactForm({ onSuccess }: ContactFormProps) {
       </Button>
 
       <p className="text-sm text-gray-400 text-center">
-        개인정보 보호를 위해 이메일 주소는 답변 목적으로만 사용됩니다.
+        문의하신 내용은 관리자 검토 후 등록하신 이메일로 답변드립니다.
       </p>
     </form>
   );
