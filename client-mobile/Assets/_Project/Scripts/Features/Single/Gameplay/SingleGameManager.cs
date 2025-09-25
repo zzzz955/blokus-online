@@ -315,7 +315,7 @@ namespace Features.Single.Gameplay
             _currentScore = 0;
             OnTotalScoreUpdated?.Invoke(_currentScore);    // UI 초기 표기 0
 
-            RemainingUndo = Mathf.Max(0, payload.MaxUndoCount > 0 ? payload.MaxUndoCount : maxUndo);
+            RemainingUndo = Mathf.Max(0, payload.MaxUndoCount >= 0 ? payload.MaxUndoCount : maxUndo);
             OnUndoCountChanged?.Invoke(RemainingUndo);
 
             // 보드 준비
@@ -465,7 +465,7 @@ namespace Features.Single.Gameplay
                 BoardSize = 20,
                 Difficulty = stageData.difficulty,
                 TimeLimit = stageData.time_limit,
-                MaxUndoCount = stageData.max_undo_count > 0 ? stageData.max_undo_count : maxUndo,
+                MaxUndoCount = stageData.max_undo_count >= 0 ? stageData.max_undo_count : maxUndo,
                 ParScore = stageData.optimal_score
             };
 
