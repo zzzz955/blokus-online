@@ -57,7 +57,7 @@ export default function Header() {
     { name: '자유 게시판', href: '/posts' },
     { name: '공지사항', href: '/announcements' },
     { name: '패치 노트', href: '/patch-notes' },
-    { name: session?.user ? '내 문의' : '고객지원', href: session?.user ? '/support' : '/contact' },
+    { name: '고객지원', href: '/support', requireAuth: true },
   ];
 
   // 관리자 네비게이션
@@ -68,6 +68,7 @@ export default function Header() {
     { name: '스테이지', href: '/admin/stages' },
     { name: '후기', href: '/admin/testimonials' },
     { name: '게시글', href: '/admin/posts' },
+    { name: '고객지원', href: '/admin/support' },
     { name: '통계', href: '/admin/stats' },
     { name: '배치', href: '/admin/batch' },
   ];
@@ -92,19 +93,26 @@ export default function Header() {
 
           {/* 데스크톱 네비게이션 */}
           <nav className="hidden md:flex space-x-4">
-            {navigation.map((item) => (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={`px-2 py-2 text-sm font-medium transition-colors duration-200 ${
-                  pathname === item.href
-                    ? 'text-primary-400 border-b-2 border-primary-400'
-                    : 'text-gray-300 hover:text-white'
-                }`}
-              >
-                {item.name}
-              </Link>
-            ))}
+            {navigation.map((item) => {
+              // 인증이 필요한 메뉴이고 사용자가 로그인하지 않은 경우 로그인 페이지로 연결
+              const href = (item as any).requireAuth && !session?.user
+                ? `/auth/signin?callbackUrl=${encodeURIComponent(item.href)}`
+                : item.href;
+
+              return (
+                <Link
+                  key={item.name}
+                  href={href}
+                  className={`px-2 py-2 text-sm font-medium transition-colors duration-200 ${
+                    pathname === item.href
+                      ? 'text-primary-400 border-b-2 border-primary-400'
+                      : 'text-gray-300 hover:text-white'
+                  }`}
+                >
+                  {item.name}
+                </Link>
+              );
+            })}
           </nav>
 
           {/* 로그인/사용자 영역 */}
@@ -192,16 +200,23 @@ export default function Header() {
         {isMenuOpen && (
           <div className="md:hidden">
             <div className="px-2 pt-2 pb-3 space-y-1 bg-dark-card rounded-lg mt-2">
-              {navigation.map((item) => (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className="text-gray-300 hover:text-white block px-3 py-2 text-base font-medium transition-colors duration-200"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  {item.name}
-                </Link>
-              ))}
+              {navigation.map((item) => {
+                // 인증이 필요한 메뉴이고 사용자가 로그인하지 않은 경우 로그인 페이지로 연결
+                const href = (item as any).requireAuth && !session?.user
+                  ? `/auth/signin?callbackUrl=${encodeURIComponent(item.href)}`
+                  : item.href;
+
+                return (
+                  <Link
+                    key={item.name}
+                    href={href}
+                    className="text-gray-300 hover:text-white block px-3 py-2 text-base font-medium transition-colors duration-200"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    {item.name}
+                  </Link>
+                );
+              })}
               
               {/* 모바일 로그인/사용자 영역 */}
               <div className="pt-2 border-t border-gray-600">

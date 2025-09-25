@@ -389,8 +389,8 @@ export default function ProfilePage() {
                   </div>
                 </Link>
 
-                <Link 
-                  href="/profile/support"
+                <Link
+                  href="/support"
                   className="bg-dark-bg border border-dark-border rounded-lg p-4 hover:border-primary-500 transition-colors"
                 >
                   <div className="flex items-center space-x-3">

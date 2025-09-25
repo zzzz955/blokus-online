@@ -167,8 +167,7 @@ export default function AdminAnnouncementsPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
-      <div className="border-4 border-dashed border-dark-border rounded-lg p-6 bg-dark-card">
+    <div>
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-white">공지사항 관리</h1>
           <button
@@ -328,7 +327,6 @@ export default function AdminAnnouncementsPage() {
             )}
           </div>
         </div>
-      </div>
     </div>
   );
 }

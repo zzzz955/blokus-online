@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { ApiResponse, PaginatedResponse, ContactForm } from '@/types';
+import { ApiResponse, PaginatedResponse } from '@/types';
 
 // API 라우트가 빌드 타임에 실행되지 않도록 설정
 export const runtime = 'nodejs';
@@ -11,27 +11,30 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    const body: ContactForm = await request.json();
+
+    // 인증된 사용자만 문의 작성 가능
+    if (!session?.user?.id) {
+      const response: ApiResponse = {
+        success: false,
+        error: '로그인이 필요합니다.',
+      };
+      return NextResponse.json(response, { status: 401 });
+    }
+
+    const body: { email: string; subject: string; message: string } = await request.json();
     const { email, subject, message } = body;
 
     // 기본 유효성 검사
-    if (!email || !subject || !message) {
+    if (!subject || !message) {
       const response: ApiResponse = {
         success: false,
-        error: '모든 필드를 입력해주세요.',
+        error: '제목과 내용을 모두 입력해주세요.',
       };
       return NextResponse.json(response, { status: 400 });
     }
 
-    // 이메일 형식 검사
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      const response: ApiResponse = {
-        success: false,
-        error: '올바른 이메일 형식이 아닙니다.',
-      };
-      return NextResponse.json(response, { status: 400 });
-    }
+    // 사용자 이메일 사용 (세션에서 가져옴)
+    const userEmail = session.user.email || email;
 
     // 내용 길이 검사
     if (subject.length > 200) {
@@ -50,11 +53,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(response, { status: 400 });
     }
 
-    // DB에 저장 (로그인 사용자인 경우 userId 연결)
+    // DB에 저장 (인증된 사용자의 userId 연결)
     const ticket = await prisma.supportTicket.create({
       data: {
-        userId: session?.user?.id ? parseInt(session.user.id) : null,
-        email,
+        userId: parseInt(session.user.id),
+        email: userEmail,
         subject,
         message,
         status: 'PENDING',

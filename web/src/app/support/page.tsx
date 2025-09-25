@@ -7,20 +7,23 @@ import Link from 'next/link';
 import Layout from '@/components/layout/Layout';
 import Card, { CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
-import { 
-  MessageSquare, 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
-  Plus, 
+import {
+  MessageSquare,
+  Clock,
+  CheckCircle,
+  XCircle,
+  Plus,
   Home,
   Loader2,
   Mail,
-  Calendar
+  Calendar,
+  List,
+  Edit
 } from 'lucide-react';
 import { formatDate } from '@/utils/format';
 import { api } from '@/utils/api';
 import { SupportTicket, PaginatedResponse } from '@/types';
+import ContactForm from '@/components/forms/ContactForm';
 
 export default function SupportPage() {
   const { data: session, status } = useSession();
@@ -30,6 +33,7 @@ export default function SupportPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [activeTab, setActiveTab] = useState<'list' | 'create'>('list');
 
   const fetchTickets = async (page: number = 1) => {
     try {
@@ -58,6 +62,11 @@ export default function SupportPage() {
 
   const handlePageChange = (page: number) => {
     fetchTickets(page);
+  };
+
+  const handleFormSuccess = () => {
+    setActiveTab('list');
+    fetchTickets(1); // 새 문의 작성 후 목록 새로고침
   };
 
   const getStatusIcon = (status: string) => {
@@ -149,10 +158,10 @@ export default function SupportPage() {
           {/* Header */}
           <div className="text-center mb-12">
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-6">
-              내 문의
+              고객 지원
             </h1>
             <p className="text-xl text-gray-400 mb-8">
-              제출한 문의 사항과 답변을 확인하실 수 있습니다.
+              문의사항을 작성하거나 기존 문의 내역을 확인하실 수 있습니다.
             </p>
             <div className="flex justify-center space-x-4">
               <Link href="/">
@@ -161,106 +170,148 @@ export default function SupportPage() {
                   <span>홈으로</span>
                 </Button>
               </Link>
-              <Link href="/contact">
-                <Button className="flex items-center space-x-2">
-                  <Plus className="w-4 h-4" />
-                  <span>새 문의 작성</span>
-                </Button>
-              </Link>
             </div>
           </div>
 
-          {/* 사용자 정보 */}
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Mail className="w-5 h-5" />
-                <span>문의자 정보</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center space-x-4">
-                <div>
-                  <p className="text-white font-medium">{session.user.name || session.user.email}</p>
-                  <p className="text-gray-400 text-sm">{session.user.email}</p>
-                </div>
-                <div className="ml-auto">
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-primary-900/30 text-primary-400 border border-primary-500/30">
-                    등록된 사용자
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Tab Navigation */}
+          <div className="flex justify-center mb-8">
+            <div className="flex bg-dark-card rounded-lg p-1 border border-dark-border">
+              <button
+                onClick={() => setActiveTab('list')}
+                className={`flex items-center space-x-2 px-6 py-3 rounded-md font-medium transition-all ${
+                  activeTab === 'list'
+                    ? 'bg-primary-500 text-white shadow-lg'
+                    : 'text-gray-400 hover:text-white hover:bg-dark-border'
+                }`}
+              >
+                <List className="w-4 h-4" />
+                <span>내 문의</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('create')}
+                className={`flex items-center space-x-2 px-6 py-3 rounded-md font-medium transition-all ${
+                  activeTab === 'create'
+                    ? 'bg-primary-500 text-white shadow-lg'
+                    : 'text-gray-400 hover:text-white hover:bg-dark-border'
+                }`}
+              >
+                <Edit className="w-4 h-4" />
+                <span>새 문의 작성</span>
+              </button>
+            </div>
+          </div>
 
-          {/* 문의 목록 */}
-          {tickets.length === 0 ? (
+          {/* Tab Content */}
+          {activeTab === 'create' ? (
+            /* 새 문의 작성 */
             <Card>
-              <CardContent className="text-center py-12">
-                <MessageSquare className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-400 text-lg mb-4">등록된 문의가 없습니다.</p>
-                <p className="text-gray-500 mb-6">궁금한 점이 있으시면 언제든 문의해주세요!</p>
-                <Link href="/contact">
-                  <Button className="flex items-center space-x-2">
-                    <Plus className="w-4 h-4" />
-                    <span>첫 문의 작성하기</span>
-                  </Button>
-                </Link>
+              <CardHeader>
+                <CardTitle>새 문의 작성</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ContactForm onSuccess={handleFormSuccess} />
               </CardContent>
             </Card>
           ) : (
+            /* 문의 목록 */
+            <div>
+              {/* 사용자 정보 */}
+              <Card className="mb-8">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Mail className="w-5 h-5" />
+                    <span>문의자 정보</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center space-x-4">
+                    <div>
+                      <p className="text-white font-medium">{session.user.name || session.user.email}</p>
+                      <p className="text-gray-400 text-sm">{session.user.email}</p>
+                    </div>
+                    <div className="ml-auto">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-primary-900/30 text-primary-400 border border-primary-500/30">
+                        등록된 사용자
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 문의 목록 */}
+              {tickets.length === 0 ? (
+                <Card>
+                  <CardContent className="text-center py-12">
+                    <MessageSquare className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-400 text-lg mb-4">등록된 문의가 없습니다.</p>
+                    <p className="text-gray-500 mb-6">궁금한 점이 있으시면 언제든 문의해주세요!</p>
+                    <Button
+                      onClick={() => setActiveTab('create')}
+                      className="flex items-center space-x-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>첫 문의 작성하기</span>
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
             <div className="space-y-6">
               {tickets.map((ticket) => (
                 <Card key={ticket.id} hover>
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <CardTitle className="text-lg mb-2">{ticket.subject}</CardTitle>
-                        <div className="flex items-center space-x-4 text-sm text-gray-400">
-                          <div className="flex items-center space-x-1">
-                            <Calendar className="w-4 h-4" />
-                            <span>{formatDate(ticket.createdAt)}</span>
-                          </div>
-                          <div className="flex items-center space-x-1">
-                            {getStatusIcon(ticket.status)}
-                            <span 
-                              className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(ticket.status)}`}
-                            >
-                              {getStatusText(ticket.status)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {/* 원본 문의 */}
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-300 mb-2">문의 내용</h4>
-                        <div className="bg-gray-700/30 rounded-lg p-4">
-                          <p className="text-gray-300 whitespace-pre-wrap">{ticket.message}</p>
-                        </div>
-                      </div>
-
-                      {/* 관리자 답변 */}
-                      {ticket.adminReply && (
-                        <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="text-sm font-medium text-green-400">관리자 답변</h4>
-                            {ticket.repliedAt && (
-                              <span className="text-xs text-gray-500">
-                                {formatDate(ticket.repliedAt)}
+                  <Link href={`/support/${ticket.id}`}>
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <CardTitle className="text-lg mb-2 hover:text-primary-400 transition-colors">
+                            {ticket.subject}
+                          </CardTitle>
+                          <div className="flex items-center space-x-4 text-sm text-gray-400">
+                            <div className="flex items-center space-x-1">
+                              <Calendar className="w-4 h-4" />
+                              <span>{formatDate(ticket.createdAt)}</span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              {getStatusIcon(ticket.status)}
+                              <span
+                                className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(ticket.status)}`}
+                              >
+                                {getStatusText(ticket.status)}
                               </span>
-                            )}
-                          </div>
-                          <div className="bg-green-900/20 border border-green-500/30 rounded-lg p-4">
-                            <p className="text-gray-300 whitespace-pre-wrap">{ticket.adminReply}</p>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <MessageSquare className="w-4 h-4" />
+                              <span>#{ticket.id}</span>
+                            </div>
                           </div>
                         </div>
-                      )}
-                    </div>
-                  </CardContent>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {/* 문의 미리보기 */}
+                        <div>
+                          <p className="text-gray-300 line-clamp-3">
+                            {ticket.message}
+                          </p>
+                        </div>
+
+                        {/* 관리자 답변 여부 표시 */}
+                        {ticket.adminReply && (
+                          <div className="bg-green-900/20 border border-green-500/30 rounded-lg p-3">
+                            <div className="flex items-center space-x-2">
+                              <MessageSquare className="w-4 h-4 text-green-400" />
+                              <span className="text-sm text-green-400 font-medium">관리자 답변 완료</span>
+                              {ticket.repliedAt && (
+                                <span className="text-xs text-gray-500">
+                                  {formatDate(ticket.repliedAt)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Link>
                 </Card>
               ))}
             </div>
@@ -313,6 +364,8 @@ export default function SupportPage() {
                   다음
                 </Button>
               </div>
+            </div>
+          )}
             </div>
           )}
         </div>

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Github, Mail, MessageCircle } from 'lucide-react';
+import { Github, Mail, Bug } from 'lucide-react';
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -29,16 +29,18 @@ export default function Footer() {
               <a
                 href="mailto:zzzzz955@gmail.com"
                 className="text-gray-400 hover:text-white transition-colors"
-                aria-label="이메일"
+                aria-label="이메일 문의"
               >
                 <Mail size={20} />
               </a>
               <a
-                href="/support"
+                href="https://github.com/zzzz955/blokus-online/issues"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-gray-400 hover:text-white transition-colors"
-                aria-label="고객지원"
+                aria-label="버그 신고"
               >
-                <MessageCircle size={20} />
+                <Bug size={20} />
               </a>
             </div>
           </div>
@@ -62,17 +64,12 @@ export default function Footer() {
                   패치 노트
                 </Link>
               </li>
-              <li>
-                <Link href="/support" className="text-gray-400 hover:text-white text-sm transition-colors">
-                  고객지원
-                </Link>
-              </li>
             </ul>
           </div>
 
-          {/* 다운로드 */}
+          {/* 지원 */}
           <div>
-            <h3 className="text-white font-semibold mb-4">다운로드</h3>
+            <h3 className="text-white font-semibold mb-4">지원</h3>
             <ul className="space-y-2">
               <li>
                 <Link href="/download" className="text-gray-400 hover:text-white text-sm transition-colors">
@@ -80,18 +77,18 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <a href="#" className="text-gray-400 hover:text-white text-sm transition-colors">
-                  시스템 요구사항
+                <a href="mailto:zzzzz955@gmail.com" className="text-gray-400 hover:text-white text-sm transition-colors">
+                  문의사항: zzzzz955@gmail.com
                 </a>
               </li>
               <li>
-                <a href="#" className="text-gray-400 hover:text-white text-sm transition-colors">
-                  설치 가이드
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-gray-400 hover:text-white text-sm transition-colors">
-                  문제 해결
+                <a
+                  href="https://github.com/zzzz955/blokus-online/issues"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-gray-400 hover:text-white text-sm transition-colors"
+                >
+                  버그 신고 (GitHub Issues)
                 </a>
               </li>
             </ul>

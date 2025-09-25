@@ -177,8 +177,7 @@ export default function AdminPatchNotesPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
-      <div className="border-4 border-dashed border-dark-border rounded-lg p-6 bg-dark-card">
+    <div>
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-white">패치노트 관리</h1>
           <button
@@ -351,7 +350,6 @@ export default function AdminPatchNotesPage() {
             )}
           </div>
         </div>
-      </div>
     </div>
   );
 }
