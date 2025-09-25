@@ -6,6 +6,7 @@ import BlockSelector from './BlockSelector';
 import { calculateOptimalScoreExact } from '@/lib/blokus/calc';
 import ThumbnailPreview from './ThumbnailPreview';
 import { BoardState, toLegacyBoardState, fromLegacyBoardState } from '@/lib/board-state-codec';
+import { getDifficultyLabel } from '@/lib/difficulty';
 
 function withTimeout<T>(promise: Promise<T>, ms: number, message = '계산 시간이 초과되었습니다.'): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -152,14 +153,6 @@ export default function StageEditor({ stage, onSave, onCancel }: StageEditorProp
     onSave(formData);
   };
 
-  const getDifficultyLabel = (difficulty: number) => {
-    const labels = {
-      1: '매우 쉬움', 2: '쉬움', 3: '보통', 4: '어려움',
-      5: '매우 어려움', 6: '극한', 7: '악몽', 8: '지옥',
-      9: '전설', 10: '신화'
-    };
-    return labels[difficulty as keyof typeof labels] || '알 수 없음';
-  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">

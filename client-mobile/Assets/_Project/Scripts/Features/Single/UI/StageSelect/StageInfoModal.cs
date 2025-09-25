@@ -58,7 +58,19 @@ namespace Features.Single.UI.StageSelect
         [Header("색상 설정 (Fallback)")]
         [SerializeField] private Color activeStarColor = Color.yellow;
         [SerializeField] private Color inactiveStarColor = Color.gray;
-        [SerializeField] private Color[] difficultyColors = { Color.green, Color.yellow, new Color(1f, 0.5f, 0f), Color.red };
+        // 웹과 동기화된 난이도별 색상 (1-10 레벨)
+        [SerializeField] private Color[] difficultyColors = {
+            new Color(0x22/255f, 0xc5/255f, 0x5e/255f), // 1: 매우 쉬움 - Green-400
+            new Color(0x84/255f, 0xcc/255f, 0x16/255f), // 2: 쉬움 - Lime-400
+            new Color(0xea/255f, 0xb3/255f, 0x08/255f), // 3: 보통 - Yellow-400
+            new Color(0xf9/255f, 0x73/255f, 0x16/255f), // 4: 어려움 - Orange-400
+            new Color(0xef/255f, 0x44/255f, 0x44/255f), // 5: 매우 어려움 - Red-400
+            new Color(0xdc/255f, 0x26/255f, 0x26/255f), // 6: 극한 - Red-500
+            new Color(0xb9/255f, 0x1c/255f, 0x1c/255f), // 7: 악몽 - Red-600
+            new Color(0x99/255f, 0x1b/255f, 0x1b/255f), // 8: 지옥 - Red-700
+            new Color(0x7c/255f, 0x2d/255f, 0x12/255f), // 9: 전설 - Red-800
+            new Color(0x45/255f, 0x1a/255f, 0x03/255f)  // 10: 신화 - Red-900
+        };
 
         // 현재 표시 중인 스테이지 정보
         private StageData currentStageData;
@@ -747,16 +759,22 @@ namespace Features.Single.UI.StageSelect
         // ========================================
 
         /// <summary>
-        /// 난이도 문자열 반환
+        /// 난이도 문자열 반환 (웹과 동기화된 1-10 매핑)
         /// </summary>
         private string GetDifficultyString(int difficulty)
         {
             switch (difficulty)
             {
-                case 1: return "쉬움";
-                case 2: return "보통";
-                case 3: return "어려움";
-                case 4: return "매우 어려움";
+                case 1: return "매우 쉬움";
+                case 2: return "쉬움";
+                case 3: return "보통";
+                case 4: return "어려움";
+                case 5: return "매우 어려움";
+                case 6: return "극한";
+                case 7: return "악몽";
+                case 8: return "지옥";
+                case 9: return "전설";
+                case 10: return "신화";
                 default: return "알 수 없음";
             }
         }
