@@ -368,12 +368,17 @@ namespace Features.Single.UI.StageSelect
             // 최대 되돌리기 횟수
             if (maxUndoText != null)
             {
-                if (currentStageData.max_undo_count > 0)
+                if (currentStageData.max_undo_count == 0)
+                {
+                    maxUndoText.text = "되돌리기: 사용 불가";
+                }
+                else if (currentStageData.max_undo_count > 0)
                 {
                     maxUndoText.text = $"되돌리기: {currentStageData.max_undo_count}회";
                 }
                 else
                 {
+                    // 서버에서 값이 설정되지 않은 경우 (음수 등)
                     maxUndoText.text = "되돌리기: 무제한";
                 }
             }

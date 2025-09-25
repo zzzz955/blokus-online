@@ -65,7 +65,7 @@ export default function AdminLoginPage() {
             관리자 로그인
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Blokus Online 관리자 페이지
+            Bloblo 관리자 페이지
           </p>
         </div>
         

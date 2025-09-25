@@ -103,7 +103,7 @@ export default function PatchNotesPage() {
               패치 노트
             </h1>
             <p className="text-xl text-gray-400">
-              블로커스 온라인의 업데이트 내역과 새로운 기능들을 확인하세요.
+              블로블로의 업데이트 내역과 새로운 기능들을 확인하세요.
             </p>
           </div>
 

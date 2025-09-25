@@ -58,7 +58,7 @@ function getLocalFilePath(platform: PlatformType, version: string): string {
     case 'desktop':
       return path.join(latestDir, `BlobloClient-Desktop-v${version}.zip`);
     case 'mobile':
-      return path.join(latestDir, `BlobloClient-Mobile-v${version}.apk`);
+      return path.join(latestDir, `bloblo-v${version}.apk`);
     default:
       return '';
   }
@@ -71,7 +71,7 @@ function getGitHubUrl(platform: PlatformType, version: string): string {
     case 'desktop':
       return `${baseUrl}/BlobloClient-Desktop-v${version}.zip`;
     case 'mobile':
-      return `${baseUrl}/BlobloClient-Mobile-v${version}.apk`;
+      return `${baseUrl}/bloblo-v${version}.apk`;
     default:
       return '';
   }
@@ -163,9 +163,9 @@ async function getLatestMultiPlatformRelease(): Promise<MultiPlatformReleaseInfo
         },
         mobile: {
           version: fallbackVersion,
-          filename: `BlobloClient-Mobile-v${fallbackVersion}.apk`,
+          filename: `bloblo-v${fallbackVersion}.apk`,
           githubUrl: getGitHubUrl('mobile', fallbackVersion),
-          available: true,
+          available: false, // APK 파일이 없을 경우 기본값을 false로 설정
           fileSize: 45000000,
           platform: 'mobile'
         }

@@ -44,7 +44,7 @@ export default function SignInPage() {
         <div className="max-w-md w-full space-y-8">
           <div>
             <h2 className="mt-6 text-center text-3xl font-extrabold text-white">
-              블로커스 온라인 회원가입
+              블로블로 회원가입
             </h2>
             <p className="mt-2 text-center text-sm text-gray-300">
               소셜 계정으로 간편하게 시작하세요

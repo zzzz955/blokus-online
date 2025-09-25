@@ -156,7 +156,7 @@ export default function PatchNoteDetailPage({ params }: PatchNoteDetailPageProps
                     이 버전 다운로드
                   </h3>
                   <p className="text-white mb-4">
-                    블로커스 온라인 v{patchNote.version}을 다운로드하여 최신 기능을 경험해보세요.
+                    블로블로 v{patchNote.version}을 다운로드하여 최신 기능을 경험해보세요.
                   </p>
                   <Link href={patchNote.downloadUrl}>
                     <Button size="lg" className="flex items-center space-x-2">

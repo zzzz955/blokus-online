@@ -85,7 +85,7 @@ export default function Header() {
                 {isAdminMode && <Settings size={16} className="text-white" />}
               </div>
               <span className="font-sans text-xl text-white">
-                {isAdminMode ? 'Blokus 관리자' : 'Blokus-online'}
+                {isAdminMode ? 'Bloblo 관리자' : 'Bloblo'}
               </span>
             </Link>
           </div>

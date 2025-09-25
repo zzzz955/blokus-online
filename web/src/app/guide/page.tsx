@@ -68,7 +68,7 @@ export default function GuidePage() {
               게임 가이드
             </h1>
             <p className="text-xl text-gray-400 max-w-3xl mx-auto">
-              블로커스의 규칙부터 고급 전략까지, 승리를 위한 모든 것을 알려드립니다.
+              블로블로의 규칙부터 고급 전략까지, 승리를 위한 모든 것을 알려드립니다.
             </p>
           </div>
 

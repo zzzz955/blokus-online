@@ -60,6 +60,10 @@ namespace Features.Multi.UI
         [Header("줌/팬 기능")]
         [SerializeField] private GameBoardZoomPan zoomPanComponent;
 
+        [Header("파티클 효과")]
+        [SerializeField] private BlockPlacementParticleEffect particleEffect;
+        [SerializeField] private SimpleDustEffect simpleDustEffect; // UI 기반 대체 효과
+
         // 내부 상태
         private SharedGameLogic gameLogic;
         private GameObject[,] cellObjects;
@@ -320,7 +324,10 @@ namespace Features.Multi.UI
                 }
                 
                 Debug.Log($"[MultiGameBoard] {playerType} 블록 배치 완료: {updatedCells}/{occupiedCells.Count}개 셀 업데이트");
-                
+
+                // 파티클 효과 재생
+                PlayBlockPlacementEffect(occupiedCells);
+
                 // 내 블록이면 미리보기 정리, 상대 블록이면 정리하지 않음
                 if (isMyBlock)
                 {
@@ -452,18 +459,19 @@ namespace Features.Multi.UI
             if (previewBlock == null) return;
 
             var cells = previewBlock.GetAbsolutePositions(previewPosition);
-            bool canPlace = gameLogic.CanPlaceBlock(previewBlock, previewPosition);
-            var col = canPlace ? previewColor : invalidColor;
 
             foreach (var pos in cells)
             {
                 if (!ValidationUtility.IsValidPosition(pos)) continue;
                 if (pos.row >= boardSize || pos.col >= boardSize) continue;
 
-                if (gameLogic.GetCellColor(pos) == PlayerColor.None)
+                // 셀별 배치 상태 분석 및 호버 효과 적용
+                CellHoverEffect.HoverState cellState = AnalyzeCellPlacementState(pos);
+
+                var cellHoverEffect = GetCellHoverEffect(pos.row, pos.col);
+                if (cellHoverEffect != null)
                 {
-                    var img = cellImages[pos.row, pos.col];
-                    if (img != null) img.color = col;
+                    cellHoverEffect.SetHoverState(cellState);
                 }
             }
         }
@@ -478,10 +486,11 @@ namespace Features.Multi.UI
                 if (!ValidationUtility.IsValidPosition(pos)) continue;
                 if (pos.row >= boardSize || pos.col >= boardSize) continue;
 
-                if (gameLogic.GetCellColor(pos) == PlayerColor.None)
+                // 호버 효과 제거
+                var cellHoverEffect = GetCellHoverEffect(pos.row, pos.col);
+                if (cellHoverEffect != null)
                 {
-                    var img = cellImages[pos.row, pos.col];
-                    if (img != null) img.color = emptyColor;
+                    cellHoverEffect.SetHoverState(CellHoverEffect.HoverState.None);
                 }
             }
 
@@ -566,7 +575,7 @@ namespace Features.Multi.UI
                 }
             }
 
-            PositionActionButtonsAtBlock();
+            // PositionActionButtonsAtBlock(); // 제거됨: ActionButtonPanel 호버링 기능 비활성화
         }
 
         private void HideActionButtons()
@@ -577,136 +586,9 @@ namespace Features.Multi.UI
             actionButtonPanel.gameObject.SetActive(false);
         }
 
-        private void PositionActionButtonsAtBlock()
-        {
-            if (!actionButtonsVisible || actionButtonPanel == null || pendingBlock == null)
-            {
-                Debug.LogWarning($"[MultiGameBoard] ActionButtonPanel 위치 설정 실패 - actionButtonsVisible: {actionButtonsVisible}, actionButtonPanel: {actionButtonPanel != null}, pendingBlock: {pendingBlock != null}");
-                return;
-            }
+        // PositionActionButtonsAtBlock() 메서드 제거됨: ActionButtonPanel 호버링 기능 비활성화
 
-            // Debug.Log($"[MultiGameBoard] ActionButtonPanel 위치 계산 시작 - 블록: {pendingBlock.Type}, 위치: ({pendingPosition.row}, {pendingPosition.col})");
-
-            // 펜딩 블록 경계 계산
-            var blockPositions = pendingBlock.GetAbsolutePositions(pendingPosition);
-            int minRow = int.MaxValue, maxRow = int.MinValue;
-            int minCol = int.MaxValue, maxCol = int.MinValue;
-
-            foreach (var pos in blockPositions)
-            {
-                if (ValidationUtility.IsValidPosition(pos) && pos.row < boardSize && pos.col < boardSize)
-                {
-                    minRow = Mathf.Min(minRow, pos.row);
-                    maxRow = Mathf.Max(maxRow, pos.row);
-                    minCol = Mathf.Min(minCol, pos.col);
-                    maxCol = Mathf.Max(maxCol, pos.col);
-                }
-            }
-            if (minRow == int.MaxValue) return;
-
-            // Canvas 좌표로 변환/적용
-            Canvas canvas = GetComponentInParent<Canvas>();
-            if (canvas == null) return;
-
-            Camera uiCamera = canvas.worldCamera ?? Camera.main;
-            RectTransform canvasRect = canvas.GetComponent<RectTransform>();
-            RectTransform buttonRect = actionButtonPanel;
-
-            if (buttonRect != null && uiCamera != null)
-            {
-                Vector2 panelSize = buttonRect.sizeDelta;
-                float safeMargin = 20f; // 안전 마진 증가
-
-                // 여러 위치 후보를 시도 (우선순위: 우상 → 좌상 → 우하 → 좌하)
-                Vector3[] candidateWorldPositions = new Vector3[]
-                {
-                    BoardToWorld(new Position(minRow, maxCol)), // 우측 상단
-                    BoardToWorld(new Position(minRow, minCol)), // 좌측 상단  
-                    BoardToWorld(new Position(maxRow, maxCol)), // 우측 하단
-                    BoardToWorld(new Position(maxRow, minCol))  // 좌측 하단
-                };
-
-                Vector2[] offsets = new Vector2[]
-                {
-                    new Vector2(cellSize * 0.5f + panelSize.x * 0.5f + safeMargin, cellSize * 0.5f + panelSize.y * 0.5f + safeMargin),   // 우상
-                    new Vector2(-(cellSize * 0.5f + panelSize.x * 0.5f + safeMargin), cellSize * 0.5f + panelSize.y * 0.5f + safeMargin), // 좌상
-                    new Vector2(cellSize * 0.5f + panelSize.x * 0.5f + safeMargin, -(cellSize * 0.5f + panelSize.y * 0.5f + safeMargin)), // 우하
-                    new Vector2(-(cellSize * 0.5f + panelSize.x * 0.5f + safeMargin), -(cellSize * 0.5f + panelSize.y * 0.5f + safeMargin)) // 좌하
-                };
-
-                Vector2 finalPosition = Vector2.zero;
-                bool positionFound = false;
-
-                // 각 위치 후보를 시도하여 화면 안에 들어오는 첫 번째 위치 사용
-                for (int i = 0; i < candidateWorldPositions.Length; i++)
-                {
-                    Vector2 screenPos = uiCamera.WorldToScreenPoint(candidateWorldPositions[i]);
-                    if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screenPos, uiCamera, out var localPos))
-                    {
-                        Vector2 candidatePosition = localPos + offsets[i];
-
-                        // 화면 경계 체크 (실제 화면 크기 기준)
-                        if (IsPositionWithinScreenBounds(candidatePosition, panelSize, canvasRect, safeMargin))
-                        {
-                            finalPosition = candidatePosition;
-                            positionFound = true;
-                            break;
-                        }
-                    }
-                }
-
-                // 모든 후보가 실패하면 강제 클램핑으로 화면 안에 위치시키기
-                if (!positionFound)
-                {
-                    Vector2 screenPos = uiCamera.WorldToScreenPoint(candidateWorldPositions[0]);
-                    if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screenPos, uiCamera, out var localPos))
-                    {
-                        Vector2 targetPosition = localPos + offsets[0];
-                        finalPosition = ClampPositionToScreenBounds(targetPosition, panelSize, canvasRect, safeMargin);
-                    }
-                }
-
-                // 최종 위치 설정
-                buttonRect.anchoredPosition = finalPosition;
-
-                // Debug.Log($"[MultiGameBoard] ActionButtonPanel 위치 설정 완료 - 최종: {finalPosition}");
-            }
-        }
-
-        /// <summary>
-        /// 주어진 위치가 화면 경계 안에 있는지 확인
-        /// </summary>
-        private bool IsPositionWithinScreenBounds(Vector2 position, Vector2 panelSize, RectTransform canvasRect, float safeMargin)
-        {
-            Vector2 canvasSize = canvasRect.sizeDelta;
-            Vector2 panelHalfSize = panelSize * 0.5f;
-
-            float minX = -canvasSize.x * 0.5f + panelHalfSize.x + safeMargin;
-            float maxX = canvasSize.x * 0.5f - panelHalfSize.x - safeMargin;
-            float minY = -canvasSize.y * 0.5f + panelHalfSize.y + safeMargin;
-            float maxY = canvasSize.y * 0.5f - panelHalfSize.y - safeMargin;
-
-            return position.x >= minX && position.x <= maxX && position.y >= minY && position.y <= maxY;
-        }
-
-        /// <summary>
-        /// 위치를 화면 경계 안으로 강제 클램핑
-        /// </summary>
-        private Vector2 ClampPositionToScreenBounds(Vector2 position, Vector2 panelSize, RectTransform canvasRect, float safeMargin)
-        {
-            Vector2 canvasSize = canvasRect.sizeDelta;
-            Vector2 panelHalfSize = panelSize * 0.5f;
-
-            float minX = -canvasSize.x * 0.5f + panelHalfSize.x + safeMargin;
-            float maxX = canvasSize.x * 0.5f - panelHalfSize.x - safeMargin;
-            float minY = -canvasSize.y * 0.5f + panelHalfSize.y + safeMargin;
-            float maxY = canvasSize.y * 0.5f - panelHalfSize.y - safeMargin;
-
-            return new Vector2(
-                Mathf.Clamp(position.x, minX, maxX),
-                Mathf.Clamp(position.y, minY, maxY)
-            );
-        }
+        // IsPositionWithinScreenBounds() 및 ClampPositionToScreenBounds() 메서드 제거됨: ActionButtonPanel 호버링 기능 비활성화
 
         private Vector3 BoardToWorld(Position p)
         {
@@ -1016,6 +898,193 @@ namespace Features.Multi.UI
             }
 
             Debug.Log($"[MultiGameBoard] 모든 셀의 raycastTarget 설정 완료: {enableCellRaycast}");
+        }
+
+        // ========================================
+        // 새로운 호버링 시스템 메서드들
+        // ========================================
+
+        /// <summary>
+        /// 셀의 배치 상태를 분석하여 호버 상태를 반환
+        /// </summary>
+        /// <param name="pos">분석할 셀 위치</param>
+        /// <returns>해당 셀의 호버 상태</returns>
+        private CellHoverEffect.HoverState AnalyzeCellPlacementState(Position pos)
+        {
+            // 해당 셀이 이미 점유되어 있는지 확인
+            PlayerColor cellColor = gameLogic.GetCellColor(pos);
+            if (cellColor != PlayerColor.None)
+            {
+                return CellHoverEffect.HoverState.Occupied;
+            }
+
+            // 현재 블록이 해당 위치에 배치 가능한지 전체적으로 확인
+            if (previewBlock != null)
+            {
+                bool canPlace = gameLogic.CanPlaceBlock(previewBlock, previewPosition);
+
+                // 전체 블록이 배치 불가능하면 이 셀도 규칙 위반
+                if (!canPlace)
+                {
+                    return CellHoverEffect.HoverState.RuleViolation;
+                }
+            }
+
+            // 배치 가능한 상태
+            return CellHoverEffect.HoverState.Placeable;
+        }
+
+        /// <summary>
+        /// 특정 셀의 CellHoverEffect 컴포넌트를 반환
+        /// </summary>
+        /// <param name="row">행</param>
+        /// <param name="col">열</param>
+        /// <returns>CellHoverEffect 컴포넌트 (없으면 null)</returns>
+        private CellHoverEffect GetCellHoverEffect(int row, int col)
+        {
+            if (cellObjects == null || row < 0 || row >= boardSize || col < 0 || col >= boardSize)
+                return null;
+
+            var cellObject = cellObjects[row, col];
+            if (cellObject == null)
+                return null;
+
+            // CellHoverEffect 컴포넌트가 없으면 자동으로 추가
+            var hoverEffect = cellObject.GetComponent<CellHoverEffect>();
+            if (hoverEffect == null)
+            {
+                hoverEffect = cellObject.AddComponent<CellHoverEffect>();
+                Debug.Log($"[MultiGameBoard] CellHoverEffect 컴포넌트를 셀 ({row},{col})에 자동 추가함");
+            }
+
+            return hoverEffect;
+        }
+
+        /// <summary>
+        /// 모든 셀의 호버 효과를 클리어
+        /// </summary>
+        public void ClearAllHoverEffects()
+        {
+            if (cellObjects == null) return;
+
+            for (int row = 0; row < boardSize; row++)
+            {
+                for (int col = 0; col < boardSize; col++)
+                {
+                    var hoverEffect = GetCellHoverEffect(row, col);
+                    if (hoverEffect != null)
+                    {
+                        hoverEffect.SetHoverState(CellHoverEffect.HoverState.None);
+                    }
+                }
+            }
+        }
+
+        // ========================================
+        // 파티클 효과 시스템
+        // ========================================
+
+        /// <summary>
+        /// 블록 배치 시 파티클 효과 재생 (Multi용 - Position 리스트 사용)
+        /// </summary>
+        /// <param name="occupiedCells">배치된 셀들의 위치 리스트</param>
+        private void PlayBlockPlacementEffect(List<Position> occupiedCells)
+        {
+            // 기존 파티클 시스템 효과
+            if (particleEffect == null)
+            {
+                // 파티클 효과 컴포넌트가 없으면 자동 생성
+                InitializeParticleEffect();
+            }
+
+            if (particleEffect != null && occupiedCells != null && occupiedCells.Count > 0)
+            {
+                // 셀들의 월드 좌표 계산
+                List<Vector3> worldPositions = new List<Vector3>();
+                foreach (var pos in occupiedCells)
+                {
+                    if (ValidationUtility.IsValidPosition(pos) && pos.row < boardSize && pos.col < boardSize)
+                    {
+                        Vector3 worldPos = BoardToWorld(pos);
+                        worldPositions.Add(worldPos);
+                    }
+                }
+
+                // 파티클 효과 재생
+                particleEffect.PlayDustEffectForBlock(worldPositions, cellSize);
+            }
+
+            // UI 기반 대체 효과도 함께 재생 (더 확실한 가시성)
+            if (simpleDustEffect == null)
+            {
+                InitializeSimpleDustEffect();
+            }
+
+            if (simpleDustEffect != null && occupiedCells != null && occupiedCells.Count > 0)
+            {
+                // 셀들의 월드 좌표 계산
+                List<Vector3> worldPositions = new List<Vector3>();
+                foreach (var pos in occupiedCells)
+                {
+                    if (ValidationUtility.IsValidPosition(pos) && pos.row < boardSize && pos.col < boardSize)
+                    {
+                        Vector3 worldPos = BoardToWorld(pos);
+                        worldPositions.Add(worldPos);
+                    }
+                }
+
+                // UI 기반 효과 재생
+                simpleDustEffect.PlayDustEffectForBlock(worldPositions);
+            }
+        }
+
+        /// <summary>
+        /// 파티클 효과 컴포넌트 초기화
+        /// </summary>
+        private void InitializeParticleEffect()
+        {
+            if (particleEffect != null) return;
+
+            // 파티클 효과용 GameObject 생성
+            GameObject particleObject = new GameObject("BlockPlacementParticles");
+            particleObject.transform.SetParent(transform, false);
+            particleObject.transform.localPosition = Vector3.zero;
+
+            // 컴포넌트 추가
+            particleEffect = particleObject.AddComponent<BlockPlacementParticleEffect>();
+
+            Debug.Log("[MultiGameBoard] 블록 배치 파티클 효과 시스템 자동 생성됨");
+        }
+
+        /// <summary>
+        /// UI 기반 흙먼지 효과 컴포넌트 초기화
+        /// </summary>
+        private void InitializeSimpleDustEffect()
+        {
+            if (simpleDustEffect != null) return;
+
+            // UI 기반 효과용 GameObject 생성
+            GameObject dustObject = new GameObject("SimpleDustEffect");
+            dustObject.transform.SetParent(transform, false);
+            dustObject.transform.localPosition = Vector3.zero;
+
+            // 컴포넌트 추가
+            simpleDustEffect = dustObject.AddComponent<SimpleDustEffect>();
+
+            Debug.Log("[MultiGameBoard] UI 기반 흙먼지 효과 시스템 자동 생성됨");
+        }
+
+        /// <summary>
+        /// 파티클 효과 테스트 (디버그용)
+        /// </summary>
+        [System.Diagnostics.Conditional("UNITY_EDITOR")]
+        public void TestParticleEffect()
+        {
+            if (Application.isPlaying && particleEffect != null)
+            {
+                Vector3 testPos = BoardToWorld(new Position(10, 10));
+                particleEffect.PlayDustEffect(testPos);
+            }
         }
     }
 }
