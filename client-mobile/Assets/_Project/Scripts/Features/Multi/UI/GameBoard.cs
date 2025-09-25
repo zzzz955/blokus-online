@@ -60,6 +60,10 @@ namespace Features.Multi.UI
         [Header("줌/팬 기능")]
         [SerializeField] private GameBoardZoomPan zoomPanComponent;
 
+        [Header("파티클 효과")]
+        [SerializeField] private BlockPlacementParticleEffect particleEffect;
+        [SerializeField] private SimpleDustEffect simpleDustEffect; // UI 기반 대체 효과
+
         // 내부 상태
         private SharedGameLogic gameLogic;
         private GameObject[,] cellObjects;
@@ -320,7 +324,10 @@ namespace Features.Multi.UI
                 }
                 
                 Debug.Log($"[MultiGameBoard] {playerType} 블록 배치 완료: {updatedCells}/{occupiedCells.Count}개 셀 업데이트");
-                
+
+                // 파티클 효과 재생
+                PlayBlockPlacementEffect(occupiedCells);
+
                 // 내 블록이면 미리보기 정리, 상대 블록이면 정리하지 않음
                 if (isMyBlock)
                 {
@@ -970,6 +977,113 @@ namespace Features.Multi.UI
                         hoverEffect.SetHoverState(CellHoverEffect.HoverState.None);
                     }
                 }
+            }
+        }
+
+        // ========================================
+        // 파티클 효과 시스템
+        // ========================================
+
+        /// <summary>
+        /// 블록 배치 시 파티클 효과 재생 (Multi용 - Position 리스트 사용)
+        /// </summary>
+        /// <param name="occupiedCells">배치된 셀들의 위치 리스트</param>
+        private void PlayBlockPlacementEffect(List<Position> occupiedCells)
+        {
+            // 기존 파티클 시스템 효과
+            if (particleEffect == null)
+            {
+                // 파티클 효과 컴포넌트가 없으면 자동 생성
+                InitializeParticleEffect();
+            }
+
+            if (particleEffect != null && occupiedCells != null && occupiedCells.Count > 0)
+            {
+                // 셀들의 월드 좌표 계산
+                List<Vector3> worldPositions = new List<Vector3>();
+                foreach (var pos in occupiedCells)
+                {
+                    if (ValidationUtility.IsValidPosition(pos) && pos.row < boardSize && pos.col < boardSize)
+                    {
+                        Vector3 worldPos = BoardToWorld(pos);
+                        worldPositions.Add(worldPos);
+                    }
+                }
+
+                // 파티클 효과 재생
+                particleEffect.PlayDustEffectForBlock(worldPositions, cellSize);
+            }
+
+            // UI 기반 대체 효과도 함께 재생 (더 확실한 가시성)
+            if (simpleDustEffect == null)
+            {
+                InitializeSimpleDustEffect();
+            }
+
+            if (simpleDustEffect != null && occupiedCells != null && occupiedCells.Count > 0)
+            {
+                // 셀들의 월드 좌표 계산
+                List<Vector3> worldPositions = new List<Vector3>();
+                foreach (var pos in occupiedCells)
+                {
+                    if (ValidationUtility.IsValidPosition(pos) && pos.row < boardSize && pos.col < boardSize)
+                    {
+                        Vector3 worldPos = BoardToWorld(pos);
+                        worldPositions.Add(worldPos);
+                    }
+                }
+
+                // UI 기반 효과 재생
+                simpleDustEffect.PlayDustEffectForBlock(worldPositions);
+            }
+        }
+
+        /// <summary>
+        /// 파티클 효과 컴포넌트 초기화
+        /// </summary>
+        private void InitializeParticleEffect()
+        {
+            if (particleEffect != null) return;
+
+            // 파티클 효과용 GameObject 생성
+            GameObject particleObject = new GameObject("BlockPlacementParticles");
+            particleObject.transform.SetParent(transform, false);
+            particleObject.transform.localPosition = Vector3.zero;
+
+            // 컴포넌트 추가
+            particleEffect = particleObject.AddComponent<BlockPlacementParticleEffect>();
+
+            Debug.Log("[MultiGameBoard] 블록 배치 파티클 효과 시스템 자동 생성됨");
+        }
+
+        /// <summary>
+        /// UI 기반 흙먼지 효과 컴포넌트 초기화
+        /// </summary>
+        private void InitializeSimpleDustEffect()
+        {
+            if (simpleDustEffect != null) return;
+
+            // UI 기반 효과용 GameObject 생성
+            GameObject dustObject = new GameObject("SimpleDustEffect");
+            dustObject.transform.SetParent(transform, false);
+            dustObject.transform.localPosition = Vector3.zero;
+
+            // 컴포넌트 추가
+            simpleDustEffect = dustObject.AddComponent<SimpleDustEffect>();
+
+            Debug.Log("[MultiGameBoard] UI 기반 흙먼지 효과 시스템 자동 생성됨");
+        }
+
+        /// <summary>
+        /// 파티클 효과 테스트 (디버그용)
+        /// </summary>
+        [System.Diagnostics.Conditional("UNITY_EDITOR")]
+        public void TestParticleEffect()
+        {
+            if (Application.isPlaying && particleEffect != null)
+            {
+                Vector3 testPos = BoardToWorld(new Position(10, 10));
+                particleEffect.PlayDustEffect(testPos);
             }
         }
     }

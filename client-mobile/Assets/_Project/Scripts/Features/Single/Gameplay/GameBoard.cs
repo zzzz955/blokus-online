@@ -57,6 +57,10 @@ namespace Features.Single.Gameplay
         [Header("줌/팬 기능")]
         [SerializeField] private GameBoardZoomPan zoomPanComponent;
 
+        [Header("파티클 효과")]
+        [SerializeField] private BlockPlacementParticleEffect particleEffect;
+        [SerializeField] private SimpleDustEffect simpleDustEffect; // UI 기반 대체 효과
+
         // 내부 상태
         private GameLogic gameLogic;
         private GameObject[,] cellObjects;
@@ -455,6 +459,10 @@ namespace Features.Single.Gameplay
             var ok = gameLogic.PlaceBlock(placement);   // bool이면 그대로, void면 호출 후 RefreshBoard로 확인
             if (!ok) return false;                      // (PlaceBlock이 bool일 때만)
             RefreshBoard();
+
+            // 파티클 효과 재생
+            PlayBlockPlacementEffect(block, position);
+
             OnBlockPlaced?.Invoke(block, position);
             return true;
         }
@@ -966,6 +974,150 @@ namespace Features.Single.Gameplay
                         hoverEffect.SetHoverState(CellHoverEffect.HoverState.None);
                     }
                 }
+            }
+        }
+
+        // ========================================
+        // 파티클 효과 시스템
+        // ========================================
+
+        /// <summary>
+        /// 블록 배치 시 파티클 효과 재생
+        /// </summary>
+        /// <param name="block">배치된 블록</param>
+        /// <param name="position">배치 위치</param>
+        private void PlayBlockPlacementEffect(Block block, Position position)
+        {
+            // 기존 파티클 시스템 효과
+            if (particleEffect == null)
+            {
+                // 파티클 효과 컴포넌트가 없으면 자동 생성
+                InitializeParticleEffect();
+            }
+
+            if (particleEffect != null)
+            {
+                // 블록이 차지하는 모든 셀의 월드 좌표 계산
+                List<Vector3> worldPositions = GetBlockWorldPositions(block, position);
+                // 파티클 효과 재생
+                particleEffect.PlayDustEffectForBlock(worldPositions, cellSize);
+            }
+
+            // UI 기반 대체 효과도 함께 재생 (더 확실한 가시성)
+            if (simpleDustEffect == null)
+            {
+                InitializeSimpleDustEffect();
+            }
+
+            if (simpleDustEffect != null)
+            {
+                // 블록이 차지하는 모든 셀의 월드 좌표 계산
+                List<Vector3> worldPositions = GetBlockWorldPositions(block, position);
+                // UI 기반 효과 재생
+                simpleDustEffect.PlayDustEffectForBlock(worldPositions);
+            }
+        }
+
+        /// <summary>
+        /// 파티클 효과 컴포넌트 초기화
+        /// </summary>
+        private void InitializeParticleEffect()
+        {
+            if (particleEffect != null) return;
+
+            // 파티클 효과용 GameObject 생성
+            GameObject particleObject = new GameObject("BlockPlacementParticles");
+            particleObject.transform.SetParent(transform, false);
+            particleObject.transform.localPosition = Vector3.zero;
+
+            // 컴포넌트 추가
+            particleEffect = particleObject.AddComponent<BlockPlacementParticleEffect>();
+
+            Debug.Log("[GameBoard] 블록 배치 파티클 효과 시스템 자동 생성됨");
+        }
+
+        /// <summary>
+        /// UI 기반 흙먼지 효과 컴포넌트 초기화
+        /// </summary>
+        private void InitializeSimpleDustEffect()
+        {
+            if (simpleDustEffect != null) return;
+
+            // UI 기반 효과용 GameObject 생성
+            GameObject dustObject = new GameObject("SimpleDustEffect");
+            dustObject.transform.SetParent(transform, false);
+            dustObject.transform.localPosition = Vector3.zero;
+
+            // 컴포넌트 추가
+            simpleDustEffect = dustObject.AddComponent<SimpleDustEffect>();
+
+            Debug.Log("[GameBoard] UI 기반 흙먼지 효과 시스템 자동 생성됨");
+        }
+
+        /// <summary>
+        /// 블록이 차지하는 셀들의 월드 좌표를 반환
+        /// </summary>
+        /// <param name="block">블록</param>
+        /// <param name="position">기준 위치</param>
+        /// <returns>월드 좌표 리스트</returns>
+        private List<Vector3> GetBlockWorldPositions(Block block, Position position)
+        {
+            List<Vector3> worldPositions = new List<Vector3>();
+            var cells = block.GetAbsolutePositions(position);
+
+            foreach (var pos in cells)
+            {
+                if (!ValidationUtility.IsValidPosition(pos)) continue;
+                if (pos.row >= boardSize || pos.col >= boardSize) continue;
+
+                // 셀의 월드 좌표 계산
+                Vector3 worldPos = BoardToWorld(pos);
+                worldPositions.Add(worldPos);
+            }
+
+            return worldPositions;
+        }
+
+        /// <summary>
+        /// 보드 좌표를 월드 좌표로 변환 (파티클용)
+        /// </summary>
+        /// <param name="boardPos">보드 좌표</param>
+        /// <returns>월드 좌표</returns>
+        private Vector3 BoardToWorldParticle(Position boardPos)
+        {
+            if (cellRects != null &&
+                boardPos.row >= 0 && boardPos.row < boardSize &&
+                boardPos.col >= 0 && boardPos.col < boardSize &&
+                cellRects[boardPos.row, boardPos.col] != null)
+            {
+                // 셀의 중심점 월드 좌표 반환
+                return cellRects[boardPos.row, boardPos.col].TransformPoint(Vector3.zero);
+            }
+
+            // 폴백: 계산된 월드 좌표
+            if (cellParent != null)
+            {
+                Vector3 localPos = new Vector3(
+                    (boardPos.col - boardSize * 0.5f + 0.5f) * cellSize,
+                    (boardSize * 0.5f - 0.5f - boardPos.row) * cellSize,
+                    0f
+                );
+                return cellParent.TransformPoint(localPos);
+            }
+
+            return transform.TransformPoint(Vector3.zero);
+        }
+
+        /// <summary>
+        /// 파티클 효과 테스트 (디버그용)
+        /// </summary>
+        [System.Diagnostics.Conditional("UNITY_EDITOR")]
+        public void TestParticleEffect()
+        {
+            if (Application.isPlaying && particleEffect != null)
+            {
+                Vector3 testPos = BoardToWorld(new Position(10, 10));
+                particleEffect.PlayDustEffect(testPos);
             }
         }
     }
