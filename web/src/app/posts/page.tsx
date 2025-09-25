@@ -82,7 +82,7 @@ export default function PostsPage() {
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-white">자유 게시판</h1>
-            <p className="text-gray-300 mt-2">블로커스 온라인 커뮤니티에서 자유롭게 소통해보세요</p>
+            <p className="text-gray-300 mt-2">블로블로 커뮤니티에서 자유롭게 소통해보세요</p>
           </div>
           {session && (
             <Link href="/posts/write">

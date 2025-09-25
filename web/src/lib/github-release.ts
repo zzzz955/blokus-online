@@ -204,9 +204,13 @@ export function transformToMultiPlatformRelease(release: GitHubRelease): MultiPl
     asset.name.endsWith('.zip')
   );
   
-  // 모바일 클라이언트 에셋 찾기 (BlobloClient-Mobile.apk)
-  const mobileAsset = release.assets?.find(asset => 
-    asset.name.includes('Mobile') && asset.name.endsWith('.apk')
+  // 모바일 클라이언트 에셋 찾기 (bloblo.apk 또는 BlobloClient.apk 또는 Mobile 포함 .apk)
+  const mobileAsset = release.assets?.find(asset =>
+    asset.name.endsWith('.apk') && (
+      asset.name.toLowerCase().includes('bloblo') ||
+      asset.name.includes('Mobile') ||
+      asset.name.includes('BlobloClient')
+    )
   );
   
   // 변경사항 파싱
@@ -222,7 +226,14 @@ export function transformToMultiPlatformRelease(release: GitHubRelease): MultiPl
     changelog: changelog.length > 0 ? changelog : [release.name || '최신 버전 릴리즈'],
     platforms: {
       desktop: desktopAsset ? transformAssetToPlatform(desktopAsset, 'desktop') : null,
-      mobile: mobileAsset ? transformAssetToPlatform(mobileAsset, 'mobile') : null
+      mobile: mobileAsset ? transformAssetToPlatform(mobileAsset, 'mobile') : {
+        platform: 'mobile' as const,
+        filename: `bloblo-v${version}.apk`,
+        downloadUrl: `https://github.com/zzzz955/blokus-online/releases/download/v${version}/bloblo-v${version}.apk`,
+        size: 45000000,
+        available: false, // APK 파일이 실제로 없으므로 false로 설정
+        systemRequirements: SYSTEM_REQUIREMENTS.mobile
+      }
     }
   };
 }
@@ -252,13 +263,13 @@ export async function getMultiPlatformReleaseInfo(): Promise<MultiPlatformReleas
  */
 export function getDefaultMultiPlatformVersion(envVersion?: string): MultiPlatformRelease {
   const version = envVersion?.replace('v', '') || '1.0.0';
-  
+
   return {
     version,
     releaseDate: new Date().toISOString(),
     changelog: [
       "초기 릴리즈",
-      "멀티플레이어 블로쿠스 게임 지원", 
+      "멀티플레이어 블로쿠스 게임 지원",
       "실시간 채팅 기능",
       "사용자 통계 및 순위 시스템"
     ],
@@ -272,11 +283,11 @@ export function getDefaultMultiPlatformVersion(envVersion?: string): MultiPlatfo
         systemRequirements: SYSTEM_REQUIREMENTS.desktop
       },
       mobile: {
-        platform: 'mobile', 
-        filename: `BlobloClient-Mobile-v${version}.apk`,
+        platform: 'mobile',
+        filename: `bloblo-v${version}.apk`,
         downloadUrl: "/api/download/client/mobile",
         size: 45000000, // 약 45MB 예상
-        available: true,
+        available: false, // APK 파일이 없을 경우를 대비하여 기본값을 false로 설정
         systemRequirements: SYSTEM_REQUIREMENTS.mobile
       }
     }

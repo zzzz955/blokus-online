@@ -88,7 +88,7 @@ export default function AnnouncementsPage() {
               공지사항
             </h1>
             <p className="text-xl text-gray-400">
-              블로커스 온라인의 최신 소식과 중요한 공지사항을 확인하세요.
+              블로블로의 최신 소식과 중요한 공지사항을 확인하세요.
             </p>
           </div>
 

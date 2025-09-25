@@ -1,5 +1,5 @@
 # ==================================================
-# Multi-Stage Dockerfile - Blokus Online Web
+# Multi-Stage Dockerfile - Bloblo Web
 # Next.js 14 기반 웹사이트 배포 최적화
 # ==================================================
 
@@ -159,9 +159,9 @@ CMD ["/app/docker-entrypoint.sh"]
 # ==================================================
 # 빌드 정보 메타데이터
 # ==================================================
-LABEL maintainer="Blokus Online Team"
+LABEL maintainer="Bloblo Team"
 LABEL version="1.0.0"
-LABEL description="Blokus Online Web - Next.js 14 Application"
+LABEL description="Bloblo Web - Next.js 14 Application"
 LABEL build-strategy="Multi-stage Docker build"
 LABEL node-version="20-alpine"
 LABEL framework="Next.js 14"

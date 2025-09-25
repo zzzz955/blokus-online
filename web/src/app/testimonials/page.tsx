@@ -94,7 +94,7 @@ export default function TestimonialsPage() {
               플레이어 후기
             </h1>
             <p className="text-xl text-gray-400 mb-8">
-              블로커스 온라인을 즐기고 있는 플레이어들의 생생한 후기를 모두 확인해보세요.
+              블로블로을 즐기고 있는 플레이어들의 생생한 후기를 모두 확인해보세요.
             </p>
             <div className="flex justify-center space-x-4">
               <Link href="/">
