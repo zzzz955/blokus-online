@@ -566,7 +566,7 @@ namespace Features.Multi.UI
                 }
             }
 
-            PositionActionButtonsAtBlock();
+            // PositionActionButtonsAtBlock(); // 제거됨: ActionButtonPanel 호버링 기능 비활성화
         }
 
         private void HideActionButtons()
@@ -577,136 +577,9 @@ namespace Features.Multi.UI
             actionButtonPanel.gameObject.SetActive(false);
         }
 
-        private void PositionActionButtonsAtBlock()
-        {
-            if (!actionButtonsVisible || actionButtonPanel == null || pendingBlock == null)
-            {
-                Debug.LogWarning($"[MultiGameBoard] ActionButtonPanel 위치 설정 실패 - actionButtonsVisible: {actionButtonsVisible}, actionButtonPanel: {actionButtonPanel != null}, pendingBlock: {pendingBlock != null}");
-                return;
-            }
+        // PositionActionButtonsAtBlock() 메서드 제거됨: ActionButtonPanel 호버링 기능 비활성화
 
-            // Debug.Log($"[MultiGameBoard] ActionButtonPanel 위치 계산 시작 - 블록: {pendingBlock.Type}, 위치: ({pendingPosition.row}, {pendingPosition.col})");
-
-            // 펜딩 블록 경계 계산
-            var blockPositions = pendingBlock.GetAbsolutePositions(pendingPosition);
-            int minRow = int.MaxValue, maxRow = int.MinValue;
-            int minCol = int.MaxValue, maxCol = int.MinValue;
-
-            foreach (var pos in blockPositions)
-            {
-                if (ValidationUtility.IsValidPosition(pos) && pos.row < boardSize && pos.col < boardSize)
-                {
-                    minRow = Mathf.Min(minRow, pos.row);
-                    maxRow = Mathf.Max(maxRow, pos.row);
-                    minCol = Mathf.Min(minCol, pos.col);
-                    maxCol = Mathf.Max(maxCol, pos.col);
-                }
-            }
-            if (minRow == int.MaxValue) return;
-
-            // Canvas 좌표로 변환/적용
-            Canvas canvas = GetComponentInParent<Canvas>();
-            if (canvas == null) return;
-
-            Camera uiCamera = canvas.worldCamera ?? Camera.main;
-            RectTransform canvasRect = canvas.GetComponent<RectTransform>();
-            RectTransform buttonRect = actionButtonPanel;
-
-            if (buttonRect != null && uiCamera != null)
-            {
-                Vector2 panelSize = buttonRect.sizeDelta;
-                float safeMargin = 20f; // 안전 마진 증가
-
-                // 여러 위치 후보를 시도 (우선순위: 우상 → 좌상 → 우하 → 좌하)
-                Vector3[] candidateWorldPositions = new Vector3[]
-                {
-                    BoardToWorld(new Position(minRow, maxCol)), // 우측 상단
-                    BoardToWorld(new Position(minRow, minCol)), // 좌측 상단  
-                    BoardToWorld(new Position(maxRow, maxCol)), // 우측 하단
-                    BoardToWorld(new Position(maxRow, minCol))  // 좌측 하단
-                };
-
-                Vector2[] offsets = new Vector2[]
-                {
-                    new Vector2(cellSize * 0.5f + panelSize.x * 0.5f + safeMargin, cellSize * 0.5f + panelSize.y * 0.5f + safeMargin),   // 우상
-                    new Vector2(-(cellSize * 0.5f + panelSize.x * 0.5f + safeMargin), cellSize * 0.5f + panelSize.y * 0.5f + safeMargin), // 좌상
-                    new Vector2(cellSize * 0.5f + panelSize.x * 0.5f + safeMargin, -(cellSize * 0.5f + panelSize.y * 0.5f + safeMargin)), // 우하
-                    new Vector2(-(cellSize * 0.5f + panelSize.x * 0.5f + safeMargin), -(cellSize * 0.5f + panelSize.y * 0.5f + safeMargin)) // 좌하
-                };
-
-                Vector2 finalPosition = Vector2.zero;
-                bool positionFound = false;
-
-                // 각 위치 후보를 시도하여 화면 안에 들어오는 첫 번째 위치 사용
-                for (int i = 0; i < candidateWorldPositions.Length; i++)
-                {
-                    Vector2 screenPos = uiCamera.WorldToScreenPoint(candidateWorldPositions[i]);
-                    if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screenPos, uiCamera, out var localPos))
-                    {
-                        Vector2 candidatePosition = localPos + offsets[i];
-
-                        // 화면 경계 체크 (실제 화면 크기 기준)
-                        if (IsPositionWithinScreenBounds(candidatePosition, panelSize, canvasRect, safeMargin))
-                        {
-                            finalPosition = candidatePosition;
-                            positionFound = true;
-                            break;
-                        }
-                    }
-                }
-
-                // 모든 후보가 실패하면 강제 클램핑으로 화면 안에 위치시키기
-                if (!positionFound)
-                {
-                    Vector2 screenPos = uiCamera.WorldToScreenPoint(candidateWorldPositions[0]);
-                    if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screenPos, uiCamera, out var localPos))
-                    {
-                        Vector2 targetPosition = localPos + offsets[0];
-                        finalPosition = ClampPositionToScreenBounds(targetPosition, panelSize, canvasRect, safeMargin);
-                    }
-                }
-
-                // 최종 위치 설정
-                buttonRect.anchoredPosition = finalPosition;
-
-                // Debug.Log($"[MultiGameBoard] ActionButtonPanel 위치 설정 완료 - 최종: {finalPosition}");
-            }
-        }
-
-        /// <summary>
-        /// 주어진 위치가 화면 경계 안에 있는지 확인
-        /// </summary>
-        private bool IsPositionWithinScreenBounds(Vector2 position, Vector2 panelSize, RectTransform canvasRect, float safeMargin)
-        {
-            Vector2 canvasSize = canvasRect.sizeDelta;
-            Vector2 panelHalfSize = panelSize * 0.5f;
-
-            float minX = -canvasSize.x * 0.5f + panelHalfSize.x + safeMargin;
-            float maxX = canvasSize.x * 0.5f - panelHalfSize.x - safeMargin;
-            float minY = -canvasSize.y * 0.5f + panelHalfSize.y + safeMargin;
-            float maxY = canvasSize.y * 0.5f - panelHalfSize.y - safeMargin;
-
-            return position.x >= minX && position.x <= maxX && position.y >= minY && position.y <= maxY;
-        }
-
-        /// <summary>
-        /// 위치를 화면 경계 안으로 강제 클램핑
-        /// </summary>
-        private Vector2 ClampPositionToScreenBounds(Vector2 position, Vector2 panelSize, RectTransform canvasRect, float safeMargin)
-        {
-            Vector2 canvasSize = canvasRect.sizeDelta;
-            Vector2 panelHalfSize = panelSize * 0.5f;
-
-            float minX = -canvasSize.x * 0.5f + panelHalfSize.x + safeMargin;
-            float maxX = canvasSize.x * 0.5f - panelHalfSize.x - safeMargin;
-            float minY = -canvasSize.y * 0.5f + panelHalfSize.y + safeMargin;
-            float maxY = canvasSize.y * 0.5f - panelHalfSize.y - safeMargin;
-
-            return new Vector2(
-                Mathf.Clamp(position.x, minX, maxX),
-                Mathf.Clamp(position.y, minY, maxY)
-            );
-        }
+        // IsPositionWithinScreenBounds() 및 ClampPositionToScreenBounds() 메서드 제거됨: ActionButtonPanel 호버링 기능 비활성화
 
         private Vector3 BoardToWorld(Position p)
         {
