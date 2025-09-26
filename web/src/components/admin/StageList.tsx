@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { BoardState } from '@/lib/board-state-codec';
+import { getDifficultyLabel, getDifficultyCssClass, getAllDifficultyLevels } from '@/lib/difficulty';
 
 interface Stage {
   stage_id: number;
@@ -44,19 +45,6 @@ export default function StageList({ stages, onEditStage, onDeleteStage, onCloneS
     }
   };
 
-  const getDifficultyColor = (difficulty: number) => {
-    if (difficulty <= 2) return 'text-green-400';
-    if (difficulty <= 4) return 'text-yellow-400';
-    if (difficulty <= 6) return 'text-orange-400';
-    return 'text-red-400';
-  };
-
-  const getDifficultyLabel = (difficulty: number) => {
-    if (difficulty <= 2) return '쉬움';
-    if (difficulty <= 4) return '보통';
-    if (difficulty <= 6) return '어려움';
-    return '매우 어려움';
-  };
 
   const formatTimeLimit = (seconds: number | null) => {
     if (!seconds) return '제한 없음';
@@ -126,12 +114,11 @@ export default function StageList({ stages, onEditStage, onDeleteStage, onCloneS
               className="w-full px-3 py-2 bg-dark-card border border-dark-border rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">전체</option>
-              <option value="1">1 - 매우 쉬움</option>
-              <option value="2">2 - 쉬움</option>
-              <option value="3">3 - 보통</option>
-              <option value="4">4 - 어려움</option>
-              <option value="5">5 - 매우 어려움</option>
-              <option value="6">6 - 최고 난이도</option>
+              {getAllDifficultyLevels().map((diffInfo) => (
+                <option key={diffInfo.level} value={diffInfo.level}>
+                  {diffInfo.level} - {diffInfo.label}
+                </option>
+              ))}
             </select>
           </div>
           
@@ -212,7 +199,7 @@ export default function StageList({ stages, onEditStage, onDeleteStage, onCloneS
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`font-medium ${getDifficultyColor(stage.difficulty)}`}>
+                    <span className={`font-medium ${getDifficultyCssClass(stage.difficulty)}`}>
                       {stage.difficulty} - {getDifficultyLabel(stage.difficulty)}
                     </span>
                   </td>
