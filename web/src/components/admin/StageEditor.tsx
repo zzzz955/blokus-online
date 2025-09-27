@@ -372,6 +372,7 @@ export default function StageEditor({ stage, onSave, onCancel }: StageEditorProp
               <BoardEditor
                 boardState={formData.initial_board_state}
                 onChange={handleBoardStateChange}
+                availableBlocks={formData.available_blocks}
               />
             </div>
           )}
