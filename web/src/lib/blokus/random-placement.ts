@@ -182,7 +182,7 @@ const CORNERS = [
 ];
 
 // Diagonal directions for Blokus adjacency rule
-const DIAGONALS = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
+const DIAGONALS: [number, number][] = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
 // Orthogonal directions (forbidden for same color)
 const ORTHOGONALS = [[0, -1], [0, 1], [-1, 0], [1, 0]];
 
