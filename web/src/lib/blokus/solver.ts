@@ -154,7 +154,7 @@ function earlyInfeasible(board:Grid, remainingSizes:number[]): boolean {
   return false;
 }
 
-/**  단일 색 최적해 계산(완전성 유지 + 안전 가지치기) */
+/**  단일 색 최적해 계산(개선된 휴리스틱 + 점진적 딥닝) */
 export function solveOptimalScoreSingleColor(
   boardState: BoardState,
   availableBlockIds: number[],
@@ -172,9 +172,11 @@ export function solveOptimalScoreSingleColor(
   })();
   let firstPlaced = firstPlacedInitially;
 
-  // 블록 전처리: 셀 수/모양, 중복 모양 제거
+  // 블록 전처리: 셀 수/모양, 중복 모양 제거 + 우선순위 정보 추가
   const idToCells = new Map<number, number>();
   const idToShapes = new Map<number, Array<Array<{dx:number;dy:number}>>>();
+  const idToPriority = new Map<number, number>(); // 블록 배치 우선순위
+
   for (const d of BLOCK_DEFS) {
     idToCells.set(d.id, d.cells);
     const seen = new Set<string>();
@@ -185,6 +187,12 @@ export function solveOptimalScoreSingleColor(
       if (!seen.has(k)) { seen.add(k); uniq.push(normalizeCells(cells)); }
     }
     idToShapes.set(d.id, uniq);
+
+    // 우선순위: 큰 블록 + 제약이 많은 블록 우선
+    const cellCount = d.cells;
+    const shapeVariations = uniq.length;
+    const priority = cellCount * 100 + (10 - Math.min(shapeVariations, 10)); // 큰 블록, 변형 적은 것 우선
+    idToPriority.set(d.id, priority);
   }
 
   const used = new Set<number>();
@@ -192,12 +200,27 @@ export function solveOptimalScoreSingleColor(
 
   const canStart = () => firstPlaced || CORNERS.some(({x,y}) => board[y][x]===0);
 
-  // 상계: 빈칸/남은블록셀수 중 최소
-  const upperBound = (score:number) => {
+  // 개선된 상계: 연결 가능성과 모양 호환성 고려
+  const advancedUpperBound = (score:number) => {
     const usedSum = Array.from(used).reduce((s,id)=>s+(idToCells.get(id)||0),0);
     const remainingCells = totalCells - usedSum;
     const empty = countEmpty(board);
-    return score + Math.min(remainingCells, empty);
+    const basicBound = Math.min(remainingCells, empty);
+
+    // 연결 가능한 영역 분석
+    const frontier = firstPlaced ? frontierCells(board, targetColor) : new Set(CORNERS.filter(c => board[c.y][c.x] === 0).map(c => c.y * BOARD_SIZE + c.x));
+
+    if (frontier.size === 0) return score;
+
+    // 각 연결 가능한 영역에서 배치 가능한 최대 블록 수 추정
+    let connectivityBonus = 0;
+    const remainingBlocks = availableBlockIds.filter(id => !used.has(id));
+    const maxRemainingBlockSize = remainingBlocks.length > 0 ? Math.max(...remainingBlocks.map(id => idToCells.get(id) || 0)) : 0;
+
+    // 프론티어 밀도 기반 보정
+    connectivityBonus = Math.min(frontier.size * 2, maxRemainingBlockSize);
+
+    return score + Math.min(basicBound + connectivityBonus, remainingCells);
   };
 
   let bestScore = 0;
@@ -206,23 +229,70 @@ export function solveOptimalScoreSingleColor(
   let iterations = 0;
   let timedOut = false;
 
-  // 전이 테이블(동일상태 재방문 컷)
-  const TT = new Map<string, number>();
-  function stateKey(): string {
-    let bits = '';
+  // 개선된 전이 테이블 (더 효율적인 키 생성)
+  const TT = new Map<string, {score: number, depth: number}>();
+  function compactStateKey(): string {
+    // 비트 압축된 보드 상태
+    let boardHash = 0;
+    let shift = 0;
     for (let y=0; y<BOARD_SIZE; y++) {
       for (let x=0; x<BOARD_SIZE; x++) {
-        bits += (board[y][x]===targetColor ? '1' : '0');
+        if (board[y][x] === targetColor) {
+          boardHash ^= (x + y * BOARD_SIZE + 1) << (shift % 30);
+        }
+        shift++;
       }
     }
     const usedKey = Array.from(used).sort((a,b)=>a-b).join(',');
-    return (firstPlaced ? '1' : '0') + '|' + usedKey + '|' + bits;
+    return `${firstPlaced ? 1 : 0}|${usedKey}|${boardHash.toString(36)}`;
+  }
+
+  // 개선된 블록 배치 점수 계산
+  function evaluatePlacementQuality(placement: Placement & {shapeCells:Array<{dx:number;dy:number}>}): number {
+    let score = 0;
+
+    // 1. 블록 크기 가중치 (큰 블록 우선)
+    const blockSize = idToCells.get(placement.blockId) || 0;
+    score += blockSize * 10;
+
+    // 2. 연결성 보너스 (많은 프론티어 생성)
+    const newFrontierCells = new Set<number>();
+    for (const {dx, dy} of placement.shapeCells) {
+      const x = placement.x + dx, y = placement.y + dy;
+      for (const [cx, cy] of DIAGS) {
+        const nx = x + cx, ny = y + cy;
+        if (inBoard(nx, ny) && board[ny][nx] === 0) {
+          newFrontierCells.add(ny * BOARD_SIZE + nx);
+        }
+      }
+    }
+    score += newFrontierCells.size * 2;
+
+    // 3. 중앙성 보너스 (보드 중앙 근처 배치 선호)
+    const centerX = BOARD_SIZE / 2, centerY = BOARD_SIZE / 2;
+    const avgX = placement.shapeCells.reduce((sum, c) => sum + placement.x + c.dx, 0) / placement.shapeCells.length;
+    const avgY = placement.shapeCells.reduce((sum, c) => sum + placement.y + c.dy, 0) / placement.shapeCells.length;
+    const distFromCenter = Math.sqrt((avgX - centerX) ** 2 + (avgY - centerY) ** 2);
+    score += Math.max(0, 20 - distFromCenter);
+
+    // 4. 코너 보너스 (corner에 가까울수록 향후 확장성 좋음)
+    if (!firstPlaced) {
+      const touchesCorner = placement.shapeCells.some(c => {
+        const x = placement.x + c.dx, y = placement.y + c.dy;
+        return CORNERS.some(corner => corner.x === x && corner.y === y);
+      });
+      if (touchesCorner) score += 50;
+    }
+
+    return score;
   }
 
   function enumeratePlacementsAtAnchor(ax:number, ay:number) {
-    const out: Array<Placement & {shapeCells:Array<{dx:number;dy:number}>, anchorDeg?:number}> = [];
+    const out: Array<Placement & {shapeCells:Array<{dx:number;dy:number}>, quality: number}> = [];
     const ids = availableBlockIds.filter(id=>!used.has(id));
-    ids.sort((a,b)=>(idToCells.get(b)||0)-(idToCells.get(a)||0)); // 큰 블록 우선
+
+    // 우선순위 기반 정렬
+    ids.sort((a,b)=>(idToPriority.get(b)||0)-(idToPriority.get(a)||0));
     const dedup = new Set<string>();
 
     for (const id of ids) {
@@ -236,14 +306,20 @@ export function solveOptimalScoreSingleColor(
           if (dedup.has(key)) continue;
           dedup.add(key);
           if (!isLegalPlacement(board, targetColor, shapeCells, ox, oy, !firstPlaced)) continue;
-          out.push({ blockId:id, color:targetColor, x:ox, y:oy, shapeIndex:s, shapeCells });
+
+          const placement = { blockId:id, color:targetColor, x:ox, y:oy, shapeIndex:s, shapeCells };
+          const quality = evaluatePlacementQuality(placement);
+          out.push({ ...placement, quality });
         }
       }
     }
+
+    // 품질 기반 정렬 (높은 품질 우선)
+    out.sort((a, b) => b.quality - a.quality);
     return out;
   }
 
-  // 모든 앵커의 move를 모아 “앵커 degree 오름차순”으로 정렬(완전성 유지)
+  // 개선된 이동 생성: 품질과 제약도 기반 정렬
   function generateMoves(){
     const anchors = firstPlaced
       ? Array.from(frontierCells(board, targetColor)).map(v => ({x: v%BOARD_SIZE, y: Math.floor(v/BOARD_SIZE)}))
@@ -251,7 +327,7 @@ export function solveOptimalScoreSingleColor(
 
     if (!anchors.length) return [];
 
-    const aggregated: Array<Placement & {shapeCells:Array<{dx:number;dy:number}>, anchorDeg:number}> = [];
+    const aggregated: Array<Placement & {shapeCells:Array<{dx:number;dy:number}>, anchorDeg:number, quality:number}> = [];
     let anyPositive = false;
 
     for (const a of anchors) {
@@ -264,10 +340,18 @@ export function solveOptimalScoreSingleColor(
     }
     if (!anyPositive) return []; // 모든 앵커가 degree==0이면 종료
 
+    // 개선된 정렬: MRV + 품질 조합
     aggregated.sort((a,b)=>{
-      if (a.anchorDeg !== b.anchorDeg) return a.anchorDeg - b.anchorDeg;       // MRV
-      const ca = (idToCells.get(b.blockId)||0) - (idToCells.get(a.blockId)||0); // 큰 블록 우선
-      if (ca !== 0) return ca;
+      // 1차: 제약도 (MRV - Most Constraining Variable)
+      if (a.anchorDeg !== b.anchorDeg) return a.anchorDeg - b.anchorDeg;
+
+      // 2차: 품질 점수 (높은 품질 우선)
+      if (Math.abs(a.quality - b.quality) > 0.1) return b.quality - a.quality;
+
+      // 3차: 블록 크기 (큰 블록 우선)
+      const cellDiff = (idToCells.get(b.blockId)||0) - (idToCells.get(a.blockId)||0);
+      if (cellDiff !== 0) return cellDiff;
+
       return 0;
     });
     return aggregated;
@@ -279,20 +363,51 @@ export function solveOptimalScoreSingleColor(
     return sizes;
   }
 
-  function dfs(score:number){
+  // 점진적 딥닝을 위한 다단계 탐색
+  function progressiveDeepening() {
+    const phases = [
+      { name: "quick", timeRatio: 0.1, maxMoves: 10 },    // 빠른 탐색
+      { name: "medium", timeRatio: 0.3, maxMoves: 50 },   // 중간 탐색
+      { name: "deep", timeRatio: 0.6, maxMoves: -1 }      // 깊은 탐색
+    ];
+
+    let phaseStartTime = Date.now();
+
+    for (const phase of phases) {
+      const phaseTimeLimit = timeLimit * phase.timeRatio;
+      const phaseEndTime = t0 + (Date.now() - t0) + phaseTimeLimit;
+
+      // 현재 단계에서 탐색
+      dfs(0, phase.maxMoves, phaseEndTime);
+
+      if (timedOut || Date.now() - t0 > timeLimit * 0.9) break;
+
+      // 다음 단계로 넘어가기 전 현재 결과 보존
+      if (bestScore > 0) {
+        console.log(`Phase ${phase.name}: ${bestScore} points, ${iterations} iterations`);
+      }
+    }
+  }
+
+  function dfs(score:number, maxMovesToExplore = -1, phaseTimeLimit = timeLimit){
     iterations++;
-    if (Date.now()-t0 > timeLimit) { timedOut = true; return; }
+    if (Date.now() > phaseTimeLimit || Date.now()-t0 > timeLimit) {
+      timedOut = true;
+      return;
+    }
     if (!canStart() && !firstPlaced) return;
 
     // 🔒 안전 가지치기: 컴포넌트 불가능성 검사
     if (earlyInfeasible(board, remainingSizes())) return;
 
-    if (upperBound(score) <= bestScore) return;
+    // 개선된 상계 검사
+    if (advancedUpperBound(score) <= bestScore) return;
 
-    const sk = stateKey();
+    const sk = compactStateKey();
     const prev = TT.get(sk);
-    if (prev !== undefined && prev >= score) return;
-    TT.set(sk, score);
+    const currentDepth = placedSeq.length;
+    if (prev && prev.score >= score && prev.depth <= currentDepth) return;
+    TT.set(sk, {score, depth: currentDepth});
 
     const moves = generateMoves();
     if (!moves.length) {
@@ -303,7 +418,10 @@ export function solveOptimalScoreSingleColor(
       return;
     }
 
-    for (let i = 0; i < moves.length && !timedOut; i++) {
+    // 이동 제한 적용 (빠른 단계에서는 일부만 탐색)
+    const movesToExplore = maxMovesToExplore > 0 ? Math.min(moves.length, maxMovesToExplore) : moves.length;
+
+    for (let i = 0; i < movesToExplore && !timedOut; i++) {
       const m = moves[i];
 
       place(board, targetColor, (m as any).shapeCells, m.x, m.y);
@@ -311,7 +429,7 @@ export function solveOptimalScoreSingleColor(
       const wasFirst = !firstPlaced; if (wasFirst) firstPlaced = true;
       used.add(m.blockId);
 
-      dfs(score + (idToCells.get(m.blockId)||0));
+      dfs(score + (idToCells.get(m.blockId)||0), maxMovesToExplore, phaseTimeLimit);
 
       used.delete(m.blockId);
       if (wasFirst) firstPlaced = false;
@@ -320,7 +438,8 @@ export function solveOptimalScoreSingleColor(
     }
   }
 
-  dfs(0);
+  // 점진적 딥닝 실행
+  progressiveDeepening();
 
   return {
     score: bestScore,

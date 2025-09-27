@@ -1,19 +1,25 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { 
-  BoardState, 
-  toLegacyBoardState, 
-  fromLegacyBoardState, 
-  addObstacle, 
-  addPreplacedPiece, 
-  removePiece, 
-  getPieceAt 
+import {
+  BoardState,
+  toLegacyBoardState,
+  fromLegacyBoardState,
+  addObstacle,
+  addPreplacedPiece,
+  removePiece,
+  getPieceAt
 } from '@/lib/board-state-codec';
+import {
+  randomlyPlaceBlocks,
+  validateCornerSelection,
+  getAvailableCorners
+} from '@/lib/blokus/random-placement';
 
 interface BoardEditorProps {
   boardState: BoardState;
   onChange: (boardState: BoardState) => void;
+  availableBlocks?: number[]; // For random placement feature
 }
 
 type CellState = {
@@ -137,9 +143,11 @@ const normalizeShape = (shape: BlockShape): BlockShape => {
   return shape.map(([r, c]) => [r - minR, c - minC] as Position);
 };
 
-export default function BoardEditor({ boardState, onChange }: BoardEditorProps) {
+export default function BoardEditor({ boardState, onChange, availableBlocks = [] }: BoardEditorProps) {
   const [selectedColor, setSelectedColor] = useState(5); // Default to Black/Obstacle
-  const [selectedTool, setSelectedTool] = useState<'cell' | 'tetromino' | 'fill' | 'eraser' | 'rangeFill' | 'image'>('cell');
+  const [selectedTool, setSelectedTool] = useState<'cell' | 'tetromino' | 'fill' | 'eraser' | 'rangeFill' | 'image' | 'randomPlacement'>('cell');
+  const [randomPlacementColor, setRandomPlacementColor] = useState(1); // Default to Blue for random placement
+  const [isWaitingForCorner, setIsWaitingForCorner] = useState(false);
   const [avoidBlueColor, setAvoidBlueColor] = useState(false);
   const [selectedBlockType, setSelectedBlockType] = useState<BlockType>(BlockType.Tetro_I);
   const [blockRotation, setBlockRotation] = useState(0);
@@ -374,7 +382,61 @@ export default function BoardEditor({ boardState, onChange }: BoardEditorProps) 
     img.src = URL.createObjectURL(file);
   };
 
+  // Random placement function
+  const handleRandomPlacement = async (startCorner: {x: number, y: number}) => {
+    if (availableBlocks.length === 0) {
+      alert('배치할 블록이 선택되지 않았습니다.\n블록 설정 탭에서 사용할 블록을 선택해주세요.');
+      return;
+    }
+
+    try {
+      const result = randomlyPlaceBlocks(
+        boardState,
+        availableBlocks,
+        startCorner,
+        randomPlacementColor,
+        1000 // max attempts
+      );
+
+      if (result.success) {
+        onChange(result.boardState);
+        alert(`✅ 랜덤 배치 완료!\n\n${result.message}`);
+      } else {
+        alert(`❌ 랜덤 배치 실패\n\n${result.message}`);
+      }
+    } catch (error) {
+      console.error('Random placement error:', error);
+      alert('랜덤 배치 중 오류가 발생했습니다.');
+    }
+
+    // 랜덤 배치 완료 후 상태 초기화
+    setIsWaitingForCorner(false);
+    setSelectedTool('cell'); // 기본 도구로 변경
+  };
+
   const handleCellClick = (x: number, y: number) => {
+    // Handle corner selection for random placement
+    if (selectedTool === 'randomPlacement' && isWaitingForCorner) {
+      const validation = validateCornerSelection(x, y);
+
+      if (!validation.isValid) {
+        alert(`⚠️ ${validation.message}`);
+        return;
+      }
+
+      // Check if corner is available
+      const availableCorners = getAvailableCorners(boardState);
+      const selectedCorner = availableCorners.find(corner => corner.x === x && corner.y === y);
+
+      if (!selectedCorner?.available) {
+        alert('⚠️ 선택한 모서리에 이미 블록이나 장애물이 있습니다.\n다른 모서리를 선택해주세요.');
+        return;
+      }
+
+      handleRandomPlacement({ x, y });
+      return;
+    }
+
     const matrix = getBoardMatrix();
     const currentCell = matrix[y][x];
 
@@ -383,31 +445,36 @@ export default function BoardEditor({ boardState, onChange }: BoardEditorProps) 
         // Toggle placement of selected color
         matrix[y][x] = currentCell.color === selectedColor
           ? { type: 'empty' }
-          : { 
-              type: selectedColor === 5 ? 'obstacle' : 'preplaced', 
-              color: selectedColor 
+          : {
+              type: selectedColor === 5 ? 'obstacle' : 'preplaced',
+              color: selectedColor
             };
         onChange(matrixToBoardState(matrix));
         break;
-      
+
       case 'tetromino':
         placeTetromino(x, y);
         break;
-      
+
       case 'eraser':
         eraseArea(x, y);
         break;
-      
+
       case 'rangeFill':
         fillRange(x, y);
         break;
-      
+
       case 'fill':
         fillAll();
         break;
-        
+
       case 'image':
         // Image tool doesn't need click handling
+        break;
+
+      case 'randomPlacement':
+        // Should not reach here if waiting for corner
+        alert('⚠️ 먼저 랜덤 배치 시작 버튼을 눌러주세요.');
         break;
     }
   };
@@ -544,13 +611,27 @@ export default function BoardEditor({ boardState, onChange }: BoardEditorProps) 
 
   const getCellStyle = (cell: CellState, x: number, y: number) => {
     let baseStyle = '';
-    
+
     if (cell.color) {
       baseStyle = 'border-gray-600 opacity-80';
     } else {
       baseStyle = 'bg-dark-card border-dark-border hover:bg-dark-bg';
     }
-    
+
+    // Add corner highlighting for random placement mode
+    const isCorner = (x === 0 && y === 0) || (x === 19 && y === 0) || (x === 0 && y === 19) || (x === 19 && y === 19);
+    if (selectedTool === 'randomPlacement' && isWaitingForCorner && isCorner) {
+      const availableCorners = getAvailableCorners(boardState);
+      const cornerData = availableCorners.find(corner => corner.x === x && corner.y === y);
+
+      if (cornerData?.available) {
+        baseStyle += ' outline outline-2 outline-green-400 outline-offset-[-1px] relative z-20 bg-green-500 bg-opacity-20 animate-pulse';
+      } else {
+        baseStyle += ' outline outline-2 outline-red-400 outline-offset-[-1px] relative z-20 bg-red-500 bg-opacity-20';
+      }
+      return baseStyle;
+    }
+
     // Add preview styles with better border visibility
     if (isInTetominoPreview(x, y)) {
       baseStyle += ' outline outline-2 outline-blue-400 outline-offset-[-1px] relative z-10';
@@ -558,7 +639,7 @@ export default function BoardEditor({ boardState, onChange }: BoardEditorProps) 
       const outlineColor = selectedTool === 'eraser' ? 'outline-red-400' : 'outline-green-400';
       baseStyle += ` outline outline-2 ${outlineColor} outline-offset-[-1px] relative z-10`;
     }
-    
+
     return baseStyle;
   };
 
@@ -672,12 +753,25 @@ export default function BoardEditor({ boardState, onChange }: BoardEditorProps) 
             <button
               onClick={() => setSelectedTool('image')}
               className={`px-3 py-2 rounded-lg transition-colors ${
-                selectedTool === 'image' 
-                  ? 'bg-indigo-600 text-white' 
+                selectedTool === 'image'
+                  ? 'bg-indigo-600 text-white'
                   : 'bg-dark-card text-gray-400 hover:text-white'
               }`}
             >
               이미지
+            </button>
+            <button
+              onClick={() => {
+                setSelectedTool('randomPlacement');
+                setIsWaitingForCorner(false);
+              }}
+              className={`px-3 py-2 rounded-lg transition-colors ${
+                selectedTool === 'randomPlacement'
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-dark-card text-gray-400 hover:text-white'
+              }`}
+            >
+              랜덤 배치
             </button>
           </div>
 
@@ -874,7 +968,114 @@ export default function BoardEditor({ boardState, onChange }: BoardEditorProps) 
             </div>
           </div>
         )}
-        
+
+        {selectedTool === 'randomPlacement' && (
+          <div className="mt-4 p-3 bg-dark-card rounded-lg">
+            <h4 className="text-white font-medium mb-3">랜덤 블록 배치</h4>
+            <p className="text-gray-400 text-sm mb-4">
+              선택된 블록들을 블로쿠스 룰에 맞게 모서리부터 시작하여 랜덤으로 배치합니다.
+            </p>
+
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-4">
+              <p className="text-blue-300 text-xs">
+                <strong>블로쿠스 규칙:</strong><br />
+                • 첫 블록: 선택한 모서리에 배치<br />
+                • 이후 블록: 같은 색 블록과 대각선으로 인접<br />
+                • 금지사항: 같은 색 블록과 면(상하좌우) 인접 불가
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {/* Color Selection for Random Placement */}
+              <div className="flex items-center gap-4">
+                <span className="text-gray-400 text-sm">배치할 색상:</span>
+                <div className="flex gap-2">
+                  {BOARD_COLORS.slice(0, 4).map((color) => (
+                    <button
+                      key={color.id}
+                      onClick={() => setRandomPlacementColor(color.id)}
+                      className={`w-8 h-8 rounded-lg border-2 transition-all ${
+                        randomPlacementColor === color.id
+                          ? 'border-white scale-110 ring-2 ring-white ring-opacity-50'
+                          : 'border-gray-600 hover:border-gray-400'
+                      }`}
+                      style={{ backgroundColor: color.color }}
+                      title={color.name}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Available Blocks Info */}
+              <div className="bg-gray-700/30 rounded-lg p-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400 text-sm">사용 가능한 블록:</span>
+                  <span className="text-white text-sm font-medium">{availableBlocks.length}개</span>
+                </div>
+                {availableBlocks.length === 0 && (
+                  <p className="text-red-400 text-xs mt-1">
+                    블록 설정 탭에서 사용할 블록을 선택해주세요.
+                  </p>
+                )}
+              </div>
+
+              {/* Start Button */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    if (availableBlocks.length === 0) {
+                      alert('배치할 블록이 선택되지 않았습니다.\n블록 설정 탭에서 사용할 블록을 선택해주세요.');
+                      return;
+                    }
+                    setIsWaitingForCorner(true);
+                  }}
+                  disabled={availableBlocks.length === 0}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    isWaitingForCorner
+                      ? 'bg-yellow-600 text-white'
+                      : availableBlocks.length === 0
+                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                      : 'bg-purple-600 hover:bg-purple-700 text-white'
+                  }`}
+                >
+                  {isWaitingForCorner ? '모서리를 클릭하세요...' : '랜덤 배치 시작'}
+                </button>
+
+                {isWaitingForCorner && (
+                  <button
+                    onClick={() => {
+                      setIsWaitingForCorner(false);
+                      setSelectedTool('cell'); // 취소 시에도 기본 도구로 변경
+                    }}
+                    className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+                  >
+                    취소
+                  </button>
+                )}
+              </div>
+
+              {/* Corner Status */}
+              {(() => {
+                const availableCorners = getAvailableCorners(boardState);
+                const availableCount = availableCorners.filter(c => c.available).length;
+                return (
+                  <div className="text-sm">
+                    <span className="text-gray-400">사용 가능한 모서리: </span>
+                    <span className={`${availableCount > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {availableCount}/4개
+                    </span>
+                    {availableCount === 0 && (
+                      <p className="text-red-400 text-xs mt-1">
+                        모든 모서리가 차단되어 있습니다.
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+
         {(selectedTool === 'eraser' || selectedTool === 'rangeFill') && (
           <div className="mt-4 p-3 bg-dark-card rounded-lg">
             <h4 className="text-white font-medium mb-3">
@@ -988,6 +1189,8 @@ export default function BoardEditor({ boardState, onChange }: BoardEditorProps) 
             {selectedTool === 'fill' && '클릭: 전체 보드 채우기'}
             {selectedTool === 'eraser' && `클릭: ${eraserSize}x${eraserSize} 영역 지우기`}
             {selectedTool === 'image' && '이미지 파일을 업로드하여 20x20 보드로 변환'}
+            {selectedTool === 'randomPlacement' && !isWaitingForCorner && '버튼을 눌러 랜덤 배치를 시작하세요'}
+            {selectedTool === 'randomPlacement' && isWaitingForCorner && '🎯 보드 모서리(녹색)를 클릭하여 시작점을 선택하세요'}
           </div>
         </div>
 
