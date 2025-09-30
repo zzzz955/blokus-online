@@ -23,6 +23,7 @@ const manualAuthRoutes = require('./routes/manual-auth')
 const directAuthRoutes = require('./routes/direct-auth')
 const unityEditorCallbackRoutes = require('./routes/unity-editor-callback')
 const mobileAuthRoutes = require('./routes/mobile-auth')
+const googlePlayGamesAuthRoutes = require('./routes/google-play-games-auth')
 
 const app = express()
 const PORT = env.PORT
@@ -147,6 +148,7 @@ app.use('/api/auth', directAuthRoutes)
 app.use('/unity-editor-callback', unityEditorCallbackRoutes)
 
 // Mount Mobile Auth routes
+app.use('/auth', googlePlayGamesAuthRoutes)
 app.use('/auth/mobile', mobileAuthRoutes)
 
 // 404 handler

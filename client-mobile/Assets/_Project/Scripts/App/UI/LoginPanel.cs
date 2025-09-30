@@ -416,8 +416,8 @@ namespace App.UI
             {
                 case 0:
                     provider = "google";
-                    // Android 빌드: Google Play Games 사용
-                    #if UNITY_ANDROID && !UNITY_EDITOR
+                    // Android 빌드 또는 Editor: Google Play Games/Editor Auth 사용
+                    #if UNITY_ANDROID || UNITY_EDITOR
                     PerformGooglePlayGamesLogin();
                     return;
                     #endif
