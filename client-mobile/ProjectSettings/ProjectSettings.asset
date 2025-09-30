@@ -141,7 +141,7 @@ PlayerSettings:
   loadStoreDebugModeEnabled: 0
   visionOSBundleVersion: 1.0
   tvOSBundleVersion: 1.0
-  bundleVersion: 1.6.1
+  bundleVersion: 1.0.0.0
   preloadedAssets: []
   metroInputSource: 0
   wsaTransparentSwapchain: 0
@@ -163,7 +163,7 @@ PlayerSettings:
   androidSupportedAspectRatio: 1
   androidMaxAspectRatio: 2.1
   applicationIdentifier:
-    Android: com.sang.bloblo
+    Android: com.madalang.bloblo
     Standalone: com.DefaultCompany.2DProject
   buildNumber:
     Standalone: 0
@@ -268,8 +268,8 @@ PlayerSettings:
   AndroidTargetDevices: 0
   AndroidSplashScreenScale: 0
   androidSplashScreen: {fileID: 0}
-  AndroidKeystoreName: C:/Users/SangHyeok/Desktop/git/keys/blokus/blokus-release.keystore
-  AndroidKeyaliasName: blokus-key
+  AndroidKeystoreName: '{inproject}: Keystores/bloblo-release.keystore'
+  AndroidKeyaliasName: bloblo-key
   AndroidEnableArmv9SecurityFeatures: 0
   AndroidBuildApkPerCpuArchitecture: 0
   AndroidTVCompatibility: 0
