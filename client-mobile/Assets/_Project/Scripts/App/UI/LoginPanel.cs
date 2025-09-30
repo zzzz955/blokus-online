@@ -44,10 +44,11 @@ namespace App.UI
         /// </summary>
         private bool IsTestModeEnabled => enableTestMode && (Application.isEditor || Debug.isDebugBuild);
 
-        // 상태 관리  
+        // 상태 관리
         private bool isAuthenticating = false;
         private bool hasCheckedRefreshToken = false;
         private OidcAuthenticator oidcAuthenticator;
+        private AuthenticationService authenticationService;
 
         protected override void Awake()
         {
@@ -128,6 +129,13 @@ namespace App.UI
             {
                 OidcAuthenticator.OnAuthenticationComplete -= OnOidcAuthenticationComplete;
                 OidcAuthenticator.OnAuthenticationError -= OnOidcAuthenticationError;
+            }
+
+            // AuthenticationService 이벤트 구독 해제
+            if (authenticationService != null)
+            {
+                AuthenticationService.OnAuthenticationComplete -= OnGooglePlayGamesAuthComplete;
+                AuthenticationService.OnAuthenticationError -= OnGooglePlayGamesAuthError;
             }
         }
 
@@ -242,26 +250,39 @@ namespace App.UI
         {
             //  글로벌 OIDC Authenticator 사용
             oidcAuthenticator = App.Core.AppBootstrap.GetGlobalOidcAuthenticator();
-            
+
             if (oidcAuthenticator == null)
             {
                 // Fallback: 글로벌 인스턴스가 없으면 직접 찾기
                 oidcAuthenticator = FindObjectOfType<OidcAuthenticator>();
                 Debug.LogWarning("글로벌 OIDC Authenticator를 찾을 수 없음 - 기존 인스턴스 사용");
             }
-            
+
             if (oidcAuthenticator != null)
             {
                 // OIDC 이벤트 구독
                 OidcAuthenticator.OnAuthenticationComplete += OnOidcAuthenticationComplete;
                 OidcAuthenticator.OnAuthenticationError += OnOidcAuthenticationError;
-                
+
                 Debug.Log($"OIDC Authenticator 연결 완료 - Ready: {oidcAuthenticator.IsReady()}");
             }
             else
             {
                 Debug.LogError("OIDC Authenticator를 찾을 수 없습니다!");
                 SystemMessageManager.ShowToast("OAuth 서비스를 찾을 수 없음", Shared.UI.MessagePriority.Error);
+            }
+
+            // AuthenticationService 설정 (Google Play Games용)
+            authenticationService = FindObjectOfType<AuthenticationService>();
+            if (authenticationService != null)
+            {
+                AuthenticationService.OnAuthenticationComplete += OnGooglePlayGamesAuthComplete;
+                AuthenticationService.OnAuthenticationError += OnGooglePlayGamesAuthError;
+                Debug.Log($"AuthenticationService 연결 완료 - Provider: {authenticationService.GetCurrentProviderName()}");
+            }
+            else
+            {
+                Debug.LogWarning("AuthenticationService를 찾을 수 없습니다 - Google Play Games 로그인 사용 불가");
             }
         }
 
@@ -393,15 +414,23 @@ namespace App.UI
             string provider = "unknown";
             switch (buttonIndex)
             {
-                case 0: provider = "google"; break;
+                case 0:
+                    provider = "google";
+                    // Android 빌드 또는 Editor: Google Play Games/Editor Auth 사용
+                    #if UNITY_ANDROID || UNITY_EDITOR
+                    PerformGooglePlayGamesLogin();
+                    return;
+                    #endif
+                    break;
                 case 1: provider = "facebook"; break;
                 // 추가 소셜 로그인 제공자들...
-                default: 
+                default:
                     SetStatusText("지원하지 않는 로그인 방식입니다", Shared.UI.MessagePriority.Warning);
                     SystemMessageManager.ShowToast("지원하지 않는 로그인 방식입니다", Shared.UI.MessagePriority.Warning);
                     return;
             }
 
+            // Web OAuth (에디터 또는 iOS)
             PerformOAuthLogin(provider);
         }
 
@@ -628,6 +657,37 @@ namespace App.UI
         }
         */
 
+        private void PerformGooglePlayGamesLogin()
+        {
+            if (authenticationService == null)
+            {
+                SetStatusText("Google Play Games 서비스를 찾을 수 없습니다", Shared.UI.MessagePriority.Error);
+                SystemMessageManager.ShowToast("Google Play Games 서비스를 찾을 수 없습니다", Shared.UI.MessagePriority.Error);
+                return;
+            }
+
+            isAuthenticating = true;
+            SetStatusText("Google Play Games로 로그인 중...", Shared.UI.MessagePriority.Info);
+            SetLoadingState(true);
+
+            // Google Play Games 인증 시작
+            authenticationService.StartGooglePlayGamesAuth((success, message, tokenResponse) =>
+            {
+                if (success && tokenResponse != null)
+                {
+                    OnOAuthLoginSuccess(tokenResponse.access_token, tokenResponse.refresh_token);
+                    isAuthenticating = false;
+                    SetLoadingState(false);
+                }
+                else
+                {
+                    OnLoginFailed(message ?? "Google Play Games 로그인 실패");
+                }
+            });
+
+            Debug.Log("Google Play Games 로그인 시작");
+        }
+
         private void PerformOAuthLogin(string provider)
         {
             if (oidcAuthenticator == null || !oidcAuthenticator.IsReady())
@@ -744,6 +804,29 @@ namespace App.UI
             isAuthenticating = false;
             SetLoadingState(false);
             OnLoginFailed($"OAuth 오류: {error}");
+        }
+
+        private void OnGooglePlayGamesAuthComplete(bool success, string message, OidcAuthenticator.TokenResponse tokens)
+        {
+            isAuthenticating = false;
+            SetLoadingState(false);
+
+            if (success && tokens != null)
+            {
+                Debug.Log("Google Play Games 인증 성공");
+                OnOAuthLoginSuccess(tokens.access_token, tokens.refresh_token);
+            }
+            else
+            {
+                OnLoginFailed(message ?? "Google Play Games 인증 실패");
+            }
+        }
+
+        private void OnGooglePlayGamesAuthError(string error)
+        {
+            isAuthenticating = false;
+            SetLoadingState(false);
+            OnLoginFailed($"Google Play Games 오류: {error}");
         }
 
         // ==========================================

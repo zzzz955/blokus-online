@@ -2,7 +2,8 @@
     "name": "BlokusUnity.Scripts",
     "rootNamespace": "BlokusUnity",
     "references": [
-        "Unity.TextMeshPro"
+        "Unity.TextMeshPro",
+        "Google.Play.Games"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
