@@ -1,29 +1,52 @@
 📑 스키마 구조 문서 (정리본)
 
 Table: users
-| Column                    | Type        | Constraints                                                   |
-| ------------------------- | ----------- | ------------------------------------------------------------- |
-| user\_id                  | integer     | PK, AUTO INCREMENT, NOT NULL                                  |
-| username                  | varchar(20) | UNIQUE, NOT NULL, CHECK length 4–20, regex ^\[a-zA-Z0-9\_]+\$ |
-| password\_hash            | text        | NOT NULL                                                      |
-| email                     | text        | UNIQUE, optional                                              |
-| oauth\_provider           | text        | optional (deprecated, for backward compatibility)             |
-| oauth\_id                 | text        | optional (deprecated, for backward compatibility)             |
-| primary\_auth\_method     | text        | DEFAULT 'manual', NOT NULL                                    |
-| google\_play\_games\_id   | text        | optional                                                      |
-| google\_oauth\_id         | text        | optional                                                      |
-| apple\_game\_center\_id   | text        | optional (future expansion)                                   |
-| last\_login\_at           | timestamp   | optional                                                      |
-| updated\_at               | timestamp   | NOT NULL                                                      |
-| progress\_version         | integer     | DEFAULT 1, NOT NULL                                           |
-| progress\_updated\_at     | timestamp   | DEFAULT now(), NOT NULL                                       |
-| last\_sync\_at            | timestamp   | DEFAULT now(), NOT NULL                                       |
-| last\_metadata\_check\_at | timestamp   | DEFAULT now(), NOT NULL                                       |
+| Column                    | Type         | Constraints                                                   |
+| ------------------------- | ------------ | ------------------------------------------------------------- |
+| user\_id                  | integer      | PK, AUTO INCREMENT, NOT NULL                                  |
+| username                  | varchar(20)  | UNIQUE, NOT NULL, CHECK length 4–20, regex ^\[a-zA-Z0-9\_]+\$ |
+| password\_hash            | varchar(255) | NOT NULL                                                      |
+| email                     | varchar(100) | UNIQUE, optional                                              |
+| oauth\_provider           | varchar(20)  | optional (deprecated, for backward compatibility)             |
+| oauth\_id                 | varchar(100) | optional (deprecated, for backward compatibility)             |
+| display\_name             | varchar(30)  | optional                                                      |
+| avatar\_url               | text         | optional                                                      |
+| is\_active                | boolean      | DEFAULT true, NOT NULL                                        |
+| created\_at               | timestamp(3) | DEFAULT CURRENT_TIMESTAMP, NOT NULL                           |
+| last\_login\_at           | timestamp(3) | optional                                                      |
+| updated\_at               | timestamp(3) | NOT NULL                                                      |
+| progress\_version         | integer      | DEFAULT 1, NOT NULL                                           |
+| progress\_updated\_at     | timestamp(3) | DEFAULT CURRENT_TIMESTAMP, NOT NULL                           |
+| last\_sync\_at            | timestamp(3) | DEFAULT CURRENT_TIMESTAMP, NOT NULL                           |
+| last\_metadata\_check\_at | timestamp(3) | DEFAULT CURRENT_TIMESTAMP, NOT NULL                           |
 
-Indexes: idx_users_email, idx_users_oauth, idx_users_primary_auth_method, idx_users_google_play_games_id (partial: WHERE google_play_games_id IS NOT NULL)
+Indexes: idx_users_email, idx_users_oauth
 Relations:
 
-Referenced by user_stats.user_id, user_settings.user_id, user_stage_progress.user_id, support_tickets.user_id, testimonials.user_id, posts.author_id, comments.author_id, replies.author_id
+Referenced by user_auth_providers.user_id, user_stats.user_id, user_settings.user_id, user_stage_progress.user_id, support_tickets.user_id, testimonials.user_id, posts.author_id, comments.author_id, replies.author_id, authorization_codes.user_id, refresh_token_families.user_id
+
+Table: user_auth_providers
+| Column               | Type         | Constraints                                                |
+| -------------------- | ------------ | ---------------------------------------------------------- |
+| id                   | integer      | PK, AUTO INCREMENT, NOT NULL                               |
+| user\_id             | integer      | FK → users(user\_id), ON DELETE CASCADE, NOT NULL          |
+| provider\_type       | varchar(50)  | NOT NULL, CHECK in ('manual', 'google_oauth', 'google_play_games', 'apple_game_center') |
+| provider\_user\_id   | text         | NOT NULL                                                   |
+| is\_primary          | boolean      | DEFAULT false                                              |
+| linked\_at           | timestamp    | DEFAULT now()                                              |
+| last\_verified\_at   | timestamp    | optional                                                   |
+| metadata             | jsonb        | optional                                                   |
+
+Unique Constraints:
+- (user_id, provider_type) - One provider type per user
+- (provider_type, provider_user_id) - One provider account per user
+
+Indexes:
+- idx_user_auth_providers_user_id (user_id)
+- idx_user_auth_providers_lookup (provider_type, provider_user_id)
+- idx_user_auth_providers_primary (user_id, is_primary) WHERE is_primary = true
+
+Relations: user_id → users.user_id (ON DELETE CASCADE)
 
 Table: user_stats
 | Column                | Type      | Constraints              |
@@ -267,6 +290,7 @@ Indexes: idx_refresh_tokens_jti, idx_refresh_tokens_family, idx_refresh_tokens_s
  관계 요약 (외래키)
 
 **Core User Relations:**
+- user_auth_providers.user_id → users.user_id (ON DELETE CASCADE)
 - user_stats.user_id → users.user_id
 - user_settings.user_id → users.user_id
 - user_stage_progress.user_id → users.user_id

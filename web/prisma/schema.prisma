@@ -19,18 +19,12 @@ model User {
 
   // 필수 로그인 정보 (모든 사용자)
   username     String   @unique @db.VarChar(20)
-  password_hash String  @map("password_hash")
+  password_hash String  @db.VarChar(255) @map("password_hash")
 
   // OAuth 연동 정보 (선택사항, 계정 복구용)
-  email        String?  @unique
-  oauth_provider String? @map("oauth_provider") // deprecated, for backward compatibility
-  oauth_id     String?  @map("oauth_id") // deprecated, for backward compatibility
-
-  // Multi-provider authentication support
-  primary_auth_method    String? @default("manual") @map("primary_auth_method")
-  google_play_games_id   String? @map("google_play_games_id")
-  google_oauth_id        String? @map("google_oauth_id")
-  apple_game_center_id   String? @map("apple_game_center_id") // future expansion
+  email        String?  @unique @db.VarChar(100)
+  oauth_provider String? @db.VarChar(20) @map("oauth_provider") // deprecated, for backward compatibility
+  oauth_id     String?  @db.VarChar(100) @map("oauth_id") // deprecated, for backward compatibility
 
   // 사용자 프로필
   display_name String?  @map("display_name") @db.VarChar(30)
@@ -40,17 +34,18 @@ model User {
   is_active    Boolean  @default(true) @map("is_active")
 
   // 시간 정보
-  created_at   DateTime @default(now()) @map("created_at")
-  last_login_at DateTime? @map("last_login_at")
-  updated_at   DateTime @updatedAt @map("updated_at")
+  created_at   DateTime @default(now()) @map("created_at") @db.Timestamp(3)
+  last_login_at DateTime? @map("last_login_at") @db.Timestamp(3)
+  updated_at   DateTime @updatedAt @map("updated_at") @db.Timestamp(3)
 
   // 진행상황 동기화 정보
   progress_version Int @default(1) @map("progress_version")
-  progress_updated_at DateTime @default(now()) @map("progress_updated_at")
-  last_sync_at DateTime @default(now()) @map("last_sync_at")
-  last_metadata_check_at DateTime @default(now()) @map("last_metadata_check_at")
+  progress_updated_at DateTime @default(now()) @map("progress_updated_at") @db.Timestamp(3)
+  last_sync_at DateTime @default(now()) @map("last_sync_at") @db.Timestamp(3)
+  last_metadata_check_at DateTime @default(now()) @map("last_metadata_check_at") @db.Timestamp(3)
 
   // 관계
+  auth_providers  UserAuthProvider[]
   user_stats     UserStats?
   user_settings  UserSettings?
   user_stage_progress UserStageProgress[]
@@ -64,9 +59,28 @@ model User {
 
   @@index([email], name: "idx_users_email")
   @@index([oauth_provider, oauth_id], name: "idx_users_oauth")
-  @@index([primary_auth_method], name: "idx_users_primary_auth_method")
-  @@index([google_play_games_id], name: "idx_users_google_play_games_id")
   @@map("users")
+}
+
+model UserAuthProvider {
+  id               Int      @id @default(autoincrement())
+  user_id          Int      @map("user_id")
+  provider_type    String   @db.VarChar(50) @map("provider_type")
+  provider_user_id String   @map("provider_user_id")
+  is_primary       Boolean? @default(false) @map("is_primary")
+  linked_at        DateTime? @default(now()) @map("linked_at")
+  last_verified_at DateTime? @map("last_verified_at")
+  metadata         Json?
+
+  // 관계
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@unique([user_id, provider_type], name: "user_auth_providers_user_id_provider_type_key")
+  @@unique([provider_type, provider_user_id], name: "user_auth_providers_provider_type_provider_user_id_key")
+  @@index([user_id], name: "idx_user_auth_providers_user_id")
+  @@index([provider_type, provider_user_id], name: "idx_user_auth_providers_lookup")
+  @@index([user_id, is_primary], name: "idx_user_auth_providers_primary")
+  @@map("user_auth_providers")
 }
 
 model UserStats {
