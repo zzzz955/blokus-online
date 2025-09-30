@@ -115,10 +115,7 @@ namespace App.Network
         /// </summary>
         private IEnumerator ExchangeAuthCodeForTokens(string authCode, Action<bool, string, OidcAuthenticator.TokenResponse> callback)
         {
-            string backendUrl = useProduction
-                ? EnvironmentConfig.ProductionOidcServerUrl
-                : EnvironmentConfig.DevelopmentOidcServerUrl;
-
+            string backendUrl = EnvironmentConfig.OidcServerUrl;
             string endpoint = $"{backendUrl}/auth/google-play-games";
 
             // Request body
