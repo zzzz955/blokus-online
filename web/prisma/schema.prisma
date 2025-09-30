@@ -16,34 +16,40 @@ datasource db {
 
 model User {
   user_id      Int      @id @default(autoincrement()) @map("user_id")
-  
+
   // 필수 로그인 정보 (모든 사용자)
   username     String   @unique @db.VarChar(20)
   password_hash String  @map("password_hash")
-  
+
   // OAuth 연동 정보 (선택사항, 계정 복구용)
   email        String?  @unique
-  oauth_provider String? @map("oauth_provider")
-  oauth_id     String?  @map("oauth_id")
-  
+  oauth_provider String? @map("oauth_provider") // deprecated, for backward compatibility
+  oauth_id     String?  @map("oauth_id") // deprecated, for backward compatibility
+
+  // Multi-provider authentication support
+  primary_auth_method    String? @default("manual") @map("primary_auth_method")
+  google_play_games_id   String? @map("google_play_games_id")
+  google_oauth_id        String? @map("google_oauth_id")
+  apple_game_center_id   String? @map("apple_game_center_id") // future expansion
+
   // 사용자 프로필
   display_name String?  @map("display_name") @db.VarChar(30)
   avatar_url   String?  @map("avatar_url")
-  
+
   // 계정 상태
   is_active    Boolean  @default(true) @map("is_active")
-  
+
   // 시간 정보
   created_at   DateTime @default(now()) @map("created_at")
   last_login_at DateTime? @map("last_login_at")
   updated_at   DateTime @updatedAt @map("updated_at")
-  
+
   // 진행상황 동기화 정보
   progress_version Int @default(1) @map("progress_version")
   progress_updated_at DateTime @default(now()) @map("progress_updated_at")
   last_sync_at DateTime @default(now()) @map("last_sync_at")
   last_metadata_check_at DateTime @default(now()) @map("last_metadata_check_at")
-  
+
   // 관계
   user_stats     UserStats?
   user_settings  UserSettings?
@@ -55,9 +61,11 @@ model User {
   replies        Reply[]
   authorization_codes AuthorizationCode[]
   refresh_token_families RefreshTokenFamily[]
-  
+
   @@index([email], name: "idx_users_email")
   @@index([oauth_provider, oauth_id], name: "idx_users_oauth")
+  @@index([primary_auth_method], name: "idx_users_primary_auth_method")
+  @@index([google_play_games_id], name: "idx_users_google_play_games_id")
   @@map("users")
 }
 

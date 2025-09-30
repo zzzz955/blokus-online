@@ -7,8 +7,12 @@ Table: users
 | username                  | varchar(20) | UNIQUE, NOT NULL, CHECK length 4–20, regex ^\[a-zA-Z0-9\_]+\$ |
 | password\_hash            | text        | NOT NULL                                                      |
 | email                     | text        | UNIQUE, optional                                              |
-| oauth\_provider           | text        | optional                                                      |
-| oauth\_id                 | text        | optional                                                      |
+| oauth\_provider           | text        | optional (deprecated, for backward compatibility)             |
+| oauth\_id                 | text        | optional (deprecated, for backward compatibility)             |
+| primary\_auth\_method     | text        | DEFAULT 'manual', NOT NULL                                    |
+| google\_play\_games\_id   | text        | optional                                                      |
+| google\_oauth\_id         | text        | optional                                                      |
+| apple\_game\_center\_id   | text        | optional (future expansion)                                   |
 | last\_login\_at           | timestamp   | optional                                                      |
 | updated\_at               | timestamp   | NOT NULL                                                      |
 | progress\_version         | integer     | DEFAULT 1, NOT NULL                                           |
@@ -16,7 +20,7 @@ Table: users
 | last\_sync\_at            | timestamp   | DEFAULT now(), NOT NULL                                       |
 | last\_metadata\_check\_at | timestamp   | DEFAULT now(), NOT NULL                                       |
 
-Indexes: idx_users_email, idx_users_oauth
+Indexes: idx_users_email, idx_users_oauth, idx_users_primary_auth_method, idx_users_google_play_games_id (partial: WHERE google_play_games_id IS NOT NULL)
 Relations:
 
 Referenced by user_stats.user_id, user_settings.user_id, user_stage_progress.user_id, support_tickets.user_id, testimonials.user_id, posts.author_id, comments.author_id, replies.author_id
