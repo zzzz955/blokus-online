@@ -179,14 +179,10 @@ namespace App.Network
 
             // Request body
             // IL2CPP에서 익명 타입 직렬화가 실패하므로 Dictionary 사용
-            // IMPORTANT: client_id는 Android OAuth Client ID (로컬 키스토어용)
+            // IMPORTANT: client_id는 내부 식별용, auth_code 검증은 백엔드가 자동으로 Android Client ID 선택
             var requestData = new System.Collections.Generic.Dictionary<string, string>
             {
-                #if UNITY_ANDROID && !UNITY_EDITOR
-                {"client_id", "1028009634900-9oupf83r2jprrohmkd65k8vbk976eeck.apps.googleusercontent.com"},
-                #else
-                {"client_id", "unity-mobile-client"},  // Editor/테스트용
-                #endif
+                {"client_id", "unity-mobile-client"},  // 내부 식별용 (백엔드가 auth_code 검증 시 Android Client ID 자동 선택)
                 {"auth_code", authCode}
             };
 
