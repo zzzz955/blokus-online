@@ -101,9 +101,9 @@ export default function Footer() {
               © {currentYear} 블로블로. All rights reserved.
             </p>
             <div className="flex space-x-6 mt-4 md:mt-0">
-              <a href="#" className="text-gray-400 hover:text-white text-sm transition-colors">
+              <Link href="/privacy-policy" className="text-gray-400 hover:text-white text-sm transition-colors">
                 개인정보처리방침
-              </a>
+              </Link>
               <a href="#" className="text-gray-400 hover:text-white text-sm transition-colors">
                 이용약관
               </a>
