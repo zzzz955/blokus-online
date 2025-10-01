@@ -57,13 +57,21 @@ namespace App.Network
         }
 
         /// <summary>
-        /// Google Play Games 인증 시작
+        /// Google Play Games 인증 시작 (authCode 파라미터 추가 - Silent sign-in용)
         /// </summary>
-        public async void StartGooglePlayGamesAuth(Action<bool, string, OidcAuthenticator.TokenResponse> callback)
+        public async void StartGooglePlayGamesAuth(Action<bool, string, OidcAuthenticator.TokenResponse> callback, string authCode = null)
         {
+            #if UNITY_ANDROID && !UNITY_EDITOR
+            App.Logging.AndroidLogger.LogAuth("=== AuthenticationService.StartGooglePlayGamesAuth START ===");
+            #endif
+
             if (_isAuthenticating)
             {
+                #if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogAuth("⚠️ Authentication already in progress");
+                #else
                 Debug.LogWarning("[AuthenticationService] Authentication already in progress");
+                #endif
                 callback?.Invoke(false, "Authentication already in progress", null);
                 return;
             }
@@ -71,7 +79,11 @@ namespace App.Network
             if (_authProvider == null || !_authProvider.IsAvailable())
             {
                 string error = "Auth provider not available for this platform";
+                #if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogError($"❌ {error}");
+                #else
                 Debug.LogError($"[AuthenticationService] {error}");
+                #endif
                 callback?.Invoke(false, error, null);
                 OnAuthenticationError?.Invoke(error);
                 return;
@@ -81,26 +93,63 @@ namespace App.Network
 
             try
             {
-                // 1. Google Play Games 인증 및 Auth Code 획득
-                Debug.Log($"[AuthenticationService] Starting authentication with {_authProvider.GetProviderName()}");
-                AuthResult authResult = await _authProvider.AuthenticateAsync();
+                AuthResult authResult;
 
-                if (!authResult.Success)
+                // authCode가 제공된 경우 (Silent sign-in에서 이미 획득한 경우)
+                if (!string.IsNullOrEmpty(authCode))
                 {
-                    Debug.LogError($"[AuthenticationService] Authentication failed: {authResult.ErrorMessage}");
-                    callback?.Invoke(false, authResult.ErrorMessage, null);
-                    OnAuthenticationError?.Invoke(authResult.ErrorMessage);
-                    return;
+                    #if UNITY_ANDROID && !UNITY_EDITOR
+                    App.Logging.AndroidLogger.LogAuth($"Using provided auth code (length: {authCode.Length})");
+                    #endif
+
+                    authResult = new AuthResult
+                    {
+                        Success = true,
+                        AuthCode = authCode
+                    };
+                }
+                else
+                {
+                    // 1. Google Play Games 인증 및 Auth Code 획득
+                    #if UNITY_ANDROID && !UNITY_EDITOR
+                    App.Logging.AndroidLogger.LogAuth($"Starting authentication with {_authProvider.GetProviderName()}");
+                    #else
+                    Debug.Log($"[AuthenticationService] Starting authentication with {_authProvider.GetProviderName()}");
+                    #endif
+
+                    authResult = await _authProvider.AuthenticateAsync();
+
+                    if (!authResult.Success)
+                    {
+                        #if UNITY_ANDROID && !UNITY_EDITOR
+                        App.Logging.AndroidLogger.LogError($"❌ Authentication failed: {authResult.ErrorMessage}");
+                        #else
+                        Debug.LogError($"[AuthenticationService] Authentication failed: {authResult.ErrorMessage}");
+                        #endif
+                        callback?.Invoke(false, authResult.ErrorMessage, null);
+                        OnAuthenticationError?.Invoke(authResult.ErrorMessage);
+                        return;
+                    }
                 }
 
+                #if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogAuth($"Auth code received (length: {authResult.AuthCode?.Length ?? 0}), exchanging with backend...");
+                #else
                 Debug.Log("[AuthenticationService] Auth code received, exchanging with backend...");
+                #endif
 
                 // 2. Backend로 Auth Code 전송 및 JWT 토큰 교환
                 StartCoroutine(ExchangeAuthCodeForTokens(authResult.AuthCode, callback));
             }
             catch (Exception ex)
             {
+                #if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogError($"❌ EXCEPTION: {ex.GetType().Name}");
+                App.Logging.AndroidLogger.LogError($"Message: {ex.Message}");
+                App.Logging.AndroidLogger.LogError($"StackTrace: {ex.StackTrace}");
+                #else
                 Debug.LogError($"[AuthenticationService] Exception: {ex.Message}");
+                #endif
                 callback?.Invoke(false, ex.Message, null);
                 OnAuthenticationError?.Invoke(ex.Message);
             }
@@ -117,6 +166,12 @@ namespace App.Network
         {
             string backendUrl = EnvironmentConfig.OidcServerUrl;
             string endpoint = $"{backendUrl}/auth/google-play-games";
+
+            #if UNITY_ANDROID && !UNITY_EDITOR
+            App.Logging.AndroidLogger.LogAuth($"Backend URL: {backendUrl}");
+            App.Logging.AndroidLogger.LogAuth($"Endpoint: {endpoint}");
+            App.Logging.AndroidLogger.LogAuth($"Auth code length: {authCode?.Length ?? 0}");
+            #endif
 
             // Request body
             var requestData = new
@@ -135,23 +190,46 @@ namespace App.Network
                 request.SetRequestHeader("Content-Type", "application/json");
                 request.timeout = 30;
 
+                #if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogAuth($"Sending auth code to backend: {endpoint}");
+                #else
                 Debug.Log($"[AuthenticationService] Sending auth code to: {endpoint}");
+                #endif
 
                 yield return request.SendWebRequest();
 
                 if (request.result == UnityWebRequest.Result.Success)
                 {
+                    #if UNITY_ANDROID && !UNITY_EDITOR
+                    App.Logging.AndroidLogger.LogAuth($"✅ Token exchange successful: {request.responseCode}");
+                    #else
                     Debug.Log($"[AuthenticationService] Token exchange successful: {request.responseCode}");
+                    #endif
 
                     try
                     {
                         var tokenResponse = JsonConvert.DeserializeObject<OidcAuthenticator.TokenResponse>(request.downloadHandler.text);
+
+                        #if UNITY_ANDROID && !UNITY_EDITOR
+                        App.Logging.AndroidLogger.LogAuth($"Token parsed successfully");
+                        App.Logging.AndroidLogger.LogAuth($"Access token length: {tokenResponse.access_token?.Length ?? 0}");
+                        App.Logging.AndroidLogger.LogAuth($"Refresh token length: {tokenResponse.refresh_token?.Length ?? 0}");
+                        #endif
 
                         // 토큰 저장 (OidcAuthenticator의 저장 로직 활용)
                         var oidcAuth = FindObjectOfType<OidcAuthenticator>();
                         if (oidcAuth != null)
                         {
                             oidcAuth.SaveTokens(tokenResponse);
+                            #if UNITY_ANDROID && !UNITY_EDITOR
+                            App.Logging.AndroidLogger.LogAuth("Tokens saved via OidcAuthenticator");
+                            #endif
+                        }
+                        else
+                        {
+                            #if UNITY_ANDROID && !UNITY_EDITOR
+                            App.Logging.AndroidLogger.LogAuth("⚠️ OidcAuthenticator not found, tokens not saved");
+                            #endif
                         }
 
                         callback?.Invoke(true, "Authentication successful", tokenResponse);
@@ -159,7 +237,12 @@ namespace App.Network
                     }
                     catch (Exception ex)
                     {
+                        #if UNITY_ANDROID && !UNITY_EDITOR
+                        App.Logging.AndroidLogger.LogError($"❌ Failed to parse token response: {ex.Message}");
+                        App.Logging.AndroidLogger.LogError($"Response text: {request.downloadHandler.text}");
+                        #else
                         Debug.LogError($"[AuthenticationService] Failed to parse token response: {ex.Message}");
+                        #endif
                         callback?.Invoke(false, "Failed to parse token response", null);
                         OnAuthenticationError?.Invoke(ex.Message);
                     }
@@ -167,8 +250,15 @@ namespace App.Network
                 else
                 {
                     string errorMsg = $"Token exchange failed: {request.responseCode} - {request.error}";
+                    #if UNITY_ANDROID && !UNITY_EDITOR
+                    App.Logging.AndroidLogger.LogError($"❌ {errorMsg}");
+                    App.Logging.AndroidLogger.LogError($"Response: {request.downloadHandler.text}");
+                    App.Logging.AndroidLogger.LogError($"Request URL: {request.url}");
+                    App.Logging.AndroidLogger.LogError($"Request method: {request.method}");
+                    #else
                     Debug.LogError($"[AuthenticationService] {errorMsg}");
                     Debug.LogError($"[AuthenticationService] Response: {request.downloadHandler.text}");
+                    #endif
 
                     callback?.Invoke(false, errorMsg, null);
                     OnAuthenticationError?.Invoke(errorMsg);

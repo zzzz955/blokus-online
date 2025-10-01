@@ -418,7 +418,7 @@ namespace App.UI
                     provider = "google";
                     // Android 빌드 또는 Editor: Google Play Games/Editor Auth 사용
                     #if UNITY_ANDROID || UNITY_EDITOR
-                    PerformGooglePlayGamesLogin();
+                    PerformGooglePlayGamesToggle();
                     return;
                     #endif
                     break;
@@ -656,6 +656,41 @@ namespace App.UI
             yield return new WaitUntil(() => !isAuthenticating || !oidcAuthenticator.IsAuthenticating());
         }
         */
+
+        /// <summary>
+        /// Google Play Games 인증 상태 토글 (로그인 <-> 로그아웃)
+        /// </summary>
+        private void PerformGooglePlayGamesToggle()
+        {
+            #if UNITY_ANDROID && !UNITY_EDITOR
+            // Google Play Games 인증 상태 확인
+            bool isAuthenticated = GooglePlayGames.PlayGamesPlatform.Instance.IsAuthenticated();
+
+            if (isAuthenticated)
+            {
+                // 이미 인증된 상태 → 통합 로그아웃 (SessionManager 사용)
+                Debug.Log("[LoginPanel] Google Play Games 로그아웃 시도 (SessionManager 사용)");
+                SetStatusText("로그아웃 중...", Shared.UI.MessagePriority.Info);
+
+                // SessionManager의 통합 로그아웃 사용
+                if (App.Core.SessionManager.Instance != null)
+                {
+                    App.Core.SessionManager.Instance.LogoutAndClearSession();
+                }
+
+                SetStatusText("로그아웃 완료", Shared.UI.MessagePriority.Success);
+                SystemMessageManager.ShowToast("로그아웃 완료", Shared.UI.MessagePriority.Success);
+            }
+            else
+            {
+                // 인증되지 않은 상태 → 로그인
+                PerformGooglePlayGamesLogin();
+            }
+            #else
+            // Editor: 항상 로그인 시도
+            PerformGooglePlayGamesLogin();
+            #endif
+        }
 
         private void PerformGooglePlayGamesLogin()
         {
