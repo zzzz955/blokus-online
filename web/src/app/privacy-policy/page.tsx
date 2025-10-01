@@ -1,4 +1,5 @@
 import { Metadata } from 'next';
+import Layout from '@/components/layout/Layout';
 
 export const metadata: Metadata = {
   title: '개인정보처리방침 | 블로블로',
@@ -7,7 +8,8 @@ export const metadata: Metadata = {
 
 export default function PrivacyPolicyPage() {
   return (
-    <div className="min-h-screen bg-dark-bg py-12">
+    <Layout>
+      <div className="bg-dark-bg py-12">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="bg-dark-card border border-dark-border rounded-lg p-8">
           <h1 className="text-3xl font-bold text-white mb-8">개인정보처리방침</h1>
@@ -228,11 +230,12 @@ export default function PrivacyPolicyPage() {
             {/* 부칙 */}
             <section className="border-t border-dark-border pt-6">
               <h2 className="text-xl font-semibold text-white mb-4">부칙</h2>
-              <p>본 방침은 2025년 1월 1일부터 시행됩니다.</p>
+              <p>본 방침은 2025년 10월 1일부터 시행됩니다.</p>
             </section>
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </Layout>
   );
 }
