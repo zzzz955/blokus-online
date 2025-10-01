@@ -93,7 +93,11 @@ const env = {
   // Google OAuth (Android - for Google Play Games)
   GOOGLE_ANDROID_CLIENT_ID: getEnvWithFallback('GOOGLE_ANDROID_CLIENT_ID', false),
   GOOGLE_ANDROID_CLIENT_SECRET: getEnvWithFallback('GOOGLE_ANDROID_CLIENT_SECRET', false),
-  
+
+  // Google OAuth (Android 2 - for Play Console Signing)
+  GOOGLE_ANDROID_CLIENT_ID_2: getEnvWithFallback('GOOGLE_ANDROID_CLIENT_ID_2', false),
+  GOOGLE_ANDROID_CLIENT_SECRET_2: getEnvWithFallback('GOOGLE_ANDROID_CLIENT_SECRET_2', false),
+
   // Session & Security
   SESSION_SECRET: getEnvWithFallback('SESSION_SECRET'),
   WEB_CLIENT_SECRET: getEnvWithFallback('WEB_CLIENT_SECRET'),

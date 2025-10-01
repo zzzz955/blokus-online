@@ -16,6 +16,10 @@
         <meta-data android:name="com.google.android.gms.games.APP_ID"
             android:value="\u0031028009634900" />
 
+        <!-- Web Client ID for server-side auth code -->
+        <meta-data android:name="com.google.android.gms.games.WEB_CLIENT_ID"
+            android:value="1028009634900-vfsatfnqhr26ahhdd8qkc090q7jffftj.apps.googleusercontent.com" />
+
         <!-- Keep track of which plugin is being used -->
         <meta-data android:name="com.google.android.gms.games.unityVersion"
             android:value="\u0032.1.0" />
