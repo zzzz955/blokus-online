@@ -29,9 +29,13 @@ const DEV_FALLBACKS = {
   DB_POOL_MIN: '2',
   DB_POOL_MAX: '10',
   
-  // Google OAuth
+  // Google OAuth (Web)
   GOOGLE_CLIENT_ID: '',
   GOOGLE_CLIENT_SECRET: '',
+
+  // Google OAuth (Android - for Google Play Games)
+  GOOGLE_ANDROID_CLIENT_ID: '',
+  GOOGLE_ANDROID_CLIENT_SECRET: '',
   
   // Session & Security
   SESSION_SECRET: 'oidc-session-secret-change-in-production',
@@ -82,9 +86,13 @@ const env = {
   DB_POOL_MIN: parseInt(getEnvWithFallback('DB_POOL_MIN')),
   DB_POOL_MAX: parseInt(getEnvWithFallback('DB_POOL_MAX')),
   
-  // Google OAuth
+  // Google OAuth (Web)
   GOOGLE_CLIENT_ID: getEnvWithFallback('GOOGLE_CLIENT_ID', false),
   GOOGLE_CLIENT_SECRET: getEnvWithFallback('GOOGLE_CLIENT_SECRET', false),
+
+  // Google OAuth (Android - for Google Play Games)
+  GOOGLE_ANDROID_CLIENT_ID: getEnvWithFallback('GOOGLE_ANDROID_CLIENT_ID', false),
+  GOOGLE_ANDROID_CLIENT_SECRET: getEnvWithFallback('GOOGLE_ANDROID_CLIENT_SECRET', false),
   
   // Session & Security
   SESSION_SECRET: getEnvWithFallback('SESSION_SECRET'),

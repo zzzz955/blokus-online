@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using UnityEngine;
+using App.Logging;
 #if UNITY_ANDROID
 using GooglePlayGames;
 using GooglePlayGames.BasicApi;
@@ -21,30 +22,72 @@ namespace App.Network
 
             try
             {
+                AndroidLogger.LogAuth("=== GooglePlayGamesAuthProvider.AuthenticateAsync START ===");
+                AndroidLogger.LogAuth("Checking PlayGamesPlatform availability...");
+
+                // PlayGamesPlatform.Instance 접근 전 로깅
+                var instance = PlayGamesPlatform.Instance;
+                AndroidLogger.LogAuth($"PlayGamesPlatform.Instance: {(instance != null ? "NOT NULL" : "NULL")}");
+
                 // Google Play Games 로그인 시도
-                PlayGamesPlatform.Instance.Authenticate((status) =>
+                AndroidLogger.LogAuth("Calling PlayGamesPlatform.Instance.Authenticate()...");
+                instance.Authenticate((status) =>
                 {
+                    AndroidLogger.LogAuth($"Authenticate callback received - Status: {status}");
+
                     if (status == SignInStatus.Success)
                     {
-                        Debug.Log("[GooglePlayGamesAuthProvider] Authentication successful");
+                        AndroidLogger.LogAuth("✅ Authentication successful");
                         RequestServerAuthCode(tcs);
                     }
                     else
                     {
-                        Debug.LogError($"[GooglePlayGamesAuthProvider] Authentication failed: {status}");
+                        // 상세한 에러 메시지
+                        string errorMessage;
+                        switch (status)
+                        {
+                            case SignInStatus.Canceled:
+                                errorMessage = "사용자가 Google 로그인을 취소했습니다";
+                                AndroidLogger.LogAuth($"⚠️ Authentication canceled by user");
+                                break;
+                            case SignInStatus.DeveloperError:
+                                errorMessage = "Google Play Games 설정 오류입니다. 개발자에게 문의하세요";
+                                AndroidLogger.LogError($"❌ Developer error - Check OAuth client ID configuration in Google Play Console");
+                                break;
+                            case SignInStatus.InternalError:
+                                errorMessage = "Google Play Services 내부 오류입니다";
+                                AndroidLogger.LogError($"❌ Internal error - Google Play Services issue");
+                                break;
+                            case SignInStatus.NotAuthenticated:
+                                errorMessage = "Google 인증에 실패했습니다";
+                                AndroidLogger.LogError($"❌ Not authenticated");
+                                break;
+                            case SignInStatus.NetworkError:
+                                errorMessage = "네트워크 연결을 확인해주세요";
+                                AndroidLogger.LogError($"❌ Network error");
+                                break;
+                            default:
+                                errorMessage = $"Google Play Games 인증 실패: {status}";
+                                AndroidLogger.LogError($"❌ Authentication failed: {status}");
+                                break;
+                        }
+
                         tcs.SetResult(new AuthResult
                         {
                             Success = false,
-                            ErrorMessage = $"Google Play Games authentication failed: {status}"
+                            ErrorMessage = errorMessage
                         });
                     }
                 });
 
+                AndroidLogger.LogAuth("Authenticate call initiated, waiting for callback...");
                 return await tcs.Task;
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[GooglePlayGamesAuthProvider] Exception: {ex.Message}");
+                AndroidLogger.LogError($"❌ EXCEPTION in AuthenticateAsync: {ex.GetType().Name}");
+                AndroidLogger.LogError($"Exception Message: {ex.Message}");
+                AndroidLogger.LogError($"StackTrace: {ex.StackTrace}");
                 return new AuthResult
                 {
                     Success = false,
@@ -64,13 +107,18 @@ namespace App.Network
         #if UNITY_ANDROID && !UNITY_EDITOR
         private void RequestServerAuthCode(TaskCompletionSource<AuthResult> tcs)
         {
+            AndroidLogger.LogAuth("Requesting server-side access code...");
+
             PlayGamesPlatform.Instance.RequestServerSideAccess(
                 forceRefreshToken: false,
                 code =>
                 {
+                    AndroidLogger.LogAuth($"RequestServerSideAccess callback received");
+                    AndroidLogger.LogAuth($"Code is null or empty: {string.IsNullOrEmpty(code)}");
+
                     if (!string.IsNullOrEmpty(code))
                     {
-                        Debug.Log("[GooglePlayGamesAuthProvider] Server auth code received");
+                        AndroidLogger.LogAuth($"✅ Server auth code received (length: {code.Length})");
                         tcs.SetResult(new AuthResult
                         {
                             Success = true,
@@ -79,7 +127,7 @@ namespace App.Network
                     }
                     else
                     {
-                        Debug.LogError("[GooglePlayGamesAuthProvider] Failed to get server auth code");
+                        AndroidLogger.LogError("❌ Failed to get server auth code");
                         tcs.SetResult(new AuthResult
                         {
                             Success = false,

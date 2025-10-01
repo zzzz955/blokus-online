@@ -54,6 +54,10 @@ android {
 dependencies {
     implementation project(':unityLibrary')
     implementation 'androidx.multidex:multidex:2.0.1'
+
+    // Google Play Games Services v2
+    implementation 'com.google.android.gms:play-services-games-v2:19.0.0'
+    implementation 'com.google.android.gms:play-services-auth:21.0.0'
 }
 
 **BUILT_APK_LOCATION**
