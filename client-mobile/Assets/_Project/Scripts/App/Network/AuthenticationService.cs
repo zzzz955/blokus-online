@@ -183,6 +183,11 @@ namespace App.Network
             string jsonData = JsonConvert.SerializeObject(requestData);
             byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(jsonData);
 
+            #if UNITY_ANDROID && !UNITY_EDITOR
+            App.Logging.AndroidLogger.LogAuth($"Request JSON: {jsonData}");
+            App.Logging.AndroidLogger.LogAuth($"Request body length: {bodyRaw.Length}");
+            #endif
+
             using (UnityWebRequest request = new UnityWebRequest(endpoint, "POST"))
             {
                 request.uploadHandler = new UploadHandlerRaw(bodyRaw);

@@ -15,6 +15,8 @@ namespace App.Network
 
         /// <summary>
         /// Google Play Games 로그아웃
+        /// GPGS v2에서는 signOut이 제거되었으므로, 로컬 세션만 클리어합니다.
+        /// 실제 Google 계정 로그아웃은 사용자가 기기 설정에서 수행해야 합니다.
         /// </summary>
         public static void SignOut()
         {
@@ -22,27 +24,20 @@ namespace App.Network
             try
             {
                 AndroidLogger.LogAuth("=== GooglePlayGamesSignOutHelper.SignOut START ===");
+                AndroidLogger.LogAuth("⚠️ GPGS v2 does not support signOut");
+                AndroidLogger.LogAuth("Clearing local session data only");
 
-                // Unity Activity 가져오기
-                using (AndroidJavaClass unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
-                {
-                    using (AndroidJavaObject activity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity"))
-                    {
-                        // GamesSignInClient 가져오기
-                        using (AndroidJavaClass playGames = new AndroidJavaClass("com.google.android.gms.games.PlayGames"))
-                        {
-                            AndroidJavaObject signInClient = playGames.CallStatic<AndroidJavaObject>("getGamesSignInClient", activity);
+                // GPGS v2에서는 signOut이 제거되었으므로
+                // 로컬 토큰/세션 정보만 클리어
+                // 실제 Google 계정 연결 해제는 불가능
 
-                            // signOut() 호출
-                            AndroidJavaObject task = signInClient.Call<AndroidJavaObject>("signOut");
+                // PlayerPrefs나 다른 로컬 저장소에서 토큰 삭제
+                UnityEngine.PlayerPrefs.DeleteKey("RefreshToken");
+                UnityEngine.PlayerPrefs.DeleteKey("AccessToken");
+                UnityEngine.PlayerPrefs.Save();
 
-                            // Task 완료 대기 (비동기)
-                            task.Call<AndroidJavaObject>("addOnCompleteListener", new SignOutListener());
-
-                            AndroidLogger.LogAuth("✅ Google Play Games signOut initiated");
-                        }
-                    }
-                }
+                AndroidLogger.LogAuth("✅ Local session cleared (GPGS account still connected)");
+                AndroidLogger.LogAuth("ℹ️ User must sign out from device settings to fully disconnect");
             }
             catch (System.Exception ex)
             {
