@@ -540,16 +540,46 @@ namespace App.Core
 
         /// <summary>
         /// 수동 로그아웃 (ModeSelectPanel에서 호출)
+        /// 모든 인증 방식(ID/PW, GooglePlayGames)에 대해 통합 로그아웃 수행
         /// </summary>
         public void LogoutAndClearSession()
         {
             if (debugMode)
                 Debug.Log("[SessionManager] 수동 로그아웃 시작");
 
+            // Google Play Games 로그아웃 (Android 전용)
+            #if UNITY_ANDROID && !UNITY_EDITOR
+            try
+            {
+                // GooglePlayGames 인증 상태 확인 후 로그아웃
+                if (GooglePlayGames.PlayGamesPlatform.Instance != null &&
+                    GooglePlayGames.PlayGamesPlatform.Instance.IsAuthenticated())
+                {
+                    if (debugMode)
+                        Debug.Log("[SessionManager] GooglePlayGames 로그아웃 수행");
+
+                    App.Network.GooglePlayGamesSignOutHelper.SignOut();
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[SessionManager] GooglePlayGames 로그아웃 실패: {ex.Message}");
+            }
+            #endif
+
             // HTTP API 로그아웃
             if (HttpApiClient.Instance != null && isLoggedIn)
             {
                 HttpApiClient.Instance.Logout();
+            }
+
+            // OIDC Authenticator 토큰 삭제
+            var oidcAuth = AppBootstrap.GetGlobalOidcAuthenticator();
+            if (oidcAuth != null)
+            {
+                oidcAuth.ClearTokens();
+                if (debugMode)
+                    Debug.Log("[SessionManager] OIDC Authenticator 토큰 삭제 완료");
             }
 
             // SingleCore 캐시 정리 (UserDataCache, StageProgress 등)
@@ -565,7 +595,7 @@ namespace App.Core
             OnLoginStateChanged?.Invoke(false);
 
             if (debugMode)
-                Debug.Log("[SessionManager] 로그아웃 및 세션 삭제 완료");
+                Debug.Log("[SessionManager] 로그아웃 및 세션 삭제 완료 (모든 인증 방식 포함)");
         }
 
         private async Task<bool> WaitForLoginResult(TaskCompletionSource<bool> taskSource, float timeoutSeconds)

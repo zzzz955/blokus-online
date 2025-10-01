@@ -1,6 +1,18 @@
 // ---- MODULE (unityLibrary) build.gradle template ----
 apply plugin: 'com.android.library'
 
+// Android Resolver Exclusions Start
+android {
+  packagingOptions {
+      exclude ('/lib/armeabi/*' + '*')
+      exclude ('/lib/armeabi-v7a/*' + '*')
+      exclude ('/lib/mips/*' + '*')
+      exclude ('/lib/mips64/*' + '*')
+      exclude ('/lib/x86/*' + '*')
+      exclude ('/lib/x86_64/*' + '*')
+  }
+}
+// Android Resolver Exclusions End
 android {
     ndkPath "**NDKPATH**"
     compileSdkVersion **APIVERSION**
@@ -30,6 +42,10 @@ android {
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     implementation 'androidx.multidex:multidex:2.0.1'
+// Android Resolver Dependencies Start
+    implementation 'com.google.android.gms:play-services-auth:21.0.0' // Assets/GooglePlayGames/com.google.play.games/Editor/GooglePlayGamesPluginDependencies.xml:13
+    implementation 'com.google.android.gms:play-services-games-v2:19.0.0' // Assets/GooglePlayGames/com.google.play.games/Editor/GooglePlayGamesPluginDependencies.xml:8
+// Android Resolver Dependencies End
     **DEPS**
 }
 

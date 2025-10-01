@@ -2,7 +2,6 @@ using UnityEngine;
 using App.Logging;
 #if UNITY_ANDROID
 using GooglePlayGames;
-using GooglePlayGames.BasicApi;
 #endif
 
 namespace App.Core
@@ -39,24 +38,16 @@ namespace App.Core
                     return;
                 }
 
-                // PlayGamesClientConfiguration으로 자동 로그인 비활성화
-                var config = new PlayGamesClientConfiguration.Builder()
-                    // 서버 인증 코드 요청 (백엔드 JWT 교환용)
-                    .RequestServerAuthCode(forceRefresh: false)
-                    // 이메일 접근 권한 요청
-                    .RequestEmail()
-                    // ID 토큰 요청
-                    .RequestIdToken()
-                    .Build();
-
-                AndroidLogger.LogAuth("PlayGamesClientConfiguration created with Web Client ID");
-
-                // PlayGamesPlatform 초기화 (자동 로그인 없음)
-                PlayGamesPlatform.InitializeInstance(config);
+                // PlayGamesPlatform.Activate() 호출:
+                // Silent sign-in을 위해 Platform을 활성화합니다.
+                // 이 시점에서는 UI를 보여주지 않으며, 이전에 로그인한 계정이 있을 경우에만 자동 로그인됩니다.
+                AndroidLogger.LogAuth("Activating PlayGamesPlatform for silent sign-in...");
                 PlayGamesPlatform.Activate();
+                AndroidLogger.LogAuth("✅ PlayGamesPlatform activated");
 
-                AndroidLogger.LogAuth("✅ Google Play Games initialized (auto-signin disabled)");
-                AndroidLogger.LogAuth("Authentication will only occur when user explicitly clicks login button");
+                AndroidLogger.LogAuth("✅ Google Play Games v2 initialized");
+                AndroidLogger.LogAuth("Silent sign-in will be attempted at app start");
+                AndroidLogger.LogAuth("Interactive sign-in requires explicit user action (button click)");
             }
             catch (System.Exception ex)
             {

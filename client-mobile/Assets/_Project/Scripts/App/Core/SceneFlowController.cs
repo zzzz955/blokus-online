@@ -661,15 +661,129 @@ namespace App.Core
         // ========================================
 
         /// <summary>
-        /// SecureStorage에서 refresh token을 확인하여 자동 로그인 시도
+        /// 자동 로그인 체크 - 우선순위: 1. Google Play Games, 2. RefreshToken
         /// </summary>
         private IEnumerator CheckAutoLogin()
         {
+            #if UNITY_ANDROID && !UNITY_EDITOR
+            App.Logging.AndroidLogger.LogAuth("=== SceneFlowController.CheckAutoLogin START ===");
+            #else
             if (debugMode)
                 Debug.Log("[SceneFlowController] 자동 로그인 체크 시작");
+            #endif
 
             CurrentAutoLoginState = AutoLoginState.InProgress;
             LoadingOverlay.Show("로그인 상태 확인 중...");
+
+            // Priority 1: Google Play Games Silent Sign-In
+            #if UNITY_ANDROID && !UNITY_EDITOR
+            App.Logging.AndroidLogger.LogAuth("Priority 1: Google Play Games silent sign-in 시도");
+
+            var googleAuthProvider = new App.Network.GooglePlayGamesAuthProvider();
+            if (googleAuthProvider.IsAvailable())
+            {
+                LoadingOverlay.Show("Google Play Games 로그인 확인 중...");
+
+                var googleAuthTask = googleAuthProvider.AuthenticateSilentAsync();
+                while (!googleAuthTask.IsCompleted)
+                {
+                    yield return new WaitForEndOfFrame();
+                }
+
+                var googleAuthResult = googleAuthTask.Result;
+                if (googleAuthResult.Success && !string.IsNullOrEmpty(googleAuthResult.AuthCode))
+                {
+                    App.Logging.AndroidLogger.LogAuth("✅ Google Play Games silent sign-in 성공, 서버 인증 시도");
+
+                    // HttpApiClient가 초기화될 때까지 대기
+                    while (App.Network.HttpApiClient.Instance == null)
+                    {
+                        yield return new WaitForEndOfFrame();
+                    }
+
+                    LoadingOverlay.Show("서버 인증 중...");
+
+                    bool serverAuthCompleted = false;
+                    bool serverAuthSuccess = false;
+                    string serverAuthMessage = "";
+
+                    // 서버 인증 완료 이벤트 구독
+                    System.Action<bool, string> onServerAuthComplete = (success, message) =>
+                    {
+                        serverAuthCompleted = true;
+                        serverAuthSuccess = success;
+                        serverAuthMessage = message;
+                    };
+
+                    App.Network.HttpApiClient.Instance.OnAutoLoginComplete += onServerAuthComplete;
+
+                    // 서버 인증 시도 (Google Auth Code 사용)
+                    // AuthenticationService 사용 (토큰 저장은 AuthenticationService에서 처리)
+                    var authService = FindObjectOfType<App.Network.AuthenticationService>();
+                    if (authService != null)
+                    {
+                        authService.StartGooglePlayGamesAuth((success, message, tokenResponse) =>
+                        {
+                            if (success && tokenResponse != null)
+                            {
+                                App.Logging.AndroidLogger.LogAuth($"✅ 서버 인증 성공: {message}");
+                                onServerAuthComplete(true, message);
+                            }
+                            else
+                            {
+                                App.Logging.AndroidLogger.LogError($"❌ 서버 인증 실패: {message}");
+                                onServerAuthComplete(false, message);
+                            }
+                        }, googleAuthResult.AuthCode);
+                    }
+                    else
+                    {
+                        App.Logging.AndroidLogger.LogError("❌ AuthenticationService를 찾을 수 없음");
+                        onServerAuthComplete(false, "AuthenticationService not found");
+                    }
+
+                    // 서버 인증 완료까지 대기 (최대 10초)
+                    float timeout = 10f;
+                    while (!serverAuthCompleted && timeout > 0)
+                    {
+                        timeout -= Time.deltaTime;
+                        yield return new WaitForEndOfFrame();
+                    }
+
+                    // 이벤트 구독 해제
+                    App.Network.HttpApiClient.Instance.OnAutoLoginComplete -= onServerAuthComplete;
+
+                    if (serverAuthCompleted && serverAuthSuccess)
+                    {
+                        CurrentAutoLoginState = AutoLoginState.Success;
+                        App.Logging.AndroidLogger.LogAuth($"✅ Google Play Games 자동 로그인 성공: {serverAuthMessage}");
+                        yield break; // 성공 시 여기서 종료
+                    }
+                    else
+                    {
+                        App.Logging.AndroidLogger.LogAuth($"❌ Google Play Games 서버 인증 실패: {serverAuthMessage}");
+                    }
+                }
+                else
+                {
+                    App.Logging.AndroidLogger.LogAuth($"Silent sign-in 실패 (expected if no previous login): {googleAuthResult.ErrorMessage}");
+                }
+            }
+            else
+            {
+                App.Logging.AndroidLogger.LogAuth("Google Play Games not available on this device");
+            }
+            #endif
+
+            // Priority 2: RefreshToken-based Auto-Login
+            #if UNITY_ANDROID && !UNITY_EDITOR
+            App.Logging.AndroidLogger.LogAuth("Priority 2: RefreshToken 자동 로그인 시도");
+            #else
+            if (debugMode)
+                Debug.Log("[SceneFlowController] Priority 2: RefreshToken 자동 로그인 시도");
+            #endif
+
+            LoadingOverlay.Show("저장된 세션 확인 중...");
 
             // HttpApiClient가 초기화될 때까지 대기
             while (App.Network.HttpApiClient.Instance == null)
@@ -691,14 +805,14 @@ namespace App.Core
 
             App.Network.HttpApiClient.Instance.OnAutoLoginComplete += onAutoLoginComplete;
 
-            // 자동 로그인 시도
+            // RefreshToken 기반 자동 로그인 시도
             App.Network.HttpApiClient.Instance.ValidateRefreshTokenFromStorage();
 
             // 자동 로그인 완료까지 대기 (최대 10초)
-            float timeout = 10f;
-            while (!autoLoginCompleted && timeout > 0)
+            float timeout2 = 10f;
+            while (!autoLoginCompleted && timeout2 > 0)
             {
-                timeout -= Time.deltaTime;
+                timeout2 -= Time.deltaTime;
                 yield return new WaitForEndOfFrame();
             }
 
@@ -709,14 +823,22 @@ namespace App.Core
             if (autoLoginCompleted && autoLoginSuccess)
             {
                 CurrentAutoLoginState = AutoLoginState.Success;
+                #if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogAuth($"✅ RefreshToken 자동 로그인 성공: {autoLoginMessage}");
+                #else
                 if (debugMode)
-                    Debug.Log($"[SceneFlowController] 자동 로그인 성공: {autoLoginMessage}");
+                    Debug.Log($"[SceneFlowController] RefreshToken 자동 로그인 성공: {autoLoginMessage}");
+                #endif
             }
             else
             {
                 CurrentAutoLoginState = AutoLoginState.Failed;
+                #if UNITY_ANDROID && !UNITY_EDITOR
+                App.Logging.AndroidLogger.LogAuth("모든 자동 로그인 실패 - LoginPanel로 이동");
+                #else
                 if (debugMode)
-                    Debug.Log($"[SceneFlowController] 자동 로그인 실패: {autoLoginMessage}");
+                    Debug.Log($"[SceneFlowController] 모든 자동 로그인 실패 - LoginPanel로 이동");
+                #endif
             }
         }
 
