@@ -17,7 +17,11 @@ android {
     ndkPath "**NDKPATH**"
     compileSdkVersion **APIVERSION**
     ndkVersion "**NDKVERSION**"
-    namespace '**APPLICATIONID**'
+    namespace '**APPLICATIONID**.unity'
+
+    buildFeatures {
+        buildConfig false
+    }
 
     defaultConfig {
         minSdkVersion **MINSDKVERSION**

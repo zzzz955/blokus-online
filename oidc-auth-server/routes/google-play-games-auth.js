@@ -110,16 +110,23 @@ router.post(
         displayName = 'Editor Test User';
       } else {
         // 1. Google API로 Auth Code 검증 및 토큰 교환
+        // IMPORTANT: Google Play Games auth_code는 Android OAuth Client로만 검증 가능
         logger.info('Exchanging Google Play Games auth code', { client_id });
 
-        const { tokens } = await androidOAuthClient.getToken(auth_code);
+        // OAuth2Client를 Android Client ID/Secret로 동적 생성
+        const oauthClient = new OAuth2Client({
+          clientId: env.GOOGLE_ANDROID_CLIENT_ID,
+          clientSecret: env.GOOGLE_ANDROID_CLIENT_SECRET
+        });
+
+        const { tokens } = await oauthClient.getToken(auth_code);
 
         if (!tokens.id_token) {
           throw new Error('No ID token received from Google');
         }
 
         // 2. ID Token 검증 및 사용자 정보 추출
-        const ticket = await androidOAuthClient.verifyIdToken({
+        const ticket = await oauthClient.verifyIdToken({
           idToken: tokens.id_token,
           audience: env.GOOGLE_ANDROID_CLIENT_ID
         });

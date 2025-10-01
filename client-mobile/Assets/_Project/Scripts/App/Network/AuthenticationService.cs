@@ -5,6 +5,9 @@ using UnityEngine;
 using UnityEngine.Networking;
 using Newtonsoft.Json;
 using App.Config;
+#if UNITY_ANDROID
+using GooglePlayGames;
+#endif
 
 namespace App.Network
 {
@@ -171,13 +174,20 @@ namespace App.Network
             App.Logging.AndroidLogger.LogAuth($"Backend URL: {backendUrl}");
             App.Logging.AndroidLogger.LogAuth($"Endpoint: {endpoint}");
             App.Logging.AndroidLogger.LogAuth($"Auth code length: {authCode?.Length ?? 0}");
+            App.Logging.AndroidLogger.LogAuth($"Web Client ID: {GameInfo.WebClientId}");
             #endif
 
             // Request body
-            var requestData = new
+            // IL2CPP에서 익명 타입 직렬화가 실패하므로 Dictionary 사용
+            // IMPORTANT: client_id는 Android OAuth Client ID (로컬 키스토어용)
+            var requestData = new System.Collections.Generic.Dictionary<string, string>
             {
-                client_id = "unity-mobile-client",
-                auth_code = authCode
+                #if UNITY_ANDROID && !UNITY_EDITOR
+                {"client_id", "1028009634900-9oupf83r2jprrohmkd65k8vbk976eeck.apps.googleusercontent.com"},
+                #else
+                {"client_id", "unity-mobile-client"},  // Editor/테스트용
+                #endif
+                {"auth_code", authCode}
             };
 
             string jsonData = JsonConvert.SerializeObject(requestData);
