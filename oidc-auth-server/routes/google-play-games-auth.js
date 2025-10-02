@@ -115,11 +115,12 @@ router.post(
         logger.info('Exchanging Google Play Games auth code with Web OAuth Client', { client_id });
 
         // Web OAuth Client로 교환 (GPGS serverAuthCode는 Web Client 전용)
-        const webOAuthClient = new OAuth2Client({
-          clientId: env.GOOGLE_CLIENT_ID,
-          clientSecret: env.GOOGLE_CLIENT_SECRET,
-          redirectUri: 'postmessage' // Play Games serverAuthCode 교환에 필수
-        });
+        // IMPORTANT: postmessage는 세 번째 인자로 전달 (콘솔 등록 불필요)
+        const webOAuthClient = new OAuth2Client(
+          env.GOOGLE_CLIENT_ID,
+          env.GOOGLE_CLIENT_SECRET,
+          'postmessage'  // Play Games serverAuthCode 교환 필수값
+        );
 
         const { tokens } = await webOAuthClient.getToken(auth_code);
 
