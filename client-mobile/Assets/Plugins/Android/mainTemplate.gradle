@@ -48,7 +48,7 @@ dependencies {
     implementation 'androidx.multidex:multidex:2.0.1'
 // Android Resolver Dependencies Start
     implementation 'com.google.android.gms:play-services-auth:21.0.0' // Assets/GooglePlayGames/com.google.play.games/Editor/GooglePlayGamesPluginDependencies.xml:13
-    implementation 'com.google.android.gms:play-services-games-v2:19.0.0' // Assets/GooglePlayGames/com.google.play.games/Editor/GooglePlayGamesPluginDependencies.xml:8
+    implementation 'com.google.android.gms:play-services-games-v2:21.0.0' // Assets/GooglePlayGames/com.google.play.games/Editor/GooglePlayGamesPluginDependencies.xml:8
 // Android Resolver Dependencies End
     **DEPS**
 }

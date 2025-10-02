@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <dependencies>
   <androidPackages>
-    <androidPackage spec="com.google.android.gms:play-services-games-v2:19.0.0">
+    <androidPackage spec="com.google.android.gms:play-services-games-v2:21.0.0">
       <androidSdkPackageIds>
         <androidSdkPackageId>extra-google-m2repository</androidSdkPackageId>
       </androidSdkPackageIds>

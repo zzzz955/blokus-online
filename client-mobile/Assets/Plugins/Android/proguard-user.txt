@@ -1,5 +1,6 @@
 # Google Play Games Services v2 ProGuard Rules
 -keep class com.google.android.gms.games.** { *; }
+-keep class com.google.android.gms.games.gamessignin.** { *; }
 -keep class com.google.android.gms.tasks.** { *; }
 -keep class com.google.android.gms.common.** { *; }
 -keep class com.google.android.gms.auth.** { *; }
