@@ -193,27 +193,34 @@ namespace App.Network
         /// <summary>
         /// 서버 코드 요청 with 스레드 기반 타임아웃
         /// Unity 메인 루프 정지에도 타임아웃 동작 보장
-        /// CRITICAL FIX: GPGS v2에서는 scopes 파라미터 없는 오버로드 사용
-        /// - openid 스코프는 기본적으로 포함됨
-        /// - AuthScope enum 사용 시 ClassNotFoundException 발생
+        /// CRITICAL: GPGS v2에서 OAuth 스코프 명시적 요청 필요
         /// </summary>
         private void RequestServerAuthCodeWithThreadTimeout(
             TaskCompletionSource<AuthResult> tcs,
             Action onGranted,
             int timeoutMs = 5000)
         {
-            AndroidLogger.LogAuth("Requesting server-side access (openid included by default in GPGS v2)...");
+            AndroidLogger.LogAuth("Requesting server-side access with OAuth scopes (openid, email, profile)...");
 
             var innerTcs = new TaskCompletionSource<AuthResult>();
 
-            // CRITICAL: GPGS v2에서는 scopes 파라미터 제거
-            // openid 스코프는 자동으로 포함되며, 백엔드에서 id_token 받을 수 있음
+            // CRITICAL: GPGS v2에서 OAuth 스코프 명시적 요청
+            // AuthScope enum을 사용하여 openid, email, profile 스코프 요청
+            var scopes = new System.Collections.Generic.List<GooglePlayGames.BasicApi.AuthScope>
+            {
+                GooglePlayGames.BasicApi.AuthScope.OPEN_ID,
+                GooglePlayGames.BasicApi.AuthScope.EMAIL,
+                GooglePlayGames.BasicApi.AuthScope.PROFILE
+            };
+
             PlayGamesPlatform.Instance.RequestServerSideAccess(
                 forceRefreshToken: false,
-                code =>
+                scopes,
+                authResponse =>
                 {
                     AndroidLogger.LogAuth("RequestServerSideAccess callback received");
 
+                    string code = authResponse?.GetAuthCode();
                     if (string.IsNullOrEmpty(code))
                     {
                         AndroidLogger.LogError("❌ Server auth code is null or empty");
@@ -223,6 +230,17 @@ namespace App.Network
                             ErrorMessage = "Empty server auth code"
                         });
                         return;
+                    }
+
+                    // 승인된 스코프 로깅
+                    var grantedScopes = authResponse.GetGrantedScopes();
+                    AndroidLogger.LogAuth($"✅ Granted scopes count: {grantedScopes?.Count ?? 0}");
+                    if (grantedScopes != null)
+                    {
+                        foreach (var scope in grantedScopes)
+                        {
+                            AndroidLogger.LogAuth($"  - Scope: {scope}");
+                        }
                     }
 
                     AndroidLogger.LogAuth($"✅ Server auth code received (length: {code.Length})");
