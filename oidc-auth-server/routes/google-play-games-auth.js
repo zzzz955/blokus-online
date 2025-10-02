@@ -110,76 +110,31 @@ router.post(
         displayName = 'Editor Test User';
       } else {
         // 1. Google API로 Auth Code 검증 및 토큰 교환
-        // IMPORTANT: Google Play Games auth_code는 Android OAuth Client로만 검증 가능
-        // APK(로컬 키스토어) vs AAB(플레이 콘솔 서명)에 따라 다른 Client ID 필요
-        logger.info('Exchanging Google Play Games auth code', { client_id });
+        // IMPORTANT: Google Play Games serverAuthCode는 Web OAuth Client로만 교환 가능
+        // Unity PlayGamesClientConfiguration.RequestServerAuthCode로 받은 코드는 Web Client 전용
+        logger.info('Exchanging Google Play Games auth code with Web OAuth Client', { client_id });
 
-        let tokens, verifiedClientId;
-        let lastError;
+        // Web OAuth Client로 교환 (GPGS serverAuthCode는 Web Client 전용)
+        const webOAuthClient = new OAuth2Client({
+          clientId: env.GOOGLE_CLIENT_ID,
+          clientSecret: env.GOOGLE_CLIENT_SECRET,
+          redirectUri: 'postmessage' // Play Games serverAuthCode 교환에 필수
+        });
 
-        // Android Client 1 시도 (로컬 키스토어)
-        try {
-          const oauthClient1 = new OAuth2Client({
-            clientId: env.GOOGLE_ANDROID_CLIENT_ID,
-            clientSecret: env.GOOGLE_ANDROID_CLIENT_SECRET
-          });
-
-          const result = await oauthClient1.getToken(auth_code);
-          tokens = result.tokens;
-          verifiedClientId = env.GOOGLE_ANDROID_CLIENT_ID;
-
-          logger.info('Auth code verified with Android Client 1 (Local Keystore)', {
-            clientId: env.GOOGLE_ANDROID_CLIENT_ID
-          });
-        } catch (error) {
-          lastError = error;
-          logger.warn('Android Client 1 verification failed, trying Client 2', {
-            error: error.message
-          });
-
-          // Android Client 2 시도 (플레이 콘솔 서명)
-          if (env.GOOGLE_ANDROID_CLIENT_ID_2) {
-            try {
-              const oauthClient2 = new OAuth2Client({
-                clientId: env.GOOGLE_ANDROID_CLIENT_ID_2,
-                clientSecret: env.GOOGLE_ANDROID_CLIENT_SECRET_2
-              });
-
-              const result = await oauthClient2.getToken(auth_code);
-              tokens = result.tokens;
-              verifiedClientId = env.GOOGLE_ANDROID_CLIENT_ID_2;
-
-              logger.info('Auth code verified with Android Client 2 (Play Console)', {
-                clientId: env.GOOGLE_ANDROID_CLIENT_ID_2
-              });
-            } catch (error2) {
-              lastError = error2;
-              logger.error('Both Android Clients failed to verify auth code', {
-                client1Error: error.message,
-                client2Error: error2.message
-              });
-              throw error2;
-            }
-          } else {
-            throw error;
-          }
-        }
+        const { tokens } = await webOAuthClient.getToken(auth_code);
 
         if (!tokens || !tokens.id_token) {
           throw new Error('No ID token received from Google');
         }
 
-        // 2. ID Token 검증 및 사용자 정보 추출
-        const oauthClient = new OAuth2Client({
-          clientId: verifiedClientId,
-          clientSecret: verifiedClientId === env.GOOGLE_ANDROID_CLIENT_ID
-            ? env.GOOGLE_ANDROID_CLIENT_SECRET
-            : env.GOOGLE_ANDROID_CLIENT_SECRET_2
+        logger.info('Auth code verified with Web OAuth Client', {
+          clientId: env.GOOGLE_CLIENT_ID
         });
 
-        const ticket = await oauthClient.verifyIdToken({
+        // 2. ID Token 검증 및 사용자 정보 추출
+        const ticket = await webOAuthClient.verifyIdToken({
           idToken: tokens.id_token,
-          audience: verifiedClientId
+          audience: env.GOOGLE_CLIENT_ID
         });
 
         const googleUser = ticket.getPayload();
