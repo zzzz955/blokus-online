@@ -663,12 +663,17 @@ namespace App.UI
         private void PerformGooglePlayGamesToggle()
         {
             #if UNITY_ANDROID && !UNITY_EDITOR
-            // Google Play Games 인증 상태 확인
-            bool isAuthenticated = GooglePlayGames.PlayGamesPlatform.Instance.IsAuthenticated();
+            // CRITICAL: PlayGamesPlatform.IsAuthenticated()가 아닌 서버 인증 상태로 판단
+            // Silent sign-in 성공 != 서버 인증 성공 (OPEN_ID 미동의 시 서버 인증 실패)
+            bool hasServerAuth = HttpApiClient.Instance != null &&
+                                 !string.IsNullOrEmpty(HttpApiClient.Instance.GetAuthToken());
 
-            if (isAuthenticated)
+            Debug.Log($"[LoginPanel] Google 버튼 클릭 - 서버 인증 상태: {hasServerAuth}");
+            Debug.Log($"[LoginPanel] PlayGamesPlatform.IsAuthenticated: {GooglePlayGames.PlayGamesPlatform.Instance.IsAuthenticated()}");
+
+            if (hasServerAuth)
             {
-                // 이미 인증된 상태 → 통합 로그아웃 (SessionManager 사용)
+                // 서버 인증 완료 상태 → 통합 로그아웃 (SessionManager 사용)
                 Debug.Log("[LoginPanel] Google Play Games 로그아웃 시도 (SessionManager 사용)");
                 SetStatusText("로그아웃 중...", Shared.UI.MessagePriority.Info);
 
@@ -683,7 +688,8 @@ namespace App.UI
             }
             else
             {
-                // 인증되지 않은 상태 → 로그인
+                // 서버 인증되지 않은 상태 → 로그인 (OPEN_ID 동의 UI 포함)
+                Debug.Log("[LoginPanel] 서버 인증 없음 → Interactive 로그인 시작");
                 PerformGooglePlayGamesLogin();
             }
             #else
