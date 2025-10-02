@@ -118,14 +118,12 @@ router.post(
           redirectUri: ''  // GPGS v2 공식 서버 예제: GoogleAuthorizationCodeTokenRequest(..., authCode, "")
         });
         
-        // getToken에서도 redirect_uri 포함 금지
-        // IMPORTANT: GPGS v2에서는 SDK가 scopes를 지정할 수 없으므로
-        // 백엔드에서 openid 스코프를 명시적으로 요청해야 id_token을 받을 수 있음
+        // IMPORTANT: Unity에서 RequestServerSideAccess(scopes)로 OPEN_ID를 요청했다면
+        // 해당 auth_code는 이미 openid 스코프에 바인딩되어 있음
+        // 백엔드에서 scope 파라미터를 추가해도 효과 없음 (이미 바인딩된 스코프만 유효)
         const { tokens } = await webOAuthClient.getToken({
-          code: auth_code,
-          // redirect_uri 포함하지 않음
-          // openid 스코프를 백엔드에서 명시
-          scope: 'openid email profile'
+          code: auth_code
+          // scope 파라미터 불필요 - auth_code에 이미 바인딩됨
         });
 
         // DEBUG: Google 응답 로깅

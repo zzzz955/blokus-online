@@ -193,30 +193,33 @@ namespace App.Network
         /// <summary>
         /// 서버 코드 요청 with 스레드 기반 타임아웃
         /// Unity 메인 루프 정지에도 타임아웃 동작 보장
-        /// CRITICAL: GPGS v2에서 OAuth 스코프 명시적 요청 필요
+        /// CRITICAL: GPGS v2에서 추가 스코프(OPEN_ID, EMAIL, PROFILE) 명시적 요청 필수
+        /// - 기본 스코프(games_lite, drive.appdata)만으로는 id_token을 받을 수 없음
+        /// - 사용자 동의 필요 (SDK가 자동으로 동의 UI 표시)
         /// </summary>
         private void RequestServerAuthCodeWithThreadTimeout(
             TaskCompletionSource<AuthResult> tcs,
             Action onGranted,
             int timeoutMs = 5000)
         {
-            AndroidLogger.LogAuth("Requesting server-side access with OAuth scopes (openid, email, profile)...");
+            AndroidLogger.LogAuth("Requesting server-side access with OAuth scopes: OPEN_ID, EMAIL, PROFILE");
 
             var innerTcs = new TaskCompletionSource<AuthResult>();
 
-            // CRITICAL: GPGS v2에서 OAuth 스코프 명시적 요청
-            // AuthScope enum을 사용하여 openid, email, profile 스코프 요청
+            // CRITICAL: 추가 스코프 명시 필수
+            // 이 스코프들이 승인되어야 서버에서 id_token을 받을 수 있음
             var scopes = new System.Collections.Generic.List<GooglePlayGames.BasicApi.AuthScope>
             {
-                GooglePlayGames.BasicApi.AuthScope.OPEN_ID,
-                GooglePlayGames.BasicApi.AuthScope.EMAIL,
-                GooglePlayGames.BasicApi.AuthScope.PROFILE
+                GooglePlayGames.BasicApi.AuthScope.OPEN_ID,   // id_token 발급 필수
+                GooglePlayGames.BasicApi.AuthScope.EMAIL,     // 이메일 정보
+                GooglePlayGames.BasicApi.AuthScope.PROFILE    // 프로필 정보
             };
 
+            // GPGS v2 정식 시그니처: (bool forceRefreshToken, List<AuthScope> scopes, Action<AuthResponse> callback)
             PlayGamesPlatform.Instance.RequestServerSideAccess(
                 forceRefreshToken: false,
-                scopes,
-                authResponse =>
+                scopes: scopes,
+                callback: authResponse =>
                 {
                     AndroidLogger.LogAuth("RequestServerSideAccess callback received");
 
@@ -232,15 +235,27 @@ namespace App.Network
                         return;
                     }
 
-                    // 승인된 스코프 로깅
+                    // 승인된 스코프 검사 및 로깅
                     var grantedScopes = authResponse.GetGrantedScopes();
                     AndroidLogger.LogAuth($"✅ Granted scopes count: {grantedScopes?.Count ?? 0}");
+
                     if (grantedScopes != null)
                     {
-                        foreach (var scope in grantedScopes)
-                        {
-                            AndroidLogger.LogAuth($"  - Scope: {scope}");
-                        }
+                        foreach (var s in grantedScopes)
+                            AndroidLogger.LogAuth($"  - Scope: {s}");
+                    }
+
+                    // openid 포함 여부 확인 (중요: 서버에서 id_token 받으려면 필수)
+                    bool hasOpenId  = grantedScopes?.Contains(GooglePlayGames.BasicApi.AuthScope.OPEN_ID) ?? false;
+                    bool hasEmail   = grantedScopes?.Contains(GooglePlayGames.BasicApi.AuthScope.EMAIL)   ?? false;
+                    bool hasProfile = grantedScopes?.Contains(GooglePlayGames.BasicApi.AuthScope.PROFILE) ?? false;
+
+                    AndroidLogger.LogAuth($"OPEN_ID: {hasOpenId}, EMAIL: {hasEmail}, PROFILE: {hasProfile}");
+
+                    if (!hasOpenId)
+                    {
+                        AndroidLogger.LogError("❌ OPEN_ID scope not granted - server will not receive id_token");
+                        AndroidLogger.LogError("User denied consent or scope request failed");
                     }
 
                     AndroidLogger.LogAuth($"✅ Server auth code received (length: {code.Length})");
