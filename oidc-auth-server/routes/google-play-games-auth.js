@@ -168,13 +168,17 @@ router.post(
       });
 
       // 3. Google Account ID 또는 이메일로 기존 계정 찾기
+      // 3-1) provider_user_id로 탐색 (정상 플로우)
       let user = await findUserByGoogleAccountId(googleAccountId);
 
-      // Google Account ID로 못 찾으면 이메일로 찾기 (Editor 테스트용)
-      if (!user && isEditorTestCode) {
+      // 3-2) 없으면 이메일로 탐색 (항상 허용: 다른 OAuth 방식으로 생성된 계정 연동)
+      if (!user && email) {
         user = await findUserByEmail(email);
         if (user) {
-          logger.info('Found existing user by email (Editor test)', { userId: user.user_id, email });
+          logger.info('Found existing user by email, will link google_play_games provider', {
+            userId: user.user_id,
+            email
+          });
         }
       }
 
@@ -191,14 +195,29 @@ router.post(
           googleAccountId
         });
       } else {
-        // 신규 사용자: users 및 user_auth_providers 생성
-        user = await createUserWithGooglePlayGames(googleAccountId, email, displayName, emailVerified);
+        // 생성 전 이메일 중복 최종 확인 (경쟁 조건 방지)
+        const duplicateUser = email ? await findUserByEmail(email) : null;
+        if (duplicateUser) {
+          logger.info('Email already exists just before create; linking provider instead', {
+            userId: duplicateUser.user_id,
+            email
+          });
+          await linkGooglePlayGamesProvider(duplicateUser.user_id, googleAccountId, {
+            email,
+            display_name: displayName,
+            email_verified: emailVerified
+          });
+          user = duplicateUser;
+        } else {
+          // 신규 사용자: users 및 user_auth_providers 생성
+          user = await createUserWithGooglePlayGames(googleAccountId, email, displayName, emailVerified);
 
-        logger.info('New user created via Google Play Games', {
-          userId: user.user_id,
-          googleAccountId,
-          email
-        });
+          logger.info('New user created via Google Play Games', {
+            userId: user.user_id,
+            googleAccountId,
+            email
+          });
+        }
       }
 
       // 4. Device fingerprint 생성
