@@ -1,7 +1,9 @@
 using System;
+using System.Collections;
 using System.Threading.Tasks;
 using UnityEngine;
 using App.Logging;
+using App.Core;
 #if UNITY_ANDROID
 using GooglePlayGames;
 #endif
@@ -14,8 +16,13 @@ namespace App.Network
     /// </summary>
     public class GooglePlayGamesAuthProvider : IAuthenticationProvider
     {
+        #if UNITY_ANDROID && !UNITY_EDITOR
+        private const string OPENID_GRANTED_KEY = "pgs_openid_granted";
+        #endif
+
         /// <summary>
         /// Silent sign-in: 이전에 로그인한 계정으로 자동 로그인 시도 (UI 없음)
+        /// CRITICAL: 새로운 스코프 요청 금지 - Unity 메인 루프 정지 방지
         /// </summary>
         public async Task<AuthResult> AuthenticateSilentAsync()
         {
@@ -39,7 +46,6 @@ namespace App.Network
                 }
 
                 // Authenticate() 호출: Silent sign-in 시도
-                // 성공하면 RequestServerAuthCode 호출, 실패하면 조용히 실패 처리
                 instance.Authenticate((success) =>
                 {
                     AndroidLogger.LogAuth($"Silent sign-in callback received - Success: {success}");
@@ -47,7 +53,28 @@ namespace App.Network
                     if (success == GooglePlayGames.BasicApi.SignInStatus.Success)
                     {
                         AndroidLogger.LogAuth("✅ Silent sign-in successful");
-                        RequestServerAuthCode(tcs);
+
+                        // CRITICAL: 로컬 플래그 확인 - 이미 동의했는지 체크
+                        bool openIdGranted = PlayerPrefs.GetInt(OPENID_GRANTED_KEY, 0) == 1;
+                        AndroidLogger.LogAuth($"OPEN_ID granted flag: {openIdGranted}");
+
+                        if (!openIdGranted)
+                        {
+                            // 아직 동의 안 함 → 스코프 요청 금지 (Unity 메인 루프 정지 방지)
+                            AndroidLogger.LogAuth("⚠️ OPEN_ID 미동의 → 서버 코드 요청 스킵");
+                            AndroidLogger.LogAuth("해결: 로그인 버튼 클릭 → Interactive sign-in → 동의 UI");
+                            tcs.SetResult(new AuthResult
+                            {
+                                Success = false,
+                                ErrorMessage = "Interactive consent required (OPEN_ID)"
+                            });
+                        }
+                        else
+                        {
+                            // 이미 동의된 기기 → 안전하게 서버 코드 요청 가능
+                            AndroidLogger.LogAuth("✅ OPEN_ID 사전 동의 확인 → 서버 코드 요청");
+                            RequestServerAuthCodeWithThreadTimeout(tcs, onGranted: null);
+                        }
                     }
                     else
                     {
@@ -86,7 +113,8 @@ namespace App.Network
         }
 
         /// <summary>
-        /// Interactive sign-in: 사용자가 명시적으로 버튼을 클릭했을 때 계정 선택 UI 표시
+        /// Interactive sign-in: 사용자가 명시적으로 버튼을 클릭했을 때 OPEN_ID 동의 UI 표시
+        /// CRITICAL FIX: ManuallyAuthenticate 제거 - 이미 인증된 상태에서 UI 세션 종료 후 스코프 요청 시 블로킹 방지
         /// </summary>
         public async Task<AuthResult> AuthenticateAsync()
         {
@@ -96,12 +124,9 @@ namespace App.Network
             try
             {
                 AndroidLogger.LogAuth("=== GooglePlayGamesAuthProvider.AuthenticateAsync START ===");
-                AndroidLogger.LogAuth("Mode: Interactive (UI will be shown)");
+                AndroidLogger.LogAuth("Mode: Interactive - Direct scope request (no ManuallyAuthenticate)");
 
-                AndroidLogger.LogAuth("Checking PlayGamesPlatform availability...");
                 var instance = PlayGamesPlatform.Instance;
-                AndroidLogger.LogAuth($"PlayGamesPlatform.Instance: {(instance != null ? "NOT NULL" : "NULL")}");
-
                 if (instance == null)
                 {
                     AndroidLogger.LogError("❌ PlayGamesPlatform.Instance is NULL - Platform not initialized");
@@ -112,73 +137,35 @@ namespace App.Network
                     };
                 }
 
-                // 현재 인증 상태 확인
+                // 현재 인증 상태 확인 (로깅용)
                 bool isAlreadyAuthenticated = instance.IsAuthenticated();
                 AndroidLogger.LogAuth($"Current authentication status: {(isAlreadyAuthenticated ? "AUTHENTICATED" : "NOT AUTHENTICATED")}");
 
                 if (isAlreadyAuthenticated)
                 {
-                    AndroidLogger.LogAuth("Already authenticated, getting local user info...");
                     var localUser = instance.localUser;
-                    AndroidLogger.LogAuth($"Local user ID: {localUser?.id ?? "NULL"}");
-                    AndroidLogger.LogAuth($"Local user name: {localUser?.userName ?? "NULL"}");
+                    AndroidLogger.LogAuth($"Already authenticated - User: {localUser?.userName ?? "NULL"} ({localUser?.id ?? "NULL"})");
                 }
 
-                // ManuallyAuthenticate() 사용: 사용자 명시적 액션으로 인증 시작 (UI 표시)
-                AndroidLogger.LogAuth("Calling PlayGamesPlatform.Instance.ManuallyAuthenticate()...");
-                AndroidLogger.LogAuth("Account selection UI should appear now...");
+                // CRITICAL FIX: ManuallyAuthenticate 제거
+                // 이유: Silent sign-in으로 이미 인증된 상태에서 ManuallyAuthenticate 호출 시
+                //       즉시 Success 콜백 반환 (UI 세션 종료)
+                //       → 그 후 RequestServerSideAccess로 동의 UI 표시 시도 → 컨텍스트 없어 블로킹
+                //
+                // 해결: RequestServerSideAccess를 직접 호출
+                //       → SDK가 필요한 경우 자동으로 인증 + 동의 UI 통합 표시
+                //       → 이미 인증된 경우 동의 UI만 표시
+                AndroidLogger.LogAuth("Directly requesting server auth code with OPEN_ID scope");
+                AndroidLogger.LogAuth("SDK will handle authentication + consent UI as needed");
 
-                instance.ManuallyAuthenticate((success) =>
+                RequestServerAuthCodeWithThreadTimeout(tcs, onGranted: () =>
                 {
-                    AndroidLogger.LogAuth($"ManuallyAuthenticate callback received");
-                    AndroidLogger.LogAuth($"SignInStatus enum value: {success}");
-                    AndroidLogger.LogAuth($"SignInStatus string: {success.ToString()}");
-
-                    if (success == GooglePlayGames.BasicApi.SignInStatus.Success)
-                    {
-                        AndroidLogger.LogAuth("✅ Authentication successful");
-
-                        // 인증 성공 후 사용자 정보 확인
-                        var localUser = instance.localUser;
-                        AndroidLogger.LogAuth($"Authenticated user ID: {localUser?.id ?? "NULL"}");
-                        AndroidLogger.LogAuth($"Authenticated user name: {localUser?.userName ?? "NULL"}");
-                        AndroidLogger.LogAuth($"Is authenticated: {instance.IsAuthenticated()}");
-
-                        RequestServerAuthCode(tcs);
-                    }
-                    else
-                    {
-                        // 상세한 에러 메시지
-                        string errorMessage;
-                        switch (success)
-                        {
-                            case GooglePlayGames.BasicApi.SignInStatus.Canceled:
-                                errorMessage = "사용자가 Google 로그인을 취소했습니다";
-                                AndroidLogger.LogAuth($"⚠️ Authentication canceled by user");
-                                AndroidLogger.LogAuth("User pressed back button or dismissed account selection dialog");
-                                break;
-                            case GooglePlayGames.BasicApi.SignInStatus.InternalError:
-                                errorMessage = "Google Play Services 내부 오류입니다";
-                                AndroidLogger.LogError($"❌ Internal error - Google Play Services issue");
-                                AndroidLogger.LogError("Possible causes: outdated Play Services, configuration error, or network issue");
-                                break;
-                            default:
-                                errorMessage = $"Google Play Games 인증 실패: {success}";
-                                AndroidLogger.LogError($"❌ Authentication failed with status: {success}");
-                                AndroidLogger.LogError($"Status code: {(int)success}");
-                                AndroidLogger.LogError("Check: OAuth Client ID, SHA-1 certificate, package name in Google Cloud Console");
-                                break;
-                        }
-
-                        tcs.SetResult(new AuthResult
-                        {
-                            Success = false,
-                            ErrorMessage = errorMessage
-                        });
-                    }
+                    // 스코프 동의 성공 → 로컬 플래그 저장
+                    PlayerPrefs.SetInt(OPENID_GRANTED_KEY, 1);
+                    PlayerPrefs.Save();
+                    AndroidLogger.LogAuth("✅ OPEN_ID 동의 완료 → 플래그 저장");
                 });
 
-                AndroidLogger.LogAuth("ManuallyAuthenticate call initiated, waiting for callback...");
                 return await tcs.Task;
             }
             catch (Exception ex)
@@ -203,37 +190,71 @@ namespace App.Network
         }
 
         #if UNITY_ANDROID && !UNITY_EDITOR
-        private void RequestServerAuthCode(TaskCompletionSource<AuthResult> tcs)
+        /// <summary>
+        /// 서버 코드 요청 with 스레드 기반 타임아웃
+        /// Unity 메인 루프 정지에도 타임아웃 동작 보장
+        /// CRITICAL FIX: GPGS v2에서는 scopes 파라미터 없는 오버로드 사용
+        /// - openid 스코프는 기본적으로 포함됨
+        /// - AuthScope enum 사용 시 ClassNotFoundException 발생
+        /// </summary>
+        private void RequestServerAuthCodeWithThreadTimeout(
+            TaskCompletionSource<AuthResult> tcs,
+            Action onGranted,
+            int timeoutMs = 5000)
         {
-            AndroidLogger.LogAuth("Requesting server-side access code...");
+            AndroidLogger.LogAuth("Requesting server-side access (openid included by default in GPGS v2)...");
 
+            var innerTcs = new TaskCompletionSource<AuthResult>();
+
+            // CRITICAL: GPGS v2에서는 scopes 파라미터 제거
+            // openid 스코프는 자동으로 포함되며, 백엔드에서 id_token 받을 수 있음
             PlayGamesPlatform.Instance.RequestServerSideAccess(
                 forceRefreshToken: false,
                 code =>
                 {
-                    AndroidLogger.LogAuth($"RequestServerSideAccess callback received");
-                    AndroidLogger.LogAuth($"Code is null or empty: {string.IsNullOrEmpty(code)}");
+                    AndroidLogger.LogAuth("RequestServerSideAccess callback received");
 
-                    if (!string.IsNullOrEmpty(code))
+                    if (string.IsNullOrEmpty(code))
                     {
-                        AndroidLogger.LogAuth($"✅ Server auth code received (length: {code.Length})");
-                        tcs.SetResult(new AuthResult
-                        {
-                            Success = true,
-                            AuthCode = code
-                        });
-                    }
-                    else
-                    {
-                        AndroidLogger.LogError("❌ Failed to get server auth code");
-                        tcs.SetResult(new AuthResult
+                        AndroidLogger.LogError("❌ Server auth code is null or empty");
+                        innerTcs.TrySetResult(new AuthResult
                         {
                             Success = false,
-                            ErrorMessage = "Failed to retrieve server auth code"
+                            ErrorMessage = "Empty server auth code"
                         });
+                        return;
                     }
+
+                    AndroidLogger.LogAuth($"✅ Server auth code received (length: {code.Length})");
+                    onGranted?.Invoke(); // 플래그 저장 콜백
+                    innerTcs.TrySetResult(new AuthResult
+                    {
+                        Success = true,
+                        AuthCode = code
+                    });
+                });
+
+            // 스레드 기반 타임아웃 (Unity 메인 루프 정지에도 동작)
+            Task.Run(async () =>
+            {
+                var completed = await Task.WhenAny(innerTcs.Task, Task.Delay(timeoutMs));
+                if (completed != innerTcs.Task)
+                {
+                    AndroidLogger.LogAuth($"⚠️ RequestServerSideAccess THREAD timeout ({timeoutMs}ms)");
+                    AndroidLogger.LogAuth("Unity 메인 루프 정지 가능성 - 스레드 타임아웃 동작");
+                    tcs.TrySetResult(new AuthResult
+                    {
+                        Success = false,
+                        ErrorMessage = "Server auth request timeout (try interactive sign-in)"
+                    });
                 }
-            );
+                else
+                {
+                    var result = await innerTcs.Task;
+                    AndroidLogger.LogAuth($"RequestServerSideAccess completed: {result.Success}");
+                    tcs.TrySetResult(result);
+                }
+            });
         }
         #endif
 
