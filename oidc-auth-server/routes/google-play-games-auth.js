@@ -132,7 +132,21 @@ router.post(
           scope: 'openid email profile'
         });
 
+        // DEBUG: Google 응답 로깅
+        logger.info('Google token exchange response', {
+          hasAccessToken: !!tokens?.access_token,
+          hasIdToken: !!tokens?.id_token,
+          hasRefreshToken: !!tokens?.refresh_token,
+          scope: tokens?.scope,
+          tokenType: tokens?.token_type,
+          expiresIn: tokens?.expiry_date
+        });
+
         if (!tokens || !tokens.id_token) {
+          logger.error('Missing ID token in Google response', {
+            tokenKeys: tokens ? Object.keys(tokens) : 'null',
+            auth_code_prefix: auth_code.substring(0, 10)
+          });
           throw new Error('No ID token received from Google');
         }
 
