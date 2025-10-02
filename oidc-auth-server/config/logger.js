@@ -24,15 +24,13 @@ const logger = winston.createLogger({
   ]
 })
 
-// If we're not in production, log to console as well
-if (env.NODE_ENV !== 'production') {
-  logger.add(new winston.transports.Console({
-    format: winston.format.combine(
-      winston.format.colorize(),
-      winston.format.simple()
-    )
-  }))
-}
+// Always log to console for Docker logs visibility
+logger.add(new winston.transports.Console({
+  format: winston.format.combine(
+    winston.format.colorize(),
+    winston.format.simple()
+  )
+}))
 
 // Ensure logs directory exists
 const fs = require('fs')
