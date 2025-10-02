@@ -123,9 +123,13 @@ router.post(
         );
 
         // getToken에서도 redirect_uri 포함 금지
+        // IMPORTANT: GPGS v2에서는 SDK가 scopes를 지정할 수 없으므로
+        // 백엔드에서 openid 스코프를 명시적으로 요청해야 id_token을 받을 수 있음
         const { tokens } = await webOAuthClient.getToken({
-          code: auth_code
+          code: auth_code,
           // redirect_uri 포함하지 않음
+          // openid 스코프를 백엔드에서 명시
+          scope: 'openid email profile'
         });
 
         if (!tokens || !tokens.id_token) {
