@@ -42,10 +42,10 @@ namespace App.Core
                     return;
                 }
 
-                // PlayGamesPlatform.Activate() 호출:
-                // Silent sign-in을 위해 Platform을 활성화합니다.
-                // 이 시점에서는 UI를 보여주지 않으며, 이전에 로그인한 계정이 있을 경우에만 자동 로그인됩니다.
-                AndroidLogger.LogAuth("Activating PlayGamesPlatform for silent sign-in...");
+                // GPGS v2: Platform 활성화만 필요
+                // CRITICAL: Web Client ID는 Unity Editor의 "Window → Google Play Games → Setup" 에서 설정
+                // OAuth 스코프는 RequestServerSideAccess() 호출 시 지정 (GooglePlayGamesAuthProvider.cs)
+                AndroidLogger.LogAuth("Activating PlayGamesPlatform (GPGS v2)...");
                 PlayGamesPlatform.Activate();
                 AndroidLogger.LogAuth("✅ PlayGamesPlatform activated");
 

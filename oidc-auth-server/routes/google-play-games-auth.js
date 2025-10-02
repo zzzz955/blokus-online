@@ -110,26 +110,20 @@ router.post(
         displayName = 'Editor Test User';
       } else {
         // 1. Google API로 Auth Code 검증 및 토큰 교환
-        // IMPORTANT: Google Play Games serverAuthCode는 Web OAuth Client로만 교환 가능
-        // Unity PlayGamesClientConfiguration.RequestServerAuthCode로 받은 코드는 Web Client 전용
-        logger.info('Exchanging Google Play Games auth code with Web OAuth Client', { client_id });
-
-        // Web OAuth Client로 교환 (GPGS serverAuthCode는 Web Client 전용)
-        // IMPORTANT: PGS v2 serverAuthCode는 redirect_uri를 아예 보내지 않아야 함
-        const webOAuthClient = new OAuth2Client(
-          env.GOOGLE_CLIENT_ID,
-          env.GOOGLE_CLIENT_SECRET
-          // redirectUri 세 번째 인자 넘기지 않음
-        );
-
-        // getToken에서도 redirect_uri 포함 금지
-        // IMPORTANT: GPGS v2에서는 SDK가 scopes를 지정할 수 없으므로
-        // 백엔드에서 openid 스코프를 명시적으로 요청해야 id_token을 받을 수 있음
+        // CRITICAL: GPGS v2 공식 문서에서 redirectUri를 빈 문자열('')로 명시 필수
+        // Reference: https://developers.google.com/games/services/android/signin
+        const webOAuthClient = new OAuth2Client({
+          clientId: env.GOOGLE_CLIENT_ID,
+          clientSecret: env.GOOGLE_CLIENT_SECRET,
+          redirectUri: ''  // GPGS v2 공식 서버 예제: GoogleAuthorizationCodeTokenRequest(..., authCode, "")
+        });
+        
+        // IMPORTANT: Unity에서 RequestServerSideAccess(scopes)로 OPEN_ID를 요청했다면
+        // 해당 auth_code는 이미 openid 스코프에 바인딩되어 있음
+        // 백엔드에서 scope 파라미터를 추가해도 효과 없음 (이미 바인딩된 스코프만 유효)
         const { tokens } = await webOAuthClient.getToken({
-          code: auth_code,
-          // redirect_uri 포함하지 않음
-          // openid 스코프를 백엔드에서 명시
-          scope: 'openid email profile'
+          code: auth_code
+          // scope 파라미터 불필요 - auth_code에 이미 바인딩됨
         });
 
         // DEBUG: Google 응답 로깅
