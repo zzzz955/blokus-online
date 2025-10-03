@@ -4852,6 +4852,7 @@ MonoBehaviour:
   settingsButton: {fileID: 463270363}
   backButton: {fileID: 639106737}
   GreatingMessage: {fileID: 1868189601}
+  gameExitModal: {fileID: 223714163}
 --- !u!225 &1719888363
 CanvasGroup:
   m_ObjectHideFlags: 0

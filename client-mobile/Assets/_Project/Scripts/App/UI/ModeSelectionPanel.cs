@@ -17,6 +17,9 @@ namespace App.UI
         [SerializeField] private Button backButton; // 로그아웃 버튼으로 사용
         [SerializeField] private TMP_Text GreatingMessage;
 
+        [Header("게임 종료 모달")]
+        [SerializeField] private GameExitModal gameExitModal;
+
         private void OnEnable()
         {
             // 나중에 값이 들어오는 상황까지 커버하고 싶다면(선택):
@@ -42,6 +45,77 @@ namespace App.UI
             // 인스펙터 할당 버튼 이벤트 연결
             SetupButtons();
             SetupTexts();
+
+            // GameExitModal 참조 확인
+            if (gameExitModal == null)
+            {
+                Debug.LogWarning("[ModeSelectionPanel] GameExitModal이 Inspector에서 할당되지 않음 - 자동으로 찾기 시도");
+                gameExitModal = FindObjectOfType<GameExitModal>();
+
+                if (gameExitModal != null)
+                {
+                    Debug.Log($"[ModeSelectionPanel] GameExitModal 자동으로 발견: {gameExitModal.name}");
+                }
+                else
+                {
+                    Debug.LogError("[ModeSelectionPanel] GameExitModal을 찾을 수 없습니다! Scene에 GameExitModal이 있는지 확인하세요.");
+                }
+            }
+            else
+            {
+                Debug.Log($"[ModeSelectionPanel] GameExitModal 참조 확인됨: {gameExitModal.name}");
+            }
+        }
+
+        private void Update()
+        {
+            // Android 뒤로가기 버튼 처리 (에뮬레이터에서는 ESC키)
+            if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                OnAndroidBackButtonPressed();
+            }
+        }
+
+        /// <summary>
+        /// Android 뒤로가기 버튼 클릭 시 처리
+        /// ModeSelectPanel이 메인 패널일 때만 GameExitModal 표시
+        /// </summary>
+        private void OnAndroidBackButtonPressed()
+        {
+            Debug.Log("[ModeSelectionPanel] Android 뒤로가기 버튼 클릭됨");
+
+            // 게임 씬이 로드되어 있는지 확인
+            bool singleSceneLoaded = UnityEngine.SceneManagement.SceneManager.GetSceneByName("SingleGameplayScene").isLoaded;
+            bool multiSceneLoaded = UnityEngine.SceneManagement.SceneManager.GetSceneByName("MultiGameplayScene").isLoaded;
+
+            if (singleSceneLoaded || multiSceneLoaded)
+            {
+                Debug.Log("[ModeSelectionPanel] 게임 씬이 활성화되어 있어 뒤로가기 버튼 무시");
+                return;
+            }
+
+            // 게임 종료 모달이 이미 표시 중이면 무시
+            if (gameExitModal != null && gameExitModal.gameObject.activeInHierarchy)
+            {
+                Debug.Log("[ModeSelectionPanel] 게임 종료 모달이 이미 표시 중");
+                return;
+            }
+
+            // GameExitModal 표시
+            if (gameExitModal != null)
+            {
+                Debug.Log("[ModeSelectionPanel] ModeSelectPanel이 메인 패널 - 게임 종료 모달 표시");
+                gameExitModal.ShowModal();
+            }
+            else
+            {
+                Debug.LogWarning("[ModeSelectionPanel] GameExitModal이 설정되지 않음 - 직접 종료");
+#if UNITY_EDITOR
+                UnityEditor.EditorApplication.isPlaying = false;
+#else
+                Application.Quit();
+#endif
+            }
         }
 
         private void SetupTexts()
