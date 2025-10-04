@@ -294,14 +294,14 @@ MonoBehaviour:
   - {fileID: 4530484368012543746}
   - {fileID: 3663710670478579506}
   - {fileID: 353684272470368975}
-  activeStar: {fileID: 21300000, guid: f53c29c0f1dc96c429f7074b4f131e22, type: 3}
-  inactiveStar: {fileID: 21300000, guid: d58ac30aef1868a4ebaa71c47ac6dd17, type: 3}
+  activeStar: {fileID: 21300000, guid: b0b916fa2914e31429250dee82f75857, type: 3}
+  inactiveStar: {fileID: 21300000, guid: a58305b5fad694540b4dbe46a35e48a6, type: 3}
   activeStarColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   inactiveStarColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
-  unlockedSprite: {fileID: 21300000, guid: 6615bcc022c8dce488a859b02e3e365c, type: 3}
-  lockedSprite: {fileID: 21300000, guid: b5f6c19435b73734ab6cdcbf8d905cc1, type: 3}
-  completedSprite: {fileID: 21300000, guid: d43b6ab39f85ef6459ee7fc3885fc790, type: 3}
-  perfectSprite: {fileID: 21300000, guid: 24efb5d1681ae6a4f92d1fceb5dd20a1, type: 3}
+  unlockedSprite: {fileID: 21300000, guid: 16f396b1cf06c8a4bb5df1534524845a, type: 3}
+  lockedSprite: {fileID: 21300000, guid: e7fd3cec9067f0d47bf54c39edd237a8, type: 3}
+  completedSprite: {fileID: 21300000, guid: 0cf5ef3811b2b79408abb2d5ac1bb373, type: 3}
+  perfectSprite: {fileID: 21300000, guid: 0cf5ef3811b2b79408abb2d5ac1bb373, type: 3}
   unlockedColor: {r: 1, g: 1, b: 1, a: 1}
   completedColor: {r: 0, g: 1, b: 0, a: 1}
   lockedColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
@@ -561,8 +561,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: New Text
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: ae0c07577eb3cfb45941d961e242956a, type: 2}
-  m_sharedMaterial: {fileID: -6104801632152175533, guid: ae0c07577eb3cfb45941d961e242956a, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []

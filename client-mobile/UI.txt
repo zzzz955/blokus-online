@@ -1,0 +1,789 @@
+================================================================================
+Unity 프로젝트 Image 컴포넌트 분석 결과
+================================================================================
+
+총 179개의 Image 컴포넌트가 직접 붙은 GameObject 발견
+
+* 크기가 0.0인 경우 부모 오브젝트의 크기를 상속받아 표시됨
+* Image 컴포넌트가 직접 붙은 오브젝트만 표시
+
+
+--------------------------------------------------------------------------------
+파일: AppPersistent.unity
+--------------------------------------------------------------------------------
+
+GameObject 이름: Panel
+  크기: (전체 화면 크기에 맞춤)
+  역할: 패널 컨테이너
+
+
+--------------------------------------------------------------------------------
+파일: BlockButton.prefab
+--------------------------------------------------------------------------------
+
+GameObject 이름: BlockButton
+  크기: 200.0 x 200.0
+  역할: 버튼 이미지/배경
+
+
+--------------------------------------------------------------------------------
+파일: ConfirmModal.prefab
+--------------------------------------------------------------------------------
+
+GameObject 이름: AcceptButton
+  크기: 200.0 x 80.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: BackgroundButton
+  크기: (전체 화면 크기에 맞춤)
+  역할: 배경 이미지
+
+GameObject 이름: ModalPanel
+  크기: -200.0 x 600.0
+  역할: 패널 컨테이너
+
+GameObject 이름: RejectButton
+  크기: 200.0 x 80.0
+  역할: 버튼 이미지/배경
+
+
+--------------------------------------------------------------------------------
+파일: MainScene.unity
+--------------------------------------------------------------------------------
+
+GameObject 이름: AcceptButton
+  크기: 300.0 x 100.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: AcceptButton
+  크기: 200.0 x 80.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: BackButton
+  크기: 600.0 x 150.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: BackgroundButton
+  크기: (전체 화면 크기에 맞춤)
+  역할: 배경 이미지
+
+GameObject 이름: BackgroundButton
+  크기: (전체 화면 크기에 맞춤)
+  역할: 배경 이미지
+
+GameObject 이름: Google
+  크기: 125.0 x 125.0
+  역할: UI 이미지 요소
+
+GameObject 이름: Header
+  크기: (부모 너비) x 200.0
+  역할: 헤더 이미지
+
+GameObject 이름: Image
+  크기: 800.0 x 500.0
+  역할: 일반 이미지
+
+GameObject 이름: Image
+  크기: 100.0 x 100.0
+  역할: 일반 이미지
+
+GameObject 이름: InputPassword
+  크기: 600.0 x 150.0
+  역할: UI 이미지 요소
+
+GameObject 이름: InputUsername
+  크기: 600.0 x 150.0
+  역할: UI 이미지 요소
+
+GameObject 이름: LoginButton
+  크기: 600.0 x 150.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: LoginPanel
+  크기: (전체 화면 크기에 맞춤)
+  역할: 패널 컨테이너
+
+GameObject 이름: ModalPanel
+  크기: -200.0 x 600.0
+  역할: 패널 컨테이너
+
+GameObject 이름: ModalPanel
+  크기: -200.0 x 600.0
+  역할: 패널 컨테이너
+
+GameObject 이름: ModeSelectionPanel
+  크기: (전체 화면 크기에 맞춤)
+  역할: 패널 컨테이너
+
+GameObject 이름: MultiModeButton
+  크기: 600.0 x 150.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: Panel
+  크기: (부모 너비) x 1400.0
+  역할: 패널 컨테이너
+
+GameObject 이름: Panel
+  크기: (부모 너비) x 1400.0
+  역할: 패널 컨테이너
+
+GameObject 이름: RegisterButton
+  크기: 600.0 x 150.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: RejectButton
+  크기: 200.0 x 80.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: SettingsButton
+  크기: 600.0 x 150.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: SingleModeButton
+  크기: 600.0 x 150.0
+  역할: 버튼 이미지/배경
+
+
+--------------------------------------------------------------------------------
+파일: MultiGameplayScene.unity
+--------------------------------------------------------------------------------
+
+GameObject 이름: ActionButtonPanel
+  크기: 100.0 x 400.0
+  역할: 패널 컨테이너
+
+GameObject 이름: Background
+  크기: (전체 화면 크기에 맞춤)
+  역할: 배경 이미지
+
+GameObject 이름: Background
+  크기: (전체 화면 크기에 맞춤)
+  역할: 배경 이미지
+
+GameObject 이름: Background
+  크기: (전체 화면 크기에 맞춤)
+  역할: 배경 이미지
+
+GameObject 이름: Background
+  크기: (전체 화면 크기에 맞춤)
+  역할: 배경 이미지
+
+GameObject 이름: Background
+  크기: (전체 화면 크기에 맞춤)
+  역할: 배경 이미지
+
+GameObject 이름: Bottom Section
+  크기: (부모 너비) x 350.0
+  역할: UI 이미지 요소
+
+GameObject 이름: Bottom Section
+  크기: 600.0 x 600.0
+  역할: UI 이미지 요소
+
+GameObject 이름: Cancel Button
+  크기: 450.0 x 150.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: Chat Display
+  크기: (부모 너비) x 450.0
+  역할: 채팅 UI 요소
+
+GameObject 이름: Chat Input
+  크기: 450.0 x 150.0
+  역할: 채팅 UI 요소
+
+GameObject 이름: Chat Toggle Button
+  크기: 150.0 x 100.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: ChatPanel
+  크기: (전체 화면 크기에 맞춤)
+  역할: 패널 컨테이너
+
+GameObject 이름: Checkmark
+  크기: 20.0 x 20.0
+  역할: UI 이미지 요소
+
+GameObject 이름: Close Button
+  크기: 450.0 x 150.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: Content Panel
+  크기: (부모 너비) x 1620.0
+  역할: 패널 컨테이너
+
+GameObject 이름: Controls Panel
+  크기: (부모 너비) x 150.0
+  역할: 패널 컨테이너
+
+GameObject 이름: Create Button
+  크기: 450.0 x 150.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: Create Room Button
+  크기: 450.0 x 150.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: CreateRoomPanel
+  크기: (전체 화면 크기에 맞춤)
+  역할: 패널 컨테이너
+
+GameObject 이름: Dialog Panel
+  크기: (부모 너비) x 1100.0
+  역할: 패널 컨테이너
+
+GameObject 이름: Fill
+  크기: 10.0 x (부모 높이)
+  역할: UI 이미지 요소
+
+GameObject 이름: FlipButton
+  크기: 100.0 x 100.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: Game Content
+  크기: (부모 너비) x 1670.0
+  역할: UI 이미지 요소
+
+GameObject 이름: Game Mode Dropdown
+  크기: -250.0 x 150.0
+  역할: UI 이미지 요소
+
+GameObject 이름: Game Start Button
+  크기: 300.0 x 100.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: GameRoomPanel
+  크기: (전체 화면 크기에 맞춤)
+  역할: 패널 컨테이너
+
+GameObject 이름: Handle
+  크기: 20.0 x 20.0
+  역할: UI 이미지 요소
+
+GameObject 이름: Handle
+  크기: 20.0 x 20.0
+  역할: UI 이미지 요소
+
+GameObject 이름: Header Panel
+  크기: (부모 너비) x 250.0
+  역할: 패널 컨테이너
+
+GameObject 이름: Header Panel
+  크기: (부모 너비) x 300.0
+  역할: 패널 컨테이너
+
+GameObject 이름: Image
+  크기: 150.0 x 150.0
+  역할: 일반 이미지
+
+GameObject 이름: Image
+  크기: 75.0 x 75.0
+  역할: 일반 이미지
+
+GameObject 이름: Image
+  크기: 75.0 x 75.0
+  역할: 일반 이미지
+
+GameObject 이름: Image
+  크기: 170.0 x 120.0
+  역할: 일반 이미지
+
+GameObject 이름: Image
+  크기: 75.0 x 75.0
+  역할: 일반 이미지
+
+GameObject 이름: Image
+  크기: -40.0 x -40.0
+  역할: 일반 이미지
+
+GameObject 이름: Image
+  크기: -40.0 x -40.0
+  역할: 일반 이미지
+
+GameObject 이름: Image
+  크기: 75.0 x 75.0
+  역할: 일반 이미지
+
+GameObject 이름: Image
+  크기: 150.0 x 150.0
+  역할: 일반 이미지
+
+GameObject 이름: Image (1)
+  크기: -40.0 x -40.0
+  역할: 일반 이미지
+
+GameObject 이름: Item Background
+  크기: (전체 화면 크기에 맞춤)
+  역할: 배경 이미지
+
+GameObject 이름: Item Background
+  크기: (전체 화면 크기에 맞춤)
+  역할: 배경 이미지
+
+GameObject 이름: Item Checkmark
+  크기: 20.0 x 20.0
+  역할: UI 이미지 요소
+
+GameObject 이름: Item Checkmark
+  크기: 20.0 x 20.0
+  역할: UI 이미지 요소
+
+GameObject 이름: Leave Room Button
+  크기: 100.0 x 100.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: LobbyPanel
+  크기: (전체 화면 크기에 맞춤)
+  역할: 패널 컨테이너
+
+GameObject 이름: Logout Button
+  크기: 100.0 x 100.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: Max Players Dropdown
+  크기: -250.0 x 150.0
+  역할: 플레이어 UI 요소
+
+GameObject 이름: Middle Section
+  크기: 480.0 x 600.0
+  역할: UI 이미지 요소
+
+GameObject 이름: Middle Section
+  크기: (부모 너비) x 920.0
+  역할: UI 이미지 요소
+
+GameObject 이름: Password Input
+  크기: -500.0 x 150.0
+  역할: UI 이미지 요소
+
+GameObject 이름: PlaceButton
+  크기: 100.0 x 100.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: Refresh Button
+  크기: 450.0 x 150.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: Response Button
+  크기: (부모 너비) x 150.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: Result Panel
+  크기: -200.0 x 1000.0
+  역할: 패널 컨테이너
+
+GameObject 이름: Room Control Bar
+  크기: -100.0 x 220.0
+  역할: 방 UI 요소
+
+GameObject 이름: Room List
+  크기: (부모 너비) x 800.0
+  역할: 방 UI 요소
+
+GameObject 이름: Room Name Input
+  크기: -250.0 x 150.0
+  역할: 방 UI 요소
+
+GameObject 이름: RotateButton
+  크기: 100.0 x 100.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: Scroll View
+  크기: (전체 화면 크기에 맞춤)
+  역할: UI 이미지 요소
+
+GameObject 이름: Scroll View
+  크기: (전체 화면 크기에 맞춤)
+  역할: UI 이미지 요소
+
+GameObject 이름: Scrollbar
+  크기: 20.0 x (부모 높이)
+  역할: UI 이미지 요소
+
+GameObject 이름: Scrollbar
+  크기: 20.0 x (부모 높이)
+  역할: UI 이미지 요소
+
+GameObject 이름: Send Button
+  크기: 150.0 x 150.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: Settings Button
+  크기: 100.0 x 100.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: Settings Button
+  크기: 100.0 x 100.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: Template
+  크기: (부모 너비) x 150.0
+  역할: UI 이미지 요소
+
+GameObject 이름: Template
+  크기: (부모 너비) x 150.0
+  역할: UI 이미지 요소
+
+GameObject 이름: To Lobby Button
+  크기: 450.0 x 150.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: Top Section
+  크기: (부모 너비) x 1020.0
+  역할: UI 이미지 요소
+
+GameObject 이름: Top Section
+  크기: (부모 너비) x 250.0
+  역할: UI 이미지 요소
+
+GameObject 이름: Users Content
+  크기: (부모 너비) x 500.0
+  역할: UI 이미지 요소
+
+GameObject 이름: Viewport
+  크기: (전체 화면 크기에 맞춤)
+  역할: UI 이미지 요소
+
+GameObject 이름: Viewport
+  크기: (전체 화면 크기에 맞춤)
+  역할: UI 이미지 요소
+
+GameObject 이름: Viewport
+  크기: -18.0 x (부모 높이)
+  역할: UI 이미지 요소
+
+GameObject 이름: Viewport
+  크기: -18.0 x (부모 높이)
+  역할: UI 이미지 요소
+
+GameObject 이름: Viewport
+  크기: (전체 화면 크기에 맞춤)
+  역할: UI 이미지 요소
+
+GameObject 이름: Viewport
+  크기: (전체 화면 크기에 맞춤)
+  역할: UI 이미지 요소
+
+GameObject 이름: Viewport
+  크기: (전체 화면 크기에 맞춤)
+  역할: UI 이미지 요소
+
+GameObject 이름: Warning Panel
+  크기: -200.0 x 600.0
+  역할: 패널 컨테이너
+
+
+--------------------------------------------------------------------------------
+파일: PlayerRankingItem.prefab
+--------------------------------------------------------------------------------
+
+GameObject 이름: ColorImage
+  크기: (전체 화면 크기에 맞춤)
+  역할: 일반 이미지
+
+
+--------------------------------------------------------------------------------
+파일: PlayerSlotWidget.prefab
+--------------------------------------------------------------------------------
+
+GameObject 이름: Background Image
+  크기: 20.0 x 20.0
+  역할: 배경 이미지
+
+GameObject 이름: Host Indicator
+  크기: 75.0 x 75.0
+  역할: 인디케이터
+
+GameObject 이름: Image
+  크기: -20.0 x -14.0
+  역할: 일반 이미지
+
+GameObject 이름: Kick Button
+  크기: 200.0 x 50.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: Me Indicator
+  크기: 75.0 x 75.0
+  역할: 인디케이터
+
+GameObject 이름: Ready Indicator
+  크기: 75.0 x 75.0
+  역할: 인디케이터
+
+
+--------------------------------------------------------------------------------
+파일: RoomItemUI.prefab
+--------------------------------------------------------------------------------
+
+GameObject 이름: Button
+  크기: 200.0 x 150.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: Image
+  크기: 60.0 x 20.0
+  역할: 일반 이미지
+
+GameObject 이름: Image
+  크기: -100.0 x -60.0
+  역할: 일반 이미지
+
+
+--------------------------------------------------------------------------------
+파일: SingleGameplayScene.unity
+--------------------------------------------------------------------------------
+
+GameObject 이름: ActionButtonPanel
+  크기: 100.0 x 400.0
+  역할: 패널 컨테이너
+
+GameObject 이름: BackButton
+  크기: 125.0 x 125.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: BackgroundButton
+  크기: (부모 너비) x 1120.0
+  역할: 배경 이미지
+
+GameObject 이름: BackgroundButton
+  크기: (전체 화면 크기에 맞춤)
+  역할: 배경 이미지
+
+GameObject 이름: BoardThumbnail
+  크기: 400.0 x 400.0
+  역할: UI 이미지 요소
+
+GameObject 이름: CloseButton
+  크기: 75.0 x 75.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: ContentPanel
+  크기: (부모 너비) x 1400.0
+  역할: 패널 컨테이너
+
+GameObject 이름: ExitButton
+  크기: 150.0 x 150.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: Flag_flapping_spritesheet_0
+  크기: 100.0 x 100.0
+  역할: UI 이미지 요소
+
+GameObject 이름: FlipButton
+  크기: 100.0 x 100.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: GamePanel
+  크기: (전체 화면 크기에 맞춤)
+  역할: 패널 컨테이너
+
+GameObject 이름: Header
+  크기: (부모 너비) x 200.0
+  역할: 헤더 이미지
+
+GameObject 이름: Header
+  크기: (부모 너비) x 100.0
+  역할: 헤더 이미지
+
+GameObject 이름: Image
+  크기: 100.0 x 100.0
+  역할: 일반 이미지
+
+GameObject 이름: Image
+  크기: 150.0 x 150.0
+  역할: 일반 이미지
+
+GameObject 이름: Image
+  크기: (부모 너비) x 150.0
+  역할: 일반 이미지
+
+GameObject 이름: Image
+  크기: 150.0 x 150.0
+  역할: 일반 이미지
+
+GameObject 이름: Image
+  크기: 170.0 x 120.0
+  역할: 일반 이미지
+
+GameObject 이름: Image
+  크기: 100.0 x 100.0
+  역할: 일반 이미지
+
+GameObject 이름: Image
+  크기: 50.0 x 50.0
+  역할: 일반 이미지
+
+GameObject 이름: Image
+  크기: 100.0 x 100.0
+  역할: 일반 이미지
+
+GameObject 이름: Image
+  크기: 100.0 x 100.0
+  역할: 일반 이미지
+
+GameObject 이름: ModalPanel
+  크기: (부모 너비) x 800.0
+  역할: 패널 컨테이너
+
+GameObject 이름: ModalPanel
+  크기: (전체 화면 크기에 맞춤)
+  역할: 패널 컨테이너
+
+GameObject 이름: PlaceButton
+  크기: 100.0 x 100.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: PlayButton
+  크기: 600.0 x 150.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: RefreshButton
+  크기: 125.0 x 125.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: RotateButton
+  크기: 100.0 x 100.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: ScoreImage
+  크기: 100.0 x 100.0
+  역할: 일반 이미지
+
+GameObject 이름: Scroll View
+  크기: (부모 너비) x -200.0
+  역할: UI 이미지 요소
+
+GameObject 이름: Scroll View
+  크기: (전체 화면 크기에 맞춤)
+  역할: UI 이미지 요소
+
+GameObject 이름: Scroll View
+  크기: (전체 화면 크기에 맞춤)
+  역할: UI 이미지 요소
+
+GameObject 이름: StageInfoModal
+  크기: (전체 화면 크기에 맞춤)
+  역할: 모달/팝업 배경
+
+GameObject 이름: StageSelectPanel
+  크기: (전체 화면 크기에 맞춤)
+  역할: 패널 컨테이너
+
+GameObject 이름: Star1
+  크기: 150.0 x 150.0
+  역할: UI 이미지 요소
+
+GameObject 이름: Star2
+  크기: 150.0 x 150.0
+  역할: UI 이미지 요소
+
+GameObject 이름: Star3
+  크기: 150.0 x 150.0
+  역할: UI 이미지 요소
+
+GameObject 이름: StarImage1
+  크기: 100.0 x 100.0
+  역할: 일반 이미지
+
+GameObject 이름: StarImage2
+  크기: 100.0 x 100.0
+  역할: 일반 이미지
+
+GameObject 이름: StarImage3
+  크기: 100.0 x 100.0
+  역할: 일반 이미지
+
+GameObject 이름: StarPanel
+  크기: (부모 너비) x 100.0
+  역할: 패널 컨테이너
+
+GameObject 이름: ThumbnailPlaceholder
+  크기: 400.0 x 400.0
+  역할: UI 이미지 요소
+
+GameObject 이름: TimerImage
+  크기: 100.0 x 100.0
+  역할: 일반 이미지
+
+GameObject 이름: TopBar
+  크기: (부모 너비) x 192.0
+  역할: UI 이미지 요소
+
+GameObject 이름: UndoButton
+  크기: 150.0 x 150.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: Viewport
+  크기: (전체 화면 크기에 맞춤)
+  역할: UI 이미지 요소
+
+GameObject 이름: Viewport
+  크기: (전체 화면 크기에 맞춤)
+  역할: UI 이미지 요소
+
+GameObject 이름: Viewport
+  크기: (부모 너비) x -17.0
+  역할: UI 이미지 요소
+
+GameObject 이름: confirmButton
+  크기: 600.0 x 200.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: star_yspin_sprite_8f_0
+  크기: 100.0 x 100.0
+  역할: UI 이미지 요소
+
+
+--------------------------------------------------------------------------------
+파일: StageButtonPrefab.prefab
+--------------------------------------------------------------------------------
+
+GameObject 이름: LockIcon
+  크기: 100.0 x 100.0
+  역할: 아이콘 이미지
+
+GameObject 이름: StageButtonPrefab
+  크기: 200.0 x 200.0
+  역할: 버튼 이미지/배경
+
+GameObject 이름: Star1
+  크기: 75.0 x 75.0
+  역할: UI 이미지 요소
+
+GameObject 이름: Star2
+  크기: 75.0 x 75.0
+  역할: UI 이미지 요소
+
+GameObject 이름: Star3
+  크기: 75.0 x 75.0
+  역할: UI 이미지 요소
+
+
+--------------------------------------------------------------------------------
+파일: ToastMessage.prefab
+--------------------------------------------------------------------------------
+
+GameObject 이름: ToastMessage
+  크기: 980.0 x 70.0
+  역할: 토스트 메시지 배경
+
+
+--------------------------------------------------------------------------------
+파일: UserItemUI.prefab
+--------------------------------------------------------------------------------
+
+GameObject 이름: Background
+  크기: 30.0 x 20.0
+  역할: 배경 이미지
+
+GameObject 이름: Click Area
+  크기: 480.0 x 100.0
+  역할: UI 이미지 요소
+
+GameObject 이름: Status Icon
+  크기: 100.0 x 100.0
+  역할: 아이콘 이미지
+
+
+================================================================================
+분석 완료
+================================================================================
