@@ -178,22 +178,36 @@ void Awake()
         /// </summary>
         private void UpdateStarIcons()
         {
-            if (starIcons == null || starIcons.Length == 0) 
+            if (starIcons == null || starIcons.Length == 0)
             {
                 Debug.LogWarning($"[StageButton {stageNumber}] starIcons 배열이 비어있습니다!");
                 return;
             }
-            
+
+            // 스테이지가 잠겨있으면 모든 별 아이콘을 비활성화
+            if (!isUnlocked)
+            {
+                for (int i = 0; i < starIcons.Length; i++)
+                {
+                    if (starIcons[i] != null)
+                    {
+                        starIcons[i].gameObject.SetActive(false);
+                    }
+                }
+                return;
+            }
+
+            // 언락된 스테이지의 경우 별 아이콘 상태 업데이트
             for (int i = 0; i < starIcons.Length; i++)
             {
                 if (starIcons[i] != null)
                 {
                     // 모든 별 아이콘을 표시 (활성화/비활성화 상태로)
                     starIcons[i].gameObject.SetActive(true);
-                    
+
                     // 획득한 별 개수에 따른 스프라이트 및 색상 설정
                     bool shouldActivate = isCompleted && (i < starsEarned);
-                    
+
                     if (shouldActivate)
                     {
                         // 활성화된 별
