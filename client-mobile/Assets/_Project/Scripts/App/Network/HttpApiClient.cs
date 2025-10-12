@@ -738,10 +738,15 @@ namespace App.Network
                                 App.Security.SecureStorage.StoreString("blokus_username", response.user.username ?? "");
                             }
 
-                            // SessionManager 업데이트
+                            // SessionManager 업데이트 - SeedFromAuth 사용하여 전체 사용자 정보 저장
                             if (App.Core.SessionManager.Instance != null)
                             {
-                                App.Core.SessionManager.Instance.SetTokens(response.access_token, "", response.user.user_id);
+                                var authData = new AuthUserData
+                                {
+                                    token = response.access_token,
+                                    user = response.user
+                                };
+                                App.Core.SessionManager.Instance.SeedFromAuth(authData);
                             }
 
                             onComplete?.Invoke(true, "OIDC 토큰 갱신 성공");

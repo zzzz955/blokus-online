@@ -15,6 +15,7 @@ namespace App.UI
         [SerializeField] private Image spinnerImage;
         [SerializeField] private TMP_Text loadingText;
         [SerializeField] private CanvasGroup canvasGroup;
+        [SerializeField] private TMP_FontAsset loadingFont;
 
         [Header("Animation Settings")]
         [SerializeField] private float spinSpeed = 180f; // degrees per second
@@ -287,6 +288,26 @@ namespace App.UI
             loadingText.fontSize = 60;
             loadingText.color = Color.white;
             loadingText.alignment = TMPro.TextAlignmentOptions.Center;
+
+            // 폰트 설정
+            if (loadingFont != null)
+            {
+                loadingText.font = loadingFont;
+            }
+            else
+            {
+                // Resources 폴더에서 자동 로드 (폴백)
+                TMP_FontAsset font = Resources.Load<TMP_FontAsset>("Fonts/NeoDunggeunmoPro-Regular SDF");
+                if (font != null)
+                {
+                    loadingText.font = font;
+                    Debug.Log("LoadingOverlay: Neo둥근모 폰트 자동 로드 성공");
+                }
+                else
+                {
+                    Debug.LogWarning("LoadingOverlay: Neo둥근모 폰트를 찾을 수 없습니다. 기본 폰트를 사용합니다.");
+                }
+            }
         }
         /// <summary>
         /// Show loading overlay with optional note

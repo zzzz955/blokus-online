@@ -633,6 +633,7 @@ MonoBehaviour:
   spinnerImage: {fileID: 0}
   loadingText: {fileID: 0}
   canvasGroup: {fileID: 0}
+  loadingFont: {fileID: 11400000, guid: 8e1bc3e17153f6e4ab65505b07bb7ffb, type: 2}
   spinSpeed: 180
   fadeSpeed: 3
   minSweep: 0.08

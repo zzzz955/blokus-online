@@ -35,7 +35,7 @@ namespace App.UI
         private void OnUserDataReceived(string username, int _)
         {
             var displayName = SessionManager.Instance?.DisplayName;
-            UpdateGreetingMessage(displayName ?? username);
+            UpdateGreetingMessage(string.IsNullOrEmpty(displayName) ? username : displayName);
         }
         protected override void Start()
         {
@@ -128,10 +128,9 @@ namespace App.UI
 
             // SessionManager에서 displayName 가져오기 (fallback: username)
             var displayName = SessionManager.Instance?.DisplayName;
-            if (string.IsNullOrEmpty(displayName))
-                displayName = SessionManager.Instance?.CachedId;
+            var username = SessionManager.Instance?.CachedId;
 
-            UpdateGreetingMessage(displayName);
+            UpdateGreetingMessage(string.IsNullOrEmpty(displayName) ? username : displayName);
         }
         
         private void UpdateGreetingMessage(string displayName)
