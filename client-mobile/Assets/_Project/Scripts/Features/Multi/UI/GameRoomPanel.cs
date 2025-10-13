@@ -18,6 +18,7 @@ using SharedUserInfo = Shared.Models.UserInfo;
 using SharedBlockPlacement = Shared.Models.BlockPlacement;
 using MultiPlayerColor = Features.Multi.Models.PlayerColor;
 using MultiBlockPlacement = Features.Multi.Models.BlockPlacement;
+using App.Audio; // AudioManager
 using MultiChatMessage = Features.Multi.Models.ChatMessage;
 using SharedGameLogic = App.Core.GameLogic;
 using SharedFlipState = Shared.Models.FlipState;
@@ -1957,20 +1958,27 @@ namespace Features.Multi.UI
         private void ReturnToLobby()
         {
             Debug.Log("[GameRoomPanel] 로비로 복귀");
-            
+
             // 게임 상태 초기화
             isGameStarted = false;
             isMyTurn = false;
             isReady = false;
             myPlayerColor = MultiPlayerColor.None;
             mySharedPlayerColor = SharedPlayerColor.None;
-            
+
             // 게임 컴포넌트 완전 정리
             CleanupGameComponents();
-            
+
             // 데이터 정리 - MultiUserDataCache 제거로 더 이상 필요 없음
             Debug.Log("[GameRoomPanel] 방 데이터 정리 완료 - NetworkManager 이벤트 기반으로 관리됨");
-            
+
+            // BGM: Lobby BGM으로 복귀 (멀티플레이 방 퇴장)
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlayBGM(BGMTrack.Lobby);
+                Debug.Log("[GameRoomPanel] Lobby BGM 전환");
+            }
+
             // MultiGameplaySceneController를 통해 로비로 전환
             var sceneController = GetComponentInParent<MultiGameplaySceneController>();
             if (sceneController != null)
