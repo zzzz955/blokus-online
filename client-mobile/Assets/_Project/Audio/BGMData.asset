@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a6c29659930cb004097c9a04db80a9bf, type: 3}
+  m_Name: BGMData
+  m_EditorClassIdentifier: 
+  bgmEntries:
+  - track: 1
+    clip: {fileID: 8300000, guid: ce302c462bfe9014493fdd17738f21ba, type: 3}
+    volume: 0.5
+    loop: 1
+    description: "\uBA54\uC778 \uD654\uBA74 BGM"
+  - track: 2
+    clip: {fileID: 8300000, guid: 3a19673f9b204bd47a0260592f0cce30, type: 3}
+    volume: 0.5
+    loop: 1
+    description: "\uB85C\uBE44 \uBC0F \uC2A4\uD14C\uC774\uC9C0 \uC120\uD0DD BGM"
+  - track: 3
+    clip: {fileID: 8300000, guid: f3dcf7d851aba884685e0a9d17c07732, type: 3}
+    volume: 1
+    loop: 1
+    description: "\uAC8C\uC784\uD50C\uB808\uC774 BGM"
+  fadeInDuration: 1.5
+  fadeOutDuration: 1
+  useCrossFade: 1
