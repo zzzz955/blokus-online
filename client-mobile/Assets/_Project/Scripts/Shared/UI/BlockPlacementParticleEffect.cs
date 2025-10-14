@@ -38,6 +38,27 @@ namespace Shared.UI
             InitializeParticleSystem();
         }
 
+        private void OnDisable()
+        {
+            // GameObject가 비활성화될 때 모든 파티클 정리
+            ClearParticles();
+            Debug.Log("[BlockPlacementParticleEffect] OnDisable - 자동 파티클 정리");
+        }
+
+        private void OnEnable()
+        {
+            // GameObject가 활성화될 때 안전 점검
+            if (isInitialized && dustParticleSystem != null)
+            {
+                // 파티클이 남아있다면 정리
+                if (dustParticleSystem.particleCount > 0)
+                {
+                    ClearParticles();
+                    Debug.Log("[BlockPlacementParticleEffect] OnEnable - 잔여 파티클 정리");
+                }
+            }
+        }
+
         /// <summary>
         /// AnimationCurve 초기화
         /// </summary>
@@ -245,6 +266,9 @@ namespace Shared.UI
                 return;
             }
 
+            // GameObject 재활성화 (ClearParticles에서 비활성화된 경우)
+            ReactivateParticleSystem();
+
             // UI 좌표계로 변환 - 부모 transform 기준으로 로컬 위치 설정
             Vector3 localPosition = transform.InverseTransformPoint(worldPosition);
             dustParticleSystem.transform.localPosition = localPosition;
@@ -296,6 +320,59 @@ namespace Shared.UI
             if (dustParticleSystem != null && dustParticleSystem.isPlaying)
             {
                 dustParticleSystem.Stop();
+            }
+        }
+
+        /// <summary>
+        /// 모든 파티클 즉시 제거 (스테이지 전환 시 사용)
+        /// </summary>
+        public void ClearParticles()
+        {
+            if (dustParticleSystem != null)
+            {
+                // 1. 파티클 시스템 정지 및 클리어
+                dustParticleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                dustParticleSystem.Clear(true);
+
+                // 2. 실행 중인 코루틴 중지
+                StopAllCoroutines();
+
+                // 3. Renderer 비활성화 (렌더링 완전 차단)
+                var renderer = dustParticleSystem.GetComponent<ParticleSystemRenderer>();
+                if (renderer != null)
+                {
+                    renderer.enabled = false;
+                }
+
+                // 4. GameObject 비활성화 (이중 안전장치)
+                if (dustParticleSystem.gameObject != null)
+                {
+                    dustParticleSystem.gameObject.SetActive(false);
+                }
+
+                Debug.Log($"[BlockPlacementParticleEffect] 모든 파티클 제거 완료 - particleCount={dustParticleSystem.particleCount}, renderer.enabled={renderer?.enabled}, GameObject.active={dustParticleSystem.gameObject.activeSelf}");
+            }
+        }
+
+        /// <summary>
+        /// 파티클 시스템 재활성화 (다음 재생을 위해)
+        /// </summary>
+        private void ReactivateParticleSystem()
+        {
+            if (dustParticleSystem != null)
+            {
+                // GameObject 재활성화
+                if (!dustParticleSystem.gameObject.activeSelf)
+                {
+                    dustParticleSystem.gameObject.SetActive(true);
+                }
+
+                // Renderer 재활성화
+                var renderer = dustParticleSystem.GetComponent<ParticleSystemRenderer>();
+                if (renderer != null && !renderer.enabled)
+                {
+                    renderer.enabled = true;
+                }
             }
         }
 

@@ -126,6 +126,20 @@ namespace Features.Single.Gameplay
             }
         }
 
+        private void OnDisable()
+        {
+            // GameBoard가 비활성화될 때 파티클 효과 제거
+            if (particleEffect != null)
+            {
+                particleEffect.ClearParticles();
+            }
+            if (simpleDustEffect != null)
+            {
+                simpleDustEffect.ClearParticles();
+            }
+            Debug.Log("[GameBoard] OnDisable - 파티클 효과 제거 완료");
+        }
+
         private void Start()
         {
             if (initialized) return;
@@ -221,6 +235,16 @@ namespace Features.Single.Gameplay
             gameLogic.ClearBoard();
             RefreshBoard();
             ClearTouchPreview();
+
+            // 파티클 효과 제거 (스테이지 전환 시 파티클이 남지 않도록)
+            if (particleEffect != null)
+            {
+                particleEffect.ClearParticles();
+            }
+            if (simpleDustEffect != null)
+            {
+                simpleDustEffect.ClearParticles();
+            }
         }
 
         /// <summary>
