@@ -28,6 +28,23 @@ namespace Shared.UI
             InitializeDustPool();
         }
 
+        private void OnDisable()
+        {
+            // GameObject가 비활성화될 때 모든 파티클 정리
+            ClearParticles();
+            Debug.Log("[SimpleDustEffect] OnDisable - 자동 파티클 정리");
+        }
+
+        private void OnEnable()
+        {
+            // GameObject가 활성화될 때 안전 점검 및 정리
+            if (isInitialized)
+            {
+                ClearParticles();
+                Debug.Log("[SimpleDustEffect] OnEnable - 안전 점검 및 정리");
+            }
+        }
+
         /// <summary>
         /// 흙먼지 UI 요소 풀 초기화
         /// </summary>
@@ -361,6 +378,49 @@ namespace Shared.UI
             {
                 dust.SetActive(false);
             }
+        }
+
+        /// <summary>
+        /// 모든 흙먼지 효과 즉시 제거 (스테이지 전환 시 사용)
+        /// </summary>
+        public void ClearParticles()
+        {
+            if (!isInitialized)
+            {
+                Debug.Log("[SimpleDustEffect] ClearParticles 호출됨 - 초기화되지 않음");
+                return;
+            }
+
+            int activeCount = 0;
+            int disabledCount = 0;
+
+            // 모든 코루틴 중지
+            StopAllCoroutines();
+
+            // 모든 먼지 요소 강제 비활성화 및 Image 투명화
+            foreach (GameObject dust in dustPool)
+            {
+                if (dust != null)
+                {
+                    if (dust.activeInHierarchy)
+                    {
+                        activeCount++;
+
+                        // Image 알파값을 0으로 설정 (즉시 투명화)
+                        Image dustImage = dust.GetComponent<Image>();
+                        if (dustImage != null)
+                        {
+                            dustImage.color = new Color(dustImage.color.r, dustImage.color.g, dustImage.color.b, 0f);
+                        }
+
+                        // GameObject 비활성화
+                        dust.SetActive(false);
+                        disabledCount++;
+                    }
+                }
+            }
+
+            Debug.Log($"[SimpleDustEffect] 모든 흙먼지 효과 제거 완료 - 활성화된 먼지: {activeCount}개, 비활성화함: {disabledCount}개, 전체 풀 크기: {dustPool.Count}");
         }
     }
 }
