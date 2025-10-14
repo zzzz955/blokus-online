@@ -6,6 +6,8 @@ using App.Services;
 using Features.Single.Core;
 using Shared.Models;
 using App.Core;
+using App.UI.Settings;
+
 namespace App.UI
 {
     public class ModeSelectionPanel : Shared.UI.PanelBase
@@ -19,6 +21,9 @@ namespace App.UI
 
         [Header("게임 종료 모달")]
         [SerializeField] private GameExitModal gameExitModal;
+
+        [Header("설정 모달")]
+        [SerializeField] private SettingsModal settingsModal;
 
         private void OnEnable()
         {
@@ -170,9 +175,9 @@ namespace App.UI
 
             if (settingsButton != null)
             {
-                settingsButton.onClick.AddListener(OnMultiPlayerClicked);
-                settingsButton.interactable = false;
-                Debug.Log("멀티플레이 버튼 이벤트 연결 완료, 비활성화(스텁)");
+                settingsButton.onClick.AddListener(OnSettingsClicked);
+                settingsButton.interactable = true;
+                Debug.Log("Settings 버튼 이벤트 연결 완료");
             }
             else
             {
@@ -251,6 +256,21 @@ namespace App.UI
             else
             {
                 Debug.LogError("[ModeSelectionPanel] UIManager를 찾을 수 없습니다!");
+            }
+        }
+
+        public void OnSettingsClicked()
+        {
+            Debug.Log("Settings 버튼 클릭");
+
+            if (settingsModal != null)
+            {
+                Debug.Log("[ModeSelectionPanel] SettingsModal 표시");
+                settingsModal.ShowModal();
+            }
+            else
+            {
+                Debug.LogError("[ModeSelectionPanel] SettingsModal을 찾을 수 없습니다! Inspector에서 settingsModal을 할당하세요.");
             }
         }
 

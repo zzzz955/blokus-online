@@ -305,47 +305,23 @@ namespace Features.Single.UI.InGame
 
         private void CloseToSelection()
         {
+            Debug.Log("[GameResultModal] ===== CloseToSelection 호출됨 =====");
+
             if (modalPanel && modalPanel.activeSelf)
-                modalPanel.SetActive(false);
-
-            //  수정: UI 안정화를 위한 지연된 처리
-            StartCoroutine(DelayedCloseToSelection());
-        }
-
-        /// <summary>
-        ///  수정: UI 안정화를 위한 지연된 화면 전환 (StageSelectPanel 강제 활성화 보장)
-        /// </summary>
-        private System.Collections.IEnumerator DelayedCloseToSelection()
-        {
-            //  수정: 2프레임 대기로 UI 상태 완전 안정화
-            yield return null;
-            yield return null;
-
-            //  수정: StageSelectPanel 먼저 강제 활성화 (우선순위 최고)
-            var stageSelectPanel = GameObject.Find("StageSelectPanel");
-            if (stageSelectPanel != null)
             {
-                if (!stageSelectPanel.activeSelf)
-                {
-                    Debug.Log("[GameResultModal] StageSelectPanel 강제 활성화 - 최우선");
-                    stageSelectPanel.SetActive(true);
-                }
-                
-                //  추가: StageSelectPanel의 CandyCrushStageMapView 강제 리프레시 (throttling 무시)
-                var stageMapView = stageSelectPanel.GetComponent<Features.Single.UI.StageSelect.CandyCrushStageMapView>();
-                if (stageMapView != null)
-                {
-                    Debug.Log("[GameResultModal] CandyCrushStageMapView 강제 리프레시 요청");
-                    // ForceRefreshStageButtons 메서드 호출 (throttling 무시)
-                    stageMapView.SendMessage("ForceRefreshStageButtons", SendMessageOptions.DontRequireReceiver);
-                }
+                modalPanel.SetActive(false);
+                Debug.Log("[GameResultModal] modalPanel 비활성화 완료");
             }
             else
             {
-                Debug.LogError("[GameResultModal] StageSelectPanel GameObject를 찾을 수 없음!");
+                Debug.Log($"[GameResultModal] modalPanel 이미 비활성화됨 또는 null (modalPanel={modalPanel}, activeSelf={modalPanel?.activeSelf})");
             }
 
-            // 컨트롤러에만 위임 (형제 패널 직접 제어 금지)
+            // 콜백 먼저 실행
+            var cb = _onClosed;
+            _onClosed = null;
+
+            // UI 컨트롤러 찾기 및 화면 전환 요청
             if (!uiController)
                 uiController = FindObjectOfType<Features.Single.UI.Scene.SingleGameplayUIScreenController>(true);
 
@@ -353,26 +329,20 @@ namespace Features.Single.UI.InGame
             {
                 Debug.Log("[GameResultModal] UIController 발견 - ShowSelection 호출");
                 uiController.ShowSelection(); // GamePanel OFF, StageSelect ON
-                
-                //  수정: ShowSelection 후 더 긴 대기 시간으로 UI 업데이트 완료 보장
-                yield return new WaitForSeconds(0.2f);
-                
-                //  추가: 최종 검증 - StageSelectPanel 활성화 재확인
-                if (stageSelectPanel != null && !stageSelectPanel.activeSelf)
-                {
-                    Debug.LogWarning("[GameResultModal] 최종 검증 실패 - StageSelectPanel 재활성화");
-                    stageSelectPanel.SetActive(true);
-                }
             }
             else
             {
                 Debug.LogWarning("[GameResultModal] UIController가 없어 화면 복귀를 수행하지 못했습니다.");
             }
 
-            var cb = _onClosed; _onClosed = null;
-            cb?.Invoke();
+            //  수정: GameResultModal 전체 비활성화 (BackgroundButton 포함)
+            //  코루틴 없이 즉시 비활성화 처리
+            Debug.Log($"[GameResultModal] GameResultModal GameObject 비활성화 시작 (현재 activeSelf={this.gameObject.activeSelf})");
+            this.gameObject.SetActive(false);
+            Debug.Log("[GameResultModal] ===== GameResultModal 비활성화 완료 =====");
 
-            Debug.Log("[GameResultModal] 닫기 → 스테이지 선택으로 복귀");
+            // GameObject가 비활성화된 후에는 이 로그가 출력되지 않을 수 있음
+            cb?.Invoke();
         }
 
         private void EnsureModalOnTopAndBlockRaycasts()

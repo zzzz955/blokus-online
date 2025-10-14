@@ -5,6 +5,7 @@ using UnityEngine.Serialization;
 using Features.Single.Core;
 using Shared.UI;
 using App.Core;
+using App.Audio;
 
 namespace App.UI
 {
@@ -112,7 +113,10 @@ namespace App.UI
         void Start()
         {
             Debug.Log("=== UIManager Start 시작 ===");
-            
+
+            // AudioManager 초기화 확인 및 MainMenu BGM 재생
+            InitializeBGM();
+
             // Exit으로 돌아온 경우 확인
             bool returnedFromGame = PlayerPrefs.GetInt("ReturnedFromGame", 0) == 1;
             if (returnedFromGame)
@@ -120,17 +124,20 @@ namespace App.UI
                 // 플래그 초기화
                 PlayerPrefs.DeleteKey("ReturnedFromGame");
                 PlayerPrefs.Save();
-                
+
                 // 로그인 상태 확인 후 적절한 패널 표시
                 if (Features.Single.Core.UserDataCache.Instance != null && Features.Single.Core.UserDataCache.Instance.IsLoggedIn())
                 {
                     Debug.Log("Exit으로 돌아옴 + 로그인됨 - 스테이지 선택 패널 표시");
                     ShowPanel(UIState.StageSelect, false);
+                    // Lobby BGM 재생 (스테이지 선택 화면)
+                    PlayBGMSafe(BGMTrack.Lobby);
                 }
                 else
                 {
                     Debug.Log("Exit으로 돌아옴 + 로그인 안됨 - 로그인 패널 표시");
                     ShowPanel(UIState.Login, false);
+                    // MainMenu BGM 유지
                 }
             }
             else
@@ -138,8 +145,40 @@ namespace App.UI
                 // 일반적인 게임 시작 - 자동 로그인 상태 확인
                 CheckAutoLoginStatus();
             }
-            
+
             Debug.Log("UIManager Start 완료");
+        }
+
+        /// <summary>
+        /// AudioManager 초기화 및 MainMenu BGM 재생
+        /// </summary>
+        private void InitializeBGM()
+        {
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlayBGM(BGMTrack.MainMenu);
+                Debug.Log("[UIManager] MainMenu BGM 재생 시작");
+            }
+            else
+            {
+                Debug.LogWarning("[UIManager] AudioManager.Instance가 null입니다. MainScene에 AudioManager가 배치되어 있는지 확인하세요.");
+            }
+        }
+
+        /// <summary>
+        /// 안전한 BGM 재생 (AudioManager null 체크 포함)
+        /// </summary>
+        private void PlayBGMSafe(BGMTrack track)
+        {
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlayBGM(track);
+                Debug.Log($"[UIManager] BGM 전환: {track}");
+            }
+            else
+            {
+                Debug.LogWarning($"[UIManager] AudioManager.Instance가 null이어서 BGM 재생 실패: {track}");
+            }
         }
 
         /// <summary>
@@ -452,6 +491,9 @@ namespace App.UI
         {
             Debug.Log("[UIManager] OnLoginSuccess() 호출됨");
             ShowPanel(UIState.ModeSelection);
+
+            // MainMenu BGM 유지 (이미 재생 중)
+            PlayBGMSafe(BGMTrack.MainMenu);
         }
 
         public void OnSingleModeSelected()
@@ -477,19 +519,22 @@ namespace App.UI
         private IEnumerator LoadScenesForStageSelection()
         {
             Debug.Log("[UIManager] 스테이지 선택 화면 로드 시작");
-            
+
             // 1. SingleCore와 SingleGameplayScene을 로드하되, 게임 데이터 없이 스테이지 선택용으로만 사용
             // 2. SingleGameManager.IsInGameplayMode = false 상태로 유지 (스테이지 선택 모드)
-            
+
             //  중요: CurrentStage = 0으로 설정하여 테스트 데이터 초기화 방지
             Features.Single.Gameplay.SingleGameManager.SetStageContext(0, null);
-            
+
             // SceneFlowController의 GoSingle을 호출 (하지만 스테이지 데이터는 없음)
             yield return StartCoroutine(App.Core.SceneFlowController.Instance.GoSingle());
-            
+
             // MainScene 패널들을 조건부로 숨김 (스테이지 선택 모드에서는 MainScene 패널 유지)
             HideMainScenePanelsForStageSelection();
-            
+
+            // Lobby BGM 재생 (스테이지 선택 화면)
+            PlayBGMSafe(BGMTrack.Lobby);
+
             Debug.Log("[UIManager]  스테이지 선택 화면 준비 완료 - IsInGameplayMode = false");
         }
         
@@ -506,10 +551,13 @@ namespace App.UI
         public void OnMultiModeSelected()
         {
             Debug.Log("[UIManager] OnMultiModeSelected() 호출됨");
-            
+
             // 멀티플레이 버튼 비활성화
             DisableMultiplayerButton();
-            
+
+            // Lobby BGM 재생 (멀티플레이 로비)
+            PlayBGMSafe(BGMTrack.Lobby);
+
             // 멀티플레이 모드 선택 시 MultiCore 씬으로 전환
             if (App.Core.SceneFlowController.Instance != null)
             {
@@ -520,7 +568,7 @@ namespace App.UI
             {
                 Debug.LogError("[UIManager] SceneFlowController.Instance가 null입니다!");
                 SystemMessageManager.ShowToast("멀티플레이 화면을 로드할 수 없습니다.", MessagePriority.Error);
-                
+
                 // 실패 시 버튼 재활성화
                 EnableMultiplayerButton();
             }
@@ -563,28 +611,31 @@ namespace App.UI
         private IEnumerator TransitionToGameplayMode()
         {
             Debug.Log("[UIManager] 게임플레이 모드 전환 시작");
-            
+
             //  핵심 수정: MainScene 패널들 숨기되, StageSelectPanel은 유지
             HideMainScenePanelsForGameplay();
-            
+
+            // Gameplay BGM 재생 (게임 시작)
+            PlayBGMSafe(BGMTrack.Gameplay);
+
             // 2.  핵심 수정: SingleGameManager 초기화 + UI 활성화
             // Scene은 이미 로드되어 있으므로 SingleGameManager 직접 호출
             var singleGameManager = Features.Single.Gameplay.SingleGameManager.Instance;
             if (singleGameManager != null && Features.Single.Gameplay.SingleGameManager.CurrentStage > 0)
             {
                 Debug.Log($"[UIManager] SingleGameManager 발견 - 스테이지 {Features.Single.Gameplay.SingleGameManager.CurrentStage} 초기화 시작");
-                
+
                 // 스테이지 데이터를 이용해 게임 초기화 (GameBoard, BlockPalette 등 초기화)
                 singleGameManager.RequestStartByNumber(Features.Single.Gameplay.SingleGameManager.CurrentStage);
                 Debug.Log("[UIManager] SingleGameManager 초기화 완료");
-                
+
                 // UI 활성화 (SingleGameManager.Init에서 OnGameReady 이벤트가 발생하여 자동 활성화됨)
                 yield return new WaitForSeconds(0.1f); // Init 완료 대기
             }
             else
             {
                 Debug.LogError("[UIManager] SingleGameManager Instance가 없거나 CurrentStage가 설정되지 않음!");
-                
+
                 // 백업: UI만이라도 활성화
                 var screenController = Object.FindObjectOfType<Features.Single.UI.Scene.SingleGameplayUIScreenController>();
                 if (screenController != null)
@@ -602,7 +653,7 @@ namespace App.UI
                     }
                 }
             }
-            
+
             Debug.Log("[UIManager]  게임플레이 모드 전환 완료 - 게임 시작!");
         }
         
@@ -759,14 +810,17 @@ namespace App.UI
         private System.Collections.IEnumerator ExitSingleAndShowModeSelection()
         {
             Debug.Log("[UIManager] ExitSingleAndShowModeSelection 코루틴 시작");
-            
+
             // SceneFlowController의 ExitSingleToMain 실행 (SingleGameplayScene 언로드)
             yield return StartCoroutine(App.Core.SceneFlowController.Instance.ExitSingleToMain());
-            
+
             Debug.Log("[UIManager] ExitSingleToMain 완료 - ModeSelection 패널 표시");
-            
+
             // MainScene으로 돌아온 후 ModeSelection 패널 표시
             ShowPanel(UIState.ModeSelection);
+
+            // MainMenu BGM으로 복귀
+            PlayBGMSafe(BGMTrack.MainMenu);
         }
 
         /// <summary>

@@ -5,6 +5,7 @@ using Features.Multi.Net;
 using App.Core;
 using App.UI;
 using Shared.UI;
+using App.Audio; // AudioManager
 
 namespace Features.Multi
 {
@@ -179,7 +180,15 @@ namespace Features.Multi
         {
             if (debugMode)
                 Debug.Log("[MultiGameplaySceneController] Joined room");
-                
+
+            // BGM: Gameplay BGM으로 전환 (멀티플레이 방 생성 또는 입장)
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlayBGM(BGMTrack.Gameplay);
+                if (debugMode)
+                    Debug.Log("[MultiGameplaySceneController] Gameplay BGM 전환");
+            }
+
             ShowGameRoomPanel();
         }
         
@@ -187,7 +196,15 @@ namespace Features.Multi
         {
             if (debugMode)
                 Debug.Log("[MultiGameplaySceneController] Left room");
-                
+
+            // BGM: Lobby BGM으로 복귀 (멀티플레이 방 퇴장)
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlayBGM(BGMTrack.Lobby);
+                if (debugMode)
+                    Debug.Log("[MultiGameplaySceneController] Lobby BGM 전환");
+            }
+
             ShowLobbyPanel();
         }
         

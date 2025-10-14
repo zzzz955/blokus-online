@@ -2,6 +2,7 @@
 using UnityEngine;
 using Features.Single.Gameplay; // SingleGameManager
 using Shared.UI; // ConfirmModal
+using App.Audio; // AudioManager
 
 namespace Features.Single.UI.Scene
 {
@@ -325,9 +326,16 @@ namespace Features.Single.UI.Scene
                 gamePanelRoot.SetActive(false);
                 if (verboseLog) Debug.Log("[UIScreenController] ShowSelection → GamePanel 비활성화");
             }
-            
+
+            // BGM: Lobby BGM으로 복귀 (게임 종료/클리어/중도 퇴장)
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlayBGM(BGMTrack.Lobby);
+                if (verboseLog) Debug.Log("[UIScreenController] ShowSelection → Lobby BGM 전환");
+            }
+
             if (verboseLog) Debug.Log("[UIScreenController] ShowSelection → GamePanel OFF, StageSelect ON");
-            
+
             //  추가: UI 안정화를 위한 코루틴 시작
             StartCoroutine(EnsureUIStabilityAfterShowSelection());
         }

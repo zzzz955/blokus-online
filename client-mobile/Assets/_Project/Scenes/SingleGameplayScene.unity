@@ -1371,10 +1371,10 @@ RectTransform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
+  - {fileID: 1699008066}
   - {fileID: 1265759960}
   - {fileID: 424487997}
   - {fileID: 1596130177}
-  - {fileID: 1699008066}
   - {fileID: 896474132}
   - {fileID: 1108413337}
   m_Father: {fileID: 975496028}
@@ -7158,8 +7158,6 @@ GameObject:
   - component: {fileID: 1708987331}
   - component: {fileID: 1708987333}
   - component: {fileID: 1708987332}
-  - component: {fileID: 1708987335}
-  - component: {fileID: 1708987334}
   m_Layer: 5
   m_Name: ScoreImage
   m_TagString: Untagged
@@ -7224,43 +7222,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1708987330}
   m_CullTransparentMesh: 1
---- !u!114 &1708987334
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1708987330}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 09261ace06758564bb77a76dd86d5ffb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  animator: {fileID: 1708987335}
-  triggerName: Glow
-  period: 3
-  unscaledTime: 0
---- !u!95 &1708987335
-Animator:
-  serializedVersion: 5
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1708987330}
-  m_Enabled: 1
-  m_Avatar: {fileID: 0}
-  m_Controller: {fileID: 9100000, guid: 882af7bc2127db14d806df1eea07db40, type: 2}
-  m_CullingMode: 0
-  m_UpdateMode: 0
-  m_ApplyRootMotion: 0
-  m_LinearVelocityBlending: 0
-  m_StabilizeFeet: 0
-  m_WarningMessage: 
-  m_HasTransformHierarchy: 1
-  m_AllowConstantClipSamplingOptimization: 1
-  m_KeepAnimatorStateOnDisable: 0
-  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &1710964872
 GameObject:
   m_ObjectHideFlags: 0
