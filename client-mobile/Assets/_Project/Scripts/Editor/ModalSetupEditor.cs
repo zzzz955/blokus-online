@@ -19,12 +19,16 @@ namespace App.Audio.Editor
         private static void SetupModalSounds()
         {
             // 현재 열린 씬에서 모달 GameObject 찾기
-            var allGameObjects = GameObject.FindObjectsOfType<GameObject>(true);
+            var scene = UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene();
+            var rootObjects = scene.GetRootGameObjects();
 
-            // "Modal"이 이름에 포함된 GameObject 필터링
-            var modalCandidates = allGameObjects
-                .Where(go => go.name.Contains("Modal") || go.name.Contains("Popup"))
-                .ToList();
+            var modalCandidates = new System.Collections.Generic.List<GameObject>();
+
+            // 모든 GameObject를 재귀적으로 탐색
+            foreach (var root in rootObjects)
+            {
+                FindModalsRecursive(root.transform, modalCandidates);
+            }
 
             if (modalCandidates.Count == 0)
             {
@@ -90,6 +94,29 @@ namespace App.Audio.Editor
 
             Debug.Log($"[ModalSetup] 완료: 추가 {addedCount}개, 건너뜀 {skippedCount}개");
             Debug.Log($"[ModalSetup]\n{report}");
+        }
+
+        // ========================================
+        // Helper Methods
+        // ========================================
+
+        /// <summary>
+        /// 재귀적으로 모달 GameObject 찾기
+        /// </summary>
+        private static void FindModalsRecursive(Transform parent, System.Collections.Generic.List<GameObject> modals)
+        {
+            // 현재 GameObject 이름 확인
+            if (parent.name.EndsWith("Modal") || parent.name.Contains("Modal") ||
+                parent.name.EndsWith("Popup") || parent.name.Contains("Popup"))
+            {
+                modals.Add(parent.gameObject);
+            }
+
+            // 자식들도 재귀적으로 탐색
+            for (int i = 0; i < parent.childCount; i++)
+            {
+                FindModalsRecursive(parent.GetChild(i), modals);
+            }
         }
 
         // ========================================

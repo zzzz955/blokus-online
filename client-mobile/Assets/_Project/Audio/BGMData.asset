@@ -15,12 +15,12 @@ MonoBehaviour:
   bgmEntries:
   - track: 1
     clip: {fileID: 8300000, guid: ce302c462bfe9014493fdd17738f21ba, type: 3}
-    volume: 0.5
+    volume: 0.7
     loop: 1
     description: "\uBA54\uC778 \uD654\uBA74 BGM"
   - track: 2
     clip: {fileID: 8300000, guid: 3a19673f9b204bd47a0260592f0cce30, type: 3}
-    volume: 0.5
+    volume: 0.7
     loop: 1
     description: "\uB85C\uBE44 \uBC0F \uC2A4\uD14C\uC774\uC9C0 \uC120\uD0DD BGM"
   - track: 3

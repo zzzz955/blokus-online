@@ -754,8 +754,8 @@ MonoBehaviour:
   scoreText: {fileID: 1740333141052534679}
   remainingBlocksText: {fileID: 4106309468376484076}
   emptySlotColor: {r: 1, g: 1, b: 1, a: 1}
-  readySprite: {fileID: 21300000, guid: e2e005598f525d3449d0a122efe72d02, type: 3}
-  notReadySprite: {fileID: 21300000, guid: 9402706911717e247aedf5b7dedffdeb, type: 3}
+  readySprite: {fileID: 21300000, guid: 7de89e9968bd44d47b89206894ae6f9c, type: 3}
+  notReadySprite: {fileID: 21300000, guid: f48966ca8c86a204cb83efe80143cff8, type: 3}
   hostCrownSprite: {fileID: 21300000, guid: bdfa2398b22c4c6478da7f0774da3229, type: 3}
   currentPlayerIndicator: {fileID: 4944964685702108685}
 --- !u!1 &7519844813334397758
