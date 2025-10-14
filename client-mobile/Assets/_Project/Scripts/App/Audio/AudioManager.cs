@@ -16,6 +16,7 @@ namespace App.Audio
 
         [Header("Audio Configuration")]
         [SerializeField] private BGMData bgmData;
+        [SerializeField] private SFXData sfxData;
 
         [Header("Audio Sources")]
         [SerializeField] private AudioSource bgmSource;
@@ -97,6 +98,16 @@ namespace App.Audio
             else
             {
                 Debug.LogWarning("[AudioManager] BGMData가 설정되지 않았습니다. Inspector에서 BGMData를 할당하세요.");
+            }
+
+            // SFXData 유효성 검사
+            if (sfxData != null)
+            {
+                sfxData.Validate();
+            }
+            else
+            {
+                Debug.LogWarning("[AudioManager] SFXData가 설정되지 않았습니다. Inspector에서 SFXData를 할당하세요.");
             }
 
             if (IsDebugEnabled)
@@ -238,7 +249,7 @@ namespace App.Audio
         // ========================================
 
         /// <summary>
-        /// 효과음 재생
+        /// 효과음 재생 (AudioClip 직접 지정)
         /// </summary>
         public void PlaySFX(AudioClip clip, float volumeScale = 1f)
         {
@@ -262,6 +273,34 @@ namespace App.Audio
             {
                 Debug.LogWarning("[AudioManager] 사용 가능한 SFX AudioSource가 없습니다.");
             }
+        }
+
+        /// <summary>
+        /// 효과음 재생 (SFXType으로 지정)
+        /// </summary>
+        public void PlaySFX(SFXType type, float volumeScale = 1f)
+        {
+            if (type == SFXType.None)
+            {
+                return;
+            }
+
+            if (sfxData == null)
+            {
+                Debug.LogError("[AudioManager] SFXData가 설정되지 않았습니다.");
+                return;
+            }
+
+            var clip = sfxData.GetClip(type);
+            if (clip == null)
+            {
+                Debug.LogWarning($"[AudioManager] SFX를 찾을 수 없습니다: {type}");
+                return;
+            }
+
+            // SFXData의 볼륨 설정을 적용
+            float dataVolume = sfxData.GetVolume(type);
+            PlaySFX(clip, dataVolume * volumeScale);
         }
 
         /// <summary>
