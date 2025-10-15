@@ -288,7 +288,7 @@ export default function MarkdownEditor({
           <button
             type="button"
             onClick={() => handleHeading(1)}
-            className="p-2 hover:bg-gray-200 rounded text-sm font-semibold"
+            className="p-2 hover:bg-gray-200 rounded text-sm font-semibold text-gray-700"
             title="제목 1"
             disabled={disabled}
           >
@@ -297,7 +297,7 @@ export default function MarkdownEditor({
           <button
             type="button"
             onClick={() => handleHeading(2)}
-            className="p-2 hover:bg-gray-200 rounded text-sm font-semibold"
+            className="p-2 hover:bg-gray-200 rounded text-sm font-semibold text-gray-700"
             title="제목 2"
             disabled={disabled}
           >
@@ -306,7 +306,7 @@ export default function MarkdownEditor({
           <button
             type="button"
             onClick={() => handleHeading(3)}
-            className="p-2 hover:bg-gray-200 rounded text-sm font-semibold"
+            className="p-2 hover:bg-gray-200 rounded text-sm font-semibold text-gray-700"
             title="제목 3"
             disabled={disabled}
           >
@@ -318,7 +318,7 @@ export default function MarkdownEditor({
           <button
             type="button"
             onClick={handleBold}
-            className="p-2 hover:bg-gray-200 rounded font-bold"
+            className="p-2 hover:bg-gray-200 rounded font-bold text-gray-700"
             title="굵게 (Ctrl+B)"
             disabled={disabled}
           >
@@ -327,7 +327,7 @@ export default function MarkdownEditor({
           <button
             type="button"
             onClick={handleItalic}
-            className="p-2 hover:bg-gray-200 rounded italic"
+            className="p-2 hover:bg-gray-200 rounded italic text-gray-700"
             title="기울임 (Ctrl+I)"
             disabled={disabled}
           >
@@ -336,7 +336,7 @@ export default function MarkdownEditor({
           <button
             type="button"
             onClick={handleStrikethrough}
-            className="p-2 hover:bg-gray-200 rounded line-through"
+            className="p-2 hover:bg-gray-200 rounded line-through text-gray-700"
             title="취소선"
             disabled={disabled}
           >
@@ -348,7 +348,7 @@ export default function MarkdownEditor({
           <button
             type="button"
             onClick={handleList}
-            className="p-2 hover:bg-gray-200 rounded"
+            className="p-2 hover:bg-gray-200 rounded text-gray-700"
             title="목록"
             disabled={disabled}
           >
@@ -357,7 +357,7 @@ export default function MarkdownEditor({
           <button
             type="button"
             onClick={handleOrderedList}
-            className="p-2 hover:bg-gray-200 rounded"
+            className="p-2 hover:bg-gray-200 rounded text-gray-700"
             title="순서 목록"
             disabled={disabled}
           >
@@ -366,7 +366,7 @@ export default function MarkdownEditor({
           <button
             type="button"
             onClick={handleQuote}
-            className="p-2 hover:bg-gray-200 rounded"
+            className="p-2 hover:bg-gray-200 rounded text-gray-700"
             title="인용"
             disabled={disabled}
           >
@@ -378,7 +378,7 @@ export default function MarkdownEditor({
           <button
             type="button"
             onClick={handleCode}
-            className="p-2 hover:bg-gray-200 rounded text-xs font-mono"
+            className="p-2 hover:bg-gray-200 rounded text-xs font-mono text-gray-700"
             title="인라인 코드"
             disabled={disabled}
           >
@@ -387,7 +387,7 @@ export default function MarkdownEditor({
           <button
             type="button"
             onClick={handleCodeBlock}
-            className="p-2 hover:bg-gray-200 rounded text-xs font-mono"
+            className="p-2 hover:bg-gray-200 rounded text-xs font-mono text-gray-700"
             title="코드 블록"
             disabled={disabled}
           >
@@ -399,7 +399,7 @@ export default function MarkdownEditor({
           <button
             type="button"
             onClick={handleLink}
-            className="p-2 hover:bg-gray-200 rounded"
+            className="p-2 hover:bg-gray-200 rounded text-gray-700"
             title="링크 (Ctrl+K)"
             disabled={disabled}
           >
@@ -409,7 +409,7 @@ export default function MarkdownEditor({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="p-2 hover:bg-gray-200 rounded"
+              className="p-2 hover:bg-gray-200 rounded text-gray-700"
               title="이미지 업로드"
               disabled={disabled || isUploading}
             >
@@ -422,7 +422,7 @@ export default function MarkdownEditor({
           <button
             type="button"
             onClick={handleHr}
-            className="p-2 hover:bg-gray-200 rounded"
+            className="p-2 hover:bg-gray-200 rounded text-gray-700"
             title="구분선"
             disabled={disabled}
           >
@@ -432,7 +432,7 @@ export default function MarkdownEditor({
             <button
               type="button"
               onClick={() => setShowTemplates(!showTemplates)}
-              className="p-2 hover:bg-gray-200 rounded"
+              className="p-2 hover:bg-gray-200 rounded text-gray-700"
               title="템플릿"
               disabled={disabled}
             >
@@ -448,7 +448,7 @@ export default function MarkdownEditor({
               type="button"
               onClick={() => setPreviewMode('edit')}
               className={`px-3 py-1 rounded text-sm ${
-                previewMode === 'edit' ? 'bg-blue-600 text-white' : 'hover:bg-gray-200'
+                previewMode === 'edit' ? 'bg-blue-600 text-white' : 'hover:bg-gray-200 text-gray-700'
               }`}
               disabled={disabled}
             >
@@ -458,7 +458,7 @@ export default function MarkdownEditor({
               type="button"
               onClick={() => setPreviewMode('split')}
               className={`px-3 py-1 rounded text-sm ${
-                previewMode === 'split' ? 'bg-blue-600 text-white' : 'hover:bg-gray-200'
+                previewMode === 'split' ? 'bg-blue-600 text-white' : 'hover:bg-gray-200 text-gray-700'
               }`}
               disabled={disabled}
             >
@@ -468,7 +468,7 @@ export default function MarkdownEditor({
               type="button"
               onClick={() => setPreviewMode('preview')}
               className={`px-3 py-1 rounded text-sm ${
-                previewMode === 'preview' ? 'bg-blue-600 text-white' : 'hover:bg-gray-200'
+                previewMode === 'preview' ? 'bg-blue-600 text-white' : 'hover:bg-gray-200 text-gray-700'
               }`}
               disabled={disabled}
             >
