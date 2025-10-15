@@ -60,7 +60,7 @@ namespace Blokus {
                 enableSqlLogging = getEnvBool("ENABLE_SQL_LOGGING", false);
 
                 // 버전 관리 설정
-                serverVersion = getEnvString("BLOKUS_SERVER_VERSION", "1.6.0");
+                serverVersion = getEnvString("BLOKUS_SERVER_VERSION", "2.0.0");
                 buildDate = getEnvString("BLOKUS_BUILD_DATE", __DATE__ " " __TIME__);
                 gitCommit = getEnvString("BLOKUS_GIT_COMMIT", "unknown");
                 gitBranch = getEnvString("BLOKUS_GIT_BRANCH", "main");

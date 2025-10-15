@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { adminFetch } from '@/lib/client/admin-fetch';
-import RichTextEditor from '@/components/ui/RichTextEditor';
+import DualModeEditor from '@/components/ui/DualModeEditor';
 
 interface Announcement {
   id: number;
@@ -217,12 +217,13 @@ export default function AdminAnnouncementsPage() {
                 <label className="block text-sm font-medium text-white mb-2">
                   내용
                 </label>
-                <RichTextEditor
+                <DualModeEditor
                   value={form.content}
                   onChange={(value) => setForm(prev => ({ ...prev, content: value }))}
-                  placeholder="공지사항 내용을 입력해주세요. 다양한 서식을 사용할 수 있습니다."
-                  height={250}
-                  className="mb-2"
+                  placeholder="공지사항 내용을 입력해주세요."
+                  height={400}
+                  defaultMode="rich"
+                  showModeSwitch={true}
                 />
               </div>
 

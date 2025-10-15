@@ -630,13 +630,13 @@ last_log.txt
 *.keystore
 .history/
 ExportHistory/
+nul
 
 # Android Build Files
 *.apk
 *.aab
 *_mapping.txt
 proguard/
-client-mobile/nul
 google_info.txt
 
 # GUIDE
