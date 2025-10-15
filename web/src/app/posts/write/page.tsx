@@ -7,7 +7,7 @@ import { PostCategory, PostForm } from '@/types';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import Layout from '@/components/layout/Layout';
-import RichTextEditor from '@/components/ui/RichTextEditor';
+import DualModeEditor from '@/components/ui/DualModeEditor';
 
 const CATEGORY_OPTIONS: { value: PostCategory; label: string }[] = [
   { value: 'QUESTION', label: '질문' },
@@ -145,16 +145,14 @@ export default function WritePostPage() {
               <label htmlFor="content" className="block text-sm font-medium text-white mb-2">
                 내용 *
               </label>
-              <RichTextEditor
+              <DualModeEditor
                 value={form.content}
                 onChange={(value) => setForm(prev => ({ ...prev, content: value }))}
-                placeholder="게시글 내용을 입력해주세요. 다양한 서식을 사용할 수 있습니다."
-                height={300}
-                className="mb-2"
+                placeholder="게시글 내용을 입력해주세요."
+                height={400}
+                defaultMode="rich"
+                showModeSwitch={true}
               />
-              <p className="text-sm text-gray-400 mt-1">
-                서식 도구를 사용하여 풍부한 내용을 작성해보세요. (굵게, 기울임, 링크, 목록 등)
-              </p>
             </div>
 
             {/* 에러 메시지 */}
