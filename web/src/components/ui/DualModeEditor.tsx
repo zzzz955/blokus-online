@@ -164,6 +164,10 @@ export default function DualModeEditor({
             height={height}
             disabled={disabled}
             showPreview={true}
+            autoSaveKey="dual-mode-editor"
+            enableAutoSave={true}
+            enableImageUpload={true}
+            enableTemplates={true}
           />
         )}
       </div>
