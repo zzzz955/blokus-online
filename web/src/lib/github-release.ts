@@ -71,7 +71,13 @@ function extractChangelog(body: string): string[] {
       const content = line.slice(2).trim();
 
       // 변경사항 섹션 내부이거나, 이모지로 시작하는 항목만 포함
-      if (inChangelogSection || /^[\u{1F300}-\u{1F9FF}]/u.test(content)) {
+      // 이모지 감지: 일반적인 이모지 범위 체크 (ES5 호환)
+      const startsWithEmoji = /^[\uD800-\uDBFF][\uDC00-\uDFFF]/.test(content) || // 서로게이트 페어
+                              /^[\u2600-\u27BF]/.test(content) || // 기타 기호
+                              /^[\u2700-\u27BF]/.test(content) || // Dingbats
+                              /^[\u2B50-\u2BFF]/.test(content);   // 별 등
+
+      if (inChangelogSection || startsWithEmoji) {
         changelog.push(content);
       }
     }
