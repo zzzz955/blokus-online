@@ -116,26 +116,6 @@ export default function RichTextEditor({
         .ql-toolbar .ql-active {
           color: #3b82f6;
         }
-        .dark .ql-toolbar {
-          background-color: #374151;
-          border-color: #4b5563;
-        }
-        .dark .ql-container {
-          background-color: #1f2937;
-          border-color: #4b5563;
-        }
-        .dark .ql-editor {
-          color: #f9fafb;
-        }
-        .dark .ql-toolbar button {
-          color: #d1d5db;
-        }
-        .dark .ql-toolbar button:hover {
-          color: #60a5fa;
-        }
-        .dark .ql-toolbar .ql-active {
-          color: #60a5fa;
-        }
       `}</style>
       
       <ReactQuill

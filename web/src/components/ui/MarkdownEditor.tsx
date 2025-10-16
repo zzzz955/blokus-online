@@ -283,12 +283,12 @@ export default function MarkdownEditor({
   return (
     <div className={`markdown-editor ${className}`}>
       {/* 툴바 */}
-      <div className="markdown-toolbar border border-gray-300 rounded-t-lg bg-gray-50 p-2 flex flex-wrap gap-1">
-        <div className="flex gap-1 border-r border-gray-300 pr-2">
+      <div className="markdown-toolbar border border-gray-300 dark:border-gray-700 rounded-t-lg bg-gray-50 dark:bg-gray-800 p-2 flex flex-wrap gap-1">
+        <div className="flex gap-1 border-r border-gray-300 dark:border-gray-600 pr-2">
           <button
             type="button"
             onClick={() => handleHeading(1)}
-            className="p-2 hover:bg-gray-200 rounded text-sm font-semibold text-gray-700"
+            className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-sm font-semibold text-gray-700 dark:text-gray-300"
             title="제목 1"
             disabled={disabled}
           >
@@ -297,7 +297,7 @@ export default function MarkdownEditor({
           <button
             type="button"
             onClick={() => handleHeading(2)}
-            className="p-2 hover:bg-gray-200 rounded text-sm font-semibold text-gray-700"
+            className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-sm font-semibold text-gray-700 dark:text-gray-300"
             title="제목 2"
             disabled={disabled}
           >
@@ -306,7 +306,7 @@ export default function MarkdownEditor({
           <button
             type="button"
             onClick={() => handleHeading(3)}
-            className="p-2 hover:bg-gray-200 rounded text-sm font-semibold text-gray-700"
+            className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-sm font-semibold text-gray-700 dark:text-gray-300"
             title="제목 3"
             disabled={disabled}
           >
@@ -314,11 +314,11 @@ export default function MarkdownEditor({
           </button>
         </div>
 
-        <div className="flex gap-1 border-r border-gray-300 pr-2">
+        <div className="flex gap-1 border-r border-gray-300 dark:border-gray-600 pr-2">
           <button
             type="button"
             onClick={handleBold}
-            className="p-2 hover:bg-gray-200 rounded font-bold text-gray-700"
+            className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded font-bold text-gray-700 dark:text-gray-300"
             title="굵게 (Ctrl+B)"
             disabled={disabled}
           >
@@ -327,7 +327,7 @@ export default function MarkdownEditor({
           <button
             type="button"
             onClick={handleItalic}
-            className="p-2 hover:bg-gray-200 rounded italic text-gray-700"
+            className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded italic text-gray-700 dark:text-gray-300"
             title="기울임 (Ctrl+I)"
             disabled={disabled}
           >
@@ -336,7 +336,7 @@ export default function MarkdownEditor({
           <button
             type="button"
             onClick={handleStrikethrough}
-            className="p-2 hover:bg-gray-200 rounded line-through text-gray-700"
+            className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded line-through text-gray-700 dark:text-gray-300"
             title="취소선"
             disabled={disabled}
           >
@@ -344,11 +344,11 @@ export default function MarkdownEditor({
           </button>
         </div>
 
-        <div className="flex gap-1 border-r border-gray-300 pr-2">
+        <div className="flex gap-1 border-r border-gray-300 dark:border-gray-600 pr-2">
           <button
             type="button"
             onClick={handleList}
-            className="p-2 hover:bg-gray-200 rounded text-gray-700"
+            className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-700 dark:text-gray-300"
             title="목록"
             disabled={disabled}
           >
@@ -357,7 +357,7 @@ export default function MarkdownEditor({
           <button
             type="button"
             onClick={handleOrderedList}
-            className="p-2 hover:bg-gray-200 rounded text-gray-700"
+            className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-700 dark:text-gray-300"
             title="순서 목록"
             disabled={disabled}
           >
@@ -366,7 +366,7 @@ export default function MarkdownEditor({
           <button
             type="button"
             onClick={handleQuote}
-            className="p-2 hover:bg-gray-200 rounded text-gray-700"
+            className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-700 dark:text-gray-300"
             title="인용"
             disabled={disabled}
           >
@@ -374,11 +374,11 @@ export default function MarkdownEditor({
           </button>
         </div>
 
-        <div className="flex gap-1 border-r border-gray-300 pr-2">
+        <div className="flex gap-1 border-r border-gray-300 dark:border-gray-600 pr-2">
           <button
             type="button"
             onClick={handleCode}
-            className="p-2 hover:bg-gray-200 rounded text-xs font-mono text-gray-700"
+            className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-xs font-mono text-gray-700 dark:text-gray-300"
             title="인라인 코드"
             disabled={disabled}
           >
@@ -387,7 +387,7 @@ export default function MarkdownEditor({
           <button
             type="button"
             onClick={handleCodeBlock}
-            className="p-2 hover:bg-gray-200 rounded text-xs font-mono text-gray-700"
+            className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-xs font-mono text-gray-700 dark:text-gray-300"
             title="코드 블록"
             disabled={disabled}
           >
@@ -395,11 +395,11 @@ export default function MarkdownEditor({
           </button>
         </div>
 
-        <div className="flex gap-1 border-r border-gray-300 pr-2">
+        <div className="flex gap-1 border-r border-gray-300 dark:border-gray-600 pr-2">
           <button
             type="button"
             onClick={handleLink}
-            className="p-2 hover:bg-gray-200 rounded text-gray-700"
+            className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-700 dark:text-gray-300"
             title="링크 (Ctrl+K)"
             disabled={disabled}
           >
@@ -409,7 +409,7 @@ export default function MarkdownEditor({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="p-2 hover:bg-gray-200 rounded text-gray-700"
+              className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-700 dark:text-gray-300"
               title="이미지 업로드"
               disabled={disabled || isUploading}
             >
@@ -418,11 +418,11 @@ export default function MarkdownEditor({
           )}
         </div>
 
-        <div className="flex gap-1 border-r border-gray-300 pr-2">
+        <div className="flex gap-1 border-r border-gray-300 dark:border-gray-600 pr-2">
           <button
             type="button"
             onClick={handleHr}
-            className="p-2 hover:bg-gray-200 rounded text-gray-700"
+            className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-700 dark:text-gray-300"
             title="구분선"
             disabled={disabled}
           >
@@ -432,7 +432,7 @@ export default function MarkdownEditor({
             <button
               type="button"
               onClick={() => setShowTemplates(!showTemplates)}
-              className="p-2 hover:bg-gray-200 rounded text-gray-700"
+              className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-700 dark:text-gray-300"
               title="템플릿"
               disabled={disabled}
             >
@@ -443,12 +443,12 @@ export default function MarkdownEditor({
 
         {/* 프리뷰 모드 전환 */}
         {showPreview && (
-          <div className="ml-auto flex gap-1 border-l border-gray-300 pl-2">
+          <div className="ml-auto flex gap-1 border-l border-gray-300 dark:border-gray-600 pl-2">
             <button
               type="button"
               onClick={() => setPreviewMode('edit')}
               className={`px-3 py-1 rounded text-sm ${
-                previewMode === 'edit' ? 'bg-blue-600 text-white' : 'hover:bg-gray-200 text-gray-700'
+                previewMode === 'edit' ? 'bg-blue-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
               }`}
               disabled={disabled}
             >
@@ -458,7 +458,7 @@ export default function MarkdownEditor({
               type="button"
               onClick={() => setPreviewMode('split')}
               className={`px-3 py-1 rounded text-sm ${
-                previewMode === 'split' ? 'bg-blue-600 text-white' : 'hover:bg-gray-200 text-gray-700'
+                previewMode === 'split' ? 'bg-blue-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
               }`}
               disabled={disabled}
             >
@@ -468,7 +468,7 @@ export default function MarkdownEditor({
               type="button"
               onClick={() => setPreviewMode('preview')}
               className={`px-3 py-1 rounded text-sm ${
-                previewMode === 'preview' ? 'bg-blue-600 text-white' : 'hover:bg-gray-200 text-gray-700'
+                previewMode === 'preview' ? 'bg-blue-600 text-white' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
               }`}
               disabled={disabled}
             >
@@ -481,13 +481,13 @@ export default function MarkdownEditor({
       {/* 템플릿 팝업 */}
       {showTemplates && (
         <div className="relative z-10 mb-2">
-          <div className="absolute top-0 left-0 right-0 bg-white border border-gray-300 rounded-lg shadow-lg p-4">
+          <div className="absolute top-0 left-0 right-0 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4">
             <div className="flex justify-between items-center mb-3">
-              <h4 className="font-medium text-gray-900">템플릿 선택</h4>
+              <h4 className="font-medium text-gray-900 dark:text-gray-100">템플릿 선택</h4>
               <button
                 type="button"
                 onClick={() => setShowTemplates(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
               >
                 ✕
               </button>
@@ -498,11 +498,11 @@ export default function MarkdownEditor({
                   key={template.name}
                   type="button"
                   onClick={() => insertTemplate(template.content)}
-                  className="flex items-center gap-2 p-3 border border-gray-200 rounded hover:bg-gray-50 hover:border-blue-500 transition-colors text-left"
+                  className="flex items-center gap-2 p-3 border border-gray-200 dark:border-gray-700 rounded hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-blue-500 dark:hover:border-blue-500 transition-colors text-left"
                   disabled={disabled}
                 >
                   <span className="text-2xl">{template.icon}</span>
-                  <span className="text-sm font-medium text-gray-700">{template.name}</span>
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{template.name}</span>
                 </button>
               ))}
             </div>
@@ -522,8 +522,8 @@ export default function MarkdownEditor({
 
       {/* 에디터 영역 */}
       <div
-        className={`markdown-content border border-t-0 border-gray-300 rounded-b-lg overflow-hidden relative ${
-          isDragging ? 'border-blue-500 bg-blue-50' : ''
+        className={`markdown-content border border-t-0 border-gray-300 dark:border-gray-700 rounded-b-lg overflow-hidden relative ${
+          isDragging ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : ''
         }`}
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
@@ -532,20 +532,20 @@ export default function MarkdownEditor({
       >
         {/* 드래그 오버레이 */}
         {isDragging && (
-          <div className="absolute inset-0 bg-blue-500 bg-opacity-10 flex items-center justify-center z-10 pointer-events-none">
-            <div className="bg-white rounded-lg p-4 shadow-lg">
-              <p className="text-blue-600 font-medium">이미지를 여기에 드롭하세요</p>
+          <div className="absolute inset-0 bg-blue-500 bg-opacity-10 dark:bg-blue-500/20 flex items-center justify-center z-10 pointer-events-none">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-lg border border-gray-300 dark:border-gray-700">
+              <p className="text-blue-600 dark:text-blue-400 font-medium">이미지를 여기에 드롭하세요</p>
             </div>
           </div>
         )}
 
-        <div className={`flex ${previewMode === 'split' ? 'divide-x divide-gray-300' : ''}`}>
+        <div className={`flex ${previewMode === 'split' ? 'divide-x divide-gray-300 dark:divide-gray-700' : ''}`}>
           {/* 편집 영역 */}
           {(previewMode === 'edit' || previewMode === 'split') && (
             <div className={previewMode === 'split' ? 'w-1/2' : 'w-full'}>
               <textarea
                 ref={textareaRef}
-                className="markdown-textarea w-full p-4 font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+                className="markdown-textarea w-full p-4 font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 placeholder:text-gray-400"
                 style={{ height: `${height}px` }}
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
@@ -598,10 +598,10 @@ export default function MarkdownEditor({
       </div>
 
       {/* 마크다운 가이드 & 상태 */}
-      <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+      <div className="mt-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
         <details>
-          <summary className="cursor-pointer hover:text-gray-700">마크다운 문법 가이드</summary>
-          <div className="mt-2 space-y-1 pl-4">
+          <summary className="cursor-pointer hover:text-gray-700 dark:hover:text-gray-300">마크다운 문법 가이드</summary>
+          <div className="mt-2 space-y-1 pl-4 text-gray-600 dark:text-gray-400">
             <p><code># 제목</code> - 제목 (H1~H6)</p>
             <p><code>**굵게**</code> - 굵은 텍스트</p>
             <p><code>*기울임*</code> - 기울임 텍스트</p>
@@ -618,40 +618,51 @@ export default function MarkdownEditor({
 
         <div className="flex items-center gap-3">
           {enableImageUpload && (
-            <span className="text-gray-400">💡 이미지를 드래그하거나 붙여넣기하세요</span>
+            <span className="text-gray-400 dark:text-gray-500">💡 이미지를 드래그하거나 붙여넣기하세요</span>
           )}
           {enableAutoSave && autoSaveKey && (
-            <span className="text-green-600">✓ 자동 저장 활성화</span>
+            <span className="text-green-600 dark:text-green-400">✓ 자동 저장 활성화</span>
           )}
         </div>
       </div>
 
       {/* 스타일 */}
       <style jsx global>{`
+        .markdown-preview {
+          color: #1f2937;
+        }
         .markdown-preview h1 {
           font-size: 2em;
           font-weight: bold;
           margin-top: 0.67em;
           margin-bottom: 0.67em;
+          color: #111827;
         }
         .markdown-preview h2 {
           font-size: 1.5em;
           font-weight: bold;
           margin-top: 0.83em;
           margin-bottom: 0.83em;
+          color: #111827;
         }
         .markdown-preview h3 {
           font-size: 1.17em;
           font-weight: bold;
           margin-top: 1em;
           margin-bottom: 1em;
+          color: #111827;
         }
         .markdown-preview p {
           margin: 1em 0;
+          color: #374151;
         }
         .markdown-preview ul, .markdown-preview ol {
           margin: 1em 0;
           padding-left: 2em;
+          color: #374151;
+        }
+        .markdown-preview li {
+          color: #374151;
         }
         .markdown-preview blockquote {
           border-left: 4px solid #e5e7eb;
@@ -665,6 +676,7 @@ export default function MarkdownEditor({
           border-radius: 3px;
           font-family: monospace;
           font-size: 0.9em;
+          color: #1f2937;
         }
         .markdown-preview pre {
           background-color: #1f2937;
@@ -695,16 +707,25 @@ export default function MarkdownEditor({
           border-collapse: collapse;
           width: 100%;
           margin: 1em 0;
+          color: #374151;
         }
         .markdown-preview th,
         .markdown-preview td {
           border: 1px solid #e5e7eb;
           padding: 0.5em;
           text-align: left;
+          color: #374151;
         }
         .markdown-preview th {
           background-color: #f3f4f6;
           font-weight: bold;
+          color: #111827;
+        }
+        .markdown-preview strong {
+          color: #111827;
+        }
+        .markdown-preview em {
+          color: #374151;
         }
       `}</style>
     </div>

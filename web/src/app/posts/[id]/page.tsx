@@ -4,8 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
-import ReactMarkdown from 'react-markdown';
-import HtmlRenderer from '@/components/ui/HtmlRenderer';
+import ContentRenderer from '@/components/ui/ContentRenderer';
 import { Post, PostCategory } from '@/types';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
@@ -248,7 +247,7 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
 
         {/* 게시글 내용 */}
         <Card className="p-6">
-          <HtmlRenderer 
+          <ContentRenderer
             content={post.content}
             className="prose-custom"
           />

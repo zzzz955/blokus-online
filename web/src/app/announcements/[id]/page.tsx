@@ -9,8 +9,7 @@ import { ArrowLeft, Calendar, User, Pin, Loader2 } from 'lucide-react';
 import { formatDateTime } from '@/utils/format';
 import { api } from '@/utils/api';
 import { Announcement } from '@/types';
-import ReactMarkdown from 'react-markdown';
-import HtmlRenderer from '@/components/ui/HtmlRenderer';
+import ContentRenderer from '@/components/ui/ContentRenderer';
 import CommentSection from '@/components/comments/CommentSection';
 
 interface AnnouncementDetailPageProps {
@@ -134,7 +133,7 @@ export default function AnnouncementDetailPage({ params }: AnnouncementDetailPag
 
               {/* 내용 */}
               <div className="prose-custom">
-                <HtmlRenderer 
+                <ContentRenderer
                   content={announcement.content}
                   className="announcement-content"
                 />

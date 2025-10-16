@@ -10,8 +10,7 @@ import { ArrowLeft, Calendar, Tag, Download, Loader2 } from 'lucide-react';
 import { formatDate } from '@/utils/format';
 import { api } from '@/utils/api';
 import { PatchNote, PaginatedResponse } from '@/types';
-import ReactMarkdown from 'react-markdown';
-import HtmlRenderer from '@/components/ui/HtmlRenderer';
+import ContentRenderer from '@/components/ui/ContentRenderer';
 import CommentSection from '@/components/comments/CommentSection';
 
 interface PatchNoteDetailPageProps {
@@ -143,7 +142,7 @@ export default function PatchNoteDetailPage({ params }: PatchNoteDetailPageProps
 
               {/* 내용 */}
               <div className="prose-custom">
-                <HtmlRenderer 
+                <ContentRenderer
                   content={patchNote.content}
                   className="patch-note-content"
                 />
