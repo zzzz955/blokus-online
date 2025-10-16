@@ -40,30 +40,30 @@ interface SystemRequirements {
 const SYSTEM_REQUIREMENTS: Record<PlatformType, { minimum: SystemRequirements; recommended: SystemRequirements }> = {
   desktop: {
     minimum: {
-      os: "Windows 7 64bit 이상",
+      os: "Windows 7 64-bit 이상",
       memory: "512MB RAM",
-      storage: "50MB 이상",
+      storage: "100MB 이상",
       network: "인터넷 연결 필수"
     },
     recommended: {
-      os: "Windows 10 64bit",
+      os: "Windows 10/11 64-bit",
       memory: "1GB RAM",
-      storage: "100MB 이상",
-      network: "안정적인 인터넷"
+      storage: "200MB 이상",
+      network: "안정적인 인터넷 연결"
     }
   },
   mobile: {
     minimum: {
-      os: "Android 5.0 (API 21) 이상",
+      os: "Android 8.0 (API 26) 이상",
       memory: "2GB RAM",
-      storage: "100MB 이상",
+      storage: "150MB 이상",
       network: "인터넷 연결 필수"
     },
     recommended: {
-      os: "Android 8.0 이상",
+      os: "Android 10.0 이상",
       memory: "4GB RAM",
-      storage: "200MB 이상",
-      network: "Wi-Fi 권장"
+      storage: "300MB 이상",
+      network: "Wi-Fi 연결 권장"
     }
   }
 };
@@ -103,6 +103,7 @@ export default function DownloadPage() {
     mobile: false
   });
   const [loading, setLoading] = useState(true);
+  const [showAllChangelog, setShowAllChangelog] = useState(false);
 
   useEffect(() => {
     // 사용자 플랫폼 자동 감지하여 기본 선택
@@ -290,19 +291,45 @@ export default function DownloadPage() {
           </div>
 
           {/* 변경사항 */}
-          {releaseInfo?.changelog && (
+          {releaseInfo?.changelog && releaseInfo.changelog.length > 0 && (
             <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 mb-8">
               <h3 className="text-2xl font-bold text-white mb-6">
                 최신 업데이트 내용
               </h3>
               <ul className="space-y-2">
-                {releaseInfo.changelog.map((change, index) => (
-                  <li key={index} className="text-blue-200 flex items-start">
-                    <span className="text-blue-400 mr-2">•</span>
-                    {change}
-                  </li>
-                ))}
+                {(showAllChangelog ? releaseInfo.changelog : releaseInfo.changelog.slice(0, 5)).map((change, index) => {
+                  // **텍스트** 패턴을 <strong>태그로 변환
+                  const formattedChange = change.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+                  return (
+                    <li key={index} className="text-blue-200 flex items-start">
+                      <span className="text-blue-400 mr-2">•</span>
+                      <span dangerouslySetInnerHTML={{ __html: formattedChange }} />
+                    </li>
+                  );
+                })}
               </ul>
+
+              {releaseInfo.changelog.length > 5 && (
+                <div className="mt-4 text-center">
+                  <button
+                    onClick={() => setShowAllChangelog(!showAllChangelog)}
+                    className="text-blue-300 hover:text-blue-100 text-sm font-medium transition-colors duration-200 flex items-center justify-center mx-auto gap-2"
+                  >
+                    {showAllChangelog ? (
+                      <>
+                        <span>접기</span>
+                        <span className="text-lg">▲</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>더보기 ({releaseInfo.changelog.length - 5}개 항목)</span>
+                        <span className="text-lg">▼</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
