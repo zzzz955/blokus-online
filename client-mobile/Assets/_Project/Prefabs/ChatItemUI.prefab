@@ -52,8 +52,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   chatMessageText: {fileID: 5544656089223506739}
   contentSizeFitter: {fileID: 0}
-  myMessageColor: {r: 0.33490568, g: 0.42847103, b: 1, a: 1}
-  otherMessageColor: {r: 0.73482937, g: 0.2971698, b: 1, a: 1}
+  myMessageColor: {r: 0.0339154, g: 1, b: 0, a: 1}
+  otherMessageColor: {r: 1, g: 1, b: 1, a: 1}
   systemMessageColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
 --- !u!114 &6036583535022472650
 MonoBehaviour:
@@ -69,7 +69,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_IgnoreLayout: 0
   m_MinWidth: -1
-  m_MinHeight: 40
+  m_MinHeight: 50
   m_PreferredWidth: -1
   m_PreferredHeight: -1
   m_FlexibleWidth: -1
