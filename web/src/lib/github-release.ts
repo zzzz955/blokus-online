@@ -1,5 +1,85 @@
 // GitHub Release API 공통 유틸리티
 import { env } from './env';
+
+/**
+ * 릴리즈 노트에서 실제 변경사항만 추출
+ * - 변경사항 섹션 또는 이모지로 시작하는 항목만 포함
+ * - 메타 정보 섹션 제외 (기능 설명, 다운로드, 설치, 시스템 요구사항, 알려진 이슈, 커뮤니티, 감사 등)
+ */
+function extractChangelog(body: string): string[] {
+  const lines = body.split('\n').map(line => line.trim());
+  const changelog: string[] = [];
+
+  // 변경사항으로 인정할 섹션 헤더 패턴
+  const changelogSectionPatterns = [
+    /^#{1,6}\s*(변경|변경사항|업데이트|update|change|what'?s new|새로운 기능|new feature)/i,
+    /^#{1,6}\s*(개선|improvement|enhancement)/i,
+    /^#{1,6}\s*(수정|fix|bug)/i,
+  ];
+
+  // 제외할 섹션 헤더 패턴
+  const excludeSectionPatterns = [
+    /^#{1,6}\s*(소개|개요|overview|about)/i,
+    /^#{1,6}\s*(주요 기능|key feature|feature|기능)/i,
+    /^#{1,6}\s*(플랫폼|platform)/i,
+    /^#{1,6}\s*(시작|getting start|how to|사용법)/i,
+    /^#{1,6}\s*(다운로드|download)/i,
+    /^#{1,6}\s*(설치|installation|install)/i,
+    /^#{1,6}\s*(시스템 요구사항|system requirements|requirements)/i,
+    /^#{1,6}\s*(알려진 이슈|known issues|issues)/i,
+    /^#{1,6}\s*(커뮤니티|community|support|지원)/i,
+    /^#{1,6}\s*(문의|contact)/i,
+    /^#{1,6}\s*(개발 현황|development|roadmap|진행|status)/i,
+    /^#{1,6}\s*(감사|thanks|acknowledgments)/i,
+    /^#{1,6}\s*(기여|contributors|contribution)/i,
+    /^#{1,6}\s*(라이선스|license)/i,
+    /^#{1,6}\s*(링크|link)/i,
+  ];
+
+  let inChangelogSection = false;
+  let inExcludedSection = false;
+
+  for (const line of lines) {
+    // 헤더 라인 체크 (## 형태)
+    if (line.match(/^#{1,6}\s+/)) {
+      // 변경사항 섹션인지 확인
+      const isChangelogSection = changelogSectionPatterns.some(pattern => pattern.test(line));
+      // 제외할 섹션인지 확인
+      const isExcludedSection = excludeSectionPatterns.some(pattern => pattern.test(line));
+
+      if (isChangelogSection) {
+        inChangelogSection = true;
+        inExcludedSection = false;
+      } else if (isExcludedSection) {
+        inChangelogSection = false;
+        inExcludedSection = true;
+      } else {
+        // 기타 헤더는 변경사항으로 간주하지 않음
+        inChangelogSection = false;
+        inExcludedSection = false;
+      }
+      continue;
+    }
+
+    // 제외 섹션 내부는 스킵
+    if (inExcludedSection) {
+      continue;
+    }
+
+    // 변경사항 라인 추출 (- 로 시작)
+    if (line.startsWith('- ')) {
+      const content = line.slice(2).trim();
+
+      // 변경사항 섹션 내부이거나, 이모지로 시작하는 항목만 포함
+      if (inChangelogSection || /^[\u{1F300}-\u{1F9FF}]/u.test(content)) {
+        changelog.push(content);
+      }
+    }
+  }
+
+  return changelog;
+}
+
 export interface GitHubRelease {
   tag_name: string;
   name: string;
@@ -85,15 +165,12 @@ export async function fetchGitHubRelease(version?: string): Promise<GitHubReleas
  */
 export function transformToClientVersion(release: GitHubRelease): ClientVersion {
   const version = release.tag_name.startsWith('v') ? release.tag_name.slice(1) : release.tag_name;
-  const downloadAsset = release.assets?.find(asset => 
+  const downloadAsset = release.assets?.find(asset =>
     asset.name.includes('BlobloClient') && asset.name.endsWith('.zip')
   );
-  
-  const bodyLines: string[] = (release.body || '').split('\n');
-  const changelog = bodyLines
-    .map(line => line.trim())
-    .filter(line => line.startsWith('- '))
-    .map(line => line.slice(2));
+
+  // 변경사항 추출 (메타 섹션 제외)
+  const changelog = extractChangelog(release.body || '');
 
   return {
     version,
@@ -197,13 +274,13 @@ function transformAssetToPlatform(asset: GitHubRelease['assets'][0], platform: P
  */
 export function transformToMultiPlatformRelease(release: GitHubRelease): MultiPlatformRelease {
   const version = release.tag_name.startsWith('v') ? release.tag_name.slice(1) : release.tag_name;
-  
+
   // 데스크톱 클라이언트 에셋 찾기 (BlobloClient-Desktop 또는 BlobloClient.zip)
-  const desktopAsset = release.assets?.find(asset => 
-    (asset.name.includes('Desktop') || asset.name.includes('BlobloClient')) && 
+  const desktopAsset = release.assets?.find(asset =>
+    (asset.name.includes('Desktop') || asset.name.includes('BlobloClient')) &&
     asset.name.endsWith('.zip')
   );
-  
+
   // 모바일 클라이언트 에셋 찾기 (bloblo.apk 또는 BlobloClient.apk 또는 Mobile 포함 .apk)
   const mobileAsset = release.assets?.find(asset =>
     asset.name.endsWith('.apk') && (
@@ -212,13 +289,9 @@ export function transformToMultiPlatformRelease(release: GitHubRelease): MultiPl
       asset.name.includes('BlobloClient')
     )
   );
-  
-  // 변경사항 파싱
-  const bodyLines: string[] = (release.body || '').split('\n');
-  const changelog = bodyLines
-    .map(line => line.trim())
-    .filter(line => line.startsWith('- '))
-    .map(line => line.slice(2));
+
+  // 변경사항 추출 (메타 섹션 제외)
+  const changelog = extractChangelog(release.body || '');
 
   return {
     version,
