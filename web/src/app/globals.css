@@ -95,43 +95,71 @@
   .prose-custom {
     @apply text-white text-lg max-w-none;
   }
-  .prose-custom ul
-  .prose-custom ol
-  .prose-custom li
-  .prose-custom span
-  .prose-custom h4
-  .prose-custom h5
-  .prose-custom h6
-  .prose-custom h1, .prose-custom h2, .prose-custom h3 {
-    @apply text-white font-bold mb-4;
+
+  /* 특정 요소만 흰색 텍스트 적용 (링크와 스타일 요소 제외) */
+  .prose-custom ul,
+  .prose-custom ol,
+  .prose-custom li {
+    color: white !important;
   }
+
+  .prose-custom h1,
+  .prose-custom h2,
+  .prose-custom h3,
+  .prose-custom h4,
+  .prose-custom h5,
+  .prose-custom h6 {
+    @apply text-white font-bold mb-4;
+    color: white !important;
+  }
+
   .prose-custom p {
     @apply text-white mb-4;
+    color: white !important;
   }
+
+  /* 링크는 primary 색상 유지 */
   .prose-custom a {
-    @apply text-white text-primary-600 hover:text-primary-700;
+    @apply text-primary-400 hover:text-primary-300;
+    color: rgb(96 165 250) !important;
   }
+
+  .prose-custom a:hover {
+    color: rgb(147 197 253) !important;
+  }
+
+  /* strong은 더 밝은 흰색으로 강조 */
   .prose-custom strong {
-    @apply text-white font-semibold;
+    @apply font-semibold;
+    color: rgb(243 244 246) !important;
+  }
+
+  /* em은 약간 다른 색조로 구분 */
+  .prose-custom em {
+    @apply italic;
+    color: rgb(229 231 235) !important;
+  }
+
+  /* 인라인 코드는 다른 배경색과 텍스트 색상 */
+  .prose-custom code {
+    background-color: rgb(31 41 55);
+    color: rgb(251 191 36) !important;
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.25rem;
+    font-size: 0.875em;
+  }
+
+  /* 코드 블록은 별도 스타일 */
+  .prose-custom pre code {
+    background-color: transparent;
+    color: inherit !important;
+    padding: 0;
   }
 }
 
 /* Dark theme styles */
 .dark .hero-gradient {
   background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
-}
-
-.dark .prose-custom h1, .dark .prose-custom h2, .dark .prose-custom h3 {
-  @apply text-gray-100;
-}
-.dark .prose-custom p {
-  @apply text-gray-300;
-}
-.dark .prose-custom a {
-  @apply text-primary-400 hover:text-primary-300;
-}
-.dark .prose-custom strong {
-  @apply text-gray-100;
 }
 
 /* Custom scrollbar */
