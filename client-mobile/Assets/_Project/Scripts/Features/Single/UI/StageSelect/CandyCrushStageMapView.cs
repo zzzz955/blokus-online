@@ -110,6 +110,8 @@ namespace Features.Single.UI.StageSelect
 
         protected void OnEnable()
         {
+            Debug.Log("[CandyCrushStageMapView] OnEnable 호출됨");
+
             //  추가: Scene 상태 확인 - MainScene 비활성화 상태에서는 프로필 업데이트 스킵
             if (!IsMainSceneActiveOrCurrent())
             {
@@ -132,6 +134,18 @@ namespace Features.Single.UI.StageSelect
             }
             else
             {
+            }
+
+            //  추가: OnEnable에서도 스크롤 위치 조정 (SetActive로 활성화된 경우 대응)
+            // 초기화가 완료된 경우에만 실행
+            if (isInitialized && stageFeed != null && scrollRect != null)
+            {
+                Debug.Log("[CandyCrushStageMapView] OnEnable - 초기화 완료됨, 스크롤 위치 조정 시작");
+                StartSafe(DelayedScrollToStage());
+            }
+            else
+            {
+                Debug.Log($"[CandyCrushStageMapView] OnEnable - 초기화 대기 중 (isInitialized={isInitialized}, stageFeed={stageFeed != null}, scrollRect={scrollRect != null})");
             }
         }
 
@@ -243,6 +257,10 @@ namespace Features.Single.UI.StageSelect
             FindOrCreateStageInfoModal();
 
             isInitialized = true;
+
+            //  추가: 초기화 완료 후 스크롤 위치 조정 (OnEnable보다 늦게 초기화되는 경우 대응)
+            Debug.Log("[CandyCrushStageMapView] InitializeStageMap 완료 - 스크롤 위치 조정 예약");
+            StartSafe(DelayedScrollToStage());
         }
 
         /// <summary>
@@ -2099,10 +2117,30 @@ namespace Features.Single.UI.StageSelect
         /// </summary>
         public void ScrollToStage(int stageNumber)
         {
-            if (!stageFeed.IsValidStage(stageNumber) || scrollRect == null) return;
+            Debug.Log($"[CandyCrushStageMapView] ScrollToStage 호출됨: stageNumber={stageNumber}");
+
+            if (stageFeed == null)
+            {
+                Debug.LogError($"[CandyCrushStageMapView] stageFeed가 null - ScrollToStage({stageNumber}) 중단");
+                return;
+            }
+
+            if (!stageFeed.IsValidStage(stageNumber))
+            {
+                Debug.LogError($"[CandyCrushStageMapView] 유효하지 않은 스테이지 - ScrollToStage({stageNumber}) 중단");
+                return;
+            }
+
+            if (scrollRect == null)
+            {
+                Debug.LogError($"[CandyCrushStageMapView] scrollRect가 null - ScrollToStage({stageNumber}) 중단");
+                return;
+            }
 
             //  추가: 데이터 로딩 실패시 스크롤 건너뛰기
             int totalStages = stageFeed.GetTotalStages();
+            Debug.Log($"[CandyCrushStageMapView] ScrollToStage - totalStages={totalStages}");
+
             if (totalStages == 0)
             {
                 Debug.LogError($"[CandyCrushStageMapView] 스테이지 데이터 없음 - ScrollToStage({stageNumber}) 건너뛰기");
@@ -2111,12 +2149,15 @@ namespace Features.Single.UI.StageSelect
 
             Vector2 stagePosition = stageFeed.GetStagePosition(stageNumber);
             float totalHeight = stageFeed.GetTotalHeight();
+            Debug.Log($"[CandyCrushStageMapView] ScrollToStage - stagePosition={stagePosition}, totalHeight={totalHeight}");
 
             // 정규화된 스크롤 위치 계산 (0-1)
             float normalizedY = 1f - (Mathf.Abs(stagePosition.y) / totalHeight);
             normalizedY = Mathf.Clamp01(normalizedY);
+            Debug.Log($"[CandyCrushStageMapView] ScrollToStage - 계산된 normalizedY={normalizedY}");
 
             // 부드러운 스크롤 애니메이션
+            Debug.Log($"[CandyCrushStageMapView] ScrollToStage - SmoothScrollTo 시작");
             StartSafe(SmoothScrollTo(new Vector2(scrollRect.normalizedPosition.x, normalizedY)));
         }
 
@@ -2239,15 +2280,21 @@ namespace Features.Single.UI.StageSelect
         /// </summary>
         private System.Collections.IEnumerator DelayedScrollToStage()
         {
+            Debug.Log("[CandyCrushStageMapView] ========== DelayedScrollToStage 시작 ==========");
+
             // Layout 시스템과 뷰포트 업데이트 완료 대기
             yield return new WaitForSeconds(0.1f);
 
+            Debug.Log("[CandyCrushStageMapView] 0.1초 대기 완료, 스크롤 계산 시작");
+
             //  수정: Features.Single.Core.UserDataCache 기반으로 도전해야 할 스테이지 계산
             int challengeStage = 1;
+            int maxStageCompleted = 0; //  추가: fallback 로직에서 사용하기 위해 스코프 확장
+
             if (Features.Single.Core.UserDataCache.Instance != null && Features.Single.Core.UserDataCache.Instance.IsLoggedIn())
             {
                 // Features.Single.Core.UserDataCache에서 직접 max_stage_completed 사용
-                int maxStageCompleted = UserDataCache.Instance.MaxStageCompleted;
+                maxStageCompleted = UserDataCache.Instance.MaxStageCompleted;
                 int maxUnlocked = maxStageCompleted + 1; // 다음 스테이지까지 언락됨
 
                 // 현재 언락된 가장 높은 스테이지가 도전 스테이지
@@ -2267,19 +2314,26 @@ namespace Features.Single.UI.StageSelect
                 Debug.Log($"[CandyCrushStageMapView] progressManager fallback: 최대 언락 스테이지={maxUnlocked}, 도전 스테이지={challengeStage}");
             }
 
-            Debug.Log($"도전 스테이지 {challengeStage}를 중앙으로 스크롤 시도");
-
-            Debug.Log($"스크롤 조정 시작: 도전 스테이지 = {challengeStage}");
-
-            // 항상 맨 위로 스크롤 (1번 스테이지를 확실히 보이도록)
-            if (scrollRect != null)
+            //  추가: 모든 스테이지 클리어 시 fallback 처리
+            int totalStages = GetActualTotalStages();
+            if (challengeStage > totalStages)
             {
-                Vector2 targetPosition = new Vector2(0.5f, 1f); // 맨 위 
-                scrollRect.normalizedPosition = targetPosition;
-                Debug.Log($"스크롤 위치를 맨 위로 설정: {targetPosition}");
+                // 모든 스테이지를 클리어한 경우, 마지막으로 클리어한 스테이지로 스크롤
+                challengeStage = Mathf.Max(1, maxStageCompleted);
+                Debug.Log($"[CandyCrushStageMapView] 모든 스테이지 클리어됨 - fallback: challengeStage={challengeStage}");
+            }
+
+            Debug.Log($"[CandyCrushStageMapView] 스크롤 조정 시작: 도전 스테이지 = {challengeStage}");
+
+            //  수정: challengeStage로 스크롤 (기존 ScrollToStage 메서드 활용)
+            if (scrollRect != null && stageFeed != null)
+            {
+                // ScrollToStage 메서드를 사용하여 부드러운 스크롤 애니메이션 적용
+                ScrollToStage(challengeStage);
+                Debug.Log($"[CandyCrushStageMapView] 스테이지 {challengeStage}(으)로 스크롤 실행");
 
                 // 스크롤 후 뷰포트 정보 로그
-                yield return new WaitForSeconds(0.1f);
+                yield return new WaitForSeconds(0.6f); // ScrollToStage 애니메이션 시간(0.5초) + 여유
                 LogScrollRectInfo();
             }
         }
