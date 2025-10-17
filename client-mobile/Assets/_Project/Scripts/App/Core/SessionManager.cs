@@ -539,6 +539,36 @@ namespace App.Core
         }
 
         /// <summary>
+        /// 로그인 화면으로 이동 (GPGS v2 권장: 로그아웃 대신 사용)
+        /// RefreshToken만 삭제하고 GPGS 세션은 유지
+        /// </summary>
+        public void GoToLoginScreen()
+        {
+            if (debugMode)
+                Debug.Log("[SessionManager] 로그인 화면으로 이동");
+
+            // RefreshToken만 삭제 (GPGS 세션은 유지)
+            App.Security.SecureStorage.DeleteKey(App.Security.TokenKeys.Refresh);
+            App.Security.SecureStorage.DeleteKey("blokus_user_id");
+            App.Security.SecureStorage.DeleteKey("blokus_username");
+
+            // 메모리 세션 클리어
+            ClearMemorySession();
+
+            // 저장된 세션 데이터 삭제 (6시간 자동 로그인 방지)
+            ClearSavedSession();
+
+            // SingleCore 캐시 정리 (UserDataCache, StageProgress 등)
+            ClearSingleCoreCache();
+
+            // 로그인 상태 변경 이벤트
+            OnLoginStateChanged?.Invoke(false);
+
+            if (debugMode)
+                Debug.Log("[SessionManager] 로그인 화면으로 이동 완료 (GPGS 세션 유지)");
+        }
+
+        /// <summary>
         /// 수동 로그아웃 (ModeSelectPanel에서 호출)
         /// 모든 인증 방식(ID/PW, GooglePlayGames)에 대해 통합 로그아웃 수행
         /// </summary>

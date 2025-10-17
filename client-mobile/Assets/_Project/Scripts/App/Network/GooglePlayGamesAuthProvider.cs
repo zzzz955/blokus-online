@@ -114,7 +114,7 @@ namespace App.Network
 
         /// <summary>
         /// Interactive sign-in: 사용자가 명시적으로 버튼을 클릭했을 때 OPEN_ID 동의 UI 표시
-        /// CRITICAL FIX: ManuallyAuthenticate 제거 - 이미 인증된 상태에서 UI 세션 종료 후 스코프 요청 시 블로킹 방지
+        /// CRITICAL FIX: 계정 선택 UI 표시로 계정 전환 지원
         /// </summary>
         public async Task<AuthResult> AuthenticateAsync()
         {
@@ -124,7 +124,7 @@ namespace App.Network
             try
             {
                 AndroidLogger.LogAuth("=== GooglePlayGamesAuthProvider.AuthenticateAsync START ===");
-                AndroidLogger.LogAuth("Mode: Interactive - Direct scope request (no ManuallyAuthenticate)");
+                AndroidLogger.LogAuth("Mode: Interactive - Account picker for login and account switching");
 
                 var instance = PlayGamesPlatform.Instance;
                 if (instance == null)
@@ -137,7 +137,7 @@ namespace App.Network
                     };
                 }
 
-                // 현재 인증 상태 확인 (로깅용)
+                // 현재 인증 상태 확인
                 bool isAlreadyAuthenticated = instance.IsAuthenticated();
                 AndroidLogger.LogAuth($"Current authentication status: {(isAlreadyAuthenticated ? "AUTHENTICATED" : "NOT AUTHENTICATED")}");
 
@@ -145,25 +145,42 @@ namespace App.Network
                 {
                     var localUser = instance.localUser;
                     AndroidLogger.LogAuth($"Already authenticated - User: {localUser?.userName ?? "NULL"} ({localUser?.id ?? "NULL"})");
+
+                    // RefreshToken 삭제 (앱 서버 세션 해제)
+                    // OPEN_ID 플래그는 유지 (GPGS SDK가 계정별로 관리)
+                    PlayerPrefs.DeleteKey("RefreshToken");
+                    PlayerPrefs.DeleteKey("AccessToken");
+                    PlayerPrefs.Save();
+                    AndroidLogger.LogAuth("✅ App session cleared - GPGS session maintained");
                 }
 
-                // CRITICAL FIX: ManuallyAuthenticate 제거
-                // 이유: Silent sign-in으로 이미 인증된 상태에서 ManuallyAuthenticate 호출 시
-                //       즉시 Success 콜백 반환 (UI 세션 종료)
-                //       → 그 후 RequestServerSideAccess로 동의 UI 표시 시도 → 컨텍스트 없어 블로킹
-                //
-                // 해결: RequestServerSideAccess를 직접 호출
-                //       → SDK가 필요한 경우 자동으로 인증 + 동의 UI 통합 표시
-                //       → 이미 인증된 경우 동의 UI만 표시
-                AndroidLogger.LogAuth("Directly requesting server auth code with OPEN_ID scope");
-                AndroidLogger.LogAuth("SDK will handle authentication + consent UI as needed");
+                // ManuallyAuthenticate: 계정 선택 UI 표시
+                AndroidLogger.LogAuth("Showing account picker for login/account switching");
 
-                RequestServerAuthCodeWithThreadTimeout(tcs, onGranted: () =>
+                instance.ManuallyAuthenticate((success) =>
                 {
-                    // 스코프 동의 성공 → 로컬 플래그 저장
-                    PlayerPrefs.SetInt(OPENID_GRANTED_KEY, 1);
-                    PlayerPrefs.Save();
-                    AndroidLogger.LogAuth("✅ OPEN_ID 동의 완료 → 플래그 저장");
+                    AndroidLogger.LogAuth($"ManuallyAuthenticate callback received - Status: {success}");
+
+                    if (success == GooglePlayGames.BasicApi.SignInStatus.Success)
+                    {
+                        AndroidLogger.LogAuth("✅ Authentication successful");
+                        AndroidLogger.LogAuth("Requesting server auth code with OPEN_ID scope");
+
+                        RequestServerAuthCodeWithThreadTimeout(tcs, onGranted: () =>
+                        {
+                            // 스코프 동의 성공 (GPGS SDK가 계정별로 저장)
+                            AndroidLogger.LogAuth("✅ OPEN_ID scope granted");
+                        });
+                    }
+                    else
+                    {
+                        AndroidLogger.LogError($"❌ Authentication failed: {success}");
+                        tcs.TrySetResult(new AuthResult
+                        {
+                            Success = false,
+                            ErrorMessage = $"Authentication failed: {success}"
+                        });
+                    }
                 });
 
                 return await tcs.Task;
@@ -200,11 +217,12 @@ namespace App.Network
         private void RequestServerAuthCodeWithThreadTimeout(
             TaskCompletionSource<AuthResult> tcs,
             Action onGranted,
-            int timeoutMs = 5000)
+            int timeoutMs = 20000)
         {
             AndroidLogger.LogAuth("Requesting server-side access with OAuth scopes: OPEN_ID, EMAIL, PROFILE");
 
-            var innerTcs = new TaskCompletionSource<AuthResult>();
+            bool isCompleted = false;
+            object lockObject = new object();
 
             // CRITICAL: 추가 스코프 명시 필수
             // 이 스코프들이 승인되어야 서버에서 id_token을 받을 수 있음
@@ -221,71 +239,87 @@ namespace App.Network
                 scopes: scopes,
                 callback: authResponse =>
                 {
-                    AndroidLogger.LogAuth("RequestServerSideAccess callback received");
-
-                    string code = authResponse?.GetAuthCode();
-                    if (string.IsNullOrEmpty(code))
+                    lock (lockObject)
                     {
-                        AndroidLogger.LogError("❌ Server auth code is null or empty");
-                        innerTcs.TrySetResult(new AuthResult
+                        if (isCompleted)
                         {
-                            Success = false,
-                            ErrorMessage = "Empty server auth code"
+                            AndroidLogger.LogAuth("⚠️ Callback received after completion (ignored)");
+                            return;
+                        }
+
+                        AndroidLogger.LogAuth("RequestServerSideAccess callback received");
+
+                        string code = authResponse?.GetAuthCode();
+                        if (string.IsNullOrEmpty(code))
+                        {
+                            AndroidLogger.LogError("❌ Server auth code is null or empty");
+                            isCompleted = true;
+                            tcs.TrySetResult(new AuthResult
+                            {
+                                Success = false,
+                                ErrorMessage = "Empty server auth code"
+                            });
+                            return;
+                        }
+
+                        // 승인된 스코프 검사 및 로깅
+                        var grantedScopes = authResponse.GetGrantedScopes();
+                        AndroidLogger.LogAuth($"✅ Granted scopes count: {grantedScopes?.Count ?? 0}");
+
+                        if (grantedScopes != null)
+                        {
+                            foreach (var s in grantedScopes)
+                                AndroidLogger.LogAuth($"  - Scope: {s}");
+                        }
+
+                        // openid 포함 여부 확인 (중요: 서버에서 id_token 받으려면 필수)
+                        bool hasOpenId  = grantedScopes?.Contains(GooglePlayGames.BasicApi.AuthScope.OPEN_ID) ?? false;
+                        bool hasEmail   = grantedScopes?.Contains(GooglePlayGames.BasicApi.AuthScope.EMAIL)   ?? false;
+                        bool hasProfile = grantedScopes?.Contains(GooglePlayGames.BasicApi.AuthScope.PROFILE) ?? false;
+
+                        AndroidLogger.LogAuth($"OPEN_ID: {hasOpenId}, EMAIL: {hasEmail}, PROFILE: {hasProfile}");
+
+                        if (!hasOpenId)
+                        {
+                            AndroidLogger.LogError("❌ OPEN_ID scope not granted - server will not receive id_token");
+                            AndroidLogger.LogError("User denied consent or scope request failed");
+                        }
+
+                        AndroidLogger.LogAuth($"✅ Server auth code received (length: {code.Length})");
+                        onGranted?.Invoke(); // 플래그 저장 콜백
+
+                        isCompleted = true;
+                        AndroidLogger.LogAuth("✅ Setting success result");
+                        tcs.TrySetResult(new AuthResult
+                        {
+                            Success = true,
+                            AuthCode = code
                         });
-                        return;
                     }
-
-                    // 승인된 스코프 검사 및 로깅
-                    var grantedScopes = authResponse.GetGrantedScopes();
-                    AndroidLogger.LogAuth($"✅ Granted scopes count: {grantedScopes?.Count ?? 0}");
-
-                    if (grantedScopes != null)
-                    {
-                        foreach (var s in grantedScopes)
-                            AndroidLogger.LogAuth($"  - Scope: {s}");
-                    }
-
-                    // openid 포함 여부 확인 (중요: 서버에서 id_token 받으려면 필수)
-                    bool hasOpenId  = grantedScopes?.Contains(GooglePlayGames.BasicApi.AuthScope.OPEN_ID) ?? false;
-                    bool hasEmail   = grantedScopes?.Contains(GooglePlayGames.BasicApi.AuthScope.EMAIL)   ?? false;
-                    bool hasProfile = grantedScopes?.Contains(GooglePlayGames.BasicApi.AuthScope.PROFILE) ?? false;
-
-                    AndroidLogger.LogAuth($"OPEN_ID: {hasOpenId}, EMAIL: {hasEmail}, PROFILE: {hasProfile}");
-
-                    if (!hasOpenId)
-                    {
-                        AndroidLogger.LogError("❌ OPEN_ID scope not granted - server will not receive id_token");
-                        AndroidLogger.LogError("User denied consent or scope request failed");
-                    }
-
-                    AndroidLogger.LogAuth($"✅ Server auth code received (length: {code.Length})");
-                    onGranted?.Invoke(); // 플래그 저장 콜백
-                    innerTcs.TrySetResult(new AuthResult
-                    {
-                        Success = true,
-                        AuthCode = code
-                    });
                 });
 
             // 스레드 기반 타임아웃 (Unity 메인 루프 정지에도 동작)
             Task.Run(async () =>
             {
-                var completed = await Task.WhenAny(innerTcs.Task, Task.Delay(timeoutMs));
-                if (completed != innerTcs.Task)
+                await Task.Delay(timeoutMs);
+
+                lock (lockObject)
                 {
-                    AndroidLogger.LogAuth($"⚠️ RequestServerSideAccess THREAD timeout ({timeoutMs}ms)");
-                    AndroidLogger.LogAuth("Unity 메인 루프 정지 가능성 - 스레드 타임아웃 동작");
-                    tcs.TrySetResult(new AuthResult
+                    if (!isCompleted)
                     {
-                        Success = false,
-                        ErrorMessage = "Server auth request timeout (try interactive sign-in)"
-                    });
-                }
-                else
-                {
-                    var result = await innerTcs.Task;
-                    AndroidLogger.LogAuth($"RequestServerSideAccess completed: {result.Success}");
-                    tcs.TrySetResult(result);
+                        AndroidLogger.LogAuth($"⚠️ RequestServerSideAccess THREAD timeout ({timeoutMs}ms)");
+                        AndroidLogger.LogAuth("Unity 메인 루프 정지 가능성 - 스레드 타임아웃 동작");
+                        isCompleted = true;
+                        tcs.TrySetResult(new AuthResult
+                        {
+                            Success = false,
+                            ErrorMessage = "Server auth request timeout (try interactive sign-in)"
+                        });
+                    }
+                    else
+                    {
+                        AndroidLogger.LogAuth("✅ Request completed before timeout - no action needed");
+                    }
                 }
             });
         }
