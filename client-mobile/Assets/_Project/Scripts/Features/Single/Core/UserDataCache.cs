@@ -41,6 +41,7 @@ namespace Features.Single.Core
 
         // 중복 요청 방지
         private bool isBatchProgressLoading = false;
+        private bool isLoadingInitialData = false; // 전체 초기 데이터 로딩 중복 방지
 
         //  추가: 초기 동기화 상태 추적
         private bool metadataReceived = false;
@@ -504,9 +505,17 @@ namespace Features.Single.Core
         /// </summary>
         private void LoadInitialDataFromServer()
         {
+            // 중복 요청 방지: 이미 초기 데이터 로딩이 진행 중이면 스킵
+            if (isLoadingInitialData)
+            {
+                Debug.Log("[UserDataCache] 초기 데이터 로딩이 이미 진행 중 - 중복 호출 방지");
+                return;
+            }
+
             if (HttpApiClient.Instance != null)
             {
-                Debug.Log("[UserDataCache] 초기 서버 데이터 로드 시작");
+                isLoadingInitialData = true;
+                Debug.Log("[UserDataCache] 초기 서버 데이터 로드 시작 (중복 방지 플래그 설정)");
 
                 // 1. 스테이지 메타데이터 로드
                 HttpApiClient.Instance.GetStageMetadata();
@@ -530,6 +539,7 @@ namespace Features.Single.Core
             else
             {
                 Debug.LogWarning("[UserDataCache] HttpApiClient가 null이어서 데이터 로드 실패");
+                isLoadingInitialData = false; // 실패 시 플래그 초기화
             }
         }
 
@@ -685,7 +695,22 @@ namespace Features.Single.Core
             metadataReceived = false;
             progressBatchReceived = false;
             currentStatusReceived = false;
-            Debug.Log("[UserDataCache] 동기화 상태 초기화됨");
+            isLoadingInitialData = false; // 초기 데이터 로딩 플래그도 초기화
+            Debug.Log("[UserDataCache] 동기화 상태 초기화됨 (로딩 플래그 포함)");
+        }
+
+        /// <summary>
+        ///  추가: 초기 데이터 로딩 완료 확인 및 플래그 해제
+        /// 메타데이터와 진행도 배치가 모두 수신되면 isLoadingInitialData 플래그를 해제하여
+        /// 이후 필요 시 재동기화가 가능하도록 함
+        /// </summary>
+        private void CheckAndClearInitialLoadingFlag()
+        {
+            if (metadataReceived && progressBatchReceived)
+            {
+                isLoadingInitialData = false;
+                Debug.Log("[UserDataCache] 초기 데이터 로딩 완료 - 중복 방지 플래그 해제");
+            }
         }
 
         /// <summary>
@@ -839,6 +864,9 @@ namespace Features.Single.Core
             metadataReceived = true;
             Debug.Log("[UserDataCache] 메타데이터 동기화 완료");
 
+            // 초기 데이터 로딩 완료 확인 및 플래그 해제
+            CheckAndClearInitialLoadingFlag();
+
             OnStageMetadataUpdated?.Invoke(metadata);
         }
 
@@ -949,11 +977,14 @@ namespace Features.Single.Core
                     SetStageProgress(networkProgress);
                 }
                 RecomputeAndCacheMaxStageCompleted();
-                
+
                 //  추가: 진행도 배치 수신 플래그 설정
                 progressBatchReceived = true;
                 Debug.Log("[UserDataCache] 진행도 배치 동기화 완료");
-                
+
+                // 초기 데이터 로딩 완료 확인 및 플래그 해제
+                CheckAndClearInitialLoadingFlag();
+
                 Debug.Log($"[UserDataCache]  일괄 진행도 캐시 완료 - 총 {progressArray.Length}개 처리됨");
             }
             else

@@ -1324,7 +1324,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Logout
+  m_text: Back
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8e1bc3e17153f6e4ab65505b07bb7ffb, type: 2}
   m_sharedMaterial: {fileID: -5011963343144279077, guid: 8e1bc3e17153f6e4ab65505b07bb7ffb, type: 2}
@@ -8889,10 +8889,10 @@ MonoBehaviour:
     m_ColorMultiplier: 1
     m_FadeDuration: 0.1
   m_SpriteState:
-    m_HighlightedSprite: {fileID: 21300000, guid: abcf70eee0c6a6541801c510c42141a2, type: 3}
+    m_HighlightedSprite: {fileID: 21300000, guid: 1fafcdbb489f6874a98b7e96c0b5f17c, type: 3}
     m_PressedSprite: {fileID: 0}
     m_SelectedSprite: {fileID: 0}
-    m_DisabledSprite: {fileID: 21300000, guid: bf0e863c1f31ff144bb8d2cc74f8b631, type: 3}
+    m_DisabledSprite: {fileID: 21300000, guid: 2b2608c37f79b18469b770fc6bb526da, type: 3}
   m_AnimationTriggers:
     m_NormalTrigger: Normal
     m_HighlightedTrigger: Highlighted

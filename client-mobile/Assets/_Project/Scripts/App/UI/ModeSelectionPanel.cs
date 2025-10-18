@@ -276,18 +276,18 @@ namespace App.UI
 
         public void OnLogoutButtonClicked()
         {
-            Debug.Log("로그아웃 버튼 클릭");
+            Debug.Log("로그인 화면으로 버튼 클릭");
 
             if (SessionManager.Instance != null)
             {
-                Debug.Log("[ModeSelectionPanel] SessionManager로 로그아웃 처리");
-                SessionManager.Instance.LogoutAndClearSession();
+                Debug.Log("[ModeSelectionPanel] SessionManager.GoToLoginScreen() 호출");
+                SessionManager.Instance.GoToLoginScreen();
 
-                // 로그아웃 후 LoginPanel로 이동
+                // 로그인 화면으로 이동
                 var uiManager = UIManager.GetInstanceSafe();
                 if (uiManager != null)
                 {
-                    Debug.Log("[ModeSelectionPanel] UIManager로 로그인 화면 복귀");
+                    Debug.Log("[ModeSelectionPanel] UIManager로 로그인 화면 이동");
                     uiManager.ShowPanel(App.UI.UIState.Login);
                 }
                 else
