@@ -8889,10 +8889,10 @@ MonoBehaviour:
     m_ColorMultiplier: 1
     m_FadeDuration: 0.1
   m_SpriteState:
-    m_HighlightedSprite: {fileID: 21300000, guid: abcf70eee0c6a6541801c510c42141a2, type: 3}
+    m_HighlightedSprite: {fileID: 21300000, guid: 1fafcdbb489f6874a98b7e96c0b5f17c, type: 3}
     m_PressedSprite: {fileID: 0}
     m_SelectedSprite: {fileID: 0}
-    m_DisabledSprite: {fileID: 21300000, guid: bf0e863c1f31ff144bb8d2cc74f8b631, type: 3}
+    m_DisabledSprite: {fileID: 21300000, guid: 2b2608c37f79b18469b770fc6bb526da, type: 3}
   m_AnimationTriggers:
     m_NormalTrigger: Normal
     m_HighlightedTrigger: Highlighted
@@ -11372,7 +11372,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1719888359
 RectTransform:
   m_ObjectHideFlags: 0
