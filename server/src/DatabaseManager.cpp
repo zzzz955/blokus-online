@@ -5,6 +5,8 @@
 #include <spdlog/fmt/fmt.h>
 #include <queue>
 #include <mutex>
+#include <condition_variable>
+#include <chrono>
 #include <ctime>
 
 namespace Blokus {
@@ -17,37 +19,101 @@ namespace Blokus {
         private:
             std::queue<std::unique_ptr<pqxx::connection>> connections_;
             std::mutex mutex_;
+            std::condition_variable cv_;
             std::string connectionString_;
+            size_t initialPoolSize_;
+            size_t maxPoolSize_;
+            size_t currentSize_;
+            std::chrono::milliseconds waitTimeout_;
 
         public:
-            ConnectionPool(const std::string& connStr, size_t size) : connectionString_(connStr) {
-                spdlog::info("{}개 커넥션의 데이터베이스 풀 생성 중... ", size);
+            ConnectionPool(const std::string& connStr, size_t size)
+                : connectionString_(connStr),
+                  initialPoolSize_(size),
+                  maxPoolSize_(size * 2),  // 초기 크기의 2배까지 확장 허용
+                  currentSize_(0),
+                  waitTimeout_(5000) {  // 5초 대기
+                spdlog::info("{}개 커넥션의 데이터베이스 풀 생성 중 (최대: {})... ", size, maxPoolSize_);
                 for (size_t i = 0; i < size; ++i) {
                     try {
                         connections_.push(std::make_unique<pqxx::connection>(connectionString_));
+                        currentSize_++;
                     }
                     catch (const std::exception& e) {
                         spdlog::error("Failed to create connection {}: {}", i + 1, e.what());
                         throw;
                     }
                 }
-                spdlog::info("데이터베이스 풀 생성 완료");
+                spdlog::info("데이터베이스 풀 생성 완료 (초기: {}, 최대: {})", currentSize_, maxPoolSize_);
             }
 
             std::unique_ptr<pqxx::connection> getConnection() {
-                std::lock_guard<std::mutex> lock(mutex_);
-                if (connections_.empty()) {
-                    return std::make_unique<pqxx::connection>(connectionString_);
+                std::unique_lock<std::mutex> lock(mutex_);
+
+                // 1. 풀에 가용 커넥션이 있으면 즉시 반환
+                if (!connections_.empty()) {
+                    auto conn = std::move(connections_.front());
+                    connections_.pop();
+                    return conn;
                 }
-                auto conn = std::move(connections_.front());
-                connections_.pop();
-                return conn;
+
+                // 2. 가용 커넥션 없음 - 새 커넥션 생성 가능한지 확인
+                if (currentSize_ < maxPoolSize_) {
+                    spdlog::warn("풀 확장: 새 커넥션 생성 중 ({}/{})", currentSize_ + 1, maxPoolSize_);
+                    currentSize_++;
+                    try {
+                        return std::make_unique<pqxx::connection>(connectionString_);
+                    } catch (const std::exception& e) {
+                        currentSize_--;  // 생성 실패 시 카운터 복구
+                        spdlog::error("커넥션 생성 실패: {}", e.what());
+                        throw;
+                    }
+                }
+
+                // 3. 최대 커넥션 수 도달 - 커넥션 반환 대기
+                spdlog::warn("커넥션 풀 한계 도달 ({}/{}), 가용 커넥션 대기 중...",
+                            currentSize_, maxPoolSize_);
+
+                auto waitStart = std::chrono::steady_clock::now();
+                bool acquired = cv_.wait_for(lock, waitTimeout_, [this] {
+                    return !connections_.empty();
+                });
+
+                if (acquired && !connections_.empty()) {
+                    auto waitDuration = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::steady_clock::now() - waitStart
+                    ).count();
+                    spdlog::info("커넥션 획득 성공 (대기 시간: {}ms)", waitDuration);
+
+                    auto conn = std::move(connections_.front());
+                    connections_.pop();
+                    return conn;
+                }
+
+                // 4. 타임아웃 - 예외 발생
+                spdlog::error("커넥션 풀 타임아웃: {}/{} 커넥션 사용 중, {}ms 대기 후 실패",
+                             currentSize_, maxPoolSize_, waitTimeout_.count());
+                throw std::runtime_error(
+                    fmt::format("데이터베이스 커넥션 풀 타임아웃 ({}/{} 커넥션 사용 중). "
+                               "{}ms 대기 후에도 가용 커넥션 없음. "
+                               "풀 크기 증가 또는 커넥션 사용 최적화가 필요합니다.",
+                               currentSize_, maxPoolSize_, waitTimeout_.count())
+                );
             }
 
             void returnConnection(std::unique_ptr<pqxx::connection> conn) {
+                std::lock_guard<std::mutex> lock(mutex_);
                 if (conn && conn->is_open()) {
-                    std::lock_guard<std::mutex> lock(mutex_);
                     connections_.push(std::move(conn));
+                    // 대기 중인 스레드에 커넥션이 반환되었음을 알림
+                    cv_.notify_one();
+                } else {
+                    // Connection is invalid or closed - decrease pool size
+                    if (currentSize_ > 0) {
+                        currentSize_--;
+                        spdlog::warn("커넥션 종료 및 풀에서 제거: {}/{}",
+                                    currentSize_, maxPoolSize_);
+                    }
                 }
             }
         };
