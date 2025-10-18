@@ -119,11 +119,40 @@ namespace App.Core
             if (debugMode)
                 Debug.Log($"[SessionManager] Login attempt: {username}");
 
+            // Use HttpApiClient for REST login
+            var loginTask = new TaskCompletionSource<bool>();
+
+            // Local event handlers - defined after loginTask to avoid forward reference errors
+            void OnLoginResponse(bool success, string message, string token)
+            {
+                if (success)
+                {
+                    authToken = token;
+                    isLoggedIn = true;
+                    loginTask.TrySetResult(true);
+                }
+                else
+                {
+                    // Migration Plan: 실패 시 SystemMessageManager로 토스트
+                    SystemMessageManager.ShowToast($"로그인 실패: {message}", MessagePriority.Error);
+                    loginTask.TrySetResult(false);
+                }
+            }
+
+            void OnUserInfoResponse(HttpApiClient.AuthUserData userData)
+            {
+                userId = userData.user.user_id;
+                cachedId = userData.user.username ?? cachedId;      // ★ 놓치지 말기
+                displayName = userData.user.display_name ?? displayName; // ★ 여기!
+                OnUserDataReceived?.Invoke(userData.user.username, userId);
+
+                if (debugMode)
+                    Debug.Log($"[SessionManager] OnUserInfoResponse: username='{cachedId}', displayName='{displayName}'");
+            }
+
             try
             {
-                // Use HttpApiClient for REST login
-                var loginTask = new TaskCompletionSource<bool>();
-
+                // Subscribe to events
                 HttpApiClient.Instance.OnAuthResponse += OnLoginResponse;
                 HttpApiClient.Instance.OnUserInfoReceived += OnUserInfoResponse;
 
@@ -131,9 +160,6 @@ namespace App.Core
 
                 // Wait for response (timeout after 10 seconds)
                 bool loginSuccess = await WaitForLoginResult(loginTask, 10f);
-
-                HttpApiClient.Instance.OnAuthResponse -= OnLoginResponse;
-                HttpApiClient.Instance.OnUserInfoReceived -= OnUserInfoResponse;
 
                 if (loginSuccess)
                 {
@@ -157,33 +183,6 @@ namespace App.Core
 
                     return false;
                 }
-
-                void OnLoginResponse(bool success, string message, string token)
-                {
-                    if (success)
-                    {
-                        authToken = token;
-                        isLoggedIn = true;
-                        loginTask.TrySetResult(true);
-                    }
-                    else
-                    {
-                        // Migration Plan: 실패 시 SystemMessageManager로 토스트
-                        SystemMessageManager.ShowToast($"로그인 실패: {message}", MessagePriority.Error);
-                        loginTask.TrySetResult(false);
-                    }
-                }
-
-                void OnUserInfoResponse(HttpApiClient.AuthUserData userData)
-                {
-                    userId = userData.user.user_id;
-                    cachedId = userData.user.username ?? cachedId;      // ★ 놓치지 말기
-                    displayName = userData.user.display_name ?? displayName; // ★ 여기!
-                    OnUserDataReceived?.Invoke(userData.user.username, userId);
-
-                    if (debugMode)
-                        Debug.Log($"[SessionManager] OnUserInfoResponse: username='{cachedId}', displayName='{displayName}'");
-                }
             }
             catch (System.Exception ex)
             {
@@ -195,6 +194,16 @@ namespace App.Core
 
                 ClearSession();
                 return false;
+            }
+            finally
+            {
+                // Always unsubscribe, even if exceptions occur
+                // This prevents memory leaks from dangling event subscriptions
+                if (HttpApiClient.Instance != null)
+                {
+                    HttpApiClient.Instance.OnAuthResponse -= OnLoginResponse;
+                    HttpApiClient.Instance.OnUserInfoReceived -= OnUserInfoResponse;
+                }
             }
         }
 
@@ -691,12 +700,9 @@ namespace App.Core
 
         void OnDestroy()
         {
-            // Clean up event subscriptions
-            if (HttpApiClient.Instance != null)
-            {
-                HttpApiClient.Instance.OnAuthResponse -= null;
-                HttpApiClient.Instance.OnUserInfoReceived -= null;
-            }
+            // Note: Event subscription cleanup is handled in the Login method's finally block
+            // No persistent class-level event handlers exist that need cleanup here
+            // Local function handlers are automatically cleaned up when they go out of scope
         }
 
         /// <summary>
