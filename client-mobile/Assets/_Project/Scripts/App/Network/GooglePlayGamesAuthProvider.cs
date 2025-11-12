@@ -164,12 +164,32 @@ namespace App.Network
                     if (success == GooglePlayGames.BasicApi.SignInStatus.Success)
                     {
                         AndroidLogger.LogAuth("✅ Authentication successful");
-                        AndroidLogger.LogAuth("Requesting server auth code with OPEN_ID scope");
 
-                        RequestServerAuthCodeWithThreadTimeout(tcs, onGranted: () =>
+                        // Play Games Player ID 가져오기 (Web Client ID 불필요)
+                        var localUser = instance.localUser;
+                        string playerId = localUser?.id;
+                        string playerName = localUser?.userName;
+
+                        if (string.IsNullOrEmpty(playerId))
                         {
-                            // 스코프 동의 성공 (GPGS SDK가 계정별로 저장)
-                            AndroidLogger.LogAuth("✅ OPEN_ID scope granted");
+                            AndroidLogger.LogError("❌ Player ID is null or empty");
+                            tcs.TrySetResult(new AuthResult
+                            {
+                                Success = false,
+                                ErrorMessage = "Failed to get Player ID"
+                            });
+                            return;
+                        }
+
+                        AndroidLogger.LogAuth($"✅ Player ID: {playerId}");
+                        AndroidLogger.LogAuth($"✅ Player Name: {playerName}");
+                        AndroidLogger.LogAuth("🎮 Using Play Games Player ID for authentication (no OAuth required)");
+
+                        // Player ID를 AuthCode 대신 전달
+                        tcs.TrySetResult(new AuthResult
+                        {
+                            Success = true,
+                            AuthCode = playerId  // Player ID를 AuthCode 필드에 전달
                         });
                     }
                     else
@@ -233,6 +253,10 @@ namespace App.Network
                 GooglePlayGames.BasicApi.AuthScope.PROFILE    // 프로필 정보
             };
 
+            AndroidLogger.LogAuth("📱 Initiating OAuth consent flow...");
+            AndroidLogger.LogAuth("📱 If consent UI appears, user must accept scopes for login to succeed");
+            AndroidLogger.LogAuth($"📱 Timeout: {timeoutMs}ms - waiting for user consent or callback");
+
             // GPGS v2 정식 시그니처: (bool forceRefreshToken, List<AuthScope> scopes, Action<AuthResponse> callback)
             PlayGamesPlatform.Instance.RequestServerSideAccess(
                 forceRefreshToken: false,
@@ -247,7 +271,8 @@ namespace App.Network
                             return;
                         }
 
-                        AndroidLogger.LogAuth("RequestServerSideAccess callback received");
+                        AndroidLogger.LogAuth("✅ RequestServerSideAccess callback received");
+                        AndroidLogger.LogAuth("📱 User completed OAuth consent flow (accepted or denied)");
 
                         string code = authResponse?.GetAuthCode();
                         if (string.IsNullOrEmpty(code))
@@ -308,7 +333,12 @@ namespace App.Network
                     if (!isCompleted)
                     {
                         AndroidLogger.LogAuth($"⚠️ RequestServerSideAccess THREAD timeout ({timeoutMs}ms)");
-                        AndroidLogger.LogAuth("Unity 메인 루프 정지 가능성 - 스레드 타임아웃 동작");
+                        AndroidLogger.LogAuth("❌ OAuth consent UI did not complete within timeout period");
+                        AndroidLogger.LogAuth("Possible causes:");
+                        AndroidLogger.LogAuth("  1. OAuth consent UI did not appear");
+                        AndroidLogger.LogAuth("  2. Web Client ID not configured in games-ids.xml");
+                        AndroidLogger.LogAuth("  3. Google Play Services outdated or incompatible");
+                        AndroidLogger.LogAuth("  4. Network connectivity issues");
                         isCompleted = true;
                         tcs.TrySetResult(new AuthResult
                         {

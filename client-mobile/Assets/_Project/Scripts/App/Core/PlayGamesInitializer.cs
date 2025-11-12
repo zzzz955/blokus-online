@@ -30,6 +30,40 @@ namespace App.Core
                 AndroidLogger.LogAuth($"Web Client ID: {GameInfo.WebClientId}");
                 AndroidLogger.LogAuth($"Web Client ID initialized: {GameInfo.WebClientIdInitialized()}");
 
+                // Android 리소스에서 Web Client ID 확인 (games-ids.xml)
+                try
+                {
+                    using (var unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
+                    using (var currentActivity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity"))
+                    using (var resources = currentActivity.Call<AndroidJavaObject>("getResources"))
+                    {
+                        int webClientIdResId = resources.Call<int>("getIdentifier", "default_web_client_id", "string", currentActivity.Call<string>("getPackageName"));
+                        if (webClientIdResId != 0)
+                        {
+                            string webClientIdFromXml = resources.Call<string>("getString", webClientIdResId);
+                            AndroidLogger.LogAuth($"✅ games-ids.xml default_web_client_id: {webClientIdFromXml}");
+
+                            if (webClientIdFromXml == GameInfo.WebClientId)
+                            {
+                                AndroidLogger.LogAuth("✅ games-ids.xml matches GameInfo.cs");
+                            }
+                            else
+                            {
+                                AndroidLogger.LogError($"❌ Mismatch! games-ids.xml != GameInfo.cs");
+                            }
+                        }
+                        else
+                        {
+                            AndroidLogger.LogError("❌ default_web_client_id NOT FOUND in games-ids.xml!");
+                            AndroidLogger.LogError("This will cause OAuth consent UI to fail");
+                        }
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    AndroidLogger.LogError($"Failed to check games-ids.xml: {ex.Message}");
+                }
+
                 // 패키지 정보 로깅 (디버깅용)
                 LogPackageSignatureInfo();
 

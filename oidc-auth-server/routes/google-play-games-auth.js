@@ -386,4 +386,199 @@ async function createUserWithGooglePlayGames(googleAccountId, email, displayName
   }
 }
 
+/**
+ * POST /auth/google-play-games-player-id
+ *
+ * Google Play Games Player ID로 직접 인증 (OAuth 불필요)
+ *
+ * Request Body:
+ * {
+ *   "client_id": "unity-mobile-client",
+ *   "player_id": "g12100055012230832292"  // Play Games Player ID
+ * }
+ *
+ * Response:
+ * {
+ *   "access_token": "eyJhbGciOiJSUzI1NiIs...",
+ *   "refresh_token": "...",
+ *   "id_token": "...",
+ *   "token_type": "Bearer",
+ *   "expires_in": 3600
+ * }
+ */
+router.post(
+  '/google-play-games-player-id',
+  [
+    body('client_id').notEmpty().withMessage('client_id is required'),
+    body('player_id').notEmpty().withMessage('player_id is required')
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'invalid_request',
+        error_description: 'Missing required parameters',
+        details: errors.array()
+      });
+    }
+
+    const { client_id, player_id } = req.body;
+
+    // Rate limiting 체크
+    if (!checkRateLimit(client_id)) {
+      logger.warn('Google Play Games Player ID auth rate limit exceeded', { client_id });
+      return res.status(429).json({
+        error: 'rate_limit_exceeded',
+        error_description: 'Too many authentication attempts. Please try again later.'
+      });
+    }
+
+    try {
+      logger.info('Google Play Games Player ID authentication started', {
+        client_id,
+        player_id
+      });
+
+      // Player ID로 사용자 찾기
+      let user = await findUserByPlayGamesPlayerId(player_id);
+
+      if (user) {
+        logger.info('Existing user logged in via Play Games Player ID', {
+          userId: user.user_id,
+          player_id
+        });
+      } else {
+        // 신규 사용자 생성 (Player ID 기반)
+        user = await createUserWithPlayGamesPlayerId(player_id);
+
+        logger.info('New user created via Play Games Player ID', {
+          userId: user.user_id,
+          player_id
+        });
+      }
+
+      // Device fingerprint 생성
+      const deviceFingerprint = crypto.createHash('sha256')
+        .update(`${client_id}-play-games-player-id-${player_id}`)
+        .digest('hex');
+
+      // Refresh Token Family 생성
+      const tokenFamily = await dbService.createRefreshTokenFamily(
+        user.user_id,
+        client_id,
+        deviceFingerprint
+      );
+
+      // 토큰 생성
+      const client = { client_id };
+      const tokens = await generateTokens(
+        user,
+        client,
+        'openid profile email',
+        tokenFamily.family_id
+      );
+
+      logger.info('Play Games Player ID login successful - tokens issued', {
+        userId: user.user_id,
+        username: user.username,
+        player_id,
+        client_id,
+        familyId: tokenFamily.family_id
+      });
+
+      // 응답 반환
+      return res.status(200).json(tokens);
+
+    } catch (error) {
+      logger.error('Google Play Games Player ID authentication failed', {
+        error: error.message,
+        stack: error.stack,
+        client_id,
+        player_id
+      });
+
+      return res.status(500).json({
+        error: 'server_error',
+        error_description: 'Failed to process Play Games Player ID authentication'
+      });
+    }
+  }
+);
+
+/**
+ * Play Games Player ID로 사용자 찾기
+ */
+async function findUserByPlayGamesPlayerId(playerId) {
+  const query = `
+    SELECT u.*
+    FROM users u
+    INNER JOIN user_auth_providers uap ON u.user_id = uap.user_id
+    WHERE uap.provider_type = 'google_play_games_player_id'
+      AND uap.provider_user_id = $1
+    LIMIT 1
+  `;
+
+  const result = await dbService.query(query, [playerId]);
+  return result.rows[0] || null;
+}
+
+/**
+ * 신규 사용자 생성 (Play Games Player ID)
+ */
+async function createUserWithPlayGamesPlayerId(playerId) {
+  const client = await dbService.pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // username 생성: playergames + 숫자
+    const randomSuffix = Math.floor(Math.random() * 100000000);
+    const username = `playergames_${randomSuffix}`.substring(0, 20);
+
+    // users 테이블에 사용자 생성
+    const insertUserQuery = `
+      INSERT INTO users (username, email, display_name, password_hash, oauth_provider, oauth_id, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, NOW())
+      RETURNING user_id, username, email, display_name
+    `;
+
+    const userResult = await client.query(insertUserQuery, [
+      username,
+      null, // email 없음
+      username, // display_name은 username과 동일
+      '', // password_hash는 빈 문자열
+      'google_play_games_player_id',
+      playerId
+    ]);
+
+    const user = userResult.rows[0];
+
+    // user_auth_providers 테이블에 추가
+    const insertProviderQuery = `
+      INSERT INTO user_auth_providers (user_id, provider_type, provider_user_id, is_primary, metadata)
+      VALUES ($1, $2, $3, $4, $5)
+    `;
+
+    await client.query(insertProviderQuery, [
+      user.user_id,
+      'google_play_games_player_id',
+      playerId,
+      true,
+      JSON.stringify({
+        player_id: playerId,
+        created_via: 'play_games_player_id'
+      })
+    ]);
+
+    await client.query('COMMIT');
+
+    return user;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 module.exports = router;
