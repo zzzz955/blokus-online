@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_id">1028009634900</string>
+    <string name="default_web_client_id">1028009634900-vfsatfnqhr26ahhdd8qkc090q7jffftj.apps.googleusercontent.com</string>
     <string name="package_name">com.madalang.bloblo</string>
 </resources>

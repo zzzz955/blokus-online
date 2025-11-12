@@ -163,27 +163,25 @@ namespace App.Network
         }
 
         /// <summary>
-        /// Backend API로 Auth Code를 전송하고 JWT 토큰을 받아옵니다
+        /// Backend API로 Player ID를 전송하고 JWT 토큰을 받아옵니다 (OAuth 불필요)
         /// </summary>
         private IEnumerator ExchangeAuthCodeForTokens(string authCode, Action<bool, string, OidcAuthenticator.TokenResponse> callback)
         {
             string backendUrl = EnvironmentConfig.OidcServerUrl;
-            string endpoint = $"{backendUrl}/auth/google-play-games";
+            string endpoint = $"{backendUrl}/auth/google-play-games-player-id";
 
             #if UNITY_ANDROID && !UNITY_EDITOR
             App.Logging.AndroidLogger.LogAuth($"Backend URL: {backendUrl}");
             App.Logging.AndroidLogger.LogAuth($"Endpoint: {endpoint}");
-            App.Logging.AndroidLogger.LogAuth($"Auth code length: {authCode?.Length ?? 0}");
-            App.Logging.AndroidLogger.LogAuth($"Web Client ID: {GameInfo.WebClientId}");
+            App.Logging.AndroidLogger.LogAuth($"Player ID length: {authCode?.Length ?? 0}");
+            App.Logging.AndroidLogger.LogAuth("🎮 Using Play Games Player ID authentication (no OAuth required)");
             #endif
 
-            // Request body
-            // IL2CPP에서 익명 타입 직렬화가 실패하므로 Dictionary 사용
-            // IMPORTANT: client_id는 내부 식별용, auth_code 검증은 백엔드가 자동으로 Android Client ID 선택
+            // Request body - Player ID 사용 (auth_code가 실제로는 player_id임)
             var requestData = new System.Collections.Generic.Dictionary<string, string>
             {
-                {"client_id", "unity-mobile-client"},  // 내부 식별용 (백엔드가 auth_code 검증 시 Android Client ID 자동 선택)
-                {"auth_code", authCode}
+                {"client_id", "unity-mobile-client"},
+                {"player_id", authCode}  // authCode 변수에 player_id가 담겨있음
             };
 
             string jsonData = JsonConvert.SerializeObject(requestData);
@@ -202,9 +200,9 @@ namespace App.Network
                 request.timeout = 30;
 
                 #if UNITY_ANDROID && !UNITY_EDITOR
-                App.Logging.AndroidLogger.LogAuth($"Sending auth code to backend: {endpoint}");
+                App.Logging.AndroidLogger.LogAuth($"Sending Player ID to backend: {endpoint}");
                 #else
-                Debug.Log($"[AuthenticationService] Sending auth code to: {endpoint}");
+                Debug.Log($"[AuthenticationService] Sending Player ID to: {endpoint}");
                 #endif
 
                 yield return request.SendWebRequest();
