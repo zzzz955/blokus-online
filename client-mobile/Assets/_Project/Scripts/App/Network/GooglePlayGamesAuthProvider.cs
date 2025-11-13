@@ -185,11 +185,14 @@ namespace App.Network
                         AndroidLogger.LogAuth($"✅ Player Name: {playerName}");
                         AndroidLogger.LogAuth("🎮 Using Play Games Player ID for authentication (no OAuth required)");
 
-                        // Player ID를 AuthCode 대신 전달
+                        // Player ID와 Player Name을 JSON 형태로 전달
+                        var authData = new { player_id = playerId, player_name = playerName };
+                        string authJson = Newtonsoft.Json.JsonConvert.SerializeObject(authData);
+
                         tcs.TrySetResult(new AuthResult
                         {
                             Success = true,
-                            AuthCode = playerId  // Player ID를 AuthCode 필드에 전달
+                            AuthCode = authJson  // JSON 형태로 전달
                         });
                     }
                     else

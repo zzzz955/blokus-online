@@ -422,7 +422,21 @@ router.post(
       });
     }
 
-    const { client_id, player_id } = req.body;
+    let { client_id, player_id } = req.body;
+    let player_name = null;
+
+    // player_id가 JSON 형태인 경우 파싱 (Unity에서 player_name 포함)
+    try {
+      if (player_id && player_id.startsWith('{')) {
+        const playerData = JSON.parse(player_id);
+        player_id = playerData.player_id;
+        player_name = playerData.player_name;
+        logger.info('Parsed player data from JSON', { player_id, player_name });
+      }
+    } catch (parseError) {
+      // JSON 파싱 실패 시 그냥 player_id로 사용
+      logger.debug('player_id is not JSON, using as-is');
+    }
 
     // Rate limiting 체크
     if (!checkRateLimit(client_id)) {
@@ -436,7 +450,8 @@ router.post(
     try {
       logger.info('Google Play Games Player ID authentication started', {
         client_id,
-        player_id
+        player_id,
+        player_name
       });
 
       // Player ID로 사용자 찾기
@@ -449,11 +464,12 @@ router.post(
         });
       } else {
         // 신규 사용자 생성 (Player ID 기반)
-        user = await createUserWithPlayGamesPlayerId(player_id);
+        user = await createUserWithPlayGamesPlayerId(player_id, player_name);
 
         logger.info('New user created via Play Games Player ID', {
           userId: user.user_id,
-          player_id
+          player_id,
+          player_name
         });
       }
 
@@ -507,13 +523,15 @@ router.post(
 
 /**
  * Play Games Player ID로 사용자 찾기
+ * OAuth 방식과 구분하기 위해 metadata의 created_via 필드 사용
  */
 async function findUserByPlayGamesPlayerId(playerId) {
   const query = `
     SELECT u.*
     FROM users u
     INNER JOIN user_auth_providers uap ON u.user_id = uap.user_id
-    WHERE uap.provider_type = 'google_play_games_player_id'
+    WHERE uap.provider_type = 'google_play_games'
+      AND uap.metadata->>'created_via' = 'play_games_player_id'
       AND uap.provider_user_id = $1
     LIMIT 1
   `;
@@ -525,7 +543,7 @@ async function findUserByPlayGamesPlayerId(playerId) {
 /**
  * 신규 사용자 생성 (Play Games Player ID)
  */
-async function createUserWithPlayGamesPlayerId(playerId) {
+async function createUserWithPlayGamesPlayerId(playerId, playerName = null) {
   const client = await dbService.pool.connect();
 
   try {
@@ -538,6 +556,9 @@ async function createUserWithPlayGamesPlayerId(playerId) {
     // Player ID 기반 더미 이메일 생성 (email 컬럼 NOT NULL 대응)
     const dummyEmail = `${playerId}@playgames.local`;
 
+    // display_name: player_name이 있으면 사용, 없으면 username 사용
+    const displayName = playerName || username;
+
     // users 테이블에 사용자 생성
     const insertUserQuery = `
       INSERT INTO users (username, email, display_name, password_hash, oauth_provider, oauth_id, updated_at)
@@ -548,15 +569,16 @@ async function createUserWithPlayGamesPlayerId(playerId) {
     const userResult = await client.query(insertUserQuery, [
       username,
       dummyEmail, // Player ID 기반 더미 이메일
-      username, // display_name은 username과 동일
+      displayName, // Play Games 이름 또는 username
       '', // password_hash는 빈 문자열
-      'google_play_games_player_id',
+      'google_play_games',
       playerId
     ]);
 
     const user = userResult.rows[0];
 
     // user_auth_providers 테이블에 추가
+    // OAuth 방식과 구분하기 위해 metadata의 created_via 필드 사용
     const insertProviderQuery = `
       INSERT INTO user_auth_providers (user_id, provider_type, provider_user_id, is_primary, metadata)
       VALUES ($1, $2, $3, $4, $5)
@@ -564,11 +586,12 @@ async function createUserWithPlayGamesPlayerId(playerId) {
 
     await client.query(insertProviderQuery, [
       user.user_id,
-      'google_play_games_player_id',
+      'google_play_games',
       playerId,
       true,
       JSON.stringify({
         player_id: playerId,
+        player_name: playerName,
         created_via: 'play_games_player_id'
       })
     ]);
