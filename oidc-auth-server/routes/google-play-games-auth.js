@@ -535,6 +535,9 @@ async function createUserWithPlayGamesPlayerId(playerId) {
     const randomSuffix = Math.floor(Math.random() * 100000000);
     const username = `playergames_${randomSuffix}`.substring(0, 20);
 
+    // Player ID 기반 더미 이메일 생성 (email 컬럼 NOT NULL 대응)
+    const dummyEmail = `${playerId}@playgames.local`;
+
     // users 테이블에 사용자 생성
     const insertUserQuery = `
       INSERT INTO users (username, email, display_name, password_hash, oauth_provider, oauth_id, updated_at)
@@ -544,7 +547,7 @@ async function createUserWithPlayGamesPlayerId(playerId) {
 
     const userResult = await client.query(insertUserQuery, [
       username,
-      null, // email 없음
+      dummyEmail, // Player ID 기반 더미 이메일
       username, // display_name은 username과 동일
       '', // password_hash는 빈 문자열
       'google_play_games_player_id',
