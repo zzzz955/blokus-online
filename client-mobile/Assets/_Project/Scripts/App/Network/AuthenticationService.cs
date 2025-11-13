@@ -173,15 +173,15 @@ namespace App.Network
             #if UNITY_ANDROID && !UNITY_EDITOR
             App.Logging.AndroidLogger.LogAuth($"Backend URL: {backendUrl}");
             App.Logging.AndroidLogger.LogAuth($"Endpoint: {endpoint}");
-            App.Logging.AndroidLogger.LogAuth($"Player ID length: {authCode?.Length ?? 0}");
+            App.Logging.AndroidLogger.LogAuth($"Player data length: {authCode?.Length ?? 0}");
             App.Logging.AndroidLogger.LogAuth("🎮 Using Play Games Player ID authentication (no OAuth required)");
             #endif
 
-            // Request body - Player ID 사용 (auth_code가 실제로는 player_id임)
+            // Request body - Player data (JSON 형태: player_id + player_name)
             var requestData = new System.Collections.Generic.Dictionary<string, string>
             {
                 {"client_id", "unity-mobile-client"},
-                {"player_id", authCode}  // authCode 변수에 player_id가 담겨있음
+                {"player_id", authCode}  // authCode 변수에 JSON 형태의 player data가 담겨있음
             };
 
             string jsonData = JsonConvert.SerializeObject(requestData);
