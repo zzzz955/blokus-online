@@ -425,17 +425,42 @@ router.post(
     let { client_id, player_id } = req.body;
     let player_name = null;
 
+    // 🔍 DEBUG: 원본 데이터 로깅
+    logger.info('🔍 DEBUG - Received request body', {
+      client_id,
+      player_id_raw: player_id,
+      player_id_type: typeof player_id,
+      player_id_length: player_id?.length
+    });
+
     // player_id가 JSON 형태인 경우 파싱 (Unity에서 player_name 포함)
     try {
       if (player_id && player_id.startsWith('{')) {
         const playerData = JSON.parse(player_id);
         player_id = playerData.player_id;
         player_name = playerData.player_name;
-        logger.info('Parsed player data from JSON', { player_id, player_name });
+        logger.info('✅ Parsed player data from JSON', { player_id, player_name });
+      } else {
+        logger.info('ℹ️ player_id is not JSON format, using as-is');
       }
     } catch (parseError) {
       // JSON 파싱 실패 시 그냥 player_id로 사용
-      logger.debug('player_id is not JSON, using as-is');
+      logger.warn('⚠️ Failed to parse player_id as JSON', {
+        error: parseError.message,
+        player_id_raw: player_id
+      });
+    }
+
+    // player_id validation (JSON 파싱 후에도 유효한지 확인)
+    if (!player_id || player_id.trim() === '') {
+      logger.error('Player ID is missing or empty after parsing', {
+        original_body: req.body.player_id,
+        parsed_player_id: player_id
+      });
+      return res.status(400).json({
+        error: 'invalid_request',
+        error_description: 'Player ID is required and cannot be empty'
+      });
     }
 
     // Rate limiting 체크
