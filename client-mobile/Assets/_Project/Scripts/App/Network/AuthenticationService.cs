@@ -173,6 +173,7 @@ namespace App.Network
             #if UNITY_ANDROID && !UNITY_EDITOR
             App.Logging.AndroidLogger.LogAuth($"Backend URL: {backendUrl}");
             App.Logging.AndroidLogger.LogAuth($"Endpoint: {endpoint}");
+            App.Logging.AndroidLogger.LogAuth($"🔍 DEBUG - authCode received: {authCode}");
             App.Logging.AndroidLogger.LogAuth($"Player data length: {authCode?.Length ?? 0}");
             App.Logging.AndroidLogger.LogAuth("🎮 Using Play Games Player ID authentication (no OAuth required)");
             #endif
@@ -188,7 +189,7 @@ namespace App.Network
             byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(jsonData);
 
             #if UNITY_ANDROID && !UNITY_EDITOR
-            App.Logging.AndroidLogger.LogAuth($"Request JSON: {jsonData}");
+            App.Logging.AndroidLogger.LogAuth($"🔍 DEBUG - Request JSON: {jsonData}");
             App.Logging.AndroidLogger.LogAuth($"Request body length: {bodyRaw.Length}");
             #endif
 
