@@ -31,9 +31,6 @@ namespace App.UI
         [Header("게임 종료 모달")]
         [SerializeField] private GameExitModal gameExitModal;
 
-        [Header("설정")]
-        [SerializeField] private bool autoLoginWithRefreshToken = true;
-
         [Header("개발용 설정")]
         [SerializeField] private bool enableTestMode = false;
         [SerializeField] private string testUsername = "testuser";
@@ -46,7 +43,6 @@ namespace App.UI
 
         // 상태 관리
         private bool isAuthenticating = false;
-        private bool hasCheckedRefreshToken = false;
         private OidcAuthenticator oidcAuthenticator;
         private AuthenticationService authenticationService;
 
@@ -95,25 +91,9 @@ namespace App.UI
 
         void OnEnable()
         {
-            // Refresh Token 기반 자동 로그인 시도
-            if (autoLoginWithRefreshToken && !hasCheckedRefreshToken)
-            {
-                // SecureStorage와 OIDC에서 저장된 refresh token이 있는지 확인
-                string savedRefreshToken = App.Security.SecureStorage.GetString(App.Security.TokenKeys.Refresh);
-                var oidcAuthenticator = App.Core.AppBootstrap.GetGlobalOidcAuthenticator();
-                string oidcRefreshToken = oidcAuthenticator?.GetRefreshToken();
-                
-                if (!string.IsNullOrEmpty(savedRefreshToken) || !string.IsNullOrEmpty(oidcRefreshToken))
-                {
-                    App.Core.CoroutineRunner.Run(TryAutoLoginWithRefreshToken());
-                }
-                else
-                {
-                    // refresh token이 없으면 체크 완료로 표시
-                    hasCheckedRefreshToken = true;
-                    Debug.Log("저장된 refresh token이 없음 - 수동 로그인 필요");
-                }
-            }
+            //  제거: RefreshToken 자동 로그인은 SceneFlowController.CheckAutoLogin에서 처리
+            // LoginPanel이 표시되는 시점은 이미 CheckAutoLogin이 실패한 경우이므로
+            // 여기서 다시 시도할 필요가 없음
         }
 
         void OnDestroy()
@@ -286,86 +266,8 @@ namespace App.UI
             }
         }
 
-        // ==========================================
-        // Refresh Token 기반 자동 로그인
-        // ==========================================
-
-        private IEnumerator TryAutoLoginWithRefreshToken()
-        {
-            hasCheckedRefreshToken = true;
-            
-            SetStatusText("자동 로그인 시도 중...", Shared.UI.MessagePriority.Info);
-            SetLoadingState(true);
-            isAuthenticating = true;
-
-            // HttpApiClient의 통합된 자동 로그인 이벤트 구독
-            bool autoLoginCompleted = false;
-            bool autoLoginSuccess = false;
-            string autoLoginMessage = "";
-
-            System.Action<bool, string> onAutoLoginComplete = (success, message) =>
-            {
-                autoLoginCompleted = true;
-                autoLoginSuccess = success;
-                autoLoginMessage = message;
-            };
-
-            if (HttpApiClient.Instance != null)
-            {
-                HttpApiClient.Instance.OnAutoLoginComplete += onAutoLoginComplete;
-                
-                // HttpApiClient의 통합된 자동 로그인 시도 (중복 체크 방지)
-                HttpApiClient.Instance.ValidateRefreshTokenFromStorage();
-                
-                // 완료 대기 (최대 15초)
-                float timeout = 5f;
-                float elapsed = 0f;
-                
-                while (!autoLoginCompleted && elapsed < timeout)
-                {
-                    yield return new WaitForSeconds(0.1f);
-                    elapsed += 0.1f;
-                }
-                
-                HttpApiClient.Instance.OnAutoLoginComplete -= onAutoLoginComplete;
-                
-                if (autoLoginCompleted && autoLoginSuccess)
-                {
-                    Debug.Log("[Info] 자동 로그인 성공!");
-                    SetStatusText("자동 로그인 성공!", Shared.UI.MessagePriority.Success);
-                    
-                    // 로그인 성공 처리
-                    isAuthenticating = false;
-                    SetLoadingState(false);
-                    
-                    // HttpApiClient에서 토큰 가져오기
-                    string currentToken = HttpApiClient.Instance?.GetAuthToken() ?? "";
-                    OnLoginSuccess("자동 로그인 성공", currentToken);
-                }
-                else
-                {
-                    Debug.Log($"[Warning] 자동 로그인 실패: {autoLoginMessage}");
-                    SetStatusText("로그인이 필요합니다", Shared.UI.MessagePriority.Warning);
-                    
-                    // 개발용 테스트 계정 자동 채우기
-                    if (IsTestModeEnabled)
-                    {
-                        if (usernameInput != null) usernameInput.text = testUsername;
-                        if (passwordInput != null) passwordInput.text = testPassword;
-                    }
-                    
-                    isAuthenticating = false;
-                    SetLoadingState(false);
-                }
-            }
-            else
-            {
-                Debug.LogError("HttpApiClient.Instance가 null입니다");
-                SetStatusText("로그인이 필요합니다", Shared.UI.MessagePriority.Warning);
-                isAuthenticating = false;
-                SetLoadingState(false);
-            }
-        }
+        //  제거: TryAutoLoginWithRefreshToken 메서드
+        // RefreshToken 자동 로그인은 SceneFlowController.CheckAutoLogin에서만 처리
 
         // ==========================================
         // 버튼 이벤트 핸들러
@@ -971,7 +873,7 @@ namespace App.UI
         private void UpdateUI()
         {
             // 개발 모드에서 테스트 계정 미리 채우기
-            if (IsTestModeEnabled && !hasCheckedRefreshToken)
+            if (IsTestModeEnabled)
             {
                 if (usernameInput != null) usernameInput.text = testUsername;
                 if (passwordInput != null) passwordInput.text = testPassword;
