@@ -12,7 +12,7 @@ namespace Blokus::Server
     class VersionManager
     {
     public:
-        // Version information structure
+        // 버전 정보 구조체
         struct Version
         {
             std::string version;
@@ -37,17 +37,15 @@ namespace Blokus::Server
             std::string downloadUrl;
         };
 
-        // Constructor - takes configuration from ConfigManager
         explicit VersionManager();
 
-        // Get current server version
+        // 현재 서버 버전 반환
         const Version &getServerVersion() const { return serverVersion_; }
 
-        // Check client compatibility
+        // 클라이언트 버전 호환 여부 확인
         CompatibilityInfo checkCompatibility(const std::string &clientVersion,
                                              const std::string &platform = "Windows") const;
 
-        // Version comparison utilities (static for utility use)
         static bool isVersionNewer(const std::string &version1, const std::string &version2);
         static std::vector<int> parseVersion(const std::string &version);
         const std::string getDownloadURL() const { return downloadUrl_; }
@@ -56,7 +54,6 @@ namespace Blokus::Server
         Version serverVersion_;
         std::string downloadUrl_;
 
-        // Helper methods
         void initializeServerVersion();
         void loadCompatibilitySettings();
     };

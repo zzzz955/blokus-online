@@ -1,5 +1,3 @@
-// ServerTypes.cpp �Ǵ� ���� ���Ͽ� ����
-
 #include "ServerTypes.h"
 #include <unordered_map>
 #include <algorithm>
@@ -11,7 +9,7 @@ namespace Blokus
     namespace Server
     {
 
-        // ���ڿ� ���� ��ƿ��Ƽ
+        // 메시지 trim처리
         std::string trimString(const std::string &str)
         {
             auto start = str.find_first_not_of(" \t\r\n");
@@ -22,21 +20,21 @@ namespace Blokus
             return str.substr(start, end - start + 1);
         }
 
-        // MessageType �ļ�
+        // MessageType 파싱
         MessageType parseMessageType(const std::string &messageStr)
         {
-            // �޽��� ����
+            // 메시지를 가져옴
             std::string clean = trimString(messageStr);
 
-            // �ҹ��ڷ� ��ȯ (��ҹ��� ����)
+            // 소문자로 통일
             std::transform(clean.begin(), clean.end(), clean.begin(), ::tolower);
 
-            // ���� ���̺�
+            // 메시지 식별
             static const std::unordered_map<std::string, MessageType> typeMap = {
-                // �⺻
+                // 하트비트 관련
                 {"ping", MessageType::Ping},
 
-                // ����
+                // 인증 관련
                 {"auth", MessageType::Auth},
                 {"auth:jwt", MessageType::Auth},  // JWT 토큰 인증
                 {"auth:login", MessageType::Auth},  // 사용자명/비밀번호 인증
@@ -48,12 +46,12 @@ namespace Blokus
                 {"logout", MessageType::Logout},
                 {"validate", MessageType::Validate},
 
-                // �κ�
+                // 로비 관련
                 {"lobby:enter", MessageType::LobbyEnter},
                 {"lobby:leave", MessageType::LobbyLeave},
                 {"lobby:list", MessageType::LobbyList},
 
-                // �� ����
+                // 방 관련
                 {"room:create", MessageType::RoomCreate},
                 {"room:join", MessageType::RoomJoin},
                 {"room:leave", MessageType::RoomLeave},
@@ -63,12 +61,12 @@ namespace Blokus
                 {"room:end", MessageType::RoomEnd},
                 {"room:transfer", MessageType::RoomTransferHost},
 
-                // ����
+                // 게임 관련
                 {"game:move", MessageType::GameMove},
                 {"game:end", MessageType::GameEnd},
                 {"game:result", MessageType::GameResultResponse},
 
-                // ä��
+                // 채팅 관련
                 {"chat", MessageType::Chat},
 
                 // 유저 관련
@@ -82,7 +80,7 @@ namespace Blokus
             return (it != typeMap.end()) ? it->second : MessageType::Unknown;
         }
 
-        // MessageType�� ���ڿ��� ��ȯ
+        // 헤더 기반 메시지 타입 식별
         std::string messageTypeToString(MessageType type)
         {
             switch (type)

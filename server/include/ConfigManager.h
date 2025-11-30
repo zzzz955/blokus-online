@@ -8,7 +8,7 @@ namespace Blokus {
     namespace Server {
 
         // ========================================
-        // ������ ȯ�溯�� ���� �Լ���
+        // 환경 변수 정보를 가져와 파싱하기
         // ========================================
         inline std::string getEnvString(const char* name, const char* defaultValue = "") {
             const char* value = std::getenv(name);
@@ -28,7 +28,7 @@ namespace Blokus {
         }
 
         // ========================================
-        // ������ ���� ������ Ŭ����
+        // 환경 변수 파싱 및 fallback처리
         // ========================================
         class ConfigManager {
         public:
@@ -100,15 +100,15 @@ namespace Blokus {
             }
 
             // ========================================
-            // ���� ���� (public static)
+            // 환경 변수를 담을 변수 선언 (public static)
             // ========================================
 
-            // ���� ����
+            // 서버 관련
             static int serverPort;
             static int maxClients;
             static int threadPoolSize;
 
-            // �����ͺ��̽� ����
+            // DB 관련
             static std::string dbHost;
             static std::string dbPort;
             static std::string dbUser;
@@ -117,16 +117,14 @@ namespace Blokus {
             static std::string dbConnectionString;
             static int dbPoolSize;
 
-            // ���� ����
+            // 인증 및 세션 관련
             static std::string jwtSecret;
             static int sessionTimeoutHours;
             static int passwordSaltRounds;
 
-            // �α� ����
+            // 디버깅 관련
             static std::string logLevel;
             static std::string logDirectory;
-
-            // ���� ����
             static bool debugMode;
             static bool enableSqlLogging;
 
