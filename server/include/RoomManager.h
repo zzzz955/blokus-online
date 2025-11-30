@@ -31,82 +31,79 @@ namespace Blokus {
             void setDatabaseManager(std::shared_ptr<DatabaseManager> dbManager);
             std::shared_ptr<DatabaseManager> getDatabaseManager() const;
 
-            // �� ����/����
+            // 방 생성 관련
             int createRoom(const std::string& hostId, const std::string& hostUsername,
                 const std::string& roomName, bool isPrivate = false,
                 const std::string& password = "");
             bool removeRoom(int roomId);
             void removeAllRooms();
 
-            // �� ����
+            // 방 정보 관련
             GameRoomPtr getRoom(int roomId);
             const GameRoomPtr getRoom(int roomId) const;
             bool hasRoom(int roomId) const;
 
-            // �÷��̾� �� ����
+            // 방 입장/퇴장 관련
             bool joinRoom(int roomId, SessionPtr session, const std::string& userId,
                 const std::string& username, const std::string& password = "");
             bool leaveRoom(const std::string& userId);
             bool leaveRoom(int roomId, const std::string& userId);
 
-            // �÷��̾� ���� ����
+            // 방 상태 관련
             bool setPlayerReady(const std::string& userId, bool ready);
             bool startGame(const std::string& hostId);
             bool endGame(int roomId);
-
-            // ȣ��Ʈ ����
             bool transferHost(int roomId, const std::string& currentHostId, const std::string& newHostId);
 
-            // �� �˻�/���
+            // 방 정보 관련
             std::vector<Common::RoomInfo> getRoomList() const;
             std::vector<GameRoomPtr> findRooms(std::function<bool(const GameRoom&)> predicate) const;
             std::vector<GameRoomPtr> getWaitingRooms() const;
             std::vector<GameRoomPtr> getPlayingRooms() const;
 
-            // �÷��̾� �˻�
+            // 클라이언트-방 매칭 정보 관련
             GameRoomPtr findPlayerRoom(const std::string& userId) const;
             bool isPlayerInRoom(const std::string& userId) const;
             bool isPlayerInGame(const std::string& userId) const;
 
-            // ���
+            // 방 통계 관련
             size_t getRoomCount() const;
             size_t getTotalPlayers() const;
             size_t getWaitingRoomCount() const;
             size_t getPlayingRoomCount() const;
 
-            // ��������
+            // 방 정리 관련
             void cleanupEmptyRooms();
             void cleanupInactiveRooms(std::chrono::minutes threshold = std::chrono::minutes(30));
             void cleanupDisconnectedPlayers();
             void performPeriodicCleanup();
 
-            // ��ε�ĳ����
+            // 브로드캐스팅 관련
             void broadcastToAllRooms(const std::string& message);
             void broadcastToWaitingRooms(const std::string& message);
             void broadcastToPlayingRooms(const std::string& message);
 
-            // ����
+            // 방 초기화 관련
             void setMaxRooms(size_t maxRooms) { m_maxRooms = maxRooms; }
             void setMaxPlayersPerRoom(size_t maxPlayers) { m_maxPlayersPerRoom = maxPlayers; }
             size_t getMaxRooms() const { return m_maxRooms; }
 
-            // �ݹ� ���� (�̺�Ʈ ó����)
             using RoomEventCallback = std::function<void(int roomId, const std::string& event, const std::string& data)>;
             void setRoomEventCallback(RoomEventCallback callback) { m_eventCallback = callback; }
 
         private:
-            // �� �����
+            // 생성된 방 목록
             std::unordered_map<int, GameRoomPtr> m_rooms;
             mutable std::shared_mutex m_roomsMutex;
 
-            // �÷��̾�-�� ���� (���� �˻��� ����)
+            // 방 인원
             std::unordered_map<std::string, int> m_playerToRoom;
             mutable std::shared_mutex m_playerMappingMutex;
 
-            // �� ID ����
+            // 방 ID관련, 1000부터 오름차순 배정
             std::atomic<int> m_nextRoomId;
 
-            // ����
+            // 방 초기화
             size_t m_maxRooms;
             size_t m_maxPlayersPerRoom;
 
@@ -123,22 +120,20 @@ namespace Blokus {
             void removePlayerMapping(const std::string& userId);
             int getPlayerRoomId(const std::string& userId) const;
 
-            // ���� �Լ���
+            // 방 정리
             void cleanupSingleRoom(GameRoomPtr room);
             bool shouldRemoveRoom(const GameRoom& room) const;
 
-            // �̺�Ʈ �߻�
+            // 방 이벤트
             void triggerRoomEvent(int roomId, const std::string& event, const std::string& data = "");
-
-            // ��� ����
             void updateStatistics();
         };
 
         // ========================================
-        // ���� �Լ���
+        // inline함수들
         // ========================================
 
-        // �� ���� Ȯ�� �Լ���
+        // 방 상태 반환
         inline bool isRoomWaiting(const GameRoom& room) {
             return room.getState() == RoomState::Waiting;
         }

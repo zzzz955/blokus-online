@@ -10,51 +10,47 @@ namespace Blokus {
     namespace Server {
 
         // ========================================
-        // ���� ����
+        // 전방 선언
         // ========================================
         class ClientSession;
         class GameRoom;
         class UserInfo;
 
         // ========================================
-        // Ÿ�� ��Ī ����
+        // 셰어드 포인터 using 선언
         // ========================================
         using ClientSessionPtr = std::shared_ptr<ClientSession>;
         using GameRoomPtr = std::shared_ptr<GameRoom>;
         using UserInfoPtr = std::shared_ptr<UserInfo>;
 
         // ========================================
-        // ���� ���
+        // 환경 변수 fallback
         // ========================================
-        constexpr uint16_t DEFAULT_SERVER_PORT = 7777;
+        constexpr uint16_t DEFAULT_SERVER_PORT = 9999;
         constexpr int MAX_CONCURRENT_USERS = 1000;
         constexpr int DEFAULT_THREAD_POOL_SIZE = 4;
         constexpr int MAX_ROOM_COUNT = 100;
         constexpr int MAX_PLAYERS_PER_ROOM = 4;
-
-        // ��Ʈ��ũ ���� ���
         constexpr int SOCKET_BUFFER_SIZE = 65536;  // 64KB
         constexpr int MAX_MESSAGE_SIZE = 1024 * 1024;  // 1MB
         constexpr std::chrono::seconds CLIENT_TIMEOUT{ 30 };
         constexpr std::chrono::seconds HEARTBEAT_INTERVAL{ 10 };
-
-        // ���� ���� ���
-        constexpr std::chrono::seconds TURN_TIMEOUT{ 120 };  // 2��
-        constexpr std::chrono::seconds ROOM_IDLE_TIMEOUT{ 600 };  // 10��
+        constexpr std::chrono::seconds TURN_TIMEOUT{ 120 };  // 2분
+        constexpr std::chrono::seconds ROOM_IDLE_TIMEOUT{ 600 };  // 10분
 
         // ========================================
-        // ������ ����
+        // Protobuf용 enumclass 정의(미사용)
         // ========================================
 
-        // Ŭ���̾�Ʈ ���� ����
+        // 클라이언트 상태 정의
         enum class ConnectionState {
-            Connected,       // �����
-            InLobby,        // �κ� ����
-            InRoom,         // �濡 ����
-            InGame,         // ���� ��
+            Connected,
+            InLobby,
+            InRoom,
+            InGame
         };
 
-        // ���� ����
+        // 세션 상태 정의
         enum class SessionState {
             Active,
             Idle,
@@ -62,34 +58,34 @@ namespace Blokus {
             Invalid
         };
 
-        // �� ����
+        // 룸 상태 정의
         enum class RoomState {
-            Waiting,    // ��� ��
-            Playing,    // ���� ��
-            Disbanded   // �� ��ü
+            Waiting,
+            Playing,
+            Disbanded
         };
 
-        // �޽��� Ÿ�� (Ȯ��� ����)
+        // 메시지타입 정의
         enum class MessageType {
             Unknown = 0,
 
-            // �⺻ ��� (1-99)
+            // 세션 상태 관련 (1-99)
             Ping = 1,
 
-            // ���� ���� (100-199)
+            // 인증 관련 (100-199)
             Auth = 100,
             Register = 101,
             Guest = 102,
             Logout = 103,
             Validate = 104,
 
-            // �κ� ���� (200-299)
+            // 로비 관련 (200-299)
             Lobby = 200,
             LobbyEnter = 201,
             LobbyLeave = 202,
             LobbyList = 203,
 
-            // �� ���� (300-399)
+            // 방 관련 (300-399)
             Room = 300,
             RoomCreate = 301,
             RoomJoin = 302,
@@ -100,13 +96,13 @@ namespace Blokus {
             RoomEnd = 307,
             RoomTransferHost = 308,
 
-            // ���� ���� (400-499)
+            // 게임 관련 (400-499)
             Game = 400,
             GameMove = 401,
             GameEnd = 402,
             GameResultResponse = 403,
 
-            // ä�� ���� (500-599)
+            // 채팅 관련 (500-599)
             Chat = 500,
 
             // 유저 관련 (600-699)
@@ -117,15 +113,14 @@ namespace Blokus {
             // 버전 관련 (700-799)
             VersionCheck = 700,
 
-            // ���� ���� (900-999)
+            // 에러코드 (900-999)
             Error = 900
         };
 
-        // MessageType ���ڿ� ��ȯ �Լ�
         MessageType parseMessageType(const std::string& messageStr);
         std::string messageTypeToString(MessageType type);
 
-        // �޽��� ó�� ���
+        // 요청 결과
         enum class MessageResult {
             Success,
             Failed,
@@ -134,7 +129,7 @@ namespace Blokus {
             InternalError
         };
 
-        // ���� ���� �ڵ�
+        // 서버에러 정의
         enum class ServerErrorCode {
             None = 0,
             ConnectionFailed = 1000,
@@ -157,27 +152,26 @@ namespace Blokus {
         };
 
         // ========================================
-        // ����ü ���� (���� ���� ���ŵ�)
+        // 서버 상태 관련
         // ========================================
 
-        // ���� ��� ���� (��Ÿ�� ����)
         struct ServerStats {
-            // ���� ���
+            // 연결 관련
             int currentConnections = 0;
             int totalConnectionsToday = 0;
             int peakConcurrentConnections = 0;
 
-            // �� ���
+            // 게임 세션 관련
             int activeRooms = 0;
             int gamesInProgress = 0;
             int totalGamesToday = 0;
 
-            // ���� ���
+            // OS 관련
             double cpuUsage = 0.0;
             double memoryUsage = 0.0;
             double networkLatency = 0.0;
 
-            // �޽��� ���
+            // 메시지 관련
             uint64_t messagesReceived = 0;
             uint64_t messagesSent = 0;
             uint64_t bytesReceived = 0;
@@ -187,7 +181,7 @@ namespace Blokus {
             std::chrono::system_clock::time_point lastStatsUpdate;
         };
 
-        // 사용자 설정 구조체
+        // 사용자 설정 구조체(PC클라이언트 전용)
         struct UserSettings {
             // UI 설정
             std::string theme = "dark";          // "dark" 또는 "light"
@@ -228,7 +222,7 @@ namespace Blokus {
             }
         };
 
-        // Ŭ���̾�Ʈ ���� ����
+        // 세션 정보(미사용, Session클래스에서 정의)
         struct ClientSession {
             std::string sessionId;
             std::string username;
@@ -242,21 +236,12 @@ namespace Blokus {
             std::string clientVersion;
             std::string ipAddress;
 
-            // ���
             uint64_t messagesSent = 0;
             uint64_t messagesReceived = 0;
             double averageLatency = 0.0;
         };
 
-        // ========================================
-        // �Լ� Ÿ�� ����
-        // ========================================
         using MessageHandlerFunc = std::function<MessageResult(ClientSessionPtr, const std::string&)>;
         using ErrorCallback = std::function<void(const std::string&, const std::exception&)>;
-
-        // ========================================
-        // ��ƿ��Ƽ �Լ���
-        // ========================================
-
     } // namespace Server
 } // namespace Blokus

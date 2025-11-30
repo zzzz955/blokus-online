@@ -7,7 +7,7 @@
 
 namespace Blokus::Server
 {
-    // VersionManager constructor
+    // 버전 매니저 생성자
     VersionManager::VersionManager()
     {
         initializeServerVersion();
@@ -17,7 +17,7 @@ namespace Blokus::Server
                      serverVersion_.version, downloadUrl_);
     }
 
-    // Version constructor
+    // 버전 매니저 생성자(오버라이딩)
     VersionManager::Version::Version(const std::string &ver, const std::string &date,
                                      const std::string &commit, const std::string &branch, bool prod)
         : version(ver), buildDate(date), gitCommit(commit), gitBranch(branch), isProduction(prod)
@@ -41,7 +41,7 @@ namespace Blokus::Server
         }
     }
 
-    // Initialize server version from ConfigManager
+    // 환경변수 기반 서버 버전 초기화
     void VersionManager::initializeServerVersion()
     {
         serverVersion_ = Version(
@@ -58,7 +58,7 @@ namespace Blokus::Server
                      serverVersion_.gitCommit);
     }
 
-    // Load compatibility settings from ConfigManager
+    // 다운로드 페이지 URL 초기화
     void VersionManager::loadCompatibilitySettings()
     {
         downloadUrl_ = ConfigManager::downloadUrl;
@@ -66,8 +66,8 @@ namespace Blokus::Server
 
     bool VersionManager::Version::isCompatibleWith(const std::string &clientVersion) const
     {
-        // Server-Client version compatibility check
-        // Rule: Server X.Y.Z is compatible with Client X.Y.0~X.Y.9
+        // 서버-클라이언트 버전 체크
+        // 규칙: 서버 버전 X.Y.Z 중 클라이언트 버전 X.Y.0~X.Y.9와 일치
         auto serverParts = VersionManager::parseVersion(version);
         auto clientParts = VersionManager::parseVersion(clientVersion);
 
@@ -76,9 +76,9 @@ namespace Blokus::Server
             return false;
         }
 
-        // Major and Minor versions must match exactly
-        // Server 1.0.0 supports Client 1.0.0~1.0.9
-        // Server 1.1.0 supports Client 1.1.0~1.1.9
+        // 반드시 아래와 같이 일치해야함
+        // 예시1) 서버 1.0.0 클라이언트 1.0.0~1.0.9 지원
+        // 예시2) 서버 1.1.0 클라이언트 1.1.0~1.1.9 지원
         return (serverParts[0] == clientParts[0]) && (serverParts[1] == clientParts[1]);
     }
 
@@ -100,7 +100,7 @@ namespace Blokus::Server
                 return 1;
         }
 
-        return 0; // Equal
+        return 0; // 일치
     }
 
     VersionManager::CompatibilityInfo VersionManager::checkCompatibility(
@@ -109,10 +109,10 @@ namespace Blokus::Server
         CompatibilityInfo info;
         info.downloadUrl = downloadUrl_;
 
-        // Check server-client compatibility (Major.Minor versions must match)
+        // 서버-클라이언트 버전 체크
         info.compatible = serverVersion_.isCompatibleWith(clientVersion);
 
-        // Generate appropriate message
+        // 불일치할 경우 새로운 클라이언트 다운로드 필요 안내
         if (!info.compatible)
         {
             info.message = "서버 버전(" + serverVersion_.version + ")과 호환되지 않는 클라이언트 버전(" + 
@@ -147,7 +147,7 @@ namespace Blokus::Server
                 return false;
         }
 
-        return false; // Equal versions
+        return false;
     }
 
     std::vector<int> VersionManager::parseVersion(const std::string &version)
@@ -156,7 +156,7 @@ namespace Blokus::Server
         std::stringstream ss(version);
         std::string part;
 
-        // Handle 'v' prefix
+        // v문자를 제외한 버전 파싱
         std::string cleanVersion = version;
         if (!cleanVersion.empty() && cleanVersion[0] == 'v')
         {
@@ -173,7 +173,7 @@ namespace Blokus::Server
             }
             catch (const std::exception &)
             {
-                // Invalid version part, skip
+                // 버전 관련 문자열이 잘못된 경우 예외 처리
                 break;
             }
         }

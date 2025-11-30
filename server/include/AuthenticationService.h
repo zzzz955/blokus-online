@@ -12,11 +12,11 @@
 namespace Blokus {
     namespace Server {
 
-        // ���� ����
+        // 전방 선언
         class DatabaseManager;
 
         // ========================================
-        // ���� ��� ����ü
+        // 인증 정보 메시지
         // ========================================
         struct AuthResult {
             bool success;
@@ -52,100 +52,80 @@ namespace Blokus {
         };
 
         // ========================================
-        // ���� ���� Ŭ����
+        // 인증 서비스 관련 클래스
         // ========================================
         class AuthenticationService {
         public:
             explicit AuthenticationService(std::shared_ptr<DatabaseManager> dbManager = nullptr);
             ~AuthenticationService();
 
-            // �ʱ�ȭ
+            // 초기화 및 종료
             bool initialize();
             void shutdown();
 
-            // ========================================
-            // ȸ������/�α��� (���� ���� - �ܼ�ȭ)
-            // ========================================
-
-            // ȸ������
+            // 계정 생성
             RegisterResult registerUser(const std::string& username, const std::string& password);
 
-            // �α��� (���̵�/�н�����)
+            // ID/PW 로그인
             AuthResult loginUser(const std::string& username, const std::string& password);
 
-            // �Խ�Ʈ �α��� (�ӽ� ����)
+            // 게스트 로그인(미사용)
             AuthResult loginGuest(const std::string& guestName = "");
 
-            // JWT ��ū �α���
+            // JWT 로그인
             AuthResult loginWithJwt(const std::string& jwtToken);
 
             // 모바일 클라이언트 전용 간소화된 인증 (사전 검증된 토큰)
             AuthResult authenticateMobileClient(const std::string& accessToken);
 
-            // �α׾ƿ�
+            // 로그아웃
             bool logoutUser(const std::string& sessionToken);
 
-            // ========================================
-            // ���� ����
-            // ========================================
-
-            // ���� ����
+            // 세션 유효 확인
             std::optional<SessionInfo> validateSession(const std::string& sessionToken);
 
-            // ���� ����
+            // 세션 갱신
             bool refreshSession(const std::string& sessionToken);
 
-            // ��� ���� ��ȿȭ (��й�ȣ ���� �� ��)
+            // 세션 무효화
             bool invalidateAllUserSessions(const std::string& userId);
 
-            // ����� ���� ����
+            // 만료 세션 제거
             void cleanupExpiredSessions();
 
-            // ========================================
-            // ���� ����
-            // ========================================
-
-
-            // ========================================
-            // ���� �Լ���
-            // ========================================
-
-            // ����ڸ�/�̸��� �ߺ� Ȯ��
+            // 유저 이름 사용 가능여부 확인
             bool isUsernameAvailable(const std::string& username);
 
-            // �Է� ������ ����
+            // 정규식 검증
             bool validateUsername(const std::string& username) const;
             bool validateEmail(const std::string& email) const;
             bool validatePassword(const std::string& password) const;
 
-            // ========================================
-            // ��� �� ����
-            // ========================================
             size_t getActiveSessionCount() const;
 
         private:
-            // ��ȣȭ/�ؽ�
+            // 비밀번호 암호화/검증
             std::string hashPassword(const std::string& password) const;
             std::string generateSalt() const;
             bool verifyPassword(const std::string& password, const std::string& hash) const;
 
-            // ���� ��ū ����
+            // 세션 토큰 생성 및 초기화
             std::string generateSessionToken() const;
             std::string generateResetToken() const;
 
-            // ���� ���� �ð� ���
+            // 세션 만료 시간 반환
             std::chrono::system_clock::time_point getSessionExpireTime() const;
 
-            // �Խ�Ʈ ���� ����
+            // 게스트 관련(미사용)
             std::string generateGuestUsername();
             std::string generateGuestUserId() const;
 
-            // ���� ���� �Լ���
+            // 세션 생성 및 제거
             bool storeSession(const std::string& token, const std::string& userId, const std::string& username);
             bool removeSession(const std::string& token);
             std::optional<SessionInfo> getSessionInfo(const std::string& token) const;
 
-            // �Է� ������ ����ȭ
+            // 이름/이메일 검증용
             std::string normalizeUsername(const std::string& username) const;
             std::string normalizeEmail(const std::string& email) const;
 
@@ -153,19 +133,19 @@ namespace Blokus {
             std::shared_ptr<DatabaseManager> m_dbManager;
             std::unique_ptr<JwtVerifier> m_jwtVerifier;
 
-            // ���� ����� (�޸� ��� - �ܼ�ȭ)
+            // 세션 뮤텍스
             mutable std::mutex m_sessionsMutex;
             std::unordered_map<std::string, SessionInfo> m_activeSessions;
 
-            // ����
-            std::chrono::hours m_sessionDuration{ 24 };        // ���� ��ȿ �Ⱓ
-            std::chrono::minutes m_resetTokenDuration{ 30 };   // ���� ��ū ��ȿ �Ⱓ
-            int m_minPasswordLength{ 6 };                      // �ּ� ��й�ȣ ����
-            int m_maxUsernameLength{ 20 };                     // �ִ� ����ڸ� ����
-            int m_minUsernameLength{ 3 };                      // �ּ� ����ڸ� ����
+            // 세션 관리용
+            std::chrono::hours m_sessionDuration{ 24 };
+            std::chrono::minutes m_resetTokenDuration{ 30 };
+            int m_minPasswordLength{ 6 };
+            int m_maxUsernameLength{ 20 };
+            int m_minUsernameLength{ 3 };
 
             std::atomic<bool> m_isInitialized{ false };
-            std::atomic<uint32_t> m_guestCounter{ 1000 };      // �Խ�Ʈ ��ȣ ī����
+            std::atomic<uint32_t> m_guestCounter{ 1000 };
         };
 
     } // namespace Server
