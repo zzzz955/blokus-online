@@ -643,21 +643,7 @@ namespace Features.Multi.UI
             // TODO: Toast 메시지 표시
         }
         
-        /// <summary>
-        /// Android 뒤로가기 버튼 처리
-        /// </summary>
-        void Update()
-        {
-            if (Input.GetKeyDown(KeyCode.Escape))
-            {
-                // 모달이 활성화된 경우 무시 (모달에서 처리)
-                if (logoutConfirmModal != null && logoutConfirmModal.gameObject.activeInHierarchy)
-                    return;
-                
-                // 로그아웃 확인 모달 표시
-                OnLogoutButtonClicked();
-            }
-        }
+        // Android 뒤로가기 처리는 BackButtonManager에서 전역 관리
 
         // ========================================
         // Public API (for Room Item UI)

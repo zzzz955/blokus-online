@@ -20,7 +20,7 @@ namespace Features.Single.UI.Scene
         [SerializeField] private bool verboseLog = true;
 
         [Header("Back Button & Modals")]
-        [SerializeField] private ConfirmModal exitConfirmModal; // 게임 종료 확인 모달
+        [SerializeField] private ConfirmModal exitConfirmModal; // 게임 나가기 확인 모달
         [SerializeField] private Features.Single.UI.StageSelect.StageInfoModal stageInfoModal; // 스테이지 정보 모달
 
         private void Awake()
@@ -56,54 +56,7 @@ namespace Features.Single.UI.Scene
             SingleGameManager.OnGameReady -= HandleGameReady;
         }
 
-        private void Update()
-        {
-            // Android 뒤로가기 버튼 처리 (에뮬레이터에서는 ESC키)
-            if (Input.GetKeyDown(KeyCode.Escape))
-            {
-                OnAndroidBackButtonPressed();
-            }
-        }
-
-        /// <summary>
-        /// Android 뒤로가기 버튼 클릭 시 처리
-        /// </summary>
-        private void OnAndroidBackButtonPressed()
-        {
-            // 1순위: StageInfoModal이 활성화되어 있으면 모달만 닫기
-            if (stageInfoModal != null && stageInfoModal.gameObject.activeInHierarchy)
-            {
-                Debug.Log("[SingleGameplayUIScreenController] StageInfoModal 활성 상태 - 모달만 닫기");
-                stageInfoModal.HideModal();
-                return;
-            }
-
-            // 2순위: ExitConfirmModal이 활성화되어 있으면 무시
-            if (exitConfirmModal != null && exitConfirmModal.gameObject.activeInHierarchy)
-            {
-                Debug.Log("[SingleGameplayUIScreenController] ExitConfirmModal이 이미 표시 중");
-                return;
-            }
-
-            // GamePanel이 활성화되어 있는지 확인
-            bool isGamePanelActive = gamePanelRoot != null && gamePanelRoot.activeSelf;
-            bool isStageSelectPanelActive = stageSelectPanelRoot != null && stageSelectPanelRoot.activeSelf;
-
-            if (isStageSelectPanelActive && !isGamePanelActive)
-            {
-                // StageSelectPanel이 활성화되어 있고 GamePanel이 비활성화 → BackButton과 동일한 이벤트
-                HandleBackButtonFromStageSelect();
-            }
-            else if (isGamePanelActive)
-            {
-                // GamePanel이 활성화 → TopBarUI.OnClickExit과 동일한 이벤트
-                HandleExitButtonFromGame();
-            }
-            else
-            {
-                Debug.LogWarning("[SingleGameplayUIScreenController] 알 수 없는 UI 상태");
-            }
-        }
+        // Android 뒤로가기 처리는 BackButtonManager에서 전역 관리
 
         /// <summary>
         /// StageSelectPanel에서 뒤로가기 - BackButton과 동일한 이벤트

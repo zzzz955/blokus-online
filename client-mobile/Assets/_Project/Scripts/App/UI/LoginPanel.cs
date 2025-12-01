@@ -35,7 +35,7 @@ namespace App.UI
         [SerializeField] private bool enableTestMode = false;
         [SerializeField] private string testUsername = "testuser";
         [SerializeField] private string testPassword = "testpass123";
-        
+
         /// <summary>
         /// 릴리즈 빌드에서는 테스트 모드 강제 비활성화
         /// </summary>
@@ -119,56 +119,7 @@ namespace App.UI
             }
         }
 
-        private void Update()
-        {
-            // Android 뒤로가기 버튼 처리 (에뮬레이터에서는 ESC키)
-            if (Input.GetKeyDown(KeyCode.Escape))
-            {
-                OnAndroidBackButtonPressed();
-            }
-        }
-
-        /// <summary>
-        /// Android 뒤로가기 버튼 클릭 시 처리
-        /// </summary>
-        private void OnAndroidBackButtonPressed()
-        {
-            Debug.Log("[LoginPanel] Android 뒤로가기 버튼 클릭됨");
-            
-            // 로그인 중이거나 게임 종료 모달이 이미 표시 중이면 무시
-            if (isAuthenticating)
-            {
-                Debug.Log("[LoginPanel] 로그인 중에는 뒤로가기 버튼 무시");
-                return;
-            }
-
-            if (gameExitModal != null && gameExitModal.gameObject.activeInHierarchy)
-            {
-                Debug.Log("[LoginPanel] 게임 종료 모달이 이미 표시 중");
-                return;
-            }
-
-            // GameExitModal 표시
-            if (gameExitModal != null)
-            {
-                Debug.Log("[LoginPanel] Android 뒤로가기 버튼 - 게임 종료 모달 표시");
-                Debug.Log($"[LoginPanel] GameExitModal 상태: gameObject={gameExitModal.gameObject != null}, active={gameExitModal.gameObject?.activeSelf}");
-                
-                gameExitModal.ShowModal();
-                
-                // ShowModal 호출 후 상태 재확인
-                Debug.Log($"[LoginPanel] ShowModal 호출 후 상태: active={gameExitModal.gameObject?.activeSelf}, activeInHierarchy={gameExitModal.gameObject?.activeInHierarchy}");
-            }
-            else
-            {
-                Debug.LogWarning("[LoginPanel] GameExitModal이 설정되지 않음 - 직접 종료");
-#if UNITY_EDITOR
-                UnityEditor.EditorApplication.isPlaying = false;
-#else
-                Application.Quit();
-#endif
-            }
-        }
+        // Android 뒤로가기 처리는 BackButtonManager에서 전역 관리
 
         // ==========================================
         // 초기화 및 설정
