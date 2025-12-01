@@ -1573,7 +1573,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cb25b109234184f4682d6699ffc34501, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  modalPanel: {fileID: 2073335998}
+  modalPanel: {fileID: 223714161}
   messageText: {fileID: 910333590}
   acceptButton: {fileID: 1094885481}
   backgroundButton: {fileID: 788614709}
@@ -4229,7 +4229,6 @@ MonoBehaviour:
   - {fileID: 1401648037}
   registerButton: {fileID: 1089548972}
   gameExitModal: {fileID: 223714163}
-  autoLoginWithRefreshToken: 1
   enableTestMode: 0
   testUsername: testuser
   testPassword: testpass
