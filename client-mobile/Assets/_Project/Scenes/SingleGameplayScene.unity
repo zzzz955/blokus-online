@@ -3511,6 +3511,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: -5011963343144279077, guid: 8e1bc3e17153f6e4ab65505b07bb7ffb, type: 2}
     - target: {fileID: 2342918327165154502, guid: a8b91b9c3ccebb745abbfd19eaae5d6c, type: 3}
+      propertyPath: m_text
+      value: "\uC9C4\uD589\uC911\uC778 \uAC8C\uC784\uC744 \uC885\uB8CC\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?"
+      objectReference: {fileID: 0}
+    - target: {fileID: 2342918327165154502, guid: a8b91b9c3ccebb745abbfd19eaae5d6c, type: 3}
       propertyPath: m_fontAsset
       value: 
       objectReference: {fileID: 11400000, guid: 8e1bc3e17153f6e4ab65505b07bb7ffb, type: 2}
@@ -3613,6 +3617,10 @@ PrefabInstance:
     - target: {fileID: 8517360527491790584, guid: a8b91b9c3ccebb745abbfd19eaae5d6c, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8862770375368528831, guid: a8b91b9c3ccebb745abbfd19eaae5d6c, type: 3}
+      propertyPath: m_text
+      value: "\uAC8C\uC784 \uC885\uB8CC"
       objectReference: {fileID: 0}
     - target: {fileID: 8862770375368528831, guid: a8b91b9c3ccebb745abbfd19eaae5d6c, type: 3}
       propertyPath: m_fontAsset

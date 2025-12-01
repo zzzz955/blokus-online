@@ -261,6 +261,19 @@ namespace Shared.UI{
                 onCancel
             );
         }
+
+        /// <summary>
+        /// 게임 종료 확인 모달을 위한 편의 메서드
+        /// </summary>
+        public void ShowBackToMainConfirmation(Action onConfirm, Action onCancel = null)
+        {
+            ShowModal(
+                "싱글 플레이 종료",
+                "정말 싱글 플레이 모드를 종료하시겠습니까?",
+                onConfirm,
+                onCancel
+            );
+        }
         
         /// <summary>
         /// 게임 종료 확인 모달을 위한 편의 메서드
@@ -269,7 +282,7 @@ namespace Shared.UI{
         {
             ShowModal(
                 "게임 종료",
-                "게임을 종료하고 스테이지 목록으로 돌아가시겠습니까?\n현재 진행상황이 저장됩니다.",
+                "게임을 종료하고 스테이지 목록으로 돌아가시겠습니까?",
                 onConfirm,
                 onCancel
             );

@@ -170,7 +170,7 @@ namespace App.UI
                 var exitConfirmModal = FindObjectOfType<ConfirmModal>(true);
                 if (exitConfirmModal != null)
                 {
-                    exitConfirmModal.ShowExitConfirmation(
+                    exitConfirmModal.ShowBackToMainConfirmation(
                         onConfirm: () => {
                             if (enableDebugLogs) Debug.Log("[BackButtonManager] MainScene으로 나가기 확인됨");
 
