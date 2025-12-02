@@ -44,6 +44,9 @@ namespace App.UI
         private UIState currentState = (UIState)(-1); // 초기값을 무효한 값으로 설정
         private PanelBase currentPanel;
 
+        // 버전 체크 응답 플래그
+        private bool versionCheckResponseReceived = false;
+
         public static UIManager Instance { get; private set; }
         
         /// <summary>
@@ -555,6 +558,149 @@ namespace App.UI
             // 멀티플레이 버튼 비활성화
             DisableMultiplayerButton();
 
+            // 버전 체크 먼저 수행
+            if (Features.Multi.Net.NetworkManager.Instance != null)
+            {
+                Debug.Log("[UIManager] NetworkManager 인스턴스 확인 완료 - 버전 체크 시작");
+
+                // 버전 체크 응답 이벤트 구독
+                Features.Multi.Net.NetworkManager.Instance.OnVersionCheckResponse += OnVersionCheckResponseReceived;
+
+                // 서버에 연결
+                StartCoroutine(ConnectAndCheckVersionCoroutine());
+            }
+            else
+            {
+                Debug.LogWarning("[UIManager] NetworkManager.Instance가 null입니다. 버전 체크 없이 진행합니다.");
+                ProceedToMultiplayerMode();
+            }
+        }
+
+        /// <summary>
+        /// 서버 연결 및 버전 체크 코루틴
+        /// </summary>
+        private System.Collections.IEnumerator ConnectAndCheckVersionCoroutine()
+        {
+            var networkManager = Features.Multi.Net.NetworkManager.Instance;
+
+            // 이미 연결되어 있지 않으면 연결
+            if (!networkManager.IsConnected())
+            {
+                Debug.Log("[UIManager] 서버에 연결 중...");
+                SystemMessageManager.ShowToast("서버에 연결 중...", MessagePriority.Info, 2f);
+
+                networkManager.ConnectToServer();
+
+                // 연결 대기 (최대 5초)
+                float waitTime = 0f;
+                float maxWaitTime = 5f;
+                while (!networkManager.IsConnected() && waitTime < maxWaitTime)
+                {
+                    yield return new WaitForSeconds(0.1f);
+                    waitTime += 0.1f;
+                }
+
+                if (!networkManager.IsConnected())
+                {
+                    Debug.LogError("[UIManager] 서버 연결 실패 - 타임아웃");
+                    SystemMessageManager.ShowToast("서버 연결에 실패했습니다.", MessagePriority.Error, 3f);
+
+                    // 버튼 재활성화
+                    EnableMultiplayerButton();
+
+                    // 이벤트 구독 해제
+                    networkManager.OnVersionCheckResponse -= OnVersionCheckResponseReceived;
+                    yield break;
+                }
+            }
+
+            Debug.Log("[UIManager] 서버 연결 완료 - 버전 체크 요청 전송");
+
+            // 버전 체크 응답 플래그 초기화
+            versionCheckResponseReceived = false;
+
+            // 버전 체크 요청 전송
+            bool versionCheckSent = networkManager.SendVersionCheckRequest();
+
+            if (!versionCheckSent)
+            {
+                Debug.LogWarning("[UIManager] 버전 체크 요청 전송 실패 - 그대로 진행합니다.");
+
+                // 이벤트 구독 해제
+                networkManager.OnVersionCheckResponse -= OnVersionCheckResponseReceived;
+
+                ProceedToMultiplayerMode();
+                yield break;
+            }
+
+            Debug.Log("[UIManager] 버전 체크 요청 전송 완료 - 응답 대기 중...");
+
+            // 버전 체크 응답 대기 (최대 5초)
+            float versionCheckWaitTime = 0f;
+            float versionCheckMaxWaitTime = 5f;
+            while (!versionCheckResponseReceived && versionCheckWaitTime < versionCheckMaxWaitTime)
+            {
+                yield return new WaitForSeconds(0.1f);
+                versionCheckWaitTime += 0.1f;
+            }
+
+            if (!versionCheckResponseReceived)
+            {
+                Debug.LogWarning("[UIManager] 버전 체크 응답 타임아웃 - 그대로 진행합니다.");
+                SystemMessageManager.ShowToast("버전 확인에 실패했습니다. 계속 진행합니다.", MessagePriority.Warning, 2f);
+
+                // 이벤트 구독 해제
+                networkManager.OnVersionCheckResponse -= OnVersionCheckResponseReceived;
+
+                // 타임아웃 시 그대로 진행
+                ProceedToMultiplayerMode();
+            }
+        }
+
+        /// <summary>
+        /// 버전 체크 응답 핸들러
+        /// </summary>
+        private void OnVersionCheckResponseReceived(bool isCompatible, string downloadUrl)
+        {
+            Debug.Log($"[UIManager] 버전 체크 응답 수신: 호환={isCompatible}");
+
+            // 응답 플래그 설정
+            versionCheckResponseReceived = true;
+
+            // 이벤트 구독 해제
+            if (Features.Multi.Net.NetworkManager.Instance != null)
+            {
+                Features.Multi.Net.NetworkManager.Instance.OnVersionCheckResponse -= OnVersionCheckResponseReceived;
+            }
+
+            if (isCompatible)
+            {
+                Debug.Log("[UIManager] 버전 호환 확인 - 멀티플레이 모드 진입");
+                ProceedToMultiplayerMode();
+            }
+            else
+            {
+                Debug.LogWarning("[UIManager] 버전 불일치 - 업데이트 모달 표시");
+
+                // 서버 연결 해제
+                if (Features.Multi.Net.NetworkManager.Instance != null)
+                {
+                    Features.Multi.Net.NetworkManager.Instance.DisconnectFromServer();
+                }
+
+                // 버전 불일치 모달 표시
+                ShowVersionMismatchModal(downloadUrl);
+
+                // 버튼 재활성화
+                EnableMultiplayerButton();
+            }
+        }
+
+        /// <summary>
+        /// 멀티플레이 모드로 실제 진입
+        /// </summary>
+        private void ProceedToMultiplayerMode()
+        {
             // Lobby BGM 재생 (멀티플레이 로비)
             PlayBGMSafe(BGMTrack.Lobby);
 
@@ -572,6 +718,59 @@ namespace App.UI
                 // 실패 시 버튼 재활성화
                 EnableMultiplayerButton();
             }
+        }
+
+        /// <summary>
+        /// 버전 불일치 모달 표시
+        /// </summary>
+        private void ShowVersionMismatchModal(string downloadUrl)
+        {
+            // VersionMismatchModal 찾기 (비활성 오브젝트 포함)
+            var versionModals = Resources.FindObjectsOfTypeAll<Features.Multi.UI.VersionMismatchModal>();
+            Features.Multi.UI.VersionMismatchModal versionModal = null;
+
+            // Scene에 있는 실제 modal 찾기 (Prefab 에셋 제외)
+            foreach (var modal in versionModals)
+            {
+                // Scene 계층 구조에 있는 오브젝트인지 확인 (Prefab 에셋이 아닌지)
+                if (modal.gameObject.scene.name != null)
+                {
+                    versionModal = modal;
+                    break;
+                }
+            }
+
+            if (versionModal == null)
+            {
+                Debug.LogWarning("[UIManager] VersionMismatchModal을 찾을 수 없습니다. 토스트 메시지로 대체합니다.");
+                SystemMessageManager.ShowToast("최신 버전으로 업데이트가 필요합니다.\n플레이스토어에서 최신 버전을 설치해주세요.", MessagePriority.Critical, 5f);
+
+                // 플레이스토어로 바로 이동
+                OpenPlayStore();
+            }
+            else
+            {
+                Debug.Log($"[UIManager] VersionMismatchModal 표시 (GameObject: {versionModal.gameObject.name})");
+                versionModal.Show(downloadUrl);
+            }
+        }
+
+        /// <summary>
+        /// 플레이스토어 열기 (폴백용)
+        /// </summary>
+        private void OpenPlayStore()
+        {
+            string packageName = "com.madalang.bloblo";
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+            string playStoreUrl = $"market://details?id={packageName}";
+            Debug.Log($"[UIManager] 플레이스토어 열기: {playStoreUrl}");
+            Application.OpenURL(playStoreUrl);
+#else
+            string webPlayStoreUrl = $"https://play.google.com/store/apps/details?id={packageName}";
+            Debug.Log($"[UIManager] 웹 플레이스토어 열기: {webPlayStoreUrl}");
+            Application.OpenURL(webPlayStoreUrl);
+#endif
         }
 
         /// <summary>

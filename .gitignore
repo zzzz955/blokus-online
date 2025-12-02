@@ -646,3 +646,6 @@ TCP_SERVER_AUTH_STRATEGY.md
 # Keystore
 **/Keystores/
 *.keystore
+
+# Host Server
+certbot/

@@ -310,15 +310,20 @@ namespace Features.Multi.Core
             bool connectionResult = false;
             bool connectionComplete = false;
 
-            networkManager.OnConnectionChanged += (connected) => {
+            // 이벤트 핸들러 정의 (중복 구독 방지를 위해 명시적으로 관리)
+            System.Action<bool> connectionHandler = (connected) => {
                 connectionResult = connected;
                 connectionComplete = true;
                 isNetworkConnected = connected;
                 Debug.Log($"[MultiCoreBootstrap] 연결 상태 변경: {connected}");
             };
 
+            // 이벤트 구독 (먼저 해제하여 중복 방지)
+            networkManager.OnConnectionChanged -= connectionHandler;
+            networkManager.OnConnectionChanged += connectionHandler;
+
             Debug.Log($"[MultiCoreBootstrap] 서버 연결 시도: {networkManager.GetStatusInfo()}");
-            
+
             // NetworkSetup에서 설정된 서버 정보 재확인 및 동기화
             var networkSetup = FindObjectOfType<NetworkSetup>();
             if (networkSetup != null)
@@ -330,7 +335,7 @@ namespace Features.Multi.Core
             {
                 Debug.LogWarning("[MultiCoreBootstrap] NetworkSetup이 없음 - 기본 서버 정보 사용");
             }
-            
+
             networkManager.ConnectToServer();
 
             // 연결 완료까지 대기 (최대 10초)
@@ -341,11 +346,14 @@ namespace Features.Multi.Core
                 timeout -= 0.1f;
             }
 
+            // 이벤트 구독 해제 (메모리 누수 방지)
+            networkManager.OnConnectionChanged -= connectionHandler;
+
             if (!connectionComplete || !connectionResult)
             {
                 Debug.LogError("[MultiCoreBootstrap] TCP 서버 연결 실패");
                 isNetworkConnected = false;
-                
+
                 // 연결 실패 시 MainScene으로 복귀
                 HandleConnectionFailure("멀티플레이어 서버 연결에 실패했습니다.");
                 yield break;
@@ -365,10 +373,9 @@ namespace Features.Multi.Core
                 Debug.LogError("[MultiCoreBootstrap] NetworkManager Instance가 없습니다.");
                 yield break;
             }
-            
-            // 이미 인증된 상태인지 확인
-            // 매번 JWT 토큰 기반 인증 수행 (캐시된 인증 상태 무시)
-            Debug.Log("[MultiCoreBootstrap] TCP 서버 연결 시도 - 매번 JWT 토큰 기반 인증 수행");
+
+            // 항상 JWT 토큰 기반 인증 수행 (로그아웃 후 재진입 시 재인증 필요)
+            Debug.Log("[MultiCoreBootstrap] TCP 서버 연결 및 JWT 토큰 기반 인증 수행");
 
             if (loadingOverlay != null)
                 LoadingOverlay.Show("사용자 인증 중...");
@@ -743,19 +750,14 @@ namespace Features.Multi.Core
             Debug.Log("[MultiCoreBootstrap] MultiCore 전용 DontDestroyOnLoad 객체들 정리 시작");
             Debug.Log("[MultiCoreBootstrap] NetworkManager는 AppPersistent 관리, NetworkClient/MessageHandler는 컴포넌트이므로 제외");
 
-            // 1. UnityMainThreadDispatcher 정리
+            // 1. UnityMainThreadDispatcher는 NetworkClient가 계속 사용하므로 정리하지 않음
+            // NetworkClient는 DontDestroyOnLoad 싱글톤으로 재진입 시에도 동일한 인스턴스를 사용하며,
+            // UnityMainThreadDispatcher를 통해 메시지를 메인 스레드로 디스패치함
+            // 로그아웃 후 재진입 시 UnityMainThreadDispatcher가 없으면 메시지 처리가 불가능하여
+            // 버전 체크 응답이 5초 타임아웃까지 처리되지 않는 문제가 발생함
             if (UnityMainThreadDispatcher.Instance != null)
             {
-                Debug.Log("[MultiCoreBootstrap] UnityMainThreadDispatcher 정리 중...");
-                try
-                {
-                    Destroy(UnityMainThreadDispatcher.Instance.gameObject);
-                    // Instance는 OnDestroy에서 자동으로 null이 됨
-                }
-                catch (System.Exception ex)
-                {
-                    Debug.LogError($"[MultiCoreBootstrap] UnityMainThreadDispatcher 정리 중 오류: {ex.Message}");
-                }
+                Debug.Log("[MultiCoreBootstrap] UnityMainThreadDispatcher는 NetworkClient가 사용 중이므로 유지");
             }
 
             // 2. MultiUserDataCache 정리 (deprecated이지만 혹시 남아있을 수 있음)

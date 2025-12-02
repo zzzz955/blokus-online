@@ -39,6 +39,8 @@ namespace Features.Multi
             InitializeScene();
         }
 
+        // Android 뒤로가기 처리는 BackButtonManager에서 전역 관리
+
         /// <summary>
         /// 씬 초기화
         /// </summary>

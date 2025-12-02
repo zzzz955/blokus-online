@@ -121,10 +121,23 @@ namespace Features.Multi.UI
                 return;
             }
             
-            // 플레이어 이름
+            // 플레이어 이름 (탈주 상태 표시 포함)
             if (playerNameText != null)
             {
-                playerNameText.text = playerData.playerName;
+                string displayName = playerData.playerName;
+
+                // 탈주 상태인 경우 "(탈주)" 텍스트 추가 및 색상 변경
+                if (playerData.isDisconnected)
+                {
+                    displayName += " (탈주)";
+                    playerNameText.color = new Color(0.7f, 0.7f, 0.7f, 1f); // 회색으로 표시
+                }
+                else
+                {
+                    playerNameText.color = Color.white; // 기본 색상
+                }
+
+                playerNameText.text = displayName;
             }
             else
             {
@@ -180,7 +193,8 @@ namespace Features.Multi.UI
             if (kickButton != null)
             {
                 bool canKick = isHost && !playerData.isHost && playerData.playerId != GetMyPlayerId();
-                kickButton.gameObject.SetActive(canKick);
+                // 서버 강퇴 기능 미구현으로 우선 주석 처리
+                // kickButton.gameObject.SetActive(canKick);
             }
         }
         
@@ -242,12 +256,22 @@ namespace Features.Multi.UI
         /// </summary>
         public void SetTurnHighlight(bool highlight)
         {
+            // 탈주한 플레이어는 하이라이트 적용하지 않음
+            if (playerData.isDisconnected)
+            {
+                if (playerNameText != null)
+                {
+                    playerNameText.color = new Color(0.7f, 0.7f, 0.7f, 1f); // 회색 유지
+                }
+                return;
+            }
+
             // 턴 하이라이트 효과 - 플레이어 이름 색상 변경으로 표시
             if (playerNameText != null)
             {
                 playerNameText.color = highlight ? Color.yellow : Color.white;
             }
-            
+
             // 또는 준비 상태 표시기에 노란색 테두리 등 추가 효과 가능
             // 현재는 이름 색상 변경으로 턴 표시
         }
@@ -330,6 +354,7 @@ namespace Features.Multi.UI
         public int colorIndex; // 플레이어 색상 인덱스 (0=빨강, 1=파랑, 2=노랑, 3=초록)
         public int currentScore;      // 현재 점수
         public int remainingBlocks;   // 남은 블록 개수
+        public bool isDisconnected;   // 게임 중 탈주 여부 (게임 종료 시까지 데이터 보존용)
         
         /// <summary>
         /// 빈 슬롯인지 확인
@@ -362,7 +387,8 @@ namespace Features.Multi.UI
             isHost = false,
             colorIndex = -1,
             currentScore = 0,
-            remainingBlocks = 0
+            remainingBlocks = 0,
+            isDisconnected = false
         };
     }
 }

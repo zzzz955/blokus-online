@@ -193,6 +193,9 @@ namespace Features.Multi.Net
             add { if (messageHandler != null) messageHandler.OnGameResultReceived += value; }
             remove { if (messageHandler != null) messageHandler.OnGameResultReceived -= value; }
         }
+
+        // 버전 체크 관련 이벤트
+        public event System.Action<bool, string> OnVersionCheckResponse; // 성공여부, downloadUrl (옵션)
         
         void Awake()
         {
@@ -237,35 +240,48 @@ namespace Features.Multi.Net
             {
                 networkClient = gameObject.AddComponent<NetworkClient>();
             }
-            
+
             // MessageHandler 컴포넌트 확인/추가
             messageHandler = GetComponent<MessageHandler>();
             if (messageHandler == null)
             {
                 messageHandler = gameObject.AddComponent<MessageHandler>();
             }
-            
+
             // 토큰 검증 서비스 초기화 (EnvironmentModeManager에서 자동으로 URL 설정)
             tokenVerificationService = new TokenVerificationService(null);
-            
-            // 연결 상태 변경 이벤트 구독
+
+            // 연결 상태 변경 이벤트 구독 (중복 구독 방지: 먼저 구독 해제)
+            networkClient.OnConnectionChanged -= OnConnectionStatusChanged;
             networkClient.OnConnectionChanged += OnConnectionStatusChanged;
+            networkClient.OnError -= OnNetworkError;
             networkClient.OnError += OnNetworkError;
-            
-            // 사용자 정보 업데이트 이벤트 구독
+
+            // 사용자 정보 업데이트 이벤트 구독 (중복 구독 방지: 먼저 구독 해제)
             if (messageHandler != null)
             {
+                messageHandler.OnMyStatsUpdated -= OnMyStatsUpdatedHandler;
                 messageHandler.OnMyStatsUpdated += OnMyStatsUpdatedHandler;
+                messageHandler.OnRoomCreated -= OnRoomCreatedHandler;
                 messageHandler.OnRoomCreated += OnRoomCreatedHandler;
+                messageHandler.OnRoomJoined -= OnRoomJoinedHandler;
                 messageHandler.OnRoomJoined += OnRoomJoinedHandler;
+                messageHandler.OnRoomLeft -= OnRoomLeftHandler;
                 messageHandler.OnRoomLeft += OnRoomLeftHandler;
+                messageHandler.OnRoomInfoUpdated -= OnRoomInfoUpdatedHandler;
                 messageHandler.OnRoomInfoUpdated += OnRoomInfoUpdatedHandler;
+                messageHandler.OnPlayerJoined -= OnPlayerJoinedHandler;
                 messageHandler.OnPlayerJoined += OnPlayerJoinedHandler;
+                messageHandler.OnPlayerLeft -= OnPlayerLeftHandler;
                 messageHandler.OnPlayerLeft += OnPlayerLeftHandler;
+                messageHandler.OnPlayerReadyChanged -= OnPlayerReadyChangedHandler;
                 messageHandler.OnPlayerReadyChanged += OnPlayerReadyChangedHandler;
+                messageHandler.OnPlayerSystemJoined -= OnPlayerSystemJoinedHandler;
                 messageHandler.OnPlayerSystemJoined += OnPlayerSystemJoinedHandler;
+                messageHandler.OnVersionCheckResponse -= OnVersionCheckResponseHandler;
+                messageHandler.OnVersionCheckResponse += OnVersionCheckResponseHandler;
             }
-            
+
             isInitialized = true;
             Debug.Log("[NetworkManager] 초기화 완료 (토큰 검증 서비스 포함)");
         }
@@ -919,7 +935,29 @@ namespace Features.Multi.Net
             
             return networkClient.SendPlaceBlockRequest(placement);
         }
-        
+
+        /// <summary>
+        /// 서버에 버전 체크 요청
+        /// </summary>
+        /// <param name="clientVersion">클라이언트 버전 (Application.version 사용)</param>
+        public bool SendVersionCheckRequest(string clientVersion = null)
+        {
+            if (!IsConnected())
+            {
+                Debug.LogWarning("[NetworkManager] 서버에 연결되지 않았습니다.");
+                return false;
+            }
+
+            // 버전이 제공되지 않으면 Unity Application.version 사용
+            if (string.IsNullOrEmpty(clientVersion))
+            {
+                clientVersion = Application.version;
+            }
+
+            Debug.Log($"[NetworkManager] 버전 체크 요청 전송: {clientVersion}");
+            return networkClient.SendVersionCheckRequest(clientVersion);
+        }
+
         // ========================================
         // 이벤트 핸들러들
         // ========================================
@@ -1255,13 +1293,23 @@ namespace Features.Multi.Net
                     // 추가 안정화 대기 (UI 로딩 완료 보장)
                     yield return new WaitForSeconds(0.5f);
 
-                    // 연결 끊김 알림 모달 표시
-                    Features.Multi.UI.NetworkDisconnectedModal.Show(
-                        title: "연결 끊김",
-                        message: "서버와의 연결이 끊어졌습니다.\n메인 화면으로 이동했습니다."
-                    );
-
-                    Debug.Log($"[NetworkManager] MainScene 전환 완료 ({elapsedTime:F1}초 후) - 연결 끊김 모달 표시됨");
+                    // 연결 끊김 알림 모달 표시 (Instance가 있는 경우에만)
+                    if (Features.Multi.UI.NetworkDisconnectedModal.Instance != null)
+                    {
+                        Features.Multi.UI.NetworkDisconnectedModal.Show(
+                            title: "연결 끊김",
+                            message: "서버와의 연결이 끊어졌습니다.\n메인 화면으로 이동했습니다."
+                        );
+                        Debug.Log($"[NetworkManager] MainScene 전환 완료 ({elapsedTime:F1}초 후) - 연결 끊김 모달 표시됨");
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[NetworkManager] NetworkDisconnectedModal Instance가 없어 토스트로 대체");
+                        if (SystemMessageManager.Instance != null)
+                        {
+                            SystemMessageManager.ShowToast("서버와의 연결이 끊어졌습니다.", MessagePriority.Warning);
+                        }
+                    }
                     yield break;
                 }
 
@@ -1273,10 +1321,22 @@ namespace Features.Multi.Net
             App.UI.LoadingOverlay.Hide();
             Debug.LogWarning($"[NetworkManager] MainScene 전환 대기 시간 초과 ({maxWaitTime}초) - 강제로 알림 모달 표시");
 
-            Features.Multi.UI.NetworkDisconnectedModal.Show(
-                title: "연결 끊김",
-                message: "서버와의 연결이 끊어졌습니다.\n메인 화면으로 이동했습니다."
-            );
+            // 연결 끊김 알림 모달 표시 (Instance가 있는 경우에만)
+            if (Features.Multi.UI.NetworkDisconnectedModal.Instance != null)
+            {
+                Features.Multi.UI.NetworkDisconnectedModal.Show(
+                    title: "연결 끊김",
+                    message: "서버와의 연결이 끊어졌습니다.\n메인 화면으로 이동했습니다."
+                );
+            }
+            else
+            {
+                Debug.LogWarning("[NetworkManager] NetworkDisconnectedModal Instance가 없어 토스트로 대체");
+                if (SystemMessageManager.Instance != null)
+                {
+                    SystemMessageManager.ShowToast("서버와의 연결이 끊어졌습니다.", MessagePriority.Warning);
+                }
+            }
         }
 
 
@@ -1656,8 +1716,19 @@ namespace Features.Multi.Net
         private void OnPlayerSystemJoinedHandler()
         {
             Debug.Log($"[NetworkManager] 시스템 메시지 기반 플레이어 입장 감지 - 즉시 동기화 트리거");
-            
+
             // 시스템 메시지 기반 플레이어 입장 시에도 서버에서 자동으로 ROOM_INFO 전송
+        }
+
+        /// <summary>
+        /// 버전 체크 응답 핸들러 - MessageHandler로부터 이벤트 수신
+        /// </summary>
+        private void OnVersionCheckResponseHandler(bool isCompatible, string downloadUrl)
+        {
+            Debug.Log($"[NetworkManager] 버전 체크 응답: 호환={isCompatible}, downloadUrl={downloadUrl}");
+
+            // 외부 이벤트로 전달
+            OnVersionCheckResponse?.Invoke(isCompatible, downloadUrl);
         }
         
 

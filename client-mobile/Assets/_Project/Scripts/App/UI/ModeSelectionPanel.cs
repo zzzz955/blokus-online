@@ -72,56 +72,7 @@ namespace App.UI
             }
         }
 
-        private void Update()
-        {
-            // Android 뒤로가기 버튼 처리 (에뮬레이터에서는 ESC키)
-            if (Input.GetKeyDown(KeyCode.Escape))
-            {
-                OnAndroidBackButtonPressed();
-            }
-        }
-
-        /// <summary>
-        /// Android 뒤로가기 버튼 클릭 시 처리
-        /// ModeSelectPanel이 메인 패널일 때만 GameExitModal 표시
-        /// </summary>
-        private void OnAndroidBackButtonPressed()
-        {
-            Debug.Log("[ModeSelectionPanel] Android 뒤로가기 버튼 클릭됨");
-
-            // 게임 씬이 로드되어 있는지 확인
-            bool singleSceneLoaded = UnityEngine.SceneManagement.SceneManager.GetSceneByName("SingleGameplayScene").isLoaded;
-            bool multiSceneLoaded = UnityEngine.SceneManagement.SceneManager.GetSceneByName("MultiGameplayScene").isLoaded;
-
-            if (singleSceneLoaded || multiSceneLoaded)
-            {
-                Debug.Log("[ModeSelectionPanel] 게임 씬이 활성화되어 있어 뒤로가기 버튼 무시");
-                return;
-            }
-
-            // 게임 종료 모달이 이미 표시 중이면 무시
-            if (gameExitModal != null && gameExitModal.gameObject.activeInHierarchy)
-            {
-                Debug.Log("[ModeSelectionPanel] 게임 종료 모달이 이미 표시 중");
-                return;
-            }
-
-            // GameExitModal 표시
-            if (gameExitModal != null)
-            {
-                Debug.Log("[ModeSelectionPanel] ModeSelectPanel이 메인 패널 - 게임 종료 모달 표시");
-                gameExitModal.ShowModal();
-            }
-            else
-            {
-                Debug.LogWarning("[ModeSelectionPanel] GameExitModal이 설정되지 않음 - 직접 종료");
-#if UNITY_EDITOR
-                UnityEditor.EditorApplication.isPlaying = false;
-#else
-                Application.Quit();
-#endif
-            }
-        }
+        // Android 뒤로가기 처리는 BackButtonManager에서 전역 관리
 
         private void SetupTexts()
         {
@@ -164,9 +115,11 @@ namespace App.UI
                 Debug.LogWarning("singlePlayerButton이 인스펙터에서 할당되지 않았습니다!");
             }
 
+            // MultiplayerMenuController에서 멀티플레이 버튼 처리를 담당하므로 여기서는 제거
+            // 중복 실행 방지: MultiplayerMenuController가 세션 검증 및 버전 체크를 포함한 전체 플로우 관리
             if (multiPlayerButton != null)
             {
-                multiPlayerButton.onClick.AddListener(OnMultiPlayerClicked);
+                Debug.Log("[ModeSelectionPanel] 멀티플레이 버튼은 MultiplayerMenuController에서 관리됩니다.");
             }
             else
             {
