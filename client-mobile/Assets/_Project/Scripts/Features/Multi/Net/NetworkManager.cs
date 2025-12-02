@@ -1293,13 +1293,23 @@ namespace Features.Multi.Net
                     // 추가 안정화 대기 (UI 로딩 완료 보장)
                     yield return new WaitForSeconds(0.5f);
 
-                    // 연결 끊김 알림 모달 표시
-                    Features.Multi.UI.NetworkDisconnectedModal.Show(
-                        title: "연결 끊김",
-                        message: "서버와의 연결이 끊어졌습니다.\n메인 화면으로 이동했습니다."
-                    );
-
-                    Debug.Log($"[NetworkManager] MainScene 전환 완료 ({elapsedTime:F1}초 후) - 연결 끊김 모달 표시됨");
+                    // 연결 끊김 알림 모달 표시 (Instance가 있는 경우에만)
+                    if (Features.Multi.UI.NetworkDisconnectedModal.Instance != null)
+                    {
+                        Features.Multi.UI.NetworkDisconnectedModal.Show(
+                            title: "연결 끊김",
+                            message: "서버와의 연결이 끊어졌습니다.\n메인 화면으로 이동했습니다."
+                        );
+                        Debug.Log($"[NetworkManager] MainScene 전환 완료 ({elapsedTime:F1}초 후) - 연결 끊김 모달 표시됨");
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[NetworkManager] NetworkDisconnectedModal Instance가 없어 토스트로 대체");
+                        if (SystemMessageManager.Instance != null)
+                        {
+                            SystemMessageManager.ShowToast("서버와의 연결이 끊어졌습니다.", MessagePriority.Warning);
+                        }
+                    }
                     yield break;
                 }
 
@@ -1311,10 +1321,22 @@ namespace Features.Multi.Net
             App.UI.LoadingOverlay.Hide();
             Debug.LogWarning($"[NetworkManager] MainScene 전환 대기 시간 초과 ({maxWaitTime}초) - 강제로 알림 모달 표시");
 
-            Features.Multi.UI.NetworkDisconnectedModal.Show(
-                title: "연결 끊김",
-                message: "서버와의 연결이 끊어졌습니다.\n메인 화면으로 이동했습니다."
-            );
+            // 연결 끊김 알림 모달 표시 (Instance가 있는 경우에만)
+            if (Features.Multi.UI.NetworkDisconnectedModal.Instance != null)
+            {
+                Features.Multi.UI.NetworkDisconnectedModal.Show(
+                    title: "연결 끊김",
+                    message: "서버와의 연결이 끊어졌습니다.\n메인 화면으로 이동했습니다."
+                );
+            }
+            else
+            {
+                Debug.LogWarning("[NetworkManager] NetworkDisconnectedModal Instance가 없어 토스트로 대체");
+                if (SystemMessageManager.Instance != null)
+                {
+                    SystemMessageManager.ShowToast("서버와의 연결이 끊어졌습니다.", MessagePriority.Warning);
+                }
+            }
         }
 
 

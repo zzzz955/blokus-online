@@ -17,7 +17,7 @@ namespace Features.Multi.UI
         [SerializeField] private Button cancelButton;
 
         [Header("설정")]
-        [SerializeField] private string playStorePackageName = "com.blokus.bloblo"; // 플레이스토어 패키지명
+        [SerializeField] private string playStorePackageName = "com.madalang.bloblo"; // 플레이스토어 패키지명
 
         private string downloadUrl;
 

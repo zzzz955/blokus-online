@@ -725,8 +725,20 @@ namespace App.UI
         /// </summary>
         private void ShowVersionMismatchModal(string downloadUrl)
         {
-            // VersionMismatchModal 찾기 또는 생성
-            var versionModal = FindObjectOfType<Features.Multi.UI.VersionMismatchModal>();
+            // VersionMismatchModal 찾기 (비활성 오브젝트 포함)
+            var versionModals = Resources.FindObjectsOfTypeAll<Features.Multi.UI.VersionMismatchModal>();
+            Features.Multi.UI.VersionMismatchModal versionModal = null;
+
+            // Scene에 있는 실제 modal 찾기 (Prefab 에셋 제외)
+            foreach (var modal in versionModals)
+            {
+                // Scene 계층 구조에 있는 오브젝트인지 확인 (Prefab 에셋이 아닌지)
+                if (modal.gameObject.scene.name != null)
+                {
+                    versionModal = modal;
+                    break;
+                }
+            }
 
             if (versionModal == null)
             {
@@ -738,7 +750,7 @@ namespace App.UI
             }
             else
             {
-                Debug.Log("[UIManager] VersionMismatchModal 표시");
+                Debug.Log($"[UIManager] VersionMismatchModal 표시 (GameObject: {versionModal.gameObject.name})");
                 versionModal.Show(downloadUrl);
             }
         }
@@ -748,7 +760,7 @@ namespace App.UI
         /// </summary>
         private void OpenPlayStore()
         {
-            string packageName = "com.blokus.bloblo";
+            string packageName = "com.madalang.bloblo";
 
 #if UNITY_ANDROID && !UNITY_EDITOR
             string playStoreUrl = $"market://details?id={packageName}";
