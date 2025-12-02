@@ -932,13 +932,16 @@ namespace Features.Multi.UI
         {
             Debug.Log("[GameRoomPanel] 게임 시작됨 - 게임 컴포넌트 재초기화");
             isGameStarted = true;
-            
+
             // 게임 시작 시 이전 상태 완전 클리어 및 재초기화
             ResetGameComponentsForNewGame();
-            
+
             // 게임 시작 시 상호작용 제어 업데이트 (아직 첫 턴이 오기 전이므로 비활성화 상태)
             UpdateTurnBasedInteraction();
-            
+
+            // Room Status Label 업데이트 ("대기 중" → "게임 중")
+            UpdateRoomInfo();
+
             UpdateGameControlsState();
             ShowMessage("게임이 시작되었습니다!");
         }
@@ -1472,7 +1475,7 @@ namespace Features.Multi.UI
         {
             isGameStarted = false;
             isTimerActive = false;
-            
+
             // 타이머 패널 비활성화
             if (timerPanel != null)
                 timerPanel.SetActive(false);
@@ -1484,8 +1487,11 @@ namespace Features.Multi.UI
             if (blockPalette != null)
                 blockPalette.SetInteractable(false);
 
+            // Room Status Label 업데이트 ("게임 중" → "대기 중")
+            UpdateRoomInfo();
+
             UpdateGameControlsState();
-            
+
             // TODO: 게임 결과 다이얼로그 표시
             ShowMessage($"게임이 종료되었습니다. 승자: {winner}");
         }
