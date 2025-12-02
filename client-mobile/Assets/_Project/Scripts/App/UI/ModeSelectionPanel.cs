@@ -115,9 +115,11 @@ namespace App.UI
                 Debug.LogWarning("singlePlayerButton이 인스펙터에서 할당되지 않았습니다!");
             }
 
+            // MultiplayerMenuController에서 멀티플레이 버튼 처리를 담당하므로 여기서는 제거
+            // 중복 실행 방지: MultiplayerMenuController가 세션 검증 및 버전 체크를 포함한 전체 플로우 관리
             if (multiPlayerButton != null)
             {
-                multiPlayerButton.onClick.AddListener(OnMultiPlayerClicked);
+                Debug.Log("[ModeSelectionPanel] 멀티플레이 버튼은 MultiplayerMenuController에서 관리됩니다.");
             }
             else
             {

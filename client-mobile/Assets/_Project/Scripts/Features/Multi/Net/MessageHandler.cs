@@ -161,6 +161,9 @@ namespace Features.Multi.Net
 
         // 게임 결과 관련 이벤트
         public event System.Action<GameResultData> OnGameResultReceived; // 새로운 GAME_RESULT 데이터 수신
+
+        // 버전 체크 관련 이벤트
+        public event System.Action<bool, string> OnVersionCheckResponse; // 성공여부, downloadUrl
         
         // 싱글플레이어 관련 (현재 HTTP API로 대체됨)
         // public event System.Action<StageData> OnStageDataReceived; // TCP에서 HTTP API로 이동
@@ -1549,12 +1552,13 @@ namespace Features.Multi.Net
                 if (status == "ok")
                 {
                     Debug.Log("[MessageHandler] 버전 호환성 확인 완료");
+                    OnVersionCheckResponse?.Invoke(true, null);
                 }
-                else if (status == "mismatch" && parts.Length >= 3)
+                else if (status == "mismatch")
                 {
-                    string downloadUrl = parts[2];
+                    string downloadUrl = parts.Length >= 3 ? parts[2] : null;
                     Debug.LogWarning($"[MessageHandler] 버전 불일치 - 다운로드 URL: {downloadUrl}");
-                    OnErrorReceived?.Invoke($"클라이언트 업데이트가 필요합니다. 다운로드 URL: {downloadUrl}");
+                    OnVersionCheckResponse?.Invoke(false, downloadUrl);
                 }
             }
         }

@@ -537,13 +537,20 @@ namespace App.Core
 
         private IEnumerator CoExitMultiToMain(System.Action<bool, string> callback)
         {
+            // NetworkManager 연결 해제 (세션 종료)
+            if (Features.Multi.Net.NetworkManager.Instance != null)
+            {
+                if (debugMode)
+                    Debug.Log("[SceneFlowController] NetworkManager 로그아웃 및 연결 해제");
+
+                // LogoutFromServer: 연결 해제 + 자동 재연결 비활성화 + 모든 세션 정보 정리
+                Features.Multi.Net.NetworkManager.Instance.LogoutFromServer();
+            }
+
             // MultiGameplayScene 언로드
             yield return UnloadIfLoaded(MultiGameplayScene);
 
-            // DontDestroyOnLoad 객체 정리는 NetworkManager.HandleDisconnection()에서 처리됨
-            // (로그아웃 시 autoReconnect = false로 설정되어 자동 정리)
-
-            // MultiCore 씬도 언로드 (연결 실패 시를 위해)
+            // MultiCore 씬도 언로드
             yield return UnloadIfLoaded(MultiCoreScene);
 
             // MainScene 활성
