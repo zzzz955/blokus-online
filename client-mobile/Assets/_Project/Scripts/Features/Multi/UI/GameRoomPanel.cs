@@ -351,7 +351,7 @@ namespace Features.Multi.UI
                 if (!currentPlayer.isEmpty)
                 {
                     string colorName = GetPlayerColorName((PlayerColor)(currentTurnPlayerId + 1));
-                    currentTurnLabel.text = $"현재 턴: {colorName} ({currentPlayer.displayName})";
+                    currentTurnLabel.text = $"현재 턴: {colorName}";
                     
                     if (isMyTurn)
                         currentTurnLabel.color = Color.yellow;
@@ -1300,7 +1300,10 @@ namespace Features.Multi.UI
 
             // 턴 기반 상호작용 제어 (게임 시작 후에만)
             UpdateTurnBasedInteraction();
-            
+
+            // 게임 상태 UI 업데이트 (Game Status Label 포함)
+            UpdateGameControlsState();
+
             // 턴 변경 로그
             if (previousTurnState != isMyTurn)
             {

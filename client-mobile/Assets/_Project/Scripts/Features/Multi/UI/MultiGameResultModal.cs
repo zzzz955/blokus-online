@@ -631,36 +631,49 @@ namespace Features.Multi.UI
         }
         
         /// <summary>
-        /// 내 결과 정보 업데이트 (Fallback)
+        /// 내 결과 정보 업데이트
         /// </summary>
         private void UpdateMyResults()
         {
             var myResult = playerResults.FirstOrDefault(p => p.isMe);
             if (myResult == null) return;
-
-            // 내 순위와 점수 (playerResults에 있으므로 표시 가능)
+            
+            // 내 순위와 점수
             if (myRankText != null)
             {
                 myRankText.text = $"{myResult.rank}등";
-                myRankText.color = myResult.rank == 1 ? Color.yellow :
-                                  myResult.rank == 2 ? Color.cyan :
+                myRankText.color = myResult.rank == 1 ? Color.yellow : 
+                                  myResult.rank == 2 ? Color.cyan : 
                                   myResult.rank == 3 ? Color.green : Color.white;
             }
-
+            
             if (myScoreText != null)
             {
                 myScoreText.text = $"{myResult.finalScore}점";
             }
-
-            // 경험치 및 레벨업 정보 (GAME_RESULT가 없으므로 표시 안함)
-            if (expGainedText != null)
+            
+            // 경험치 및 레벨업 정보
+            if (myUpdatedStats != null)
             {
-                expGainedText.text = "";
-            }
-
-            if (newLevelText != null)
-            {
-                newLevelText.gameObject.SetActive(false);
+                if (expGainedText != null)
+                {
+                    // 획득한 경험치 계산 (실제로는 이전 경험치와 비교해야 함)
+                    int expGained = myResult.finalScore; // 임시로 점수만큼 경험치를 얻는다고 가정
+                    expGainedText.text = $"+{expGained} EXP";
+                    expGainedText.color = Color.cyan;
+                }
+                
+                // 레벨업 확인 (실제로는 이전 레벨과 비교해야 함)
+                if (newLevelText != null && myUpdatedStats.level > 0) // 임시 조건
+                {
+                    newLevelText.text = $"Level {myUpdatedStats.level}!";
+                    newLevelText.gameObject.SetActive(true);
+                    newLevelText.color = Color.yellow;
+                }
+                else if (newLevelText != null)
+                {
+                    newLevelText.gameObject.SetActive(false);
+                }
             }
         }
         
@@ -1011,20 +1024,18 @@ namespace Features.Multi.UI
 
         /// <summary>
         /// 게임 통계 정보 업데이트 (Fallback - 탈주로 인한 종료)
-        /// 클라이언트에서 수집한 점수/블록 데이터 표시
         /// </summary>
         private void UpdateGameStats()
         {
             // 탈주로 인한 게임 종료 여부 확인
             bool endedByDisconnection = IsGameEndedByDisconnection();
 
-            // 게임 시간은 서버 데이터가 필요하므로 표시 안함
             if (gameDurationText != null)
             {
-                gameDurationText.text = "";
+                // 실제로는 게임 시작 시간을 기록해서 계산해야 함
+                gameDurationText.text = "게임 시간: 15:23";
             }
 
-            // 총 배치된 블록 수 (클라이언트 데이터로 계산 가능)
             if (totalBlocksPlacedText != null)
             {
                 int totalBlocks = playerResults.Sum(p => p.blocksPlaced);

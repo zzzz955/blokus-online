@@ -193,7 +193,8 @@ namespace Features.Multi.UI
             if (kickButton != null)
             {
                 bool canKick = isHost && !playerData.isHost && playerData.playerId != GetMyPlayerId();
-                kickButton.gameObject.SetActive(canKick);
+                // 서버 강퇴 기능 미구현으로 우선 주석 처리
+                // kickButton.gameObject.SetActive(canKick);
             }
         }
         
