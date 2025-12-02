@@ -844,27 +844,48 @@ namespace Features.Multi.UI
 
         private void OnPlayerLeft(int playerId)
         {
-            Debug.Log($"[GameRoomPanel] OnPlayerLeft 호출: playerId={playerId}");
-            
+            Debug.Log($"[GameRoomPanel] OnPlayerLeft 호출: playerId={playerId}, 게임 중={isGameStarted}");
+
             int slotIndex = playerId - 1;
             if (slotIndex >= 0 && slotIndex < 4)
             {
                 // 나간 플레이어가 호스트였는지 확인
                 bool wasHost = playerData[slotIndex].isHost;
                 string leavingPlayerName = playerData[slotIndex].playerName;
-                
+
                 Debug.Log($"[GameRoomPanel] 플레이어 {leavingPlayerName} 퇴장 - 호스트 여부: {wasHost}");
-                
-                // 빈 슬롯으로 설정 (Empty 사용)
-                PlayerSlot emptySlot = PlayerSlot.Empty;
-                playerData[slotIndex] = emptySlot;
-                
-                if (playerSlots[slotIndex] != null)
+
+                // 게임 중인 경우: 데이터 보존하고 탈주 상태로 마킹
+                if (isGameStarted)
                 {
-                    playerSlots[slotIndex].UpdateSlot(emptySlot);
-                    playerSlots[slotIndex].SetAsMySlot(false);
+                    Debug.Log($"[GameRoomPanel] 게임 중 탈주 처리: {leavingPlayerName} - 데이터 보존 및 탈주 마킹");
+
+                    // 현재 플레이어 데이터를 유지하되 탈주 상태만 업데이트
+                    PlayerSlot disconnectedSlot = playerData[slotIndex];
+                    disconnectedSlot.isDisconnected = true;
+                    playerData[slotIndex] = disconnectedSlot;
+
+                    if (playerSlots[slotIndex] != null)
+                    {
+                        playerSlots[slotIndex].UpdateSlot(disconnectedSlot);
+                        // 본인 슬롯 표시는 유지 (탈주한 플레이어가 본인인 경우 대비)
+                    }
                 }
-                
+                else
+                {
+                    // 게임 시작 전: 기존대로 빈 슬롯으로 설정
+                    Debug.Log($"[GameRoomPanel] 게임 시작 전 퇴장: {leavingPlayerName} - 슬롯 비우기");
+
+                    PlayerSlot emptySlot = PlayerSlot.Empty;
+                    playerData[slotIndex] = emptySlot;
+
+                    if (playerSlots[slotIndex] != null)
+                    {
+                        playerSlots[slotIndex].UpdateSlot(emptySlot);
+                        playerSlots[slotIndex].SetAsMySlot(false);
+                    }
+                }
+
                 // 호스트가 나간 경우 - 호스트 변경 처리를 위해 ROOM_INFO 재요청
                 if (wasHost)
                 {
@@ -1862,11 +1883,16 @@ namespace Features.Multi.UI
                             int score = scoreEntry.Value;
                             
                             // 해당 슬롯이 비어있지 않고 PlayerSlotWidget이 존재하는 경우만 업데이트
-                            if (clientIndex >= 0 && clientIndex < 4 && 
-                                playerSlots[clientIndex] != null && 
+                            if (clientIndex >= 0 && clientIndex < 4 &&
+                                playerSlots[clientIndex] != null &&
                                 !playerData[clientIndex].isEmpty)
                             {
+                                // PlayerSlotWidget 업데이트
                                 playerSlots[clientIndex].UpdateScore(score);
+
+                                // playerData 배열도 업데이트 (결과 모달에서 사용)
+                                playerData[clientIndex].currentScore = score;
+
                                 Debug.Log($"[GameRoomPanel] 플레이어 슬롯 {clientIndex} 점수 업데이트: {score}점");
                             }
                             else if (playerData[clientIndex].isEmpty)
@@ -1927,11 +1953,16 @@ namespace Features.Multi.UI
                             int remainingBlocks = blockEntry.Value;
                             
                             // 해당 슬롯이 비어있지 않고 PlayerSlotWidget이 존재하는 경우만 업데이트
-                            if (clientIndex >= 0 && clientIndex < 4 && 
-                                playerSlots[clientIndex] != null && 
+                            if (clientIndex >= 0 && clientIndex < 4 &&
+                                playerSlots[clientIndex] != null &&
                                 !playerData[clientIndex].isEmpty)
                             {
+                                // PlayerSlotWidget 업데이트
                                 playerSlots[clientIndex].UpdateRemainingBlocks(remainingBlocks);
+
+                                // playerData 배열도 업데이트 (결과 모달에서 사용)
+                                playerData[clientIndex].remainingBlocks = remainingBlocks;
+
                                 Debug.Log($"[GameRoomPanel] 플레이어 슬롯 {clientIndex} 남은 블록 업데이트: {remainingBlocks}개");
                             }
                             else if (playerData[clientIndex].isEmpty)
@@ -2110,7 +2141,54 @@ namespace Features.Multi.UI
                 _ => Shared.Models.BlockType.Single
             };
         }
-        
+
+        // ========================================
+        // Public Helper Methods (게임 결과 모달용)
+        // ========================================
+
+        /// <summary>
+        /// 특정 플레이어 ID의 탈주 여부 확인 (게임 결과 표시용)
+        /// </summary>
+        public bool IsPlayerDisconnected(int playerId)
+        {
+            int slotIndex = playerId - 1;
+            if (slotIndex >= 0 && slotIndex < 4)
+            {
+                return playerData[slotIndex].isDisconnected;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// username으로 탈주 여부 확인 (게임 결과 표시용)
+        /// 최대 4명이므로 선형 탐색 성능 문제 없음
+        /// </summary>
+        public bool IsPlayerDisconnectedByUsername(string username)
+        {
+            if (string.IsNullOrEmpty(username))
+                return false;
+
+            for (int i = 0; i < 4; i++)
+            {
+                if (playerData[i].playerName == username && playerData[i].isDisconnected)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 플레이어 데이터 배열 가져오기 (읽기 전용)
+        /// </summary>
+        public PlayerSlot[] GetPlayerDataSnapshot()
+        {
+            // 배열 복사하여 반환 (외부에서 수정 불가)
+            PlayerSlot[] snapshot = new PlayerSlot[4];
+            System.Array.Copy(playerData, snapshot, 4);
+            return snapshot;
+        }
+
     }
 
     /// <summary>

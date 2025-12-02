@@ -37,7 +37,11 @@ namespace Features.Multi.UI
         [SerializeField] private TextMeshProUGUI gameDurationText;
         [SerializeField] private TextMeshProUGUI totalBlocksPlacedText;
         [SerializeField] private TextMeshProUGUI gameResultSummaryText;
-        
+
+        [Header("로딩 상태 UI")]
+        [SerializeField] private GameObject loadingPanel; // 로딩 패널 (Optional)
+        [SerializeField] private TextMeshProUGUI loadingText; // 로딩 텍스트
+
         [Header("네트워크 참조")]
         [SerializeField] private NetworkManager networkManager;
         
@@ -67,6 +71,7 @@ namespace Features.Multi.UI
             public int rank;
             public bool isWinner;
             public bool isMe;
+            public bool isDisconnected; // 게임 중 탈주 여부
         }
         
         private void Awake()
@@ -99,6 +104,17 @@ namespace Features.Multi.UI
             if (modalPanel != null)
             {
                 modalPanel.SetActive(false);
+            }
+
+            // 로딩 UI 초기화 (비활성화 상태로 시작)
+            if (loadingPanel != null)
+            {
+                loadingPanel.SetActive(false);
+            }
+
+            if (loadingText != null)
+            {
+                loadingText.gameObject.SetActive(false);
             }
 
             // ⭐ 이벤트 구독을 Awake()에서 실행 (GameObject가 비활성화되어도 실행됨)
@@ -236,7 +252,10 @@ namespace Features.Multi.UI
             // 현재 게임 상태에서 결과 데이터 수집
             CollectGameResults();
 
-            // 통계 업데이트 대기 (2초 후에도 안 오면 그냥 표시)
+            // 즉시 모달을 표시하고 로딩 상태로 시작 (UX 개선)
+            ShowLoadingState();
+
+            // 통계 업데이트 대기 (3초 후에도 안 오면 그냥 표시)
             waitForStatsCoroutine = StartCoroutine(WaitForStatsUpdate());
         }
         
@@ -315,11 +334,12 @@ namespace Features.Multi.UI
         
         /// <summary>
         /// 현재 게임 상태에서 결과 데이터 수집
+        /// GAME_RESULT가 도착하지 않을 경우 fallback으로 사용
         /// </summary>
         private void CollectGameResults()
         {
             playerResults.Clear();
-            
+
             // GameRoomPanel에서 현재 플레이어 정보와 점수를 수집
             var gameRoomPanel = FindObjectOfType<GameRoomPanel>();
             if (gameRoomPanel == null)
@@ -327,10 +347,88 @@ namespace Features.Multi.UI
                 Debug.LogWarning("[MultiGameResultModal] GameRoomPanel을 찾을 수 없습니다!");
                 return;
             }
-            
-            // TODO: GameRoomPanel에서 실제 최종 점수와 플레이어 정보를 가져오는 로직
-            // 현재는 예시 데이터로 대체
-            CreateSampleResults();
+
+            // GameRoomPanel에서 실제 플레이어 데이터 가져오기
+            var playerDataSnapshot = gameRoomPanel.GetPlayerDataSnapshot();
+
+            // 빈 슬롯 제외하고 플레이어 결과 생성
+            var validPlayers = new System.Collections.Generic.List<PlayerGameResult>();
+
+            for (int i = 0; i < playerDataSnapshot.Length; i++)
+            {
+                var playerSlot = playerDataSnapshot[i];
+
+                // 빈 슬롯은 제외
+                if (playerSlot.isEmpty)
+                    continue;
+
+                // PlayerGameResult로 변환
+                var result = new PlayerGameResult
+                {
+                    username = playerSlot.playerName,
+                    displayName = playerSlot.playerName,
+                    playerColor = ConvertColorIndexToPlayerColor(playerSlot.colorIndex),
+                    finalScore = playerSlot.currentScore,
+                    blocksPlaced = 21 - playerSlot.remainingBlocks, // 전체 블록 - 남은 블록
+                    rank = 0, // 정렬 후 설정
+                    isWinner = false, // 정렬 후 설정
+                    isMe = false, // TODO: 본인 확인 필요
+                    isDisconnected = playerSlot.isDisconnected // 탈주 여부
+                };
+
+                validPlayers.Add(result);
+            }
+
+            // 점수 순으로 정렬 및 순위 설정
+            validPlayers = validPlayers.OrderByDescending(p => p.finalScore).ToList();
+
+            for (int i = 0; i < validPlayers.Count; i++)
+            {
+                validPlayers[i].rank = i + 1;
+
+                // 1등을 승자로 설정
+                if (i == 0)
+                {
+                    validPlayers[i].isWinner = true;
+                }
+            }
+
+            playerResults = validPlayers;
+
+            Debug.Log($"[MultiGameResultModal] GameRoomPanel에서 {playerResults.Count}명의 플레이어 결과 수집 완료");
+        }
+
+        /// <summary>
+        /// 탈주로 인한 게임 종료 여부 확인
+        /// </summary>
+        private bool IsGameEndedByDisconnection()
+        {
+            // playerResults에 탈주한 플레이어가 있는지 확인
+            return playerResults.Any(p => p.isDisconnected);
+        }
+
+        /// <summary>
+        /// 탈주로 인한 게임 종료 메시지 (단순화)
+        /// </summary>
+        private string GetDisconnectionMessage()
+        {
+            int disconnectedCount = playerResults.Count(p => p.isDisconnected);
+            return $"모든 플레이어가 탈주하여 게임이 종료되었습니다. (탈주: {disconnectedCount}명)";
+        }
+
+        /// <summary>
+        /// colorIndex를 PlayerColor로 변환
+        /// </summary>
+        private MultiModels.PlayerColor ConvertColorIndexToPlayerColor(int colorIndex)
+        {
+            return colorIndex switch
+            {
+                0 => MultiModels.PlayerColor.Blue,
+                1 => MultiModels.PlayerColor.Yellow,
+                2 => MultiModels.PlayerColor.Red,
+                3 => MultiModels.PlayerColor.Green,
+                _ => MultiModels.PlayerColor.None
+            };
         }
         
         /// <summary>
@@ -384,6 +482,64 @@ namespace Features.Multi.UI
         }
         
         /// <summary>
+        /// 로딩 상태 표시 (결과 집계 중)
+        /// </summary>
+        private void ShowLoadingState()
+        {
+            Debug.Log("[MultiGameResultModal] 로딩 상태 표시");
+
+            // 부모 GameObject 활성화
+            if (!gameObject.activeInHierarchy)
+            {
+                gameObject.SetActive(true);
+            }
+
+            // 모달 패널 활성화
+            if (modalPanel != null)
+            {
+                modalPanel.SetActive(true);
+                EnsureModalOnTop();
+            }
+
+            // 로딩 UI 표시
+            if (loadingPanel != null)
+            {
+                loadingPanel.SetActive(true);
+            }
+
+            if (loadingText != null)
+            {
+                loadingText.text = "결과 집계 중...";
+                loadingText.gameObject.SetActive(true);
+            }
+
+            // 타이틀 임시 설정
+            if (titleText != null)
+            {
+                titleText.text = "게임 종료";
+                titleText.color = Color.white;
+            }
+        }
+
+        /// <summary>
+        /// 로딩 상태 해제
+        /// </summary>
+        private void HideLoadingState()
+        {
+            Debug.Log("[MultiGameResultModal] 로딩 상태 해제");
+
+            if (loadingPanel != null)
+            {
+                loadingPanel.SetActive(false);
+            }
+
+            if (loadingText != null)
+            {
+                loadingText.gameObject.SetActive(false);
+            }
+        }
+
+        /// <summary>
         /// 게임 결과 모달 표시
         /// </summary>
         private void ShowGameResultModal()
@@ -395,6 +551,9 @@ namespace Features.Multi.UI
             {
                 gameObject.SetActive(true);
             }
+
+            // 로딩 상태 해제
+            HideLoadingState();
 
             // UI 업데이트
             UpdateResultUI();
@@ -420,6 +579,9 @@ namespace Features.Multi.UI
                 gameObject.SetActive(true);
             }
 
+            // 로딩 상태 해제
+            HideLoadingState();
+
             // 새로운 데이터로 UI 업데이트
             UpdateResultUIWithNewData();
 
@@ -432,80 +594,73 @@ namespace Features.Multi.UI
         }
         
         /// <summary>
-        /// 결과 UI 업데이트
+        /// 결과 UI 업데이트 (Fallback 경로 - GAME_RESULT 수신 안됨)
+        /// 탈주로 인한 게임 종료로 간주
         /// </summary>
         private void UpdateResultUI()
         {
+            // 탈주로 인한 게임 종료 여부 확인
+            bool endedByDisconnection = IsGameEndedByDisconnection();
+
             // 타이틀 설정
             if (titleText != null)
             {
-                var myResult = playerResults.FirstOrDefault(p => p.isMe);
-                if (myResult != null)
+                if (endedByDisconnection)
                 {
-                    string title = myResult.isWinner ? "🏆 승리!" : $"게임 종료 - {myResult.rank}등";
-                    titleText.text = title;
-                    titleText.color = myResult.isWinner ? Color.yellow : Color.white;
+                    // 탈주로 인한 게임 종료
+                    int disconnectedCount = playerResults.Count(p => p.isDisconnected);
+                    titleText.text = $"게임 종료 ({disconnectedCount}명 탈주)";
+                    titleText.color = new Color(0.9f, 0.9f, 0.9f, 1f); // 밝은 회색
                 }
                 else
                 {
+                    // 탈주 플레이어가 없는데 GAME_RESULT가 안 온 경우 (네트워크 이슈 등)
                     titleText.text = "게임 종료";
+                    titleText.color = Color.white;
                 }
             }
-            
+
             // 내 결과 표시
             UpdateMyResults();
-            
+
             // 플레이어 순위 표시
             UpdatePlayerRankings();
-            
+
             // 게임 통계 표시
             UpdateGameStats();
         }
         
         /// <summary>
-        /// 내 결과 정보 업데이트
+        /// 내 결과 정보 업데이트 (Fallback)
         /// </summary>
         private void UpdateMyResults()
         {
             var myResult = playerResults.FirstOrDefault(p => p.isMe);
             if (myResult == null) return;
-            
-            // 내 순위와 점수
+
+            // 내 순위와 점수 (playerResults에 있으므로 표시 가능)
             if (myRankText != null)
             {
                 myRankText.text = $"{myResult.rank}등";
-                myRankText.color = myResult.rank == 1 ? Color.yellow : 
-                                  myResult.rank == 2 ? Color.cyan : 
+                myRankText.color = myResult.rank == 1 ? Color.yellow :
+                                  myResult.rank == 2 ? Color.cyan :
                                   myResult.rank == 3 ? Color.green : Color.white;
             }
-            
+
             if (myScoreText != null)
             {
                 myScoreText.text = $"{myResult.finalScore}점";
             }
-            
-            // 경험치 및 레벨업 정보
-            if (myUpdatedStats != null)
+
+            // 경험치 및 레벨업 정보 (GAME_RESULT가 없으므로 표시 안함)
+            if (expGainedText != null)
             {
-                if (expGainedText != null)
-                {
-                    // 획득한 경험치 계산 (실제로는 이전 경험치와 비교해야 함)
-                    int expGained = myResult.finalScore; // 임시로 점수만큼 경험치를 얻는다고 가정
-                    expGainedText.text = $"+{expGained} EXP";
-                    expGainedText.color = Color.cyan;
-                }
-                
-                // 레벨업 확인 (실제로는 이전 레벨과 비교해야 함)
-                if (newLevelText != null && myUpdatedStats.level > 0) // 임시 조건
-                {
-                    newLevelText.text = $"Level {myUpdatedStats.level}!";
-                    newLevelText.gameObject.SetActive(true);
-                    newLevelText.color = Color.yellow;
-                }
-                else if (newLevelText != null)
-                {
-                    newLevelText.gameObject.SetActive(false);
-                }
+                expGainedText.text = "";
+            }
+
+            if (newLevelText != null)
+            {
+                newLevelText.gameObject.SetActive(false);
             }
         }
         
@@ -554,15 +709,26 @@ namespace Features.Multi.UI
                                 result.rank == 3 ? Color.green : Color.white;
             }
             
-            // 플레이어 이름
+            // 플레이어 이름 (탈주 표시 포함)
             var nameText = itemObj.transform.Find("NameText")?.GetComponent<TextMeshProUGUI>();
             if (nameText != null)
             {
                 nameText.text = result.displayName;
-                nameText.color = result.isMe ? Color.yellow : Color.white;
-                if (result.isMe)
+
+                // 탈주 상태 표시
+                if (result.isDisconnected)
+                {
+                    nameText.text += " (탈주)";
+                    nameText.color = new Color(0.7f, 0.7f, 0.7f, 1f); // 회색
+                }
+                else if (result.isMe)
                 {
                     nameText.text += " (나)";
+                    nameText.color = Color.yellow;
+                }
+                else
+                {
+                    nameText.color = Color.white;
                 }
             }
             
@@ -597,7 +763,7 @@ namespace Features.Multi.UI
         }
         
         /// <summary>
-        /// 새로운 GAME_RESULT 데이터로 결과 UI 업데이트
+        /// 새로운 GAME_RESULT 데이터로 결과 UI 업데이트 (정상 게임 종료)
         /// </summary>
         private void UpdateResultUIWithNewData()
         {
@@ -608,9 +774,9 @@ namespace Features.Multi.UI
                 return;
             }
 
-            Debug.Log("[MultiGameResultModal] 새로운 GAME_RESULT 데이터로 UI 업데이트");
+            Debug.Log("[MultiGameResultModal] 새로운 GAME_RESULT 데이터로 UI 업데이트 (정상 종료)");
 
-            // 타이틀 설정
+            // 타이틀 설정 (정상 게임 종료)
             if (titleText != null)
             {
                 bool isWinner = currentGameResult.winners != null &&
@@ -701,13 +867,17 @@ namespace Features.Multi.UI
                 }
             }
 
-            // scores 딕셔너리에서 빈 슬롯 플레이어 필터링 및 점수 순 정렬
+            // scores 딕셔너리에서 빈 슬롯 플레이어만 필터링 및 점수 순 정렬
+            // 개선: 0점 플레이어도 포함 (게임 중 탈주한 플레이어 데이터 보존)
             var validPlayers = currentGameResult.scores
-                .Where(kvp => !networkManager.IsEmptySlotPlayer(kvp.Key) && kvp.Value > 0) // 빈 슬롯과 0점 플레이어 제외
+                .Where(kvp => !networkManager.IsEmptySlotPlayer(kvp.Key)) // 빈 슬롯만 제외
                 .OrderByDescending(kvp => kvp.Value)
                 .ToList();
 
             Debug.Log($"[MultiGameResultModal] 유효한 플레이어 수: {validPlayers.Count} (전체: {currentGameResult.scores.Count})");
+
+            // GameRoomPanel에서 플레이어 탈주 정보 가져오기
+            var gameRoomPanel = FindObjectOfType<GameRoomPanel>();
 
             // 순위별로 아이템 생성
             for (int i = 0; i < validPlayers.Count; i++)
@@ -721,16 +891,25 @@ namespace Features.Multi.UI
                 // user_name을 display_name으로 변환
                 string displayName = networkManager.GetPlayerDisplayName(playerScore.Key);
 
-                Debug.Log($"[MultiGameResultModal] 플레이어 순위 생성: {rank}등 - {playerScore.Key} → {displayName} ({playerScore.Value}점)");
+                // 탈주 여부 확인 (GameRoomPanel의 username 기반 확인)
+                bool isDisconnected = false;
+                if (gameRoomPanel != null)
+                {
+                    // GAME_RESULT의 username(playerScore.Key)으로 직접 확인
+                    // 최대 4명이므로 선형 탐색 성능 문제 없음
+                    isDisconnected = gameRoomPanel.IsPlayerDisconnectedByUsername(playerScore.Key);
+                }
 
-                CreatePlayerRankingItemWithNewData(rank, displayName, playerScore.Value, isMe, isWinner);
+                Debug.Log($"[MultiGameResultModal] 플레이어 순위 생성: {rank}등 - {playerScore.Key} → {displayName} ({playerScore.Value}점, 탈주={isDisconnected})");
+
+                CreatePlayerRankingItemWithNewData(rank, displayName, playerScore.Value, isMe, isWinner, isDisconnected);
             }
         }
 
         /// <summary>
         /// 새로운 데이터로 플레이어 순위 아이템 생성
         /// </summary>
-        private void CreatePlayerRankingItemWithNewData(int rank, string playerName, int score, bool isMe, bool isWinner)
+        private void CreatePlayerRankingItemWithNewData(int rank, string playerName, int score, bool isMe, bool isWinner, bool isDisconnected = false)
         {
             var itemObj = Instantiate(playerRankingItemPrefab, playerRankingParent);
             itemObj.SetActive(true);
@@ -745,15 +924,26 @@ namespace Features.Multi.UI
                                 rank == 3 ? Color.green : Color.white;
             }
 
-            // 플레이어 이름
+            // 플레이어 이름 (탈주 표시 포함)
             var nameText = itemObj.transform.Find("NameText")?.GetComponent<TextMeshProUGUI>();
             if (nameText != null)
             {
                 nameText.text = playerName;
-                nameText.color = isMe ? Color.yellow : Color.white;
-                if (isMe)
+
+                // 탈주 상태 표시
+                if (isDisconnected)
+                {
+                    nameText.text += " (탈주)";
+                    nameText.color = new Color(0.7f, 0.7f, 0.7f, 1f); // 회색
+                }
+                else if (isMe)
                 {
                     nameText.text += " (나)";
+                    nameText.color = Color.yellow;
+                }
+                else
+                {
+                    nameText.color = Color.white;
                 }
             }
 
@@ -775,7 +965,7 @@ namespace Features.Multi.UI
         }
 
         /// <summary>
-        /// 새로운 데이터로 게임 통계 정보 업데이트
+        /// 새로운 데이터로 게임 통계 정보 업데이트 (정상 게임 종료)
         /// </summary>
         private void UpdateGameStatsWithNewData()
         {
@@ -803,30 +993,38 @@ namespace Features.Multi.UI
 
             if (gameResultSummaryText != null)
             {
+                // 정상 게임 종료
                 if (currentGameResult.winners != null && currentGameResult.winners.Length > 0)
                 {
                     string winnerUserName = currentGameResult.winners[0];
                     string winnerDisplayName = networkManager.GetPlayerDisplayName(winnerUserName);
                     gameResultSummaryText.text = $"🏆 {winnerDisplayName}님이 승리했습니다!";
+                    gameResultSummaryText.color = Color.white;
                 }
                 else
                 {
                     gameResultSummaryText.text = "게임이 종료되었습니다.";
+                    gameResultSummaryText.color = Color.white;
                 }
             }
         }
 
         /// <summary>
-        /// 게임 통계 정보 업데이트
+        /// 게임 통계 정보 업데이트 (Fallback - 탈주로 인한 종료)
+        /// 클라이언트에서 수집한 점수/블록 데이터 표시
         /// </summary>
         private void UpdateGameStats()
         {
+            // 탈주로 인한 게임 종료 여부 확인
+            bool endedByDisconnection = IsGameEndedByDisconnection();
+
+            // 게임 시간은 서버 데이터가 필요하므로 표시 안함
             if (gameDurationText != null)
             {
-                // 실제로는 게임 시작 시간을 기록해서 계산해야 함
-                gameDurationText.text = "게임 시간: 15:23";
+                gameDurationText.text = "";
             }
 
+            // 총 배치된 블록 수 (클라이언트 데이터로 계산 가능)
             if (totalBlocksPlacedText != null)
             {
                 int totalBlocks = playerResults.Sum(p => p.blocksPlaced);
@@ -835,14 +1033,17 @@ namespace Features.Multi.UI
 
             if (gameResultSummaryText != null)
             {
-                var winner = playerResults.FirstOrDefault(p => p.isWinner);
-                if (winner != null)
+                if (endedByDisconnection)
                 {
-                    gameResultSummaryText.text = $"🏆 {winner.displayName}님이 승리했습니다!";
+                    // 탈주로 인한 게임 종료
+                    gameResultSummaryText.text = GetDisconnectionMessage();
+                    gameResultSummaryText.color = new Color(0.9f, 0.7f, 0.3f, 1f); // 주황색
                 }
                 else
                 {
+                    // 탈주 없는데 GAME_RESULT가 안 온 경우
                     gameResultSummaryText.text = "게임이 종료되었습니다.";
+                    gameResultSummaryText.color = Color.white;
                 }
             }
         }
