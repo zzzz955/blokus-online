@@ -568,12 +568,13 @@ namespace App.Network
         {
             Debug.Log("[HttpApiClient] OIDC refresh token 자동 로그인 시도");
 
-            // OIDC refresh token만 확인 (Single-API refresh token 지원 중단)
-            string oidcRefreshToken = App.Security.SecureStorage.GetString(App.Security.TokenKeys.Refresh);
+            // OIDC refresh token을 백업 복구 메커니즘과 함께 조회
+            // Android Keystore 손실 시 자동으로 백업에서 복구 시도
+            string oidcRefreshToken = App.Security.SecureStorage.GetStringWithBackup(App.Security.TokenKeys.Refresh);
 
             if (!string.IsNullOrEmpty(oidcRefreshToken))
             {
-                Debug.Log("[HttpApiClient] 저장된 OIDC refresh token으로 자동 로그인 시도");
+                Debug.Log("[HttpApiClient] 저장된 OIDC refresh token으로 자동 로그인 시도 (백업 복구 포함)");
                 StartCoroutine(TryAutoLoginWithOidcToken(oidcRefreshToken));
                 return;
             }
@@ -640,8 +641,8 @@ namespace App.Network
         {
             Debug.LogWarning($"[HttpApiClient] 401 Unauthorized 처리 시작: {endpoint}");
 
-            // OIDC refresh token만 사용 (Single-API refresh token 지원 중단)
-            var refreshToken = App.Security.SecureStorage.GetString(App.Security.TokenKeys.Refresh);
+            // OIDC refresh token을 백업 복구 메커니즘과 함께 조회
+            var refreshToken = App.Security.SecureStorage.GetStringWithBackup(App.Security.TokenKeys.Refresh);
             if (string.IsNullOrEmpty(refreshToken))
             {
                 Debug.LogError("[HttpApiClient] OIDC refresh token 없음 - 재로그인 필요");
