@@ -739,6 +739,15 @@ namespace App.Network
                                 App.Security.SecureStorage.StoreString("blokus_username", response.user.username ?? "");
                             }
 
+                            // ⚠️ 중요: AccessToken 만료 시간 업데이트 (1분 버퍼 포함)
+                            // 이 업데이트가 누락되면 GetAccessToken()이 계속 만료로 판단하여 무한 갱신 루프 발생
+                            if (response.expires_in > 0)
+                            {
+                                var expiryTime = System.DateTime.UtcNow.AddSeconds(response.expires_in - 60);
+                                App.Security.SecureStorage.StoreString(App.Security.TokenKeys.Expiry, expiryTime.ToBinary().ToString());
+                                Debug.Log($"[HttpApiClient] AccessToken 만료 시간 업데이트: {response.expires_in}초 후 (버퍼 제외 시)");
+                            }
+
                             // SessionManager 업데이트 - SeedFromAuth 사용하여 전체 사용자 정보 저장
                             if (App.Core.SessionManager.Instance != null)
                             {

@@ -778,8 +778,9 @@ namespace App.Network
                 App.Security.SecureStorage.StoreStringWithBackup(PREF_ACCESS_TOKEN, tokenResponse.access_token ?? "");
                 App.Security.SecureStorage.StoreStringWithBackup(PREF_REFRESH_TOKEN, tokenResponse.refresh_token ?? "");
 
-                // Calculate expiry time (AccessToken expiry - not RefreshToken)
-                var expiryTime = DateTime.UtcNow.AddSeconds(tokenResponse.expires_in - 60); // 1 minute buffer
+                // AccessToken 만료 시간 계산 및 저장 (1분 버퍼 포함)
+                // 참고: RefreshToken 만료 시간은 서버의 sliding window 방식으로 관리되므로 클라이언트에서 저장하지 않음
+                var expiryTime = DateTime.UtcNow.AddSeconds(tokenResponse.expires_in - 60);
                 App.Security.SecureStorage.StoreString(PREF_TOKEN_EXPIRY, expiryTime.ToBinary().ToString());
 
                 LogDebug("Tokens saved to SecureStorage with backup successfully");
