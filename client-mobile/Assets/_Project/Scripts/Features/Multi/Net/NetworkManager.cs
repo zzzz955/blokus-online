@@ -520,20 +520,21 @@ namespace Features.Multi.Net
                 if (verifyResult.Refreshed)
                 {
                     Debug.Log("[NetworkManager] 토큰이 자동으로 갱신되었습니다.");
-                    
-                    // 갱신된 토큰을 SecureStorage에 저장
+
+                    // 갱신된 토큰을 이중 저장 (Keystore + 암호화 백업)
+                    // ⚠️ StoreStringWithBackup을 사용해야 Keystore 손실 시 백업에서 복구 가능
                     if (!string.IsNullOrEmpty(verifyResult.AccessToken))
                     {
-                        App.Security.SecureStorage.StoreString(App.Security.TokenKeys.Access, verifyResult.AccessToken);
+                        App.Security.SecureStorage.StoreStringWithBackup(App.Security.TokenKeys.Access, verifyResult.AccessToken);
 
                         // AccessToken 만료 시간 업데이트 (1분 버퍼 포함)
                         if (verifyResult.ExpiresIn > 0)
                         {
                             var expiryTime = DateTime.UtcNow.AddSeconds(verifyResult.ExpiresIn - 60);
-                            App.Security.SecureStorage.StoreString(App.Security.TokenKeys.Expiry, expiryTime.ToBinary().ToString());
+                            App.Security.SecureStorage.StoreStringWithBackup(App.Security.TokenKeys.Expiry, expiryTime.ToBinary().ToString());
                         }
 
-                        Debug.Log("[NetworkManager] 갱신된 토큰을 SecureStorage에 저장 완료");
+                        Debug.Log("[NetworkManager] 갱신된 토큰을 SecureStorage에 이중 저장 완료");
                     }
                 }
 

@@ -65,7 +65,57 @@ namespace App.Security
             return "Fallback: PlayerPrefs with XOR encryption";
 #endif
         }
-        
+
+        /// <summary>
+        /// SecureStorage 초기화 - 앱 시작 시 호출 필수
+        /// Android Keystore 키의 유효성을 검사하고, 문제가 있으면 재생성합니다.
+        /// </summary>
+        public static void Initialize()
+        {
+            try
+            {
+#if UNITY_ANDROID && !UNITY_EDITOR
+                Debug.Log("[SecureStorage] Android Keystore 초기화 시작...");
+
+                // Keystore 키 유효성 검사
+                if (!ValidateKeystoreKey())
+                {
+                    Debug.LogWarning("[SecureStorage] Keystore 키가 유효하지 않음 - 재생성 시작");
+
+                    // 기존 키 삭제 및 새 키 생성
+                    try
+                    {
+                        DeleteKeystoreKey();
+                        Debug.Log("[SecureStorage] 기존 Keystore 키 삭제 완료");
+                    }
+                    catch (Exception deleteEx)
+                    {
+                        Debug.LogWarning($"[SecureStorage] Keystore 키 삭제 실패 (무시): {deleteEx.Message}");
+                    }
+
+                    if (GenerateKeystoreKey())
+                    {
+                        Debug.Log("[SecureStorage] Keystore 키 재생성 성공");
+                    }
+                    else
+                    {
+                        Debug.LogError("[SecureStorage] Keystore 키 재생성 실패 - 폴백 모드로 동작");
+                    }
+                }
+                else
+                {
+                    Debug.Log("[SecureStorage] Keystore 키 유효성 검사 통과");
+                }
+#else
+                Debug.Log($"[SecureStorage] 초기화 완료: {GetPlatformInfo()}");
+#endif
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[SecureStorage] 초기화 실패: {ex.Message}");
+            }
+        }
+
         /// <summary>
         /// 문자열 값을 안전하게 저장
         /// </summary>
@@ -708,12 +758,12 @@ namespace App.Security
                 {
                     AndroidJavaObject keyStore = keyStoreClass.CallStatic<AndroidJavaObject>("getInstance", ANDROID_KEYSTORE);
                     keyStore.Call("load", (AndroidJavaObject)null);
-                    
+
                     // 키가 이미 존재하는지 확인
                     bool keyExists = keyStore.Call<bool>("containsAlias", KEYSTORE_ALIAS);
                     if (keyExists)
                         return true;
-                    
+
                     // 키가 없으면 생성
                     return GenerateKeystoreKey();
                 }
@@ -721,6 +771,61 @@ namespace App.Security
             catch (Exception ex)
             {
                 Debug.LogError($"[SecureStorage] [ANDROID] EnsureKeyExists failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Keystore 키 유효성 검사 - 키가 존재하고 실제로 암복호화가 가능한지 테스트
+        /// </summary>
+        private static bool ValidateKeystoreKey()
+        {
+            try
+            {
+                using (AndroidJavaClass keyStoreClass = new AndroidJavaClass("java.security.KeyStore"))
+                {
+                    AndroidJavaObject keyStore = keyStoreClass.CallStatic<AndroidJavaObject>("getInstance", ANDROID_KEYSTORE);
+                    keyStore.Call("load", (AndroidJavaObject)null);
+
+                    // 1. 키가 존재하는지 확인
+                    bool keyExists = keyStore.Call<bool>("containsAlias", KEYSTORE_ALIAS);
+                    if (!keyExists)
+                    {
+                        Debug.LogWarning("[SecureStorage] Keystore 키가 존재하지 않음");
+                        return false;
+                    }
+
+                    // 2. 키를 가져올 수 있는지 확인
+                    AndroidJavaObject secretKey = keyStore.Call<AndroidJavaObject>("getKey", KEYSTORE_ALIAS, (AndroidJavaObject)null);
+                    if (secretKey == null)
+                    {
+                        Debug.LogWarning("[SecureStorage] Keystore 키를 가져올 수 없음");
+                        return false;
+                    }
+
+                    // 3. 암복호화 테스트
+                    string testData = "SecureStorageValidationTest2025";
+                    string encrypted = EncryptWithKeystore(testData);
+                    if (string.IsNullOrEmpty(encrypted))
+                    {
+                        Debug.LogWarning("[SecureStorage] Keystore 암호화 테스트 실패");
+                        return false;
+                    }
+
+                    string decrypted = DecryptWithKeystore(encrypted);
+                    if (decrypted != testData)
+                    {
+                        Debug.LogWarning("[SecureStorage] Keystore 복호화 테스트 실패");
+                        return false;
+                    }
+
+                    Debug.Log("[SecureStorage] Keystore 키 유효성 검사 성공 (암복호화 테스트 통과)");
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[SecureStorage] Keystore 키 유효성 검사 실패: {ex.Message}");
                 return false;
             }
         }
@@ -734,27 +839,39 @@ namespace App.Security
                 using (AndroidJavaClass keyPropertiesClass = new AndroidJavaClass("android.security.keystore.KeyProperties"))
                 {
                     AndroidJavaObject keyGenerator = keyGenClass.CallStatic<AndroidJavaObject>("getInstance", "AES", ANDROID_KEYSTORE);
-                    
+
                     // KeyGenParameterSpec 생성
                     int purposes = keyPropertiesClass.GetStatic<int>("PURPOSE_ENCRYPT") | keyPropertiesClass.GetStatic<int>("PURPOSE_DECRYPT");
                     AndroidJavaObject builder = new AndroidJavaObject("android.security.keystore.KeyGenParameterSpec$Builder", KEYSTORE_ALIAS, purposes);
-                    
-                    builder.Call<AndroidJavaObject>("setBlockModes", keyPropertiesClass.GetStatic<string>("BLOCK_MODE_GCM"));
-                    builder.Call<AndroidJavaObject>("setEncryptionPaddings", keyPropertiesClass.GetStatic<string>("ENCRYPTION_PADDING_NONE"));
+
+                    // ⚠️ 수정: setBlockModes와 setEncryptionPaddings는 배열을 받아야 함
+                    // Java varargs를 위해 배열로 전달
+                    string blockMode = keyPropertiesClass.GetStatic<string>("BLOCK_MODE_GCM");
+                    string encryptionPadding = keyPropertiesClass.GetStatic<string>("ENCRYPTION_PADDING_NONE");
+
+                    builder.Call<AndroidJavaObject>("setBlockModes", new object[] { new string[] { blockMode } });
+                    builder.Call<AndroidJavaObject>("setEncryptionPaddings", new object[] { new string[] { encryptionPadding } });
                     builder.Call<AndroidJavaObject>("setKeySize", 256);
-                    
+
+                    // 사용자 인증 불필요 설정 (화면 잠금 변경 시 키 손실 방지)
+                    builder.Call<AndroidJavaObject>("setUserAuthenticationRequired", false);
+
+                    // Android 9 (API 28) 이상: Randomized Encryption Required 설정
+                    // 기본값은 true이므로 명시적으로 설정하지 않음 (보안 강화)
+
                     AndroidJavaObject keyGenSpec = builder.Call<AndroidJavaObject>("build");
                     keyGenerator.Call("init", keyGenSpec);
                     keyGenerator.Call<AndroidJavaObject>("generateKey");
-                    
+
                     if (DEBUG_MODE)
-                        Debug.Log("[SecureStorage] [ANDROID] Keystore key generated successfully");
+                        Debug.Log("[SecureStorage] [ANDROID] Keystore key generated successfully with proper settings");
                     return true;
                 }
             }
             catch (Exception ex)
             {
                 Debug.LogError($"[SecureStorage] [ANDROID] GenerateKeystoreKey failed: {ex.Message}");
+                Debug.LogError($"[SecureStorage] [ANDROID] Stack trace: {ex.StackTrace}");
                 return false;
             }
         }
@@ -1292,26 +1409,26 @@ namespace App.Security
                 if (DEBUG_MODE)
                     Debug.Log("[SecureStorage] Starting token key migration");
 
-                // Migrate refresh tokens from legacy keys
+                // Migrate refresh tokens from legacy keys (이중 저장 사용)
                 foreach (var oldKey in TokenKeys.LegacyRefresh)
                 {
                     var value = GetString(oldKey, "");
                     if (!string.IsNullOrEmpty(value))
                     {
-                        StoreString(TokenKeys.Refresh, value);
+                        StoreStringWithBackup(TokenKeys.Refresh, value);
                         DeleteKey(oldKey);
                         if (DEBUG_MODE)
                             Debug.Log($"[SecureStorage] Migrated refresh token from {oldKey} to {TokenKeys.Refresh}");
                     }
                 }
 
-                // Migrate access tokens from legacy keys
+                // Migrate access tokens from legacy keys (이중 저장 사용)
                 foreach (var oldKey in TokenKeys.LegacyAccess)
                 {
                     var value = GetString(oldKey, "");
                     if (!string.IsNullOrEmpty(value))
                     {
-                        StoreString(TokenKeys.Access, value);
+                        StoreStringWithBackup(TokenKeys.Access, value);
                         DeleteKey(oldKey);
                         if (DEBUG_MODE)
                             Debug.Log($"[SecureStorage] Migrated access token from {oldKey} to {TokenKeys.Access}");
@@ -1319,10 +1436,11 @@ namespace App.Security
                 }
 
                 // Also check PlayerPrefs for very old tokens (pre-SecureStorage)
+                // ⚠️ 레거시 마이그레이션도 이중 저장 사용
                 var ppRefresh = PlayerPrefs.GetString("blokus_refresh_token", "");
                 if (!string.IsNullOrEmpty(ppRefresh))
                 {
-                    StoreString(TokenKeys.Refresh, ppRefresh);
+                    StoreStringWithBackup(TokenKeys.Refresh, ppRefresh);
                     PlayerPrefs.DeleteKey("blokus_refresh_token");
                     if (DEBUG_MODE)
                         Debug.Log("[SecureStorage] Migrated refresh token from PlayerPrefs");
@@ -1331,7 +1449,7 @@ namespace App.Security
                 var ppAccess = PlayerPrefs.GetString("blokus_access_token", "");
                 if (!string.IsNullOrEmpty(ppAccess))
                 {
-                    StoreString(TokenKeys.Access, ppAccess);
+                    StoreStringWithBackup(TokenKeys.Access, ppAccess);
                     PlayerPrefs.DeleteKey("blokus_access_token");
                     if (DEBUG_MODE)
                         Debug.Log("[SecureStorage] Migrated access token from PlayerPrefs");

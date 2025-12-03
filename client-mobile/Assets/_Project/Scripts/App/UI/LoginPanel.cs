@@ -365,17 +365,18 @@ namespace App.UI
 
                         if (loginResponse != null && !string.IsNullOrEmpty(loginResponse.access_token))
                         {
-                            // 토큰을 SecurityStorage에 저장
-                            App.Security.SecureStorage.StoreString(App.Security.TokenKeys.Access, loginResponse.access_token);
-                            App.Security.SecureStorage.StoreString(App.Security.TokenKeys.Refresh, loginResponse.refresh_token);
-                            App.Security.SecureStorage.StoreString("blokus_id_token", loginResponse.id_token);
+                            // 토큰을 SecurityStorage에 이중 저장 (Keystore + 암호화 백업)
+                            // ⚠️ StoreStringWithBackup을 사용해야 Keystore 손실 시 백업에서 복구 가능
+                            App.Security.SecureStorage.StoreStringWithBackup(App.Security.TokenKeys.Access, loginResponse.access_token);
+                            App.Security.SecureStorage.StoreStringWithBackup(App.Security.TokenKeys.Refresh, loginResponse.refresh_token);
+                            App.Security.SecureStorage.StoreStringWithBackup("blokus_id_token", loginResponse.id_token);
 
                             // 사용자 정보 저장
                             if (loginResponse.user != null)
                             {
-                                App.Security.SecureStorage.StoreString("blokus_user_id", loginResponse.user.user_id.ToString());
-                                App.Security.SecureStorage.StoreString("blokus_username", loginResponse.user.username);
-                                App.Security.SecureStorage.StoreString("blokus_email", loginResponse.user.email);
+                                App.Security.SecureStorage.StoreStringWithBackup("blokus_user_id", loginResponse.user.user_id.ToString());
+                                App.Security.SecureStorage.StoreStringWithBackup("blokus_username", loginResponse.user.username);
+                                App.Security.SecureStorage.StoreStringWithBackup("blokus_email", loginResponse.user.email);
                             }
 
                             Debug.Log($"토큰 저장 완료: access_token 길이={loginResponse.access_token.Length}");
