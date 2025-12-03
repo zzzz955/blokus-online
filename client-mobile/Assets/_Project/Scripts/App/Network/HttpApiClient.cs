@@ -431,12 +431,13 @@ namespace App.Network
                         Debug.Log($"SetAuthToken 호출 시작: token={response.access_token.Substring(0, 20)}..., userId={response.user.user_id}");
                         SetAuthToken(response.access_token, response.user.user_id);
 
-                        //  수정: refresh token을 SecureStorage에 저장
+                        // refresh token을 이중 저장 (Keystore + 암호화 백업)
+                        // ⚠️ StoreStringWithBackup을 사용해야 Keystore 손실 시 백업에서 복구 가능
                         if (!string.IsNullOrEmpty(response.refresh_token))
                         {
-                            App.Security.SecureStorage.StoreString(App.Security.TokenKeys.Refresh, response.refresh_token);
-                            App.Security.SecureStorage.StoreString("blokus_user_id", response.user.user_id.ToString());
-                            App.Security.SecureStorage.StoreString("blokus_username", response.user.username ?? "");
+                            App.Security.SecureStorage.StoreStringWithBackup(App.Security.TokenKeys.Refresh, response.refresh_token);
+                            App.Security.SecureStorage.StoreStringWithBackup("blokus_user_id", response.user.user_id.ToString());
+                            App.Security.SecureStorage.StoreStringWithBackup("blokus_username", response.user.username ?? "");
                         }
 
                         // SessionManager에 access token만 저장 (refresh_token은 SecureStorage에서 관리)
@@ -731,12 +732,13 @@ namespace App.Network
                             // JWT에서 userId 추출하여 안전하게 설정
                             SetAuthToken(response.access_token, response.user.user_id);
 
-                            // 새 refresh token 저장
+                            // 새 refresh token 저장 (이중 저장 메커니즘 사용 - 중요!)
+                            // ⚠️ StoreStringWithBackup을 사용해야 Keystore 손실 시 백업에서 복구 가능
                             if (!string.IsNullOrEmpty(response.refresh_token))
                             {
-                                App.Security.SecureStorage.StoreString(App.Security.TokenKeys.Refresh, response.refresh_token);
-                                App.Security.SecureStorage.StoreString("blokus_user_id", response.user.user_id.ToString());
-                                App.Security.SecureStorage.StoreString("blokus_username", response.user.username ?? "");
+                                App.Security.SecureStorage.StoreStringWithBackup(App.Security.TokenKeys.Refresh, response.refresh_token);
+                                App.Security.SecureStorage.StoreStringWithBackup("blokus_user_id", response.user.user_id.ToString());
+                                App.Security.SecureStorage.StoreStringWithBackup("blokus_username", response.user.username ?? "");
                             }
 
                             // ⚠️ 중요: AccessToken 만료 시간 업데이트 (1분 버퍼 포함)

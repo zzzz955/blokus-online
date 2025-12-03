@@ -778,10 +778,10 @@ namespace App.Network
                 App.Security.SecureStorage.StoreStringWithBackup(PREF_ACCESS_TOKEN, tokenResponse.access_token ?? "");
                 App.Security.SecureStorage.StoreStringWithBackup(PREF_REFRESH_TOKEN, tokenResponse.refresh_token ?? "");
 
-                // AccessToken 만료 시간 계산 및 저장 (1분 버퍼 포함)
+                // AccessToken 만료 시간 계산 및 이중 저장 (1분 버퍼 포함)
                 // 참고: RefreshToken 만료 시간은 서버의 sliding window 방식으로 관리되므로 클라이언트에서 저장하지 않음
                 var expiryTime = DateTime.UtcNow.AddSeconds(tokenResponse.expires_in - 60);
-                App.Security.SecureStorage.StoreString(PREF_TOKEN_EXPIRY, expiryTime.ToBinary().ToString());
+                App.Security.SecureStorage.StoreStringWithBackup(PREF_TOKEN_EXPIRY, expiryTime.ToBinary().ToString());
 
                 LogDebug("Tokens saved to SecureStorage with backup successfully");
                 LogDebug($"SecureStorage Platform: {App.Security.SecureStorage.GetPlatformInfo()}");
@@ -908,29 +908,30 @@ namespace App.Network
                 }
                 
                 LogDebug("Starting token migration from PlayerPrefs to SecureStorage...");
-                
-                // Migrate refresh token
+
+                // Migrate refresh token (이중 저장 사용)
+                // ⚠️ 레거시 마이그레이션도 이중 저장을 사용해야 향후 Keystore 손실 시 복구 가능
                 string refreshToken = PlayerPrefs.GetString(PREF_REFRESH_TOKEN, "");
                 if (!string.IsNullOrEmpty(refreshToken))
                 {
-                    App.Security.SecureStorage.StoreString(PREF_REFRESH_TOKEN, refreshToken);
-                    LogDebug("Refresh token migrated to SecureStorage");
+                    App.Security.SecureStorage.StoreStringWithBackup(PREF_REFRESH_TOKEN, refreshToken);
+                    LogDebug("Refresh token migrated to SecureStorage with backup");
                 }
-                
-                // Migrate access token
+
+                // Migrate access token (이중 저장 사용)
                 string accessToken = PlayerPrefs.GetString(PREF_ACCESS_TOKEN, "");
                 if (!string.IsNullOrEmpty(accessToken))
                 {
-                    App.Security.SecureStorage.StoreString(PREF_ACCESS_TOKEN, accessToken);
-                    LogDebug("Access token migrated to SecureStorage");
+                    App.Security.SecureStorage.StoreStringWithBackup(PREF_ACCESS_TOKEN, accessToken);
+                    LogDebug("Access token migrated to SecureStorage with backup");
                 }
-                
-                // Migrate expiry time
+
+                // Migrate expiry time (이중 저장 사용)
                 string expiryTime = PlayerPrefs.GetString(PREF_TOKEN_EXPIRY, "");
                 if (!string.IsNullOrEmpty(expiryTime))
                 {
-                    App.Security.SecureStorage.StoreString(PREF_TOKEN_EXPIRY, expiryTime);
-                    LogDebug("Token expiry time migrated to SecureStorage");
+                    App.Security.SecureStorage.StoreStringWithBackup(PREF_TOKEN_EXPIRY, expiryTime);
+                    LogDebug("Token expiry time migrated to SecureStorage with backup");
                 }
                 
                 // Clear PlayerPrefs after successful migration

@@ -16,6 +16,11 @@ namespace App.Core
         private void Awake()
         {
             DontDestroyOnLoad(gameObject);
+
+            // SecureStorage 초기화 (Android Keystore 키 유효성 검사 및 재생성)
+            // ⚠️ 중요: Google Play Games 초기화 전에 호출하여 토큰 저장소 준비
+            App.Security.SecureStorage.Initialize();
+
             InitializeGooglePlayGames();
         }
 
