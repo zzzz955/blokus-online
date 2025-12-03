@@ -479,7 +479,24 @@ namespace App.Security
 
                 if (string.IsNullOrEmpty(encryptedValue))
                 {
-                    // 2) 폴백도 확인 (저장이 폴백으로 되었을 수 있음)
+                    // 2) SharedPreferences가 비어있음 - 백업에서 복구 시도
+                    string recoveredValue = TryRecoverFromBackup(key);
+                    if (!string.IsNullOrEmpty(recoveredValue))
+                    {
+                        Debug.Log($"[SecureStorage] [ANDROID] 백업에서 복구 성공: {key}");
+                        // 복구된 데이터를 Primary 저장소에 재저장
+                        try
+                        {
+                            StoreStringAndroid(key, recoveredValue);
+                        }
+                        catch (Exception storeEx)
+                        {
+                            Debug.LogWarning($"[SecureStorage] [ANDROID] 복구 후 재저장 실패: {storeEx.Message}");
+                        }
+                        return recoveredValue;
+                    }
+
+                    // 3) 백업도 없으면 폴백 확인
                     var fb = GetStringAndroidFallback(key, defaultValue);
                     if (!string.IsNullOrEmpty(fb) && fb != defaultValue)
                     {
@@ -489,7 +506,7 @@ namespace App.Security
                     return defaultValue;
                 }
 
-                // 3) Keystore로 복호화
+                // 4) Keystore로 복호화 시도
                 if (EnsureKeyExists())
                 {
                     string decryptedValue = DecryptWithKeystore(encryptedValue);
@@ -501,28 +518,129 @@ namespace App.Security
                     }
                 }
 
-                // 4) Keystore 실패 시 폴백
-                Debug.LogWarning($"[SecureStorage] [ANDROID] Keystore failed, using encrypted fallback for key: {key}");
+                // 5) Keystore 복호화 실패 - 백업에서 복구 시도
+                Debug.LogWarning($"[SecureStorage] [ANDROID] Keystore 복호화 실패, 백업에서 복구 시도: {key}");
+                string recoveredFromBackup = TryRecoverFromBackup(key);
+                if (!string.IsNullOrEmpty(recoveredFromBackup))
+                {
+                    Debug.Log($"[SecureStorage] [ANDROID] 백업에서 복구 성공, Keystore 재생성 시도: {key}");
+
+                    // Keystore 재생성 시도
+                    if (TryRegenerateKeystoreAndRestore(key, recoveredFromBackup))
+                    {
+                        Debug.Log($"[SecureStorage] [ANDROID] Keystore 재생성 및 데이터 복원 성공: {key}");
+                        return recoveredFromBackup;
+                    }
+
+                    // Keystore 재생성 실패해도 복구된 값은 반환
+                    return recoveredFromBackup;
+                }
+
+                // 6) 백업도 실패 - 폴백 시도
+                Debug.LogWarning($"[SecureStorage] [ANDROID] 백업 복구 실패, 폴백 시도: {key}");
                 return GetStringAndroidFallback(key, defaultValue);
             }
             catch (Exception ex)
             {
                 Debug.LogError($"[SecureStorage] [ANDROID] Get failed: {ex.Message}");
-                // Check if data might be corrupted
-                if (ex.Message.Contains("decrypt") || ex.Message.Contains("BadPadding"))
+
+                // Keystore 손상 감지
+                if (ex.Message.Contains("KeyStore") || ex.Message.Contains("InvalidKey") ||
+                    ex.Message.Contains("decrypt") || ex.Message.Contains("BadPadding"))
                 {
-                    Debug.LogWarning($"[SecureStorage] [ANDROID] Data corruption detected for key: {key}");
-                    try
+                    Debug.LogWarning($"[SecureStorage] [ANDROID] Keystore 손상 감지: {key}");
+
+                    // 백업에서 복구 시도
+                    string recoveredValue = TryRecoverFromBackup(key);
+                    if (!string.IsNullOrEmpty(recoveredValue))
                     {
-                        RemoveSharedPreference($"SecureStorage_{key}");
-                    }
-                    catch (Exception cleanupEx)
-                    {
-                        Debug.LogError($"[SecureStorage] [ANDROID] Corrupted data cleanup failed: {cleanupEx.Message}");
+                        Debug.Log($"[SecureStorage] [ANDROID] 예외 발생 후 백업에서 복구 성공: {key}");
+
+                        // 손상된 데이터 정리
+                        try
+                        {
+                            RemoveSharedPreference($"SecureStorage_{key}");
+                        }
+                        catch { /* 정리 실패는 무시 */ }
+
+                        // Keystore 재생성 및 복원 시도
+                        TryRegenerateKeystoreAndRestore(key, recoveredValue);
+
+                        return recoveredValue;
                     }
                 }
+
                 // 최후의 폴백
                 return GetStringAndroidFallback(key, defaultValue);
+            }
+        }
+
+        /// <summary>
+        /// Backup_키에서 데이터 복구 시도
+        /// </summary>
+        private static string TryRecoverFromBackup(string key)
+        {
+            try
+            {
+                string backup = PlayerPrefs.GetString($"Backup_{key}", "");
+                if (string.IsNullOrEmpty(backup))
+                    return null;
+
+                string decrypted = SimpleDecrypt(backup);
+                if (!string.IsNullOrEmpty(decrypted))
+                {
+                    if (DEBUG_MODE)
+                        Debug.Log($"[SecureStorage] [ANDROID] 백업 복호화 성공: {key}");
+                    return decrypted;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[SecureStorage] [ANDROID] 백업 복구 실패: {ex.Message}");
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Keystore 재생성 및 데이터 복원 시도
+        /// </summary>
+        private static bool TryRegenerateKeystoreAndRestore(string key, string value)
+        {
+            try
+            {
+                Debug.Log($"[SecureStorage] [ANDROID] Keystore 재생성 시작: {key}");
+
+                // 기존 Keystore 키 삭제
+                try
+                {
+                    DeleteKeystoreKey();
+                    Debug.Log($"[SecureStorage] [ANDROID] 기존 Keystore 키 삭제 완료");
+                }
+                catch (Exception deleteEx)
+                {
+                    Debug.LogWarning($"[SecureStorage] [ANDROID] Keystore 키 삭제 실패 (무시): {deleteEx.Message}");
+                }
+
+                // 새 Keystore 키 생성
+                if (!GenerateKeystoreKey())
+                {
+                    Debug.LogError($"[SecureStorage] [ANDROID] Keystore 키 재생성 실패");
+                    return false;
+                }
+
+                Debug.Log($"[SecureStorage] [ANDROID] 새 Keystore 키 생성 완료");
+
+                // 복구된 데이터를 새 Keystore로 재암호화하여 저장
+                StoreStringAndroid(key, value);
+                Debug.Log($"[SecureStorage] [ANDROID] 데이터 재암호화 및 저장 완료: {key}");
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[SecureStorage] [ANDROID] Keystore 재생성 실패: {ex.Message}");
+                return false;
             }
         }
 
@@ -888,42 +1006,122 @@ namespace App.Security
         {
             try
             {
-                // Check Keychain availability first
+                // Step 1: Keychain 사용 가능 여부 체크
                 if (_SecureStorage_IsAvailable() == 0)
                 {
-                    Debug.LogWarning("[SecureStorage] [IOS] Keychain unavailable, using encrypted fallback");
+                    Debug.LogWarning("[SecureStorage] [IOS] Keychain 사용 불가, 백업에서 복구 시도");
+
+                    // Step 2: 백업에서 복구 시도
+                    string recoveredValue = TryRecoverFromBackup(key);
+                    if (!string.IsNullOrEmpty(recoveredValue))
+                    {
+                        Debug.Log($"[SecureStorage] [IOS] 백업에서 복구 성공: {key}");
+                        return recoveredValue;
+                    }
+
+                    // Step 3: 폴백으로 시도 (암호화된 PlayerPrefs)
                     return GetStringIOSFallback(key, defaultValue);
                 }
-                
+
+                // Step 4: Keychain에서 값 조회 시도
                 System.IntPtr ptr = _SecureStorage_GetString(key, defaultValue);
                 if (ptr != System.IntPtr.Zero)
                 {
                     string result = Marshal.PtrToStringAnsi(ptr);
                     Marshal.FreeHGlobal(ptr); // Free the allocated string from native code
-                    
+
                     if (!string.IsNullOrEmpty(result) && result != defaultValue)
                     {
                         if (DEBUG_MODE)
-                            Debug.Log($"[SecureStorage] [IOS_KEYCHAIN] Retrieved key: {key}");
+                            Debug.Log($"[SecureStorage] [IOS_KEYCHAIN] 조회 성공: {key}");
                         return result;
                     }
                 }
-                
-                // If Keychain returns default value or empty, try fallback
+
+                // Step 5: Keychain이 비어있거나 실패 - 백업에서 복구 시도
+                string backupValue = TryRecoverFromBackup(key);
+                if (!string.IsNullOrEmpty(backupValue))
+                {
+                    Debug.Log($"[SecureStorage] [IOS] Keychain 실패 후 백업에서 복구: {key}");
+
+                    // Keychain에 복원된 데이터 재저장 시도
+                    try
+                    {
+                        int storeResult = _SecureStorage_StoreString(key, backupValue);
+                        if (storeResult == 1)
+                        {
+                            Debug.Log($"[SecureStorage] [IOS] Keychain에 데이터 복원 완료: {key}");
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"[SecureStorage] [IOS] Keychain 복원 실패하였으나 백업 데이터는 사용 가능: {key}");
+                        }
+                    }
+                    catch (Exception restoreEx)
+                    {
+                        Debug.LogWarning($"[SecureStorage] [IOS] Keychain 복원 중 예외 발생 (백업 데이터는 사용 가능): {restoreEx.Message}");
+                    }
+
+                    return backupValue;
+                }
+
+                // Step 6: 최종 폴백 - 암호화된 PlayerPrefs
                 return GetStringIOSFallback(key, defaultValue);
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[SecureStorage] [IOS] Get failed: {ex.Message}");
-                // Handle common Keychain read errors
+                Debug.LogError($"[SecureStorage] [IOS] 조회 실패: {ex.Message}");
+
+                // iOS Keychain 일반적인 에러 처리
+                bool isKeychainError = false;
+
                 if (ex.Message.Contains("-25300") || ex.Message.Contains("errSecItemNotFound"))
                 {
-                    Debug.LogWarning($"[SecureStorage] [IOS] Keychain item not found for key: {key}");
+                    Debug.LogWarning($"[SecureStorage] [IOS] Keychain 항목 없음: {key}");
+                    isKeychainError = true;
                 }
-                else if (ex.Message.Contains("-34018") || ex.Message.Contains("errSecMissingEntitlement"))
+                else if (ex.Message.Contains("-34018") || ex.Message.Contains("errSecIO"))
                 {
-                    Debug.LogError("[SecureStorage] [IOS] Keychain entitlement missing - check iOS project settings");
+                    Debug.LogError("[SecureStorage] [IOS] Keychain I/O 에러 (접근 권한 또는 Entitlement 문제)");
+                    isKeychainError = true;
                 }
+                else if (ex.Message.Contains("-25293") || ex.Message.Contains("errSecAuthFailed"))
+                {
+                    Debug.LogError("[SecureStorage] [IOS] Keychain 인증 실패");
+                    isKeychainError = true;
+                }
+                else if (ex.Message.Contains("errSecMissingEntitlement"))
+                {
+                    Debug.LogError("[SecureStorage] [IOS] Keychain Entitlement 누락 - iOS 프로젝트 설정 확인 필요");
+                    isKeychainError = true;
+                }
+
+                // Keychain 에러인 경우 백업 복구 시도
+                if (isKeychainError)
+                {
+                    string recoveredValue = TryRecoverFromBackup(key);
+                    if (!string.IsNullOrEmpty(recoveredValue))
+                    {
+                        Debug.Log($"[SecureStorage] [IOS] 예외 발생 후 백업에서 복구: {key}");
+
+                        // Keychain에 복원 시도 (선택적)
+                        try
+                        {
+                            int storeResult = _SecureStorage_StoreString(key, recoveredValue);
+                            if (storeResult == 1)
+                            {
+                                Debug.Log($"[SecureStorage] [IOS] Keychain에 데이터 복원 완료: {key}");
+                            }
+                        }
+                        catch
+                        {
+                            // 복원 실패는 무시 (백업 데이터는 사용 가능)
+                        }
+
+                        return recoveredValue;
+                    }
+                }
+
                 return GetStringIOSFallback(key, defaultValue);
             }
         }
