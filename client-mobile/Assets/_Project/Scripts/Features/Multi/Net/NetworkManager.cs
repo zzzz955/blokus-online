@@ -525,14 +525,14 @@ namespace Features.Multi.Net
                     if (!string.IsNullOrEmpty(verifyResult.AccessToken))
                     {
                         App.Security.SecureStorage.StoreString(App.Security.TokenKeys.Access, verifyResult.AccessToken);
-                        
-                        // 만료 시간 업데이트 (1분 버퍼 포함)
+
+                        // AccessToken 만료 시간 업데이트 (1분 버퍼 포함)
                         if (verifyResult.ExpiresIn > 0)
                         {
                             var expiryTime = DateTime.UtcNow.AddSeconds(verifyResult.ExpiresIn - 60);
                             App.Security.SecureStorage.StoreString(App.Security.TokenKeys.Expiry, expiryTime.ToBinary().ToString());
                         }
-                        
+
                         Debug.Log("[NetworkManager] 갱신된 토큰을 SecureStorage에 저장 완료");
                     }
                 }

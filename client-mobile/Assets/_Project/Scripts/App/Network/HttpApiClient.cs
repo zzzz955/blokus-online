@@ -568,12 +568,13 @@ namespace App.Network
         {
             Debug.Log("[HttpApiClient] OIDC refresh token 자동 로그인 시도");
 
-            // OIDC refresh token만 확인 (Single-API refresh token 지원 중단)
-            string oidcRefreshToken = App.Security.SecureStorage.GetString(App.Security.TokenKeys.Refresh);
+            // OIDC refresh token을 백업 복구 메커니즘과 함께 조회
+            // Android Keystore 손실 시 자동으로 백업에서 복구 시도
+            string oidcRefreshToken = App.Security.SecureStorage.GetStringWithBackup(App.Security.TokenKeys.Refresh);
 
             if (!string.IsNullOrEmpty(oidcRefreshToken))
             {
-                Debug.Log("[HttpApiClient] 저장된 OIDC refresh token으로 자동 로그인 시도");
+                Debug.Log("[HttpApiClient] 저장된 OIDC refresh token으로 자동 로그인 시도 (백업 복구 포함)");
                 StartCoroutine(TryAutoLoginWithOidcToken(oidcRefreshToken));
                 return;
             }
@@ -640,8 +641,8 @@ namespace App.Network
         {
             Debug.LogWarning($"[HttpApiClient] 401 Unauthorized 처리 시작: {endpoint}");
 
-            // OIDC refresh token만 사용 (Single-API refresh token 지원 중단)
-            var refreshToken = App.Security.SecureStorage.GetString(App.Security.TokenKeys.Refresh);
+            // OIDC refresh token을 백업 복구 메커니즘과 함께 조회
+            var refreshToken = App.Security.SecureStorage.GetStringWithBackup(App.Security.TokenKeys.Refresh);
             if (string.IsNullOrEmpty(refreshToken))
             {
                 Debug.LogError("[HttpApiClient] OIDC refresh token 없음 - 재로그인 필요");
@@ -736,6 +737,15 @@ namespace App.Network
                                 App.Security.SecureStorage.StoreString(App.Security.TokenKeys.Refresh, response.refresh_token);
                                 App.Security.SecureStorage.StoreString("blokus_user_id", response.user.user_id.ToString());
                                 App.Security.SecureStorage.StoreString("blokus_username", response.user.username ?? "");
+                            }
+
+                            // ⚠️ 중요: AccessToken 만료 시간 업데이트 (1분 버퍼 포함)
+                            // 이 업데이트가 누락되면 GetAccessToken()이 계속 만료로 판단하여 무한 갱신 루프 발생
+                            if (response.expires_in > 0)
+                            {
+                                var expiryTime = System.DateTime.UtcNow.AddSeconds(response.expires_in - 60);
+                                App.Security.SecureStorage.StoreString(App.Security.TokenKeys.Expiry, expiryTime.ToBinary().ToString());
+                                Debug.Log($"[HttpApiClient] AccessToken 만료 시간 업데이트: {response.expires_in}초 후 (버퍼 제외 시)");
                             }
 
                             // SessionManager 업데이트 - SeedFromAuth 사용하여 전체 사용자 정보 저장
