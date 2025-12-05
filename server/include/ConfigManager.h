@@ -81,7 +81,7 @@ namespace Blokus {
 
             static bool validate() {
                 if (dbHost.empty() || dbUser.empty() || dbName.empty()) {
-                    spdlog::error("�ʼ� DB ������ �����Ǿ����ϴ�: DB_HOST, DB_USER, DB_NAME");
+                    spdlog::error("필수 DB 파라미터가 설정되지않았습니다: DB_HOST, DB_USER, DB_NAME");
                     return false;
                 }
                 return true;

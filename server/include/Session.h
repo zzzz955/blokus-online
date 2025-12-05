@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ServerTypes.h"  // ConnectionState�� ���⿡ ���ǵ�
+#include "ServerTypes.h"  // ConnectionState가 여기에 정의됨
 #include "DatabaseManager.h"  // UserAccount 구조체를 위해 추가
 #include <boost/asio.hpp>
 #include <spdlog/spdlog.h>

@@ -1,5 +1,5 @@
 #include "GameLogic.h"
-#include "Block.h" // Block Ŭ���� ���
+#include "Block.h" // Block 클래스 사용
 #include "Utils.h"
 #include <algorithm>
 #include <spdlog/spdlog.h>
@@ -11,7 +11,7 @@ namespace Blokus
     {
 
         // ========================================
-        // GameLogic ����
+        // GameLogic 구현
         // ========================================
 
         GameLogic::GameLogic()
@@ -19,7 +19,7 @@ namespace Blokus
         {
             initializeBoard();
 
-            // ��� �÷��̾��� ù ���� ��ġ ���� �ʱ�ȭ
+            // 모든 플레이어의 첫 블록 배치 상태 초기화
             m_hasPlacedFirstBlock[PlayerColor::Blue] = false;
             m_hasPlacedFirstBlock[PlayerColor::Yellow] = false;
             m_hasPlacedFirstBlock[PlayerColor::Red] = false;
@@ -41,7 +41,7 @@ namespace Blokus
                 }
             }
 
-            // ���� ���ϰ� ��ġ ���� �ʱ�ȭ
+            // 블록 사용과 배치 정보 초기화
             m_usedBlocks.clear();
             m_playerOccupiedCells.clear();
 
@@ -72,25 +72,25 @@ namespace Blokus
 
         bool GameLogic::canPlaceBlock(const BlockPlacement &placement) const
         {
-            // 1. �⺻ ��ȿ�� �˻� (���� ���, �浹)
+            // 1. 기본 유효성 검사 (범위 체크, 충돌)
             if (hasCollision(placement))
             {
                 return false;
             }
 
-            // 2. ������ �̹� ���Ǿ����� Ȯ��
+            // 2. 블록이 이미 사용되었는지 확인
             if (isBlockUsed(placement.player, placement.type))
             {
                 return false;
             }
 
-            // 3. ù ��° �������� Ȯ��
+            // 3. 첫 번째 블록인지 확인
             if (!hasPlayerPlacedFirstBlock(placement.player))
             {
                 return isFirstBlockValid(placement);
             }
 
-            // 4. ù ��° ������ �ƴ� ���, ����Ŀ�� ��Ģ ����
+            // 4. 첫 번째 블록이 아닌 경우, 코너커넥션 규칙 검사
             return isCornerAdjacencyValid(placement) && hasNoEdgeAdjacency(placement);
         }
 
@@ -101,7 +101,7 @@ namespace Blokus
                 return false;
             }
 
-            // ���忡 ���� ��ġ (Block Ŭ���� ���)
+            // 보드에 블록 배치 (Block 클래스 사용)
             Block block(placement.type, placement.player);
             block.setRotation(placement.rotation);
             block.setFlipState(placement.flip);
@@ -114,10 +114,10 @@ namespace Blokus
                 m_playerOccupiedCells[placement.player].push_back(pos);
             }
 
-            // ���� ��� ǥ��
+            // 블록 사용 표시
             setPlayerBlockUsed(placement.player, placement.type);
 
-            // ù ���� ��ġ ǥ��
+            // 첫 블록 배치 표시
             if (!hasPlayerPlacedFirstBlock(placement.player))
             {
                 m_hasPlacedFirstBlock[placement.player] = true;
@@ -138,7 +138,7 @@ namespace Blokus
             if (owner == PlayerColor::None)
                 return false;
 
-            // �ܼ��� �ش� ���� ���� (�����δ� ��ü ������ ã�Ƽ� �����ؾ� ��)
+            // 단순히 해당 블록 제거 (실제로는 전체 블록을 찾아서 제거해야 함)
             m_board[position.first][position.second] = PlayerColor::None;
             return true;
         }
@@ -181,7 +181,7 @@ namespace Blokus
         {
             std::vector<BlockType> available;
 
-            // ���� Types.h�� ��� ���� Ÿ�� ��� (Block.cpp�� ����)
+            // 현재 Types.h에 정의된 블록 타입 순회 (Block.cpp와 동일)
             std::vector<BlockType> allTypes = {
                 BlockType::Single,
                 BlockType::Domino,
@@ -338,7 +338,7 @@ namespace Blokus
 
         bool GameLogic::isGameFinished() const
         {
-            // ��� �÷��̾ �� �̻� ������ ���� �� ������ ���� ����
+            // 모든 플레이어가 더 이상 블록을 놓을 수 없으면 게임 종료
             std::vector<PlayerColor> players = {
                 PlayerColor::Blue, PlayerColor::Yellow,
                 PlayerColor::Red, PlayerColor::Green};
@@ -474,7 +474,7 @@ namespace Blokus
         }
 
         // ========================================
-        // ���� ���� �Լ���
+        // 헬퍼 함수들
         // ========================================
 
         bool GameLogic::isPositionValid(const Position &pos) const
@@ -484,7 +484,7 @@ namespace Blokus
 
         bool GameLogic::hasCollision(const BlockPlacement &placement) const
         {
-            // Block Ŭ������ ����Ͽ� �浹 �˻�
+            // Block 클래스를 사용하여 충돌 검사
             Block block(placement.type, placement.player);
             block.setRotation(placement.rotation);
             block.setFlipState(placement.flip);
@@ -504,22 +504,22 @@ namespace Blokus
 
         bool GameLogic::isFirstBlockValid(const BlockPlacement &placement) const
         {
-            // Block Ŭ������ ����Ͽ� ù ���� ����
+            // Block 클래스를 사용하여 첫 블록 검사
             Block block(placement.type, placement.player);
             block.setRotation(placement.rotation);
             block.setFlipState(placement.flip);
 
             PositionList absolutePositions = block.getAbsolutePositions(placement.position);
 
-            // Ŭ���� ���: 4�� �𼭸� �� �ϳ��� ��ƾ� ��
+            // 클래식 룰: 4개 코너 중 하나에 놓아야 함
             std::vector<Position> corners = {
-                {0, 0},                          // ���� �� �𼭸�
-                {0, BOARD_SIZE - 1},             // ������ �� �𼭸�
-                {BOARD_SIZE - 1, 0},             // ���� �Ʒ� �𼭸�
-                {BOARD_SIZE - 1, BOARD_SIZE - 1} // ������ �Ʒ� �𼭸�
+                {0, 0},                          // 왼쪽 위 코너
+                {0, BOARD_SIZE - 1},             // ��왼쪽 위 코너
+                {BOARD_SIZE - 1, 0},             // 왼쪽 아래 코너
+                {BOARD_SIZE - 1, BOARD_SIZE - 1} // ��왼쪽 아래 코너
             };
 
-            // ������ �� �� �ϳ��� 4�� �𼭸� �� �ϳ��� ��Ȯ�� ��ġ�ؾ� ��
+            // 블록의 셀 중 하나가 4개 코너 중 하나에 정확히 배치되어야 함
             for (const auto &blockPos : absolutePositions)
             {
                 for (const auto &corner : corners)
@@ -536,7 +536,7 @@ namespace Blokus
 
         bool GameLogic::isCornerAdjacencyValid(const BlockPlacement &placement) const
         {
-            // ���� �� ���ϰ� �𼭸��� �����ؾ� ��
+            // 같은 색 블록과 코너로 연결되어야 함
             Block block(placement.type, placement.player);
             block.setRotation(placement.rotation);
             block.setFlipState(placement.flip);
@@ -551,7 +551,7 @@ namespace Blokus
                 {
                     if (isPositionValid(diagonal) && getCellOwner(diagonal) == placement.player)
                     {
-                        return true; // ���� �� ���ϰ� �𼭸� ���� �߰�
+                        return true; // 같은 색 블록과 코너로 접촉 발견
                     }
                 }
             }
@@ -561,7 +561,7 @@ namespace Blokus
 
         bool GameLogic::hasNoEdgeAdjacency(const BlockPlacement &placement) const
         {
-            // ���� �� ���ϰ� ������ �����ϸ� �ȵ�
+            // 같은 색 블록과 변으로 접촉하면 안됨
             Block block(placement.type, placement.player);
             block.setRotation(placement.rotation);
             block.setFlipState(placement.flip);
@@ -576,7 +576,7 @@ namespace Blokus
                 {
                     if (isPositionValid(adjacent) && getCellOwner(adjacent) == placement.player)
                     {
-                        return false; // ���� �� ���ϰ� �� ���� �߰�
+                        return false; // 같은 색 블록과 변 접촉 발견
                     }
                 }
             }
@@ -588,7 +588,7 @@ namespace Blokus
         {
             std::vector<Position> adjacents;
 
-            // �����¿� 4����
+            // 상하좌우 4방향
             std::vector<Position> directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
 
             for (const auto &dir : directions)
@@ -607,7 +607,7 @@ namespace Blokus
         {
             std::vector<Position> diagonals;
 
-            // �밢�� 4����
+            // 대각선 4방향
             std::vector<Position> directions = {{-1, -1}, {-1, 1}, {1, -1}, {1, 1}};
 
             for (const auto &dir : directions)
@@ -627,13 +627,13 @@ namespace Blokus
             switch (player)
             {
             case PlayerColor::Blue:
-                return {0, 0}; // ���� ��
+                return {0, 0}; // 왼쪽 위
             case PlayerColor::Yellow:
-                return {0, BOARD_SIZE - 1}; // ������ ��
+                return {0, BOARD_SIZE - 1}; // ��왼쪽 위
             case PlayerColor::Red:
-                return {BOARD_SIZE - 1, 0}; // ���� �Ʒ�
+                return {BOARD_SIZE - 1, 0}; // 왼쪽 아래
             case PlayerColor::Green:
-                return {BOARD_SIZE - 1, BOARD_SIZE - 1}; // ������ �Ʒ�
+                return {BOARD_SIZE - 1, BOARD_SIZE - 1}; // ��왼쪽 아래
             default:
                 return {0, 0};
             }
@@ -670,15 +670,15 @@ namespace Blokus
         }
 
         // ========================================
-        // GameStateManager ����
+        // GameStateManager 구현
         // ========================================
 
         GameStateManager::GameStateManager()
-            : m_gameState(GameState::Waiting), m_turnState(TurnState::WaitingForMove) // Types.h�� TurnState ���
+            : m_gameState(GameState::Waiting), m_turnState(TurnState::WaitingForMove) // Types.h에 TurnState 정의
               ,
               m_turnNumber(1), m_currentPlayerIndex(0)
         {
-            // �÷��̾� ���� ����
+            // 파-노-빨-초 순
             m_playerOrder = {
                 PlayerColor::Blue, PlayerColor::Yellow,
                 PlayerColor::Red, PlayerColor::Green};
@@ -720,7 +720,7 @@ namespace Blokus
 
             m_currentPlayerIndex = (m_currentPlayerIndex + 1) % m_playerOrder.size();
 
-            // �� ���� ���� �� ��ȣ ����
+            // 턴 번호 증가 및 턴 번호 업데이트
             if (m_currentPlayerIndex == 0)
             {
                 m_turnNumber++;
@@ -729,7 +729,7 @@ namespace Blokus
             PlayerColor newPlayer = m_playerOrder[m_currentPlayerIndex];
             m_gameLogic.setCurrentPlayer(newPlayer);
 
-            // ���� ���� ���� Ȯ��
+            // 게임 종료 조건 확인
             if (m_gameLogic.isGameFinished())
             {
                 endGame();
